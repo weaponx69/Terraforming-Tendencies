@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0dfa12f3e60a8441b5388bf205af9e7, type: 3}
+  m_Name: Worker
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Worker
+  <IsOneTimeUnlock>k__BackingField: 0
+  <BuildTime>k__BackingField: 5
+  <Icon>k__BackingField: {fileID: 21300000, guid: 6e40afd6361ffe44a87846d98dd04e7c, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: c1b2c0704ea98b04fb413b6d97bb07ec, type: 2}
+  <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
+  <unlockRequirements>k__BackingField: []
+  <Health>k__BackingField: 50
+  <Prefab>k__BackingField: {fileID: 6510919576379171628, guid: 883b9682b823cb84cac42e4ad43d41d2, type: 3}
+  <Upgrades>k__BackingField: []
+  <SightConfig>k__BackingField: {fileID: 11400000, guid: a96f6069717cae64c924edfa4799d04d, type: 2}
+  <AttackConfig>k__BackingField: {fileID: 11400000, guid: da6f23f4ec49aee41ab26898cf51cb33, type: 2}
+  <TransportConfig>k__BackingField: {fileID: 11400000, guid: e3ea2795dbe570a48bcae80ab9c52dc1, type: 2}

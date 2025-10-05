@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &2186560404095377415
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1767475288648887423, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_Layer
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2477694138082414906, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_Layer
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -4.3121676
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -54.21164
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4556868348065212012, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5827066523746683823, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_Name
+      value: Barracks Ghost Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 5827066523746683823, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_Layer
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: 4212464277386913961, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+    - {fileID: 9126003935667859044, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+    - {fileID: 6234324901356792241, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0769b0d4430bf10488837724577a9cde, type: 3}

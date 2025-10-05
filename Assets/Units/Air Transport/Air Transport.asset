@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0dfa12f3e60a8441b5388bf205af9e7, type: 3}
+  m_Name: Air Transport
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Air Transport
+  <IsOneTimeUnlock>k__BackingField: 0
+  <BuildTime>k__BackingField: 60
+  <Icon>k__BackingField: {fileID: 21300000, guid: 4d0944a6c62020d4f955f5b7174bb96f, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: df0bafee89701b04784fd5146a3407ab, type: 2}
+  <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
+  <unlockRequirements>k__BackingField: []
+  <Health>k__BackingField: 200
+  <Prefab>k__BackingField: {fileID: 1076983579694789324, guid: 4d0c2e8c3bd76b64097b86828a286bc6, type: 3}
+  <Upgrades>k__BackingField: []
+  <SightConfig>k__BackingField: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
+  <AttackConfig>k__BackingField: {fileID: 0}
+  <TransportConfig>k__BackingField: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}

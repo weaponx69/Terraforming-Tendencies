@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32194d70ac3bc0647b55685549f2c196, type: 3}
+  m_Name: Build Airport
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Airport
+  <Icon>k__BackingField: {fileID: 21300000, guid: b947cd2ebe26be8448a6f7c04aabc5e5, type: 3}
+  <Slot>k__BackingField: 4
+  <RequiresClickToActivate>k__BackingField: 1
+  <IsSingleUnitCommand>k__BackingField: 1
+  <GhostPrefab>k__BackingField: {fileID: 7212627389978637412, guid: 9660ce54f48e277449e83f376c7c20de, type: 3}
+  <Restrictions>k__BackingField:
+  - {fileID: 11400000, guid: 56b38c40a3360594cb05105a71758f47, type: 2}
+  techTree: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
+  <Building>k__BackingField: {fileID: 11400000, guid: 484fa8e123befe4448234d913dccc773, type: 2}

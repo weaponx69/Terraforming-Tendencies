@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99123b4c91ef4f0d8a7c019c45e90d33, type: 3}
+  m_Name: Infantry Weapons 2
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Infantry Weapons 2
+  <IsOneTimeUnlock>k__BackingField: 1
+  <BuildTime>k__BackingField: 5
+  <Icon>k__BackingField: {fileID: 21300000, guid: 4be4d75da3282e64fbab743c34270c88, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: df0bafee89701b04784fd5146a3407ab, type: 2}
+  <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
+  <unlockRequirements>k__BackingField:
+  - {fileID: 11400000, guid: 1a539722dcaa7bf4bbf2af09917a710d, type: 2}
+  <PropertyPath>k__BackingField: AttackConfig/Damage
+  <Amount>k__BackingField: 1

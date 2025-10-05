@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 861b3bcd1f3d999409bb525c8d4d32cb, type: 3}
+  m_Name: Unload All Units
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Unload Units
+  <Icon>k__BackingField: {fileID: 21300000, guid: d10fe192d72e15c4686485dc1abeb418, type: 3}
+  <Slot>k__BackingField: 7
+  <RequiresClickToActivate>k__BackingField: 0
+  <IsSingleUnitCommand>k__BackingField: 0
+  <GhostPrefab>k__BackingField: {fileID: 0}
+  <Restrictions>k__BackingField: []

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8721c85abd0c4cdfb2b659d8a0c1c660, type: 3}
+  m_Name: Human Tech Tree
+  m_EditorClassIdentifier: 
+  allUnlockables:
+  - {fileID: 11400000, guid: f15d9d4a0e8b3d848a49aaba59177157, type: 2}
+  - {fileID: 11400000, guid: 8dd662d3b241c224ab9deac17c33674b, type: 2}
+  - {fileID: 11400000, guid: 3aac74df7495d4b40b3c6df03219294b, type: 2}
+  - {fileID: 11400000, guid: 0997c20444ad8e64990f524ed591c91f, type: 2}
+  - {fileID: 11400000, guid: d23aeaf68f2283446848bb2702e64d64, type: 2}
+  - {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
+  - {fileID: 11400000, guid: 88f39542ca9a1044296b78a2433d8468, type: 2}
+  - {fileID: 11400000, guid: f6b38bef630bb884195c6d3f702eefb9, type: 2}
+  - {fileID: 11400000, guid: 484fa8e123befe4448234d913dccc773, type: 2}
+  - {fileID: 11400000, guid: 1a539722dcaa7bf4bbf2af09917a710d, type: 2}
+  - {fileID: 11400000, guid: b7906a4f1eb2f2e429ac1da9d89dc60c, type: 2}
+  - {fileID: 11400000, guid: b39eb73e31472a34b9d50f8cc7b1be7f, type: 2}
+  - {fileID: 11400000, guid: e3fdd4caf0dc0224c83521c0ace2254a, type: 2}

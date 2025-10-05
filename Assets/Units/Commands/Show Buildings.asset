@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe71856ab070fd748aaf455281f9040e, type: 3}
+  m_Name: Show Buildings
+  m_EditorClassIdentifier:
+  <Name>k__BackingField: Build
+  <Icon>k__BackingField: {fileID: 21300000, guid: a5df28aa58ab6264bb16fe1e21c4e327, type: 3}
+  <Slot>k__BackingField: 6
+  <RequiresClickToActivate>k__BackingField: 0
+  <IsSingleUnitCommand>k__BackingField: 0
+  <GhostPrefab>k__BackingField: {fileID: 0}
+  <Restrictions>k__BackingField: []
+  <Commands>k__BackingField:
+  - {fileID: 11400000, guid: 353de729618c1304283936a115bdae25, type: 2}
+  - {fileID: 11400000, guid: 955ba5813201ba3408e5c8a03b22ae01, type: 2}
+  - {fileID: 11400000, guid: 8c3b4134cdb7056469a051b247388c7d, type: 2}
+  - {fileID: 11400000, guid: 3803826c197867d4ba1bc8b10b39c478, type: 2}
+  - {fileID: 11400000, guid: c04fc63ecbb97d34792716df8c1df982, type: 2}
+  - {fileID: 11400000, guid: 8cfa0c37270c07c4b8169deec753a15c, type: 2}
