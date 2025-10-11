@@ -74,10 +74,19 @@ namespace GameDevTV.RTS.Commands
 
         private bool HasEnoughSupplies(CommandContext context)
         {
-            int biomassCost = Mathf.FloorToInt(Upgrade.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
-                + Upgrade.Cost.Gas * Supplies.GasToBiomassRateStatic);
+            // defensive guards to avoid NullReferenceExceptions after engine/package updates
+            if (context == null) return false;
+            if (Upgrade == null || Upgrade.Cost == null) return false;
 
-            return biomassCost <= Supplies.Biomass[context.Owner];
+            int biomassCost = Supplies.CalculateBiomassCost(Upgrade.Cost);
+
+            // Supplies.Biomass should exist, but be defensive if the key is missing
+            if (!Supplies.Biomass.TryGetValue(context.Owner, out int currentBiomass))
+            {
+                currentBiomass = 0;
+            }
+
+            return biomassCost <= currentBiomass;
         }
     }
 }

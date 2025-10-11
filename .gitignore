@@ -78,3 +78,8 @@ crashlytics-build.properties
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+.plastic/plastic.changes
+.plastic/plastic.changes
+.plastic/plastic.changes
+.plastic/plastic.wktree
+UserSettings/Layouts/default-6000.dwlt
