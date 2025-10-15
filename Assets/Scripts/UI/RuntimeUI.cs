@@ -5,12 +5,20 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using TMPro;
+using GameDevTV.RTS.Player;
 
 namespace GameDevTV.RTS.UI
 {
     public class RuntimeUI : MonoBehaviour
     {
-        [SerializeField] private TMPro.TextMeshProUGUI biomassText;
+        [SerializeField] private TextMeshProUGUI biomassLabelText;
+        [SerializeField] private TextMeshProUGUI biomassValueText;
+
+        // Oxygen UI
+        [SerializeField] private TextMeshProUGUI oxygenLabelText;
+        [SerializeField] private TextMeshProUGUI oxygenValueText;
+
         [SerializeField] private ActionsUI actionsUI;
         [SerializeField] private BuildingSelectedUI buildingSelectedUI;
         [SerializeField] private UnitIconUI unitIconUI;
@@ -40,23 +48,37 @@ namespace GameDevTV.RTS.UI
             singleUnitSelectedUI.Disable();
             unitTransportUI.Disable();
 
-            if (biomassText != null && GameDevTV.RTS.Player.Supplies.Biomass != null)
-            {
-                biomassText.SetText(GameDevTV.RTS.Player.Supplies.Biomass[Owner.Player1].ToString());
-            }
+            if (biomassLabelText != null) biomassLabelText.SetText("Biomass");
+            if (biomassValueText != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int initial))
+                biomassValueText.SetText(initial.ToString());
+
+            if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
+            if (oxygenValueText != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out int oxyInitial))
+                oxygenValueText.SetText(oxyInitial.ToString());
+
+            Supplies.OnOxygenChanged += HandleOxygenChanged;
+
+            Supplies.OnBiomassChanged += HandleBiomassChanged;
         }
 
         private void OnDestroy()
         {
-            Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] -= HandleUnitSelected;
-            Bus<UnitDeselectedEvent>.OnEvent[Owner.Player1] -= HandleUnitDeselected;
-            Bus<UnitDeathEvent>.OnEvent[Owner.Player1] -= HandleUnitDeath;
-            Bus<SupplyEvent>.OnEvent[Owner.Player1] -= HandleSupplyChange;
-            Bus<UnitLoadEvent>.OnEvent[Owner.Player1] -= HandleLoadUnit;
-            Bus<UnitUnloadEvent>.OnEvent[Owner.Player1] -= HandleUnloadUnit;
-            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= HandleBuildingSpawn;
-            Bus<UpgradeResearchedEvent>.OnEvent[Owner.Player1] -= HandleUpgradeResearched;
-            Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] -= HandleBuildingDeath;
+            Supplies.OnOxygenChanged -= HandleOxygenChanged;
+            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+        }
+
+        private void HandleOxygenChanged(Owner owner, int newValue)
+        {
+            if (owner != Owner.Player1) return;
+            if (oxygenValueText == null) return;
+            oxygenValueText.SetText(newValue.ToString());
+        }
+
+        private void HandleBiomassChanged(Owner owner, int newValue)
+        {
+            if (owner != Owner.Player1) return;
+            if (biomassValueText == null) return;
+            biomassValueText.SetText(newValue.ToString());
         }
 
         private void HandleUnitSelected(UnitSelectedEvent evt)
@@ -185,9 +207,9 @@ namespace GameDevTV.RTS.UI
         {
             actionsUI.EnableFor(selectedUnits);
             // Update biomass HUD for Player1
-            if (Owner.Player1 == evt.Owner && biomassText != null)
+            if (Owner.Player1 == evt.Owner && biomassValueText != null)
             {
-                biomassText.SetText(GameDevTV.RTS.Player.Supplies.Biomass[evt.Owner].ToString());
+                biomassValueText.SetText(GameDevTV.RTS.Player.Supplies.Biomass[evt.Owner].ToString());
             }
         }
     }
