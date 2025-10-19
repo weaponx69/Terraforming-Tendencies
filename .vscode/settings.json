@@ -56,5 +56,8 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Terriforming Tendencies.sln"
+    "dotnet.defaultSolution": "Terriforming Tendencies.sln",
+    "github.copilot.enable": {
+        "markdown": true
+    }
 }
