@@ -3,32 +3,73 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 
 public static class PlaneGridInspector
 {
     [MenuItem("Tools/Inspect Selected Mesh Grid")]
     public static void InspectSelectedMeshGrid()
     {
-        var go = Selection.activeGameObject;
-        if (go == null)
+        UnityEngine.Object sel = Selection.activeObject;
+        GameObject sceneGO = Selection.activeGameObject;
+        Mesh mesh = null;
+        string meshName = "<none>";
+
+        // 1) If a scene GameObject is selected, prefer its MeshFilter
+        if (sceneGO != null)
         {
-            Debug.LogWarning("No GameObject selected.");
+            var mf = sceneGO.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null)
+            {
+                mesh = mf.sharedMesh;
+                meshName = mesh.name + " (from scene GameObject)";
+            }
+        }
+
+        // 2) If a Mesh asset is selected in Project view
+        if (mesh == null && sel is Mesh selMesh)
+        {
+            mesh = selMesh;
+            meshName = mesh.name + " (Mesh asset)";
+        }
+
+        // 3) If a prefab GameObject asset is selected, try to load prefab contents and find a MeshFilter
+        if (mesh == null && sel is GameObject selGO)
+        {
+            string assetPath = AssetDatabase.GetAssetPath(selGO);
+            if (!string.IsNullOrEmpty(assetPath))
+            {
+                GameObject contents = null;
+                try
+                {
+                    contents = PrefabUtility.LoadPrefabContents(assetPath);
+                    var mf = contents.GetComponentInChildren<MeshFilter>(true);
+                    if (mf != null && mf.sharedMesh != null)
+                    {
+                        mesh = mf.sharedMesh;
+                        meshName = mesh.name + " (from prefab asset)";
+                    }
+                }
+                finally
+                {
+                    if (contents != null) PrefabUtility.UnloadPrefabContents(contents);
+                }
+            }
+        }
+
+        if (mesh == null)
+        {
+            Debug.LogWarning("Selected GameObject/asset has no MeshFilter/sharedMesh (select a scene object with a MeshFilter, a Mesh asset, or a prefab containing a MeshFilter).");
             return;
         }
 
-        var mf = go.GetComponent<MeshFilter>();
-        if (mf == null || mf.sharedMesh == null)
-        {
-            Debug.LogWarning("Selected GameObject has no MeshFilter/sharedMesh.");
-            return;
-        }
-
-        Mesh mesh = mf.sharedMesh;
         Vector3[] verts = mesh.vertices;
-
-        // Transform vertices to world (in case mesh is not centered)
-        for (int i = 0; i < verts.Length; i++)
-            verts[i] = go.transform.TransformPoint(verts[i]);
+        // Note: if we used a scene GameObject earlier, we already transformed verts to world; do it here only for scene selection
+        if (sceneGO != null && sceneGO.GetComponent<MeshFilter>() != null && sceneGO.GetComponent<MeshFilter>().sharedMesh == mesh)
+        {
+            for (int i = 0; i < verts.Length; i++)
+                verts[i] = sceneGO.transform.TransformPoint(verts[i]);
+        }
 
         // Collect unique X and Z (treat Y as up)
         var xs = verts.Select(v => v.x).Distinct().OrderBy(v => v).ToArray();
@@ -36,7 +77,7 @@ public static class PlaneGridInspector
 
         bool isGrid = xs.Length * zs.Length == verts.Length;
 
-        string msg = $"Mesh '{mesh.name}' vertex count: {verts.Length}\nUnique X: {xs.Length}, Unique Z: {zs.Length}\nGrid candidate: {isGrid}\n";
+        string msg = $"Mesh '{meshName}' vertex count: {verts.Length}\nUnique X: {xs.Length}, Unique Z: {zs.Length}\nGrid candidate: {isGrid}\n";
 
         if (isGrid)
         {
@@ -64,7 +105,6 @@ public static class PlaneGridInspector
         }
         else
         {
-            // check for simple quad
             if (verts.Length == 4)
             {
                 msg += "This is likely a single quad (4 vertices) — not a grid.\n";
@@ -75,7 +115,6 @@ public static class PlaneGridInspector
             }
         }
 
-        // check normals roughly up
         bool normalsExist = mesh.normals != null && mesh.normals.Length == verts.Length;
         if (normalsExist)
         {
