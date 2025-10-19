@@ -7,6 +7,7 @@ using GameDevTV.RTS.Units;
 using UnityEngine;
 using TMPro;
 using GameDevTV.RTS.Player;
+using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI
 {
@@ -24,6 +25,7 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private UnitIconUI unitIconUI;
         [SerializeField] private SingleUnitSelectedUI singleUnitSelectedUI;
         [SerializeField] private UnitTransportUI unitTransportUI;
+        [SerializeField] private Image iconImage;
 
         private HashSet<AbstractCommandable> selectedUnits = new(12);
 
@@ -171,11 +173,40 @@ namespace GameDevTV.RTS.UI
 
         private void DisableAllContainers()
         {
-            actionsUI.Disable();
-            buildingSelectedUI.Disable();
-            unitIconUI.Disable();
-            singleUnitSelectedUI.Disable();
-            unitTransportUI.Disable();
+            TryDisable(actionsUI);
+            TryDisable(buildingSelectedUI);
+            TryDisable(unitIconUI);
+            TryDisable(singleUnitSelectedUI);
+            TryDisable(unitTransportUI);
+        }
+
+        // Safely call Disable on UI container objects that may have partially-destroyed child components.
+        private void TryDisable(object container)
+        {
+            if (container == null) return;
+            try
+            {
+                switch (container)
+                {
+                    case GameDevTV.RTS.UI.Containers.ActionsUI a: a.Disable(); return;
+                    case GameDevTV.RTS.UI.Containers.BuildingSelectedUI b: b.Disable(); return;
+                    case GameDevTV.RTS.UI.Containers.UnitIconUI u: u.Disable(); return;
+                    case GameDevTV.RTS.UI.Containers.SingleUnitSelectedUI s: s.Disable(); return;
+                    case GameDevTV.RTS.UI.Containers.UnitTransportUI t: t.Disable(); return;
+                }
+
+                // Fallback: try to invoke a Disable method via reflection (covers unexpected types)
+                var mi = container.GetType().GetMethod("Disable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                mi?.Invoke(container, null);
+            }
+            catch (UnityEngine.MissingReferenceException)
+            {
+                // ignore: UI child was destroyed during shutdown/unload
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogException(ex);
+            }
         }
 
         private void ResolveSingleUnitSelectedUI()
@@ -210,6 +241,30 @@ namespace GameDevTV.RTS.UI
             if (Owner.Player1 == evt.Owner && biomassValueText != null)
             {
                 biomassValueText.SetText(GameDevTV.RTS.Player.Supplies.Biomass[evt.Owner].ToString());
+            }
+        }
+
+        private void SetIcon(Sprite icon)
+        {
+            // Defensive: Unity objects may be destroyed while UI is tearing down.
+            if (iconImage == null) return;
+            try
+            {
+                if (icon == null)
+                {
+                    iconImage.sprite = null;
+                    iconImage.enabled = false;
+                }
+                else
+                {
+                    iconImage.sprite = icon;
+                    iconImage.enabled = true;
+                }
+            }
+            catch (UnityEngine.MissingReferenceException)
+            {
+                // Reference was destroyed; clear local reference so future calls skip it.
+                iconImage = null;
             }
         }
     }
