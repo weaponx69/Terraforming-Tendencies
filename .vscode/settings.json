@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Terriforming Tendencies.sln"
+    "dotnet.defaultSolution": "Terriforming Tendencies.slnx"
 }
