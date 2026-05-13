@@ -463,19 +463,19 @@ namespace GameDevTV.RTS.Player
         {
             Vector2 moveAmount = Vector2.zero;
 
-            if (Keyboard.current.upArrowKey.isPressed)
+            if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed)
             {
                 moveAmount.y += cameraConfig.KeyboardPanSpeed;
             }
-            if (Keyboard.current.leftArrowKey.isPressed)
+            if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)
             {
                 moveAmount.x -= cameraConfig.KeyboardPanSpeed;
             }
-            if (Keyboard.current.downArrowKey.isPressed)
+            if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed)
             {
                 moveAmount.y -= cameraConfig.KeyboardPanSpeed;
             }
-            if (Keyboard.current.rightArrowKey.isPressed)
+            if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed)
             {
                 moveAmount.x += cameraConfig.KeyboardPanSpeed;
             }
