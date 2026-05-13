@@ -29,8 +29,8 @@ namespace GameDevTV.RTS.Environment
         private void Update()
         {
             // Performance note: In a larger game, we'd use a LayerMask OverlapSphere or spatial partitioning
-            // For MVP, FindObjectsOfType is sufficient for a low number of resources
-            HiddenResource[] hiddenResources = FindObjectsOfType<HiddenResource>();
+            // For MVP, FindObjectsByType is sufficient for a low number of resources
+            HiddenResource[] hiddenResources = FindObjectsByType<HiddenResource>(FindObjectsSortMode.None);
             foreach (var res in hiddenResources)
             {
                 if (!res.IsDiscovered)

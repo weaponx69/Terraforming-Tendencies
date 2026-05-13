@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Environment
             if (mapWidthWorld <= 0 || mapHeightWorld <= 0) return;
 
             // Wrap Units
-            AbstractUnit[] units = FindObjectsOfType<AbstractUnit>();
+            AbstractUnit[] units = FindObjectsByType<AbstractUnit>(FindObjectsSortMode.None);
             foreach (var unit in units)
             {
                 if (unit.Agent != null)
