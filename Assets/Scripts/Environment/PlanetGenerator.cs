@@ -74,8 +74,8 @@ namespace GameDevTV.RTS.Environment
             {
                 for (int x = 0; x <= width; x++, i++)
                 {
-                    // Simple edge blending for seamless wrap
-                    float noise = GetSeamlessNoise(x, y, width, height, Config.NoiseScale);
+                    // Use fractal noise for rough, rocky terrain instead of smooth hills
+                    float noise = GetFractalNoise(x, y, width, height, Config.NoiseScale, 4);
                     float yPos = noise * Config.HeightMultiplier;
 
                     vertices[i] = new Vector3(x * CellSize, yPos, y * CellSize);
@@ -110,7 +110,8 @@ namespace GameDevTV.RTS.Environment
                 if (shader != null)
                 {
                     Material mat = new Material(shader);
-                    mat.color = new Color(0.2f, 0.5f, 0.2f); // Default dark green
+                    mat.color = new Color(0.6f, 0.45f, 0.35f); // Barren dusty rock color
+                    mat.SetFloat("_Smoothness", 0.1f); // Make it look like rough dirt/rock, not shiny plastic
                     renderer.sharedMaterial = mat;
                 }
             }
@@ -196,6 +197,23 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        private float GetFractalNoise(float x, float y, float width, float height, float scale, int octaves)
+        {
+            float total = 0;
+            float frequency = 1;
+            float amplitude = 1;
+            float maxValue = 0;
+            
+            for (int i = 0; i < octaves; i++)
+            {
+                total += GetSeamlessNoise(x * frequency, y * frequency, width * frequency, height * frequency, scale) * amplitude;
+                maxValue += amplitude;
+                amplitude *= 0.5f;
+                frequency *= 2f;
+            }
+            return total / maxValue;
+        }
+
         private float GetSeamlessNoise(float x, float y, float width, float height, float scale)
         {
             float s = x / scale;
@@ -209,8 +227,8 @@ namespace GameDevTV.RTS.Environment
             float n01 = Mathf.PerlinNoise(s, t - dy);
             float n11 = Mathf.PerlinNoise(s - dx, t - dy);
 
-            float blendX = x / width;
-            float blendY = y / height;
+            float blendX = (x % width) / width;
+            float blendY = (y % height) / height;
 
             float valTop = Mathf.Lerp(n00, n10, blendX);
             float valBottom = Mathf.Lerp(n01, n11, blendX);
