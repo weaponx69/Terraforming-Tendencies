@@ -11,6 +11,7 @@ namespace GameDevTV.RTS.Environment
 
         public PlanetConfig Config;
         public float CellSize = 1f;
+        public bool SpawnFloraOnStart = false; // Default to barren planet
 
         private void Awake()
         {
@@ -24,6 +25,34 @@ namespace GameDevTV.RTS.Environment
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
             }
             
+            // Only generate if we haven't already generated it in the editor
+            if (GetComponent<MeshFilter>().sharedMesh == null)
+            {
+                GeneratePlanet();
+            }
+            else
+            {
+                // If it was pre-generated in editor, we still need to bake navmesh and spawn resources at runtime
+                if (TryGetComponent<NavMeshSurface>(out var navMeshSurface)) navMeshSurface.BuildNavMesh();
+                if (TryGetComponent<HiddenResourceSpawner>(out var resourceSpawner)) resourceSpawner.SpawnResources();
+            }
+        }
+
+        [ContextMenu("Clear Planet (Editor)")]
+        public void ClearPlanet()
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                DestroyImmediate(transform.GetChild(i).gameObject);
+            }
+            if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
+            if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
+        }
+
+        [ContextMenu("Generate Planet (Editor)")]
+        public void GeneratePlanetEditor()
+        {
+            ClearPlanet();
             GeneratePlanet();
         }
 
@@ -123,6 +152,7 @@ namespace GameDevTV.RTS.Environment
 
         private void ScatterEnvironment()
         {
+            if (!SpawnFloraOnStart) return;
             if (Config.EnvironmentPrefabs == null || Config.EnvironmentPrefabs.Length == 0) return;
 
             float mapWidth = Config.MapWidth * CellSize;
