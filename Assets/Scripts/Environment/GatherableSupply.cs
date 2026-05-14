@@ -29,7 +29,7 @@ namespace GameDevTV.RTS.Environment
 
         private void Start()
         {
-            Amount = Supply.MaxAmount;
+            Amount = Supply != null ? Supply.MaxAmount : 100;
             Bus<SupplySpawnEvent>.Raise(Owner.Unowned, new SupplySpawnEvent(this));
         }
 
@@ -58,7 +58,8 @@ namespace GameDevTV.RTS.Environment
         public int EndGather()
         {
             IsBusy = false;
-            int amountGathered = Mathf.Min(Supply.AmountPerGather, Amount);
+            int gatherRate = Supply != null ? Supply.AmountPerGather : 10;
+            int amountGathered = Mathf.Min(gatherRate, Amount);
             Amount -= amountGathered;
 
             if (Amount <= 0)
