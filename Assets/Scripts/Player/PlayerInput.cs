@@ -41,6 +41,7 @@ namespace GameDevTV.RTS.Player
         private float zoomStartTime;
         private float rotationStartTime;
         private Vector3 startingFollowOffset;
+        private float targetZoomDistance;
         private float maxRotationAmount;
         private HashSet<AbstractUnit> aliveUnits = new(100);
         private HashSet<AbstractUnit> addedUnits = new(24);
@@ -58,6 +59,7 @@ namespace GameDevTV.RTS.Player
             else
             {
                 startingFollowOffset = cinemachineFollow.FollowOffset;
+                targetZoomDistance = startingFollowOffset.y;
                 maxRotationAmount = Mathf.Abs(cinemachineFollow.FollowOffset.z);
             }
 
@@ -388,42 +390,32 @@ namespace GameDevTV.RTS.Player
         {
             if (cinemachineFollow == null) return;
 
-            if (ShouldSetZoomStartTime())
+            float scroll = Mouse.current.scroll.y.ReadValue();
+            if (Mathf.Abs(scroll) > 0.01f)
             {
-                zoomStartTime = Time.time;
+                // Invert scroll so scrolling up zooms in
+                targetZoomDistance -= scroll * cameraConfig.ZoomSpeed * 0.02f;
+                // Clamp distance to keep from zooming through the floor or too far out
+                targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 3f);
             }
 
-            float zoomTime = Mathf.Clamp01((Time.time - zoomStartTime) * cameraConfig.ZoomSpeed);
-            Vector3 targetFollowOffset;
+            Vector3 targetFollowOffset = new Vector3(
+                cinemachineFollow.FollowOffset.x,
+                targetZoomDistance,
+                cinemachineFollow.FollowOffset.z
+            );
 
-            if (Keyboard.current.endKey.isPressed)
-            {
-                targetFollowOffset = new Vector3(
-                    cinemachineFollow.FollowOffset.x,
-                    cameraConfig.MinZoomDistance,
-                    cinemachineFollow.FollowOffset.z
-                );
-            }
-            else
-            {
-                targetFollowOffset = new Vector3(
-                    cinemachineFollow.FollowOffset.x,
-                    startingFollowOffset.y,
-                    cinemachineFollow.FollowOffset.z
-                );
-            }
-
-            cinemachineFollow.FollowOffset = Vector3.Slerp(
+            cinemachineFollow.FollowOffset = Vector3.Lerp(
                 cinemachineFollow.FollowOffset,
                 targetFollowOffset,
-                zoomTime
+                Time.deltaTime * 10f
             );
         }
 
         private bool ShouldSetZoomStartTime()
         {
-            return Keyboard.current.endKey.wasPressedThisFrame
-                || Keyboard.current.endKey.wasReleasedThisFrame;
+            // Now handled entirely by continuous scrolling
+            return false;
         }
 
         private void HandlePanning()

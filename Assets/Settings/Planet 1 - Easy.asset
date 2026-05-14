@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82d784a53ab118875a8a86409a3bce3d, type: 3}
   m_Name: Planet 1 - Easy
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.PlanetConfig
-  MapWidth: 50
-  MapHeight: 50
+  MapWidth: 200
+  MapHeight: 200
   NoiseScale: 15
   HeightMultiplier: 3
-  ResourceCount: 10
+  ResourceCount: 80
   BaseDecayRate: 2
   ToxicityLevel: 0
-  EnvironmentDensity: 50
+  EnvironmentDensity: 400
   EnvironmentPrefabs:
   - {fileID: 153421202405420986, guid: 35fac6f4b2e42d84086833e25844954a, type: 3}
   - {fileID: 6289819893858953828, guid: 0ea19ebcf842fc747be2158852be64bb, type: 3}
