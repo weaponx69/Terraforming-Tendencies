@@ -102,23 +102,7 @@ namespace GameDevTV.RTS.Environment
                     
                     float yPos = finalNoise * Config.HeightMultiplier;
 
-                    // Add a second layer: Seamless Worley Noise for impact craters
-                    float worleyDist = GetSeamlessWorleyNoise(x, y, width, height, 12f); // 12 cells across the map
-                    float craterRadius = 0.35f; 
-                    if (worleyDist < craterRadius)
-                    {
-                        // Map distance to a 0..1 scale within the crater
-                        float t = worleyDist / craterRadius;
-                        // Beautiful math profile for a crater: -cos(1.5*pi*t) * (1-t)
-                        float craterShape = -Mathf.Cos(t * Mathf.PI * 1.5f) * (1f - t);
-                        
-                        // The user requested craters to only be on the "high points of the land"
-                        // We use SmoothStep to completely erase craters on the flat plains (finalNoise < 0.2) 
-                        // and smoothly fade them in so they only appear in full depth on the mountain ridges (finalNoise > 0.6)
-                        float elevationFade = Mathf.SmoothStep(0.2f, 0.6f, finalNoise);
-                        
-                        yPos += craterShape * 5f * elevationFade; 
-                    }
+                    
                     heights[x, y] = yPos;
 
                     if (yPos < minHeight) minHeight = yPos;
@@ -328,50 +312,6 @@ namespace GameDevTV.RTS.Environment
             }
             return total;
         }
-
-        private float GetSeamlessWorleyNoise(float x, float y, float width, float height, float numCells)
-        {
-            float s = (x / width) * numCells;
-            float t = (y / height) * numCells;
-
-            int cellX = Mathf.FloorToInt(s);
-            int cellY = Mathf.FloorToInt(t);
-
-            float minDist = float.MaxValue;
-
-            for (int j = -1; j <= 1; j++)
-            {
-                for (int i = -1; i <= 1; i++)
-                {
-                    int cx = cellX + i;
-                    int cy = cellY + j;
-
-                    // Seamlessly wrap the cell coordinates
-                    int wrappedCx = (cx % (int)numCells + (int)numCells) % (int)numCells;
-                    int wrappedCy = (cy % (int)numCells + (int)numCells) % (int)numCells;
-
-                    // Deterministic pseudo-random generation based on wrapped cell coordinates
-                    // Only spawn a crater in ~10% of the cells
-                    float spawnChance = Frac(Mathf.Sin(wrappedCx * 73.156f + wrappedCy * 21.91f) * 43758.5453f);
-                    if (spawnChance > 0.10f) continue;
-
-                    float randomX = Frac(Mathf.Sin(wrappedCx * 12.989f + wrappedCy * 78.233f) * 43758.5453f);
-                    float randomY = Frac(Mathf.Sin(wrappedCx * 39.346f + wrappedCy * 11.135f) * 43758.5453f);
-
-                    float px = cx + randomX;
-                    float py = cy + randomY;
-
-                    float dist = Vector2.Distance(new Vector2(s, t), new Vector2(px, py));
-                    if (dist < minDist)
-                    {
-                        minDist = dist;
-                    }
-                }
-            }
-            return minDist;
-        }
-
-        private float Frac(float v) { return v - Mathf.Floor(v); }
 
         private float GetSeamlessNoise(float x, float y, float width, float height, float scale)
         {
