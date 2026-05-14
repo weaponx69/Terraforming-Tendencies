@@ -56,7 +56,7 @@ namespace GameDevTV.RTS.Environment
                 yield return new WaitForSeconds(decayTickRate);
 
                 // Re-fetch in case new ones were built
-                LifeSupportNode[] lifeSupportNodes = FindObjectsByType<LifeSupportNode>(FindObjectsSortMode.None);
+                LifeSupportNode[] lifeSupportNodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
 
                 for (int i = activeBuildings.Count - 1; i >= 0; i--)
                 {

@@ -15,5 +15,10 @@ namespace GameDevTV.RTS.Environment
         public int ResourceCount = 10;
         public float BaseDecayRate = 2f;
         public float ToxicityLevel = 0f;
+
+        [Header("Procedural Scatter")]
+        public int EnvironmentDensity = 50;
+        public GameObject[] EnvironmentPrefabs;
+        public GameObject[] ResourcePrefabs;
     }
 }

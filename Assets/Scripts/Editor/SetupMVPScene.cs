@@ -48,9 +48,14 @@ public class SetupMVPScene
             config.BaseDecayRate = 2f;
             
             AssetDatabase.CreateAsset(config, configPath);
-            AssetDatabase.SaveAssets();
             Debug.Log("[MVP Setup] Created new PlanetConfig at " + configPath);
         }
+
+        // Auto-assign prefabs to config
+        config.EnvironmentPrefabs = FindPrefabsInFolder("Assets/SciFi Pack/Prefabs");
+        config.ResourcePrefabs = FindPrefabsInFolder("Assets/Gatherable Supplies");
+        EditorUtility.SetDirty(config);
+        AssetDatabase.SaveAssets();
 
         // 4. Assign the Config to our scripts
         planetGenerator.Config = config;
@@ -70,6 +75,21 @@ public class SetupMVPScene
         
         Debug.Log("[MVP Setup] Successfully rebuilt the PlanetManager and attached all scripts! You can now hit Play.");
         Selection.activeGameObject = planetManager;
+    }
+
+    private static GameObject[] FindPrefabsInFolder(string folderPath)
+    {
+        if (!AssetDatabase.IsValidFolder(folderPath)) return new GameObject[0];
+
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { folderPath });
+        System.Collections.Generic.List<GameObject> prefabs = new System.Collections.Generic.List<GameObject>();
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab != null) prefabs.Add(prefab);
+        }
+        return prefabs.ToArray();
     }
 }
 #endif

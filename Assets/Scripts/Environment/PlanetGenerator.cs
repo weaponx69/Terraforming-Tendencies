@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.AI.Navigation;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -72,8 +73,75 @@ namespace GameDevTV.RTS.Environment
             GetComponent<MeshFilter>().mesh = mesh;
             GetComponent<MeshCollider>().sharedMesh = mesh;
 
-            // Note: In a full project, you would call GetComponent<NavMeshSurface>().BuildNavMesh() here
-            // if you have the Unity.AI.Navigation package installed.
+            MeshRenderer renderer = GetComponent<MeshRenderer>();
+            if (renderer.sharedMaterial == null)
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                if (shader == null) shader = Shader.Find("Standard");
+                if (shader != null)
+                {
+                    Material mat = new Material(shader);
+                    mat.color = new Color(0.2f, 0.5f, 0.2f); // Default dark green
+                    renderer.sharedMaterial = mat;
+                }
+            }
+
+            if (TryGetComponent<NavMeshSurface>(out var navMeshSurface))
+            {
+                navMeshSurface.BuildNavMesh();
+            }
+
+            ScatterEnvironment();
+
+            if (TryGetComponent<HiddenResourceSpawner>(out var resourceSpawner))
+            {
+                resourceSpawner.SpawnResources();
+            }
+        }
+
+        private void ScatterEnvironment()
+        {
+            if (Config.EnvironmentPrefabs == null || Config.EnvironmentPrefabs.Length == 0) return;
+
+            float mapWidth = Config.MapWidth * CellSize;
+            float mapHeight = Config.MapHeight * CellSize;
+            
+            float minSpacing = 4f; // Minimum distance to prevent clustering
+            System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+            int maxAttempts = Config.EnvironmentDensity * 10;
+            int spawnedCount = 0;
+
+            for (int i = 0; i < maxAttempts && spawnedCount < Config.EnvironmentDensity; i++)
+            {
+                Vector3 randomPos = new Vector3(Random.Range(0, mapWidth), 0, Random.Range(0, mapHeight));
+                
+                if (NavMesh.SamplePosition(randomPos, out NavMeshHit hit, 10f, NavMesh.AllAreas))
+                {
+                    bool tooClose = false;
+                    foreach(Vector3 pos in spawnedPositions)
+                    {
+                        if (Vector3.Distance(pos, hit.position) < minSpacing)
+                        {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+
+                    if (!tooClose)
+                    {
+                        GameObject prefab = Config.EnvironmentPrefabs[Random.Range(0, Config.EnvironmentPrefabs.Length)];
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, hit.position, randomRot, transform);
+                        
+                        float scaleVar = Random.Range(0.8f, 1.2f);
+                        instance.transform.localScale *= scaleVar;
+
+                        spawnedPositions.Add(hit.position);
+                        spawnedCount++;
+                    }
+                }
+            }
         }
 
         private float GetSeamlessNoise(float x, float y, float width, float height, float scale)

@@ -5,21 +5,14 @@ namespace GameDevTV.RTS.Environment
 {
     public class HiddenResourceSpawner : MonoBehaviour
     {
-        [SerializeField] private GameObject[] resourcePrefabs;
-
-        private void Start()
+        public void SpawnResources()
         {
-            if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
-            {
-                int count = PlanetGenerator.Instance.Config.ResourceCount;
-                SpawnResources(count);
-            }
-        }
+            if (PlanetGenerator.Instance == null || PlanetGenerator.Instance.Config == null) return;
+            
+            GameObject[] prefabs = PlanetGenerator.Instance.Config.ResourcePrefabs;
+            if (prefabs == null || prefabs.Length == 0) return;
 
-        private void SpawnResources(int count)
-        {
-            if (resourcePrefabs == null || resourcePrefabs.Length == 0) return;
-
+            int count = PlanetGenerator.Instance.Config.ResourceCount;
             float mapWidth = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
             float mapHeight = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
 
@@ -30,7 +23,7 @@ namespace GameDevTV.RTS.Environment
                 // Try to find a valid spot on the NavMesh
                 if (NavMesh.SamplePosition(randomPos, out NavMeshHit hit, 10f, NavMesh.AllAreas))
                 {
-                    GameObject prefab = resourcePrefabs[Random.Range(0, resourcePrefabs.Length)];
+                    GameObject prefab = prefabs[Random.Range(0, prefabs.Length)];
                     GameObject instance = Instantiate(prefab, hit.position, Quaternion.identity);
                     
                     if (instance.GetComponent<HiddenResource>() == null)

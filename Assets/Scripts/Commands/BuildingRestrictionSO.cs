@@ -25,7 +25,8 @@ namespace GameDevTV.RTS.Commands
                 OverlapStyle.Sphere => Physics.OverlapSphereNonAlloc(position, Radius, hitColliders, LayerMask),
                 OverlapStyle.Box => Physics.OverlapBoxNonAlloc(
                     position, Extents, hitColliders, Quaternion.identity, LayerMask
-                )
+                ),
+                _ => 0
             };
 
             if (MustBeFullyOnNavmesh)

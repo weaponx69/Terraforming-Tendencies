@@ -55,9 +55,11 @@ namespace GameDevTV.RTS.Player
             {
                 Debug.LogError("Cinemachine Camera did not have CinemachineFollow. Zoom functionality will not work!");
             }
-
-            startingFollowOffset = cinemachineFollow.FollowOffset;
-            maxRotationAmount = Mathf.Abs(cinemachineFollow.FollowOffset.z);
+            else
+            {
+                startingFollowOffset = cinemachineFollow.FollowOffset;
+                maxRotationAmount = Mathf.Abs(cinemachineFollow.FollowOffset.z);
+            }
 
             Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] += HandleUnitSelected;
             Bus<UnitDeselectedEvent>.OnEvent[Owner.Player1] += HandleUnitDeselected;
@@ -331,6 +333,8 @@ namespace GameDevTV.RTS.Player
 
         private void HandleRotation()
         {
+            if (cinemachineFollow == null) return;
+
             if (ShouldSetRotationStartTime())
             {
                 rotationStartTime = Time.time;
@@ -382,6 +386,8 @@ namespace GameDevTV.RTS.Player
 
         private void HandleZooming()
         {
+            if (cinemachineFollow == null) return;
+
             if (ShouldSetZoomStartTime())
             {
                 zoomStartTime = Time.time;
@@ -425,7 +431,12 @@ namespace GameDevTV.RTS.Player
             Vector2 moveAmount = GetKeyboardMoveAmount();
             moveAmount += GetMouseMoveAmount();
 
-            cameraTarget.linearVelocity = new Vector3(moveAmount.x, 0, moveAmount.y);
+            Vector3 velocity = new Vector3(moveAmount.x, 0, moveAmount.y);
+            
+            if (cameraTarget != null)
+            {
+                cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.World);
+            }
         }
 
         private Vector2 GetMouseMoveAmount()

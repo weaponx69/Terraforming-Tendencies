@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Environment
             if (mapWidthWorld <= 0 || mapHeightWorld <= 0) return;
 
             // Wrap Units
-            AbstractUnit[] units = FindObjectsByType<AbstractUnit>(FindObjectsSortMode.None);
+            AbstractUnit[] units = FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude);
             foreach (var unit in units)
             {
                 if (unit.Agent != null)
@@ -49,8 +49,16 @@ namespace GameDevTV.RTS.Environment
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
-                Transform camParent = mainCam.transform.parent != null ? mainCam.transform.parent : mainCam.transform;
-                Vector3 camPos = camParent.position;
+                Transform camRig = mainCam.transform.parent != null ? mainCam.transform.parent : mainCam.transform;
+                
+                // If there's an RTS Camera Target, wrap that instead so we don't fight Cinemachine
+                GameObject camTargetObj = GameObject.Find("Camera Target");
+                if (camTargetObj != null)
+                {
+                    camRig = camTargetObj.transform;
+                }
+
+                Vector3 camPos = camRig.position;
                 bool camWrapped = false;
 
                 if (camPos.x < 0) { camPos.x += mapWidthWorld; camWrapped = true; }
@@ -61,7 +69,7 @@ namespace GameDevTV.RTS.Environment
 
                 if (camWrapped)
                 {
-                    camParent.position = camPos;
+                    camRig.position = camPos;
                 }
             }
         }
