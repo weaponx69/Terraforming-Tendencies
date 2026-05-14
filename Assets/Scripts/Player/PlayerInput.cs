@@ -453,23 +453,6 @@ namespace GameDevTV.RTS.Player
             if (cameraTarget != null)
             {
                 cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.World);
-                
-                if (GameDevTV.RTS.Environment.PlanetGenerator.Instance != null && GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config != null)
-                {
-                    float mapWidth = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapWidth * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
-                    float mapHeight = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapHeight * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
-                    
-                    // Padding to prevent camera from seeing the edges
-                    // Since the camera is angled down and forward, we need more padding at the top (max Z) and bottom (min Z)
-                    float padX = 25f;
-                    float minZ = 15f; 
-                    float maxZ = 45f; 
-                    
-                    Vector3 pos = cameraTarget.position;
-                    pos.x = Mathf.Clamp(pos.x, padX, mapWidth - padX);
-                    pos.z = Mathf.Clamp(pos.z, minZ, mapHeight - maxZ);
-                    cameraTarget.position = pos;
-                }
             }
         }
 

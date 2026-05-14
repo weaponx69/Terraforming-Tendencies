@@ -69,7 +69,15 @@ namespace GameDevTV.RTS.Environment
 
                 if (camWrapped)
                 {
+                    Vector3 delta = camPos - camRig.position;
                     camRig.position = camPos;
+                    
+                    // If we use Cinemachine, notify it of the warp so it doesn't sweep across the map
+                    var vcam = Object.FindAnyObjectByType<Unity.Cinemachine.CinemachineCamera>();
+                    if (vcam != null)
+                    {
+                        vcam.OnTargetObjectWarped(camRig, delta);
+                    }
                 }
             }
         }

@@ -86,6 +86,28 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
+            // Create 8 visual ghosts for seamless wrapping
+            float mapWidthWorld = width * CellSize;
+            float mapHeightWorld = height * CellSize;
+
+            for (int x = -1; x <= 1; x++)
+            {
+                for (int z = -1; z <= 1; z++)
+                {
+                    if (x == 0 && z == 0) continue; // Skip the real central terrain
+                    
+                    GameObject ghost = new GameObject($"Terrain Ghost ({x},{z})");
+                    ghost.transform.parent = transform;
+                    ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
+                    
+                    MeshFilter mf = ghost.AddComponent<MeshFilter>();
+                    mf.sharedMesh = mesh;
+                    
+                    MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = renderer.sharedMaterial;
+                }
+            }
+
             if (TryGetComponent<NavMeshSurface>(out var navMeshSurface))
             {
                 navMeshSurface.BuildNavMesh();
