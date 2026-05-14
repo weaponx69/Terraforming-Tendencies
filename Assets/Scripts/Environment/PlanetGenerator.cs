@@ -213,10 +213,11 @@ namespace GameDevTV.RTS.Environment
             tex.wrapMode = TextureWrapMode.Clamp;
             tex.filterMode = FilterMode.Bilinear; // Smooth blending
             
-            Color colorDeep = new Color(0.15f, 0.05f, 0.05f); // Deep valleys
-            Color colorLow = new Color(0.4f, 0.2f, 0.1f);     // Lowlands
-            Color colorMid = new Color(0.65f, 0.45f, 0.3f);   // Slopes
-            Color colorPeak = new Color(0.85f, 0.7f, 0.5f);   // Peaks
+            // Mars Palette: Vibrant rust, terracotta, and burnt orange
+            Color colorDeep = new Color(0.3f, 0.05f, 0.02f);  // Deep craters (dark burnt red)
+            Color colorLow = new Color(0.65f, 0.25f, 0.1f);   // Vast plains (iconic rust/terracotta)
+            Color colorMid = new Color(0.85f, 0.4f, 0.15f);   // Slopes (vibrant mars orange)
+            Color colorPeak = new Color(0.95f, 0.55f, 0.3f);  // Peaks (bright dusty orange)
 
             for (int i = 0; i < 256; i++)
             {
@@ -346,9 +347,9 @@ namespace GameDevTV.RTS.Environment
                     int wrappedCy = (cy % (int)numCells + (int)numCells) % (int)numCells;
 
                     // Deterministic pseudo-random generation based on wrapped cell coordinates
-                    // Only spawn a crater in ~35% of the cells so they remain rare
+                    // Only spawn a crater in ~15% of the cells so they are rarer, fitting Mars' wind-swept plains
                     float spawnChance = Frac(Mathf.Sin(wrappedCx * 73.156f + wrappedCy * 21.91f) * 43758.5453f);
-                    if (spawnChance > 0.35f) continue;
+                    if (spawnChance > 0.15f) continue;
 
                     float randomX = Frac(Mathf.Sin(wrappedCx * 12.989f + wrappedCy * 78.233f) * 43758.5453f);
                     float randomY = Frac(Mathf.Sin(wrappedCx * 39.346f + wrappedCy * 11.135f) * 43758.5453f);
