@@ -84,10 +84,11 @@ namespace GameDevTV.RTS.Environment
                 for (int x = 0; x <= width; x++)
                 {
                     // Base Layer: Low-frequency Standard FBM (approx 40% influence)
-                    float baseNoise = GetStandardFBM(x, y, width, height, Config.NoiseScale * 1.5f, 4, 0.45f);
+                    float baseNoise = GetStandardFBM(x, y, width, height, Config.NoiseScale * 1.2f, 3, 0.4f);
                     
                     // Detail Layer: Ridged noise on top of the base layer
-                    float ridgedNoise = GetRidgedMultifractal(x, y, width, height, Config.NoiseScale, 4, 0.45f);
+                    // Lower persistence to 0.35 to strongly suppress high-frequency spikes/needles
+                    float ridgedNoise = GetRidgedMultifractal(x, y, width, height, Config.NoiseScale, 4, 0.35f);
                     ridgedNoise = Mathf.Clamp01(ridgedNoise / 1.5f);
                     
                     // Combine Base and Detail
