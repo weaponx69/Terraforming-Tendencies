@@ -110,10 +110,14 @@ namespace GameDevTV.RTS.Environment
                         // Map distance to a 0..1 scale within the crater
                         float t = worleyDist / craterRadius;
                         // Beautiful math profile for a crater: -cos(1.5*pi*t) * (1-t)
-                        // This creates a deep bowl at t=0, crosses 0, peaks for a rim, and smoothly returns to 0 at t=1.
                         float craterShape = -Mathf.Cos(t * Mathf.PI * 1.5f) * (1f - t);
                         
-                        yPos += craterShape * 5f; // Depth and rim height of the crater
+                        // The user requested craters to only be on the "high points of the land"
+                        // We use SmoothStep to completely erase craters on the flat plains (finalNoise < 0.2) 
+                        // and smoothly fade them in so they only appear in full depth on the mountain ridges (finalNoise > 0.6)
+                        float elevationFade = Mathf.SmoothStep(0.2f, 0.6f, finalNoise);
+                        
+                        yPos += craterShape * 5f * elevationFade; 
                     }
                     heights[x, y] = yPos;
 
@@ -347,9 +351,9 @@ namespace GameDevTV.RTS.Environment
                     int wrappedCy = (cy % (int)numCells + (int)numCells) % (int)numCells;
 
                     // Deterministic pseudo-random generation based on wrapped cell coordinates
-                    // Only spawn a crater in ~15% of the cells so they are rarer, fitting Mars' wind-swept plains
+                    // Only spawn a crater in ~10% of the cells
                     float spawnChance = Frac(Mathf.Sin(wrappedCx * 73.156f + wrappedCy * 21.91f) * 43758.5453f);
-                    if (spawnChance > 0.15f) continue;
+                    if (spawnChance > 0.10f) continue;
 
                     float randomX = Frac(Mathf.Sin(wrappedCx * 12.989f + wrappedCy * 78.233f) * 43758.5453f);
                     float randomY = Frac(Mathf.Sin(wrappedCx * 39.346f + wrappedCy * 11.135f) * 43758.5453f);
