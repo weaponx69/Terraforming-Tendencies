@@ -83,9 +83,37 @@ namespace GameDevTV.RTS.Environment
             {
                 for (int x = 0; x <= width; x++)
                 {
-                    float noise = GetFractalNoise(x, y, width, height, Config.NoiseScale, 4);
-                    noise = Mathf.Pow(noise, 1.8f);
-                    float yPos = noise * Config.HeightMultiplier;
+                    // Base Layer: Low-frequency Standard FBM (approx 40% influence)
+                    float baseNoise = GetStandardFBM(x, y, width, height, Config.NoiseScale * 1.5f, 4, 0.45f);
+                    
+                    // Detail Layer: Ridged noise on top of the base layer
+                    float ridgedNoise = GetRidgedMultifractal(x, y, width, height, Config.NoiseScale, 4, 0.45f);
+                    ridgedNoise = Mathf.Clamp01(ridgedNoise / 1.5f);
+                    
+                    // Combine Base and Detail
+                    float combinedNoise = (baseNoise * 0.4f) + (ridgedNoise * 0.6f);
+                    
+                    // Power Curve applied to final combined height to aggressively flatten lowlands
+                    float finalNoise = Mathf.Pow(combinedNoise, 3.0f);
+                    
+                    // Clamping before scaling to world units
+                    finalNoise = Mathf.Clamp01(finalNoise);
+                    
+                    float yPos = finalNoise * Config.HeightMultiplier;
+
+                    // Add a second layer: Seamless Worley Noise for impact craters
+                    float worleyDist = GetSeamlessWorleyNoise(x, y, width, height, 12f); // 12 cells across the map
+                    float craterRadius = 0.35f; 
+                    if (worleyDist < craterRadius)
+                    {
+                        // Map distance to a 0..1 scale within the crater
+                        float t = worleyDist / craterRadius;
+                        // Beautiful math profile for a crater: -cos(1.5*pi*t) * (1-t)
+                        // This creates a deep bowl at t=0, crosses 0, peaks for a rim, and smoothly returns to 0 at t=1.
+                        float craterShape = -Mathf.Cos(t * Mathf.PI * 1.5f) * (1f - t);
+                        
+                        yPos += craterShape * 5f; // Depth and rim height of the crater
+                    }
                     heights[x, y] = yPos;
 
                     if (yPos < minHeight) minHeight = yPos;
@@ -182,18 +210,23 @@ namespace GameDevTV.RTS.Environment
         {
             Texture2D tex = new Texture2D(1, 256);
             tex.wrapMode = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Point; // Forces stark, sharp pixels with no blurring
+            tex.filterMode = FilterMode.Bilinear; // Smooth blending
             
+            Color colorDeep = new Color(0.15f, 0.05f, 0.05f); // Deep valleys
+            Color colorLow = new Color(0.4f, 0.2f, 0.1f);     // Lowlands
+            Color colorMid = new Color(0.65f, 0.45f, 0.3f);   // Slopes
+            Color colorPeak = new Color(0.85f, 0.7f, 0.5f);   // Peaks
+
             for (int i = 0; i < 256; i++)
             {
                 float t = i / 255f;
                 Color c;
                 
-                // Create stark, hard-edged bands of color instead of a smooth fade
-                if (t < 0.2f) c = new Color(0.15f, 0.05f, 0.05f); // Deep valleys
-                else if (t < 0.45f) c = new Color(0.4f, 0.2f, 0.1f); // Lowlands
-                else if (t < 0.75f) c = new Color(0.65f, 0.45f, 0.3f); // Slopes
-                else c = new Color(0.85f, 0.7f, 0.5f); // Peaks
+                // Smoothly blend between the high-contrast colors
+                if (t < 0.2f) c = Color.Lerp(colorDeep, colorLow, t / 0.2f);
+                else if (t < 0.45f) c = Color.Lerp(colorLow, colorMid, (t - 0.2f) / 0.25f);
+                else if (t < 0.75f) c = Color.Lerp(colorMid, colorPeak, (t - 0.45f) / 0.3f);
+                else c = colorPeak; // Top peaks stay solid light
                 
                 tex.SetPixel(0, i, c);
             }
@@ -247,7 +280,7 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-        private float GetFractalNoise(float x, float y, float width, float height, float scale, int octaves)
+        private float GetStandardFBM(float x, float y, float width, float height, float scale, int octaves, float persistence)
         {
             float total = 0;
             float frequency = 1;
@@ -258,11 +291,81 @@ namespace GameDevTV.RTS.Environment
             {
                 total += GetSeamlessNoise(x * frequency, y * frequency, width * frequency, height * frequency, scale) * amplitude;
                 maxValue += amplitude;
-                amplitude *= 0.5f;
+                amplitude *= persistence;
                 frequency *= 2f;
             }
             return total / maxValue;
         }
+
+        private float GetRidgedMultifractal(float x, float y, float width, float height, float scale, int octaves, float persistence)
+        {
+            float total = 0;
+            float frequency = 1;
+            float amplitude = 1;
+            float weight = 1.0f;
+            
+            for (int i = 0; i < octaves; i++)
+            {
+                // Get seamless noise, convert from 0..1 to -1..1
+                float n = GetSeamlessNoise(x * frequency, y * frequency, width * frequency, height * frequency, scale);
+                n = n * 2.0f - 1.0f;
+                // Create sharp ridge by inverting absolute value
+                n = 1.0f - Mathf.Abs(n);
+                n *= n; // square to sharpen
+                
+                n *= weight; // Octave Weighting (Gain): detail only appears on ridges
+                weight = Mathf.Clamp01(n); // Value of the previous octave limits the amplitude of the next
+                
+                total += n * amplitude;
+                amplitude *= persistence; // Prevent peaks from becoming needles
+                frequency *= 2f;
+            }
+            return total;
+        }
+
+        private float GetSeamlessWorleyNoise(float x, float y, float width, float height, float numCells)
+        {
+            float s = (x / width) * numCells;
+            float t = (y / height) * numCells;
+
+            int cellX = Mathf.FloorToInt(s);
+            int cellY = Mathf.FloorToInt(t);
+
+            float minDist = float.MaxValue;
+
+            for (int j = -1; j <= 1; j++)
+            {
+                for (int i = -1; i <= 1; i++)
+                {
+                    int cx = cellX + i;
+                    int cy = cellY + j;
+
+                    // Seamlessly wrap the cell coordinates
+                    int wrappedCx = (cx % (int)numCells + (int)numCells) % (int)numCells;
+                    int wrappedCy = (cy % (int)numCells + (int)numCells) % (int)numCells;
+
+                    // Deterministic pseudo-random generation based on wrapped cell coordinates
+                    // Only spawn a crater in ~35% of the cells so they remain rare
+                    float spawnChance = Frac(Mathf.Sin(wrappedCx * 73.156f + wrappedCy * 21.91f) * 43758.5453f);
+                    if (spawnChance > 0.35f) continue;
+
+                    float randomX = Frac(Mathf.Sin(wrappedCx * 12.989f + wrappedCy * 78.233f) * 43758.5453f);
+                    float randomY = Frac(Mathf.Sin(wrappedCx * 39.346f + wrappedCy * 11.135f) * 43758.5453f);
+
+                    float px = cx + randomX;
+                    float py = cy + randomY;
+
+                    float dist = Vector2.Distance(new Vector2(s, t), new Vector2(px, py));
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                    }
+                }
+            }
+            return minDist;
+        }
+
+        private float Frac(float v) { return v - Mathf.Floor(v); }
 
         private float GetSeamlessNoise(float x, float y, float width, float height, float scale)
         {
