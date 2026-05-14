@@ -70,6 +70,28 @@ namespace GameDevTV.RTS.Player
             Bus<UnitDeathEvent>.OnEvent[Owner.Player1] += HandleUnitDeath;
         }
 
+        private void Start()
+        {
+            CenterCameraOnMap();
+        }
+
+        private void CenterCameraOnMap()
+        {
+            if (cameraTarget == null) return;
+            
+            // Wait for PlanetGenerator to be ready
+            if (GameDevTV.RTS.Environment.PlanetGenerator.Instance != null && GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config != null)
+            {
+                float mapWidth = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapWidth * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
+                float mapHeight = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapHeight * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
+                
+                Vector3 pos = cameraTarget.position;
+                pos.x = mapWidth / 2f;
+                pos.z = mapHeight / 2f;
+                cameraTarget.position = pos;
+            }
+        }
+
         private void OnDestroy()
         {
             Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] -= HandleUnitSelected;
@@ -393,8 +415,11 @@ namespace GameDevTV.RTS.Player
             float scroll = Mouse.current.scroll.y.ReadValue();
             if (Mathf.Abs(scroll) > 0.01f)
             {
-                // Invert scroll so scrolling up zooms in
-                targetZoomDistance -= scroll * cameraConfig.ZoomSpeed * 0.02f;
+                // Normalize scroll to get consistent zoom speeds across all operating systems and mice
+                float scrollSign = Mathf.Sign(scroll);
+                
+                // Invert scroll so scrolling up zooms in. A fixed step of 2.0 units per notch times ZoomSpeed
+                targetZoomDistance -= scrollSign * cameraConfig.ZoomSpeed * 2.0f;
                 // Clamp distance to keep from zooming through the floor or too far out
                 targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 3f);
             }
@@ -428,6 +453,23 @@ namespace GameDevTV.RTS.Player
             if (cameraTarget != null)
             {
                 cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.World);
+                
+                if (GameDevTV.RTS.Environment.PlanetGenerator.Instance != null && GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config != null)
+                {
+                    float mapWidth = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapWidth * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
+                    float mapHeight = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapHeight * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
+                    
+                    // Padding to prevent camera from seeing the edges
+                    // Since the camera is angled down and forward, we need more padding at the top (max Z) and bottom (min Z)
+                    float padX = 25f;
+                    float minZ = 15f; 
+                    float maxZ = 45f; 
+                    
+                    Vector3 pos = cameraTarget.position;
+                    pos.x = Mathf.Clamp(pos.x, padX, mapWidth - padX);
+                    pos.z = Mathf.Clamp(pos.z, minZ, mapHeight - maxZ);
+                    cameraTarget.position = pos;
+                }
             }
         }
 
