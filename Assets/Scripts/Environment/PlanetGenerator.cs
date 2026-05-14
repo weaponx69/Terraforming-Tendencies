@@ -62,35 +62,65 @@ namespace GameDevTV.RTS.Environment
 
             Mesh mesh = new Mesh();
             mesh.name = "Procedural Planet Surface";
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
 
             int width = Config.MapWidth;
             int height = Config.MapHeight;
 
-            Vector3[] vertices = new Vector3[(width + 1) * (height + 1)];
-            Vector2[] uvs = new Vector2[vertices.Length];
-            int[] triangles = new int[width * height * 6];
+            int triangleCount = width * height * 2;
+            int vertexCount = triangleCount * 3;
 
-            for (int i = 0, y = 0; y <= height; y++)
+            Vector3[] vertices = new Vector3[vertexCount];
+            Vector2[] uvs = new Vector2[vertexCount];
+            int[] triangles = new int[vertexCount];
+
+            // Precalculate heights
+            float[,] heights = new float[width + 1, height + 1];
+            float minHeight = float.MaxValue;
+            float maxHeight = float.MinValue;
+
+            for (int y = 0; y <= height; y++)
             {
-                for (int x = 0; x <= width; x++, i++)
+                for (int x = 0; x <= width; x++)
                 {
-                    // Use fractal noise for rough, rocky terrain instead of smooth hills
                     float noise = GetFractalNoise(x, y, width, height, Config.NoiseScale, 4);
+                    noise = Mathf.Pow(noise, 1.8f);
                     float yPos = noise * Config.HeightMultiplier;
+                    heights[x, y] = yPos;
 
-                    vertices[i] = new Vector3(x * CellSize, yPos, y * CellSize);
-                    uvs[i] = new Vector2((float)x / width, (float)y / height);
+                    if (yPos < minHeight) minHeight = yPos;
+                    if (yPos > maxHeight) maxHeight = yPos;
                 }
             }
 
-            for (int ti = 0, vi = 0, y = 0; y < height; y++, vi++)
+            int vIndex = 0;
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < width; x++, ti += 6, vi++)
+                for (int x = 0; x < width; x++)
                 {
-                    triangles[ti] = vi;
-                    triangles[ti + 3] = triangles[ti + 2] = vi + 1;
-                    triangles[ti + 4] = triangles[ti + 1] = vi + width + 1;
-                    triangles[ti + 5] = vi + width + 2;
+                    Vector3 p00 = new Vector3(x * CellSize, heights[x, y], y * CellSize);
+                    Vector3 p10 = new Vector3((x + 1) * CellSize, heights[x + 1, y], y * CellSize);
+                    Vector3 p01 = new Vector3(x * CellSize, heights[x, y + 1], (y + 1) * CellSize);
+                    Vector3 p11 = new Vector3((x + 1) * CellSize, heights[x + 1, y + 1], (y + 1) * CellSize);
+
+                    // Triangle 1
+                    vertices[vIndex] = p00;
+                    vertices[vIndex + 1] = p01;
+                    vertices[vIndex + 2] = p11;
+
+                    // Triangle 2
+                    vertices[vIndex + 3] = p00;
+                    vertices[vIndex + 4] = p11;
+                    vertices[vIndex + 5] = p10;
+
+                    for (int i = 0; i < 6; i++)
+                    {
+                        triangles[vIndex + i] = vIndex + i;
+                        // Map UV y to normalized height for our gradient
+                        float normHeight = Mathf.InverseLerp(minHeight, maxHeight, vertices[vIndex + i].y);
+                        uvs[vIndex + i] = new Vector2(0, normHeight);
+                    }
+                    vIndex += 6;
                 }
             }
 
@@ -103,17 +133,14 @@ namespace GameDevTV.RTS.Environment
             GetComponent<MeshCollider>().sharedMesh = mesh;
 
             MeshRenderer renderer = GetComponent<MeshRenderer>();
-            if (renderer.sharedMaterial == null)
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+            if (shader != null)
             {
-                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-                if (shader == null) shader = Shader.Find("Standard");
-                if (shader != null)
-                {
-                    Material mat = new Material(shader);
-                    mat.color = new Color(0.6f, 0.45f, 0.35f); // Barren dusty rock color
-                    mat.SetFloat("_Smoothness", 0.1f); // Make it look like rough dirt/rock, not shiny plastic
-                    renderer.sharedMaterial = mat;
-                }
+                Material mat = new Material(shader);
+                mat.mainTexture = GenerateHeightGradient();
+                mat.SetFloat("_Smoothness", 0.0f); // Completely matte for stark low-poly look
+                renderer.sharedMaterial = mat;
             }
 
             // Create 8 visual ghosts for seamless wrapping
@@ -124,7 +151,7 @@ namespace GameDevTV.RTS.Environment
             {
                 for (int z = -1; z <= 1; z++)
                 {
-                    if (x == 0 && z == 0) continue; // Skip the real central terrain
+                    if (x == 0 && z == 0) continue; 
                     
                     GameObject ghost = new GameObject($"Terrain Ghost ({x},{z})");
                     ghost.transform.parent = transform;
@@ -149,6 +176,29 @@ namespace GameDevTV.RTS.Environment
             {
                 resourceSpawner.SpawnResources();
             }
+        }
+
+        private Texture2D GenerateHeightGradient()
+        {
+            Texture2D tex = new Texture2D(1, 256);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Point; // Forces stark, sharp pixels with no blurring
+            
+            for (int i = 0; i < 256; i++)
+            {
+                float t = i / 255f;
+                Color c;
+                
+                // Create stark, hard-edged bands of color instead of a smooth fade
+                if (t < 0.2f) c = new Color(0.15f, 0.05f, 0.05f); // Deep valleys
+                else if (t < 0.45f) c = new Color(0.4f, 0.2f, 0.1f); // Lowlands
+                else if (t < 0.75f) c = new Color(0.65f, 0.45f, 0.3f); // Slopes
+                else c = new Color(0.85f, 0.7f, 0.5f); // Peaks
+                
+                tex.SetPixel(0, i, c);
+            }
+            tex.Apply();
+            return tex;
         }
 
         private void ScatterEnvironment()
@@ -227,8 +277,8 @@ namespace GameDevTV.RTS.Environment
             float n01 = Mathf.PerlinNoise(s, t - dy);
             float n11 = Mathf.PerlinNoise(s - dx, t - dy);
 
-            float blendX = (x % width) / width;
-            float blendY = (y % height) / height;
+            float blendX = x / width;
+            float blendY = y / height;
 
             float valTop = Mathf.Lerp(n00, n10, blendX);
             float valBottom = Mathf.Lerp(n01, n11, blendX);

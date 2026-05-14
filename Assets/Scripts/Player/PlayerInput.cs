@@ -421,7 +421,7 @@ namespace GameDevTV.RTS.Player
                 // Invert scroll so scrolling up zooms in. A fixed step of 2.0 units per notch times ZoomSpeed
                 targetZoomDistance -= scrollSign * cameraConfig.ZoomSpeed * 2.0f;
                 // Clamp distance to keep from zooming through the floor or too far out
-                targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 3f);
+                targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 10f);
             }
 
             Vector3 targetFollowOffset = new Vector3(

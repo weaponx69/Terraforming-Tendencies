@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.PlanetConfig
   MapWidth: 200
   MapHeight: 200
-  NoiseScale: 15
-  HeightMultiplier: 3
+  NoiseScale: 12
+  HeightMultiplier: 12
   ResourceCount: 80
   BaseDecayRate: 2
   ToxicityLevel: 0
