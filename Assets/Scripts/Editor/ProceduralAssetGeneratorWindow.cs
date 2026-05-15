@@ -75,7 +75,7 @@ namespace GameDevTV.RTS.Environment.Editor
             }
         }
 
-        private void GenerateAsset()
+        public GameObject GenerateAsset()
         {
             string meshFolder = "Assets/ProceduralAssets/Meshes";
             string prefabFolder = "Assets/ProceduralAssets/Prefabs";
@@ -99,7 +99,7 @@ namespace GameDevTV.RTS.Environment.Editor
                 generatedMesh = ProceduralMeshUtils.GenerateCrystal(crystalSides, crystalHeight, crystalRadius);
             }
 
-            if (generatedMesh == null) return;
+            if (generatedMesh == null) return null;
 
             string fileName = $"{assetName}_{type}_{seed}";
             string meshPath = $"{meshFolder}/{fileName}.asset";
@@ -155,6 +155,78 @@ namespace GameDevTV.RTS.Environment.Editor
             // Ping the prefab in the project window
             GameObject savedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             EditorGUIUtility.PingObject(savedPrefab);
+            return savedPrefab;
+        }
+
+        public static void BatchGenerateRandomAssets()
+        {
+            ProceduralAssetGeneratorWindow generator = ScriptableObject.CreateInstance<ProceduralAssetGeneratorWindow>();
+
+            System.Collections.Generic.List<GameObject> newPrefabs = new System.Collections.Generic.List<GameObject>();
+
+            for (int i = 0; i < 5; i++)
+            {
+                generator.type = AssetType.Rock;
+                generator.assetName = "RandomRock";
+                generator.seed = Random.Range(0, 100000);
+                generator.rockSubdivisions = Random.Range(2, 5);
+                generator.rockRadius = Random.Range(0.5f, 3f);
+                generator.rockNoiseScale = Random.Range(1f, 4f);
+                generator.rockNoiseStrength = Random.Range(0.1f, 1f);
+                generator.flattenBottom = true;
+                newPrefabs.Add(generator.GenerateAsset());
+            }
+
+            for (int i = 0; i < 5; i++)
+            {
+                generator.type = AssetType.Crystal;
+                generator.assetName = "RandomCrystal";
+                generator.seed = Random.Range(0, 100000);
+                generator.crystalSides = Random.Range(4, 9);
+                generator.crystalHeight = Random.Range(1f, 5f);
+                generator.crystalRadius = Random.Range(0.2f, 1.5f);
+                newPrefabs.Add(generator.GenerateAsset());
+            }
+            
+            PlanetConfig config = AssetDatabase.LoadAssetAtPath<PlanetConfig>("Assets/Settings/Planet 1 - Easy.asset");
+            if (config != null)
+            {
+                System.Collections.Generic.List<GameObject> currentPrefabs = new System.Collections.Generic.List<GameObject>();
+                if (config.SurfaceFeaturePrefabs != null) currentPrefabs.AddRange(config.SurfaceFeaturePrefabs);
+                currentPrefabs.AddRange(newPrefabs);
+                config.SurfaceFeaturePrefabs = currentPrefabs.ToArray();
+                EditorUtility.SetDirty(config);
+                AssetDatabase.SaveAssets();
+                Debug.Log("Added 10 random features to Planet 1 - Easy SurfaceFeaturePrefabs array.");
+            }
+            else
+            {
+                Debug.LogWarning("PlanetConfig at 'Assets/Settings/Planet 1 - Easy.asset' not found! Make sure to assign prefabs manually.");
+            }
+            
+            Debug.Log("Batch generation of 10 random assets complete!");
+        }
+
+        public static void AssignDefaultResources()
+        {
+            PlanetConfig config = AssetDatabase.LoadAssetAtPath<PlanetConfig>("Assets/Settings/Planet 1 - Easy.asset");
+            if (config != null)
+            {
+                GameObject gas = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Gas.prefab");
+                GameObject mineral = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Minerals.prefab");
+
+                if (gas != null && mineral != null)
+                {
+                    config.ResourcePrefabs = new GameObject[] { gas, mineral };
+                    EditorUtility.SetDirty(config);
+                    AssetDatabase.SaveAssets();
+                    Debug.Log("Successfully assigned Gas and Minerals to Planet 1 - Easy Resource Prefabs!");
+                }
+                else
+                {
+                    Debug.LogWarning("Could not find Gas or Minerals prefab in Assets/Gatherable Supplies/");
+                }
+            }
         }
     }
 }
