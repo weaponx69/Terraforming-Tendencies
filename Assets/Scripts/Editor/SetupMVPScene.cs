@@ -22,7 +22,6 @@ public class SetupMVPScene
         PlanetGenerator planetGenerator = planetManager.GetComponent<PlanetGenerator>() ?? planetManager.AddComponent<PlanetGenerator>();
         MapWrapper mapWrapper = planetManager.GetComponent<MapWrapper>() ?? planetManager.AddComponent<MapWrapper>();
         GlobalDecayManager decayManager = planetManager.GetComponent<GlobalDecayManager>() ?? planetManager.AddComponent<GlobalDecayManager>();
-        HiddenResourceSpawner resourceSpawner = planetManager.GetComponent<HiddenResourceSpawner>() ?? planetManager.AddComponent<HiddenResourceSpawner>();
         
         // Add NavMeshSurface for the AI
         NavMeshSurface navMeshSurface = planetManager.GetComponent<NavMeshSurface>() ?? planetManager.AddComponent<NavMeshSurface>();
@@ -52,7 +51,7 @@ public class SetupMVPScene
         }
 
         // Auto-assign prefabs to config
-        config.EnvironmentPrefabs = FindPrefabsInFolder("Assets/SciFi Pack/Prefabs");
+        config.SurfaceRockPrefabs = FindPrefabsInFolder("Assets/ProceduralAssets/Prefabs");
         config.ResourcePrefabs = FindPrefabsInFolder("Assets/Gatherable Supplies");
         EditorUtility.SetDirty(config);
         AssetDatabase.SaveAssets();

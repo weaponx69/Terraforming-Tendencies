@@ -32,9 +32,8 @@ namespace GameDevTV.RTS.Environment
             }
             else
             {
-                // If it was pre-generated in editor, we still need to bake navmesh and spawn resources at runtime
+                // If it was pre-generated in editor, we still need to bake navmesh
                 if (TryGetComponent<NavMeshSurface>(out var navMeshSurface)) navMeshSurface.BuildNavMesh();
-                if (TryGetComponent<HiddenResourceSpawner>(out var resourceSpawner)) resourceSpawner.SpawnResources();
             }
         }
 
@@ -181,13 +180,7 @@ namespace GameDevTV.RTS.Environment
                 navMeshSurface.BuildNavMesh();
             }
 
-            ScatterSurfaceFeatures();
-            ScatterEnvironment();
-
-            if (TryGetComponent<HiddenResourceSpawner>(out var resourceSpawner))
-            {
-                resourceSpawner.SpawnResources();
-            }
+            ScatterSurfaceRocks();
         }
 
         private Texture2D GenerateHeightGradient()
@@ -216,92 +209,46 @@ namespace GameDevTV.RTS.Environment
             return tex;
         }
 
-        private void ScatterEnvironment()
+        private void ScatterSurfaceRocks()
         {
-            if (!SpawnFloraOnStart) return;
-            if (Config.EnvironmentPrefabs == null || Config.EnvironmentPrefabs.Length == 0) return;
+            if (Config.SurfaceRockPrefabs == null || Config.SurfaceRockPrefabs.Length == 0) return;
 
-            float mapWidth = Config.MapWidth * CellSize;
-            float mapHeight = Config.MapHeight * CellSize;
+            int width = Config.MapWidth;
+            int height = Config.MapHeight;
             
-            float minSpacing = 4f; // Minimum distance to prevent clustering
-            System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+            // Define an exclusion zone for the starting Command Post so they have initial room
+            float exclusionRadius = 15f; 
+            Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-            int maxAttempts = Config.EnvironmentDensity * 10;
-            int spawnedCount = 0;
-
-            for (int i = 0; i < maxAttempts && spawnedCount < Config.EnvironmentDensity; i++)
+            for (int x = 0; x < width; x++)
             {
-                Vector3 randomPos = new Vector3(Random.Range(0, mapWidth), 0, Random.Range(0, mapHeight));
-                
-                if (NavMesh.SamplePosition(randomPos, out NavMeshHit hit, 10f, NavMesh.AllAreas))
+                for (int z = 0; z < height; z++)
                 {
-                    bool tooClose = false;
-                    foreach(Vector3 pos in spawnedPositions)
+                    // Calculate world position
+                    Vector3 cellPos = new Vector3(x * CellSize, 0, z * CellSize);
+                    
+                    // Exclude the center area for the base
+                    if (Vector3.Distance(cellPos, center) < exclusionRadius) continue;
+
+                    // Add some random scatter so it doesn't look like a perfect grid
+                    float offsetX = Random.Range(-CellSize * 0.3f, CellSize * 0.3f);
+                    float offsetZ = Random.Range(-CellSize * 0.3f, CellSize * 0.3f);
+                    Vector3 spawnPos = cellPos + new Vector3(offsetX, 0, offsetZ);
+
+                    // Pick random rock prefab
+                    GameObject prefab = Config.SurfaceRockPrefabs[Random.Range(0, Config.SurfaceRockPrefabs.Length)];
+                    
+                    // Random rotation and scale
+                    Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                    GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                    
+                    float scaleVar = Random.Range(0.8f, 1.3f);
+                    instance.transform.localScale *= scaleVar;
+
+                    // Turn it into a gatherable terraforming resource!
+                    if (instance.GetComponent<HiddenResource>() == null)
                     {
-                        if (Vector3.Distance(pos, hit.position) < minSpacing)
-                        {
-                            tooClose = true;
-                            break;
-                        }
-                    }
-
-                    if (!tooClose)
-                    {
-                        GameObject prefab = Config.EnvironmentPrefabs[Random.Range(0, Config.EnvironmentPrefabs.Length)];
-                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-                        GameObject instance = Instantiate(prefab, hit.position, randomRot, transform);
-                        
-                        float scaleVar = Random.Range(0.8f, 1.2f);
-                        instance.transform.localScale *= scaleVar;
-
-                        spawnedPositions.Add(hit.position);
-                        spawnedCount++;
-                    }
-                }
-            }
-        }
-
-        private void ScatterSurfaceFeatures()
-        {
-            if (Config.SurfaceFeaturePrefabs == null || Config.SurfaceFeaturePrefabs.Length == 0) return;
-
-            float mapWidth = Config.MapWidth * CellSize;
-            float mapHeight = Config.MapHeight * CellSize;
-            
-            float minSpacing = 5f; // Minimum distance to prevent overlapping big rocks
-            System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
-
-            int maxAttempts = Config.SurfaceFeatureDensity * 10;
-            int spawnedCount = 0;
-
-            for (int i = 0; i < maxAttempts && spawnedCount < Config.SurfaceFeatureDensity; i++)
-            {
-                Vector3 randomPos = new Vector3(Random.Range(0, mapWidth), 0, Random.Range(0, mapHeight));
-                
-                if (NavMesh.SamplePosition(randomPos, out NavMeshHit hit, 10f, NavMesh.AllAreas))
-                {
-                    bool tooClose = false;
-                    foreach(Vector3 pos in spawnedPositions)
-                    {
-                        if (Vector3.Distance(pos, hit.position) < minSpacing)
-                        {
-                            tooClose = true;
-                            break;
-                        }
-                    }
-
-                    if (!tooClose)
-                    {
-                        GameObject prefab = Config.SurfaceFeaturePrefabs[Random.Range(0, Config.SurfaceFeaturePrefabs.Length)];
-                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-                        GameObject instance = Instantiate(prefab, hit.position, randomRot, transform);
-                        
-                        float scaleVar = Random.Range(0.6f, 1.5f);
-                        instance.transform.localScale *= scaleVar;
-
-                        spawnedPositions.Add(hit.position);
-                        spawnedCount++;
+                        instance.AddComponent<HiddenResource>();
                     }
                 }
             }

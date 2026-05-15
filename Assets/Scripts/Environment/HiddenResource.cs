@@ -9,7 +9,8 @@ namespace GameDevTV.RTS.Environment
 
         private void Start()
         {
-            SetVisibleState(false);
+            // Rocks now act as the physical surface terrain, so we no longer make them invisible.
+            // Fog of War will naturally hide them from the player's view if they are out of range.
         }
 
         public void Discover()
@@ -17,22 +18,7 @@ namespace GameDevTV.RTS.Environment
             if (IsDiscovered) return;
             
             IsDiscovered = true;
-            SetVisibleState(true);
-
-            Debug.Log($"Resource Discovered at {transform.position}!");
-        }
-
-        private void SetVisibleState(bool state)
-        {
-            // We disable/enable visual and physics interaction so it remains hidden 
-            // from the player's interaction and the Gather commands until discovered.
-            Renderer[] renderers = GetComponentsInChildren<Renderer>();
-            foreach (var r in renderers) r.enabled = state;
-
-            Collider[] colliders = GetComponentsInChildren<Collider>();
-            foreach (var c in colliders) c.enabled = state;
-            
-            // The object itself remains Active so ProbeLogic can find it via FindObjectsOfType
+            Debug.Log($"Rock surface charted at {transform.position}!");
         }
     }
 }

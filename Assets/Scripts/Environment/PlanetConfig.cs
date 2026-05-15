@@ -23,6 +23,9 @@ namespace GameDevTV.RTS.Environment
         [Header("Surface Features (Barren Planet)")]
         public int SurfaceFeatureDensity = 100;
         public GameObject[] SurfaceFeaturePrefabs;
+        
+        [Header("Surface Rocks (Terraforming Overlay)")]
+        public GameObject[] SurfaceRockPrefabs;
 
         [Header("Resources")]
         public GameObject[] ResourcePrefabs;
