@@ -221,8 +221,10 @@ namespace GameDevTV.RTS.Environment
             Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
             int density = Config.SurfaceFeatureDensity;
-            int maxAttempts = density * 5;
+            int maxAttempts = density * 10;
             int spawnedCount = 0;
+            float minSpacing = 4f;
+            System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
 
             for (int i = 0; i < maxAttempts && spawnedCount < density; i++)
             {
@@ -234,6 +236,19 @@ namespace GameDevTV.RTS.Environment
                 // Exclude the center area for the base
                 if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
 
+                // Spacing check
+                bool tooClose = false;
+                foreach (Vector3 pos in spawnedPositions)
+                {
+                    if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                    {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (tooClose) continue;
+                spawnedPositions.Add(spawnPos);
+
                 // Pick random rock prefab
                 GameObject prefab = Config.SurfaceRockPrefabs[Random.Range(0, Config.SurfaceRockPrefabs.Length)];
                 
@@ -244,12 +259,56 @@ namespace GameDevTV.RTS.Environment
                 float scaleVar = Random.Range(0.8f, 1.3f);
                 instance.transform.localScale *= scaleVar;
 
+                // Tint rock to match ground color
+                Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+                Color groundColor = new Color(0.65f, 0.35f, 0.20f);
+                foreach (var r in renderers)
+                {
+                    foreach (var m in r.materials)
+                    {
+                        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                        else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                    }
+                }
+
                 // Turn it into a gatherable terraforming resource!
                 if (instance.GetComponent<HiddenResource>() == null)
                 {
                     instance.AddComponent<HiddenResource>();
                 }
                 
+                // Clone to 8 ghost tiles
+                float mapWidthWorld = width * CellSize;
+                float mapHeightWorld = height * CellSize;
+                for (int gx = -1; gx <= 1; gx++)
+                {
+                    for (int gz = -1; gz <= 1; gz++)
+                    {
+                        if (gx == 0 && gz == 0) continue; 
+                        
+                        Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
+                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
+                        ghost.transform.localScale = instance.transform.localScale;
+                        
+                        // Copy color
+                        Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
+                        foreach (var r in ghostRenderers)
+                        {
+                            foreach (var m in r.materials)
+                            {
+                                if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                                else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                            }
+                        }
+
+                        // Remove physics and logic from ghost
+                        foreach (var c in ghost.GetComponentsInChildren<Collider>()) Destroy(c);
+                        
+                        GhostRock ghostScript = ghost.AddComponent<GhostRock>();
+                        ghostScript.TargetRock = instance.transform;
+                    }
+                }
+
                 spawnedCount++;
             }
         }

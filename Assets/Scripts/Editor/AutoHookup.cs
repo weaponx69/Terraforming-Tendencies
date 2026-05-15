@@ -14,14 +14,17 @@ public class AutoHookup
     private static void RunOnce()
     {
         PlanetConfig config = AssetDatabase.LoadAssetAtPath<PlanetConfig>("Assets/Settings/Planet 1 - Easy.asset");
-        if (config != null && (config.SurfaceRockPrefabs == null || config.SurfaceRockPrefabs.Length == 0))
+        if (config != null)
         {
+            config.MapWidth = 100;
+            config.MapHeight = 100;
+
             string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/ProceduralAssets/Prefabs", "Assets/SciFi Pack/Prefabs" });
             List<GameObject> prefabs = new List<GameObject>();
             foreach (string guid in guids)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (path.ToLower().Contains("rock") || path.ToLower().Contains("boulder"))
+                string path = AssetDatabase.GUIDToAssetPath(guid).ToLower();
+                if ((path.Contains("rock") || path.Contains("boulder")) && !path.Contains("tentacle"))
                 {
                     GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     if (prefab != null) prefabs.Add(prefab);
