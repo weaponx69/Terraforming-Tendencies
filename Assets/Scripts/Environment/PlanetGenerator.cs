@@ -220,37 +220,37 @@ namespace GameDevTV.RTS.Environment
             float exclusionRadius = 15f; 
             Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-            for (int x = 0; x < width; x++)
+            int density = Config.SurfaceFeatureDensity;
+            int maxAttempts = density * 5;
+            int spawnedCount = 0;
+
+            for (int i = 0; i < maxAttempts && spawnedCount < density; i++)
             {
-                for (int z = 0; z < height; z++)
+                // Calculate random world position
+                float randomX = Random.Range(0f, width * CellSize);
+                float randomZ = Random.Range(0f, height * CellSize);
+                Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                
+                // Exclude the center area for the base
+                if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+
+                // Pick random rock prefab
+                GameObject prefab = Config.SurfaceRockPrefabs[Random.Range(0, Config.SurfaceRockPrefabs.Length)];
+                
+                // Random rotation and scale
+                Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                
+                float scaleVar = Random.Range(0.8f, 1.3f);
+                instance.transform.localScale *= scaleVar;
+
+                // Turn it into a gatherable terraforming resource!
+                if (instance.GetComponent<HiddenResource>() == null)
                 {
-                    // Calculate world position
-                    Vector3 cellPos = new Vector3(x * CellSize, 0, z * CellSize);
-                    
-                    // Exclude the center area for the base
-                    if (Vector3.Distance(cellPos, center) < exclusionRadius) continue;
-
-                    // Add some random scatter so it doesn't look like a perfect grid
-                    float offsetX = Random.Range(-CellSize * 0.3f, CellSize * 0.3f);
-                    float offsetZ = Random.Range(-CellSize * 0.3f, CellSize * 0.3f);
-                    Vector3 spawnPos = cellPos + new Vector3(offsetX, 0, offsetZ);
-
-                    // Pick random rock prefab
-                    GameObject prefab = Config.SurfaceRockPrefabs[Random.Range(0, Config.SurfaceRockPrefabs.Length)];
-                    
-                    // Random rotation and scale
-                    Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-                    GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
-                    
-                    float scaleVar = Random.Range(0.8f, 1.3f);
-                    instance.transform.localScale *= scaleVar;
-
-                    // Turn it into a gatherable terraforming resource!
-                    if (instance.GetComponent<HiddenResource>() == null)
-                    {
-                        instance.AddComponent<HiddenResource>();
-                    }
+                    instance.AddComponent<HiddenResource>();
                 }
+                
+                spawnedCount++;
             }
         }
     }
