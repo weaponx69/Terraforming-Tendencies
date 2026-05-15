@@ -19,6 +19,12 @@ namespace GameDevTV.RTS.Environment
         [Header("Procedural Scatter")]
         public int EnvironmentDensity = 50;
         public GameObject[] EnvironmentPrefabs;
+        
+        [Header("Surface Features (Barren Planet)")]
+        public int SurfaceFeatureDensity = 100;
+        public GameObject[] SurfaceFeaturePrefabs;
+
+        [Header("Resources")]
         public GameObject[] ResourcePrefabs;
     }
 }

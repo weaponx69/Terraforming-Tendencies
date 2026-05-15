@@ -67,84 +67,78 @@ namespace GameDevTV.RTS.Environment
             int width = Config.MapWidth;
             int height = Config.MapHeight;
 
-            int triangleCount = width * height * 2;
-            int vertexCount = triangleCount * 3;
-
+            int vertexCount = (width + 1) * (height + 1);
             Vector3[] vertices = new Vector3[vertexCount];
             Vector2[] uvs = new Vector2[vertexCount];
-            int[] triangles = new int[vertexCount];
+            int[] triangles = new int[width * height * 6];
 
-            // Precalculate heights
-            float[,] heights = new float[width + 1, height + 1];
-            float minHeight = float.MaxValue;
-            float maxHeight = float.MinValue;
+            float minHeight = 0f;
+            float maxHeight = 0.1f; // Avoid divide by zero in UV mapping
 
-            for (int y = 0; y <= height; y++)
+            for (int i = 0, y = 0; y <= height; y++)
             {
-                for (int x = 0; x <= width; x++)
+                for (int x = 0; x <= width; x++, i++)
                 {
-                    // Base Layer: Low-frequency Standard FBM (approx 40% influence)
-                    float baseNoise = GetStandardFBM(x, y, width, height, Config.NoiseScale * 1.2f, 3, 0.4f);
-                    
-                    // Detail Layer: Ridged noise on top of the base layer
-                    // Lower persistence to 0.35 to strongly suppress high-frequency spikes/needles
-                    float ridgedNoise = GetRidgedMultifractal(x, y, width, height, Config.NoiseScale, 4, 0.35f);
-                    ridgedNoise = Mathf.Clamp01(ridgedNoise / 1.5f);
-                    
-                    // Combine Base and Detail
-                    float combinedNoise = (baseNoise * 0.4f) + (ridgedNoise * 0.6f);
-                    
-                    // Power Curve applied to final combined height to aggressively flatten lowlands
-                    float finalNoise = Mathf.Pow(combinedNoise, 3.0f);
-                    
-                    // Clamping before scaling to world units
-                    finalNoise = Mathf.Clamp01(finalNoise);
-                    
-                    float yPos = finalNoise * Config.HeightMultiplier;
+                    // Flat terrain
+                    float yPos = 0f;
 
-                    
-                    heights[x, y] = yPos;
-
-                    if (yPos < minHeight) minHeight = yPos;
-                    if (yPos > maxHeight) maxHeight = yPos;
+                    vertices[i] = new Vector3(x * CellSize, yPos, y * CellSize);
                 }
             }
 
-            int vIndex = 0;
-            for (int y = 0; y < height; y++)
+            for (int ti = 0, vi = 0, y = 0; y < height; y++, vi++)
             {
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < width; x++, ti += 6, vi++)
                 {
-                    Vector3 p00 = new Vector3(x * CellSize, heights[x, y], y * CellSize);
-                    Vector3 p10 = new Vector3((x + 1) * CellSize, heights[x + 1, y], y * CellSize);
-                    Vector3 p01 = new Vector3(x * CellSize, heights[x, y + 1], (y + 1) * CellSize);
-                    Vector3 p11 = new Vector3((x + 1) * CellSize, heights[x + 1, y + 1], (y + 1) * CellSize);
-
-                    // Triangle 1
-                    vertices[vIndex] = p00;
-                    vertices[vIndex + 1] = p01;
-                    vertices[vIndex + 2] = p11;
-
-                    // Triangle 2
-                    vertices[vIndex + 3] = p00;
-                    vertices[vIndex + 4] = p11;
-                    vertices[vIndex + 5] = p10;
-
-                    for (int i = 0; i < 6; i++)
-                    {
-                        triangles[vIndex + i] = vIndex + i;
-                        // Map UV y to normalized height for our gradient
-                        float normHeight = Mathf.InverseLerp(minHeight, maxHeight, vertices[vIndex + i].y);
-                        uvs[vIndex + i] = new Vector2(0, normHeight);
-                    }
-                    vIndex += 6;
+                    triangles[ti] = vi;
+                    triangles[ti + 3] = triangles[ti + 2] = vi + 1;
+                    triangles[ti + 4] = triangles[ti + 1] = vi + width + 1;
+                    triangles[ti + 5] = vi + width + 2;
                 }
+            }
+
+            // Assign UVs strictly based on normalized height for the gradient mapping
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                float normHeight = Mathf.InverseLerp(minHeight, maxHeight, vertices[i].y);
+                uvs[i] = new Vector2(0, normHeight);
             }
 
             mesh.vertices = vertices;
             mesh.triangles = triangles;
             mesh.uv = uvs;
             mesh.RecalculateNormals();
+
+            // Fix lighting seams by averaging the normals on the opposite edges
+            Vector3[] normals = mesh.normals;
+            for (int y = 0; y <= height; y++)
+            {
+                int idxLeft = y * (width + 1);
+                int idxRight = idxLeft + width;
+                Vector3 avgNormalX = (normals[idxLeft] + normals[idxRight]).normalized;
+                normals[idxLeft] = avgNormalX;
+                normals[idxRight] = avgNormalX;
+            }
+            for (int x = 0; x <= width; x++)
+            {
+                int idxBottom = x;
+                int idxTop = height * (width + 1) + x;
+                Vector3 avgNormalZ = (normals[idxBottom] + normals[idxTop]).normalized;
+                normals[idxBottom] = avgNormalZ;
+                normals[idxTop] = avgNormalZ;
+            }
+            // Fix the 4 corners
+            int c00 = 0;
+            int c10 = width;
+            int c01 = height * (width + 1);
+            int c11 = height * (width + 1) + width;
+            Vector3 avgCorner = (normals[c00] + normals[c10] + normals[c01] + normals[c11]).normalized;
+            normals[c00] = avgCorner;
+            normals[c10] = avgCorner;
+            normals[c01] = avgCorner;
+            normals[c11] = avgCorner;
+            
+            mesh.normals = normals;
 
             GetComponent<MeshFilter>().mesh = mesh;
             GetComponent<MeshCollider>().sharedMesh = mesh;
@@ -156,7 +150,7 @@ namespace GameDevTV.RTS.Environment
             {
                 Material mat = new Material(shader);
                 mat.mainTexture = GenerateHeightGradient();
-                mat.SetFloat("_Smoothness", 0.0f); // Completely matte for stark low-poly look
+                mat.SetFloat("_Smoothness", 0.1f); // Smooth but not shiny
                 renderer.sharedMaterial = mat;
             }
 
@@ -187,6 +181,7 @@ namespace GameDevTV.RTS.Environment
                 navMeshSurface.BuildNavMesh();
             }
 
+            ScatterSurfaceFeatures();
             ScatterEnvironment();
 
             if (TryGetComponent<HiddenResourceSpawner>(out var resourceSpawner))
@@ -201,22 +196,19 @@ namespace GameDevTV.RTS.Environment
             tex.wrapMode = TextureWrapMode.Clamp;
             tex.filterMode = FilterMode.Bilinear; // Smooth blending
             
-            // Mars Palette: Vibrant rust, terracotta, and burnt orange
-            Color colorDeep = new Color(0.3f, 0.05f, 0.02f);  // Deep craters (dark burnt red)
-            Color colorLow = new Color(0.65f, 0.25f, 0.1f);   // Vast plains (iconic rust/terracotta)
-            Color colorMid = new Color(0.85f, 0.4f, 0.15f);   // Slopes (vibrant mars orange)
-            Color colorPeak = new Color(0.95f, 0.55f, 0.3f);  // Peaks (bright dusty orange)
+            // Muted Mars Palette: Subtle contrast limited to a few specific tones
+            Color colorLow = new Color(0.55f, 0.25f, 0.15f);   // Deep plains
+            Color colorMid = new Color(0.65f, 0.35f, 0.20f);   // Slopes
+            Color colorHigh = new Color(0.75f, 0.45f, 0.25f);  // Peaks
 
             for (int i = 0; i < 256; i++)
             {
                 float t = i / 255f;
                 Color c;
                 
-                // Smoothly blend between the high-contrast colors
-                if (t < 0.2f) c = Color.Lerp(colorDeep, colorLow, t / 0.2f);
-                else if (t < 0.45f) c = Color.Lerp(colorLow, colorMid, (t - 0.2f) / 0.25f);
-                else if (t < 0.75f) c = Color.Lerp(colorMid, colorPeak, (t - 0.45f) / 0.3f);
-                else c = colorPeak; // Top peaks stay solid light
+                // Smoothly blend across the three subtle tones
+                if (t < 0.5f) c = Color.Lerp(colorLow, colorMid, t * 2f);
+                else c = Color.Lerp(colorMid, colorHigh, (t - 0.5f) * 2f);
                 
                 tex.SetPixel(0, i, c);
             }
@@ -270,68 +262,49 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-        private float GetStandardFBM(float x, float y, float width, float height, float scale, int octaves, float persistence)
+        private void ScatterSurfaceFeatures()
         {
-            float total = 0;
-            float frequency = 1;
-            float amplitude = 1;
-            float maxValue = 0;
+            if (Config.SurfaceFeaturePrefabs == null || Config.SurfaceFeaturePrefabs.Length == 0) return;
+
+            float mapWidth = Config.MapWidth * CellSize;
+            float mapHeight = Config.MapHeight * CellSize;
             
-            for (int i = 0; i < octaves; i++)
+            float minSpacing = 5f; // Minimum distance to prevent overlapping big rocks
+            System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+            int maxAttempts = Config.SurfaceFeatureDensity * 10;
+            int spawnedCount = 0;
+
+            for (int i = 0; i < maxAttempts && spawnedCount < Config.SurfaceFeatureDensity; i++)
             {
-                total += GetSeamlessNoise(x * frequency, y * frequency, width * frequency, height * frequency, scale) * amplitude;
-                maxValue += amplitude;
-                amplitude *= persistence;
-                frequency *= 2f;
-            }
-            return total / maxValue;
-        }
-
-        private float GetRidgedMultifractal(float x, float y, float width, float height, float scale, int octaves, float persistence)
-        {
-            float total = 0;
-            float frequency = 1;
-            float amplitude = 1;
-            float weight = 1.0f;
-            
-            for (int i = 0; i < octaves; i++)
-            {
-                // Get seamless noise, convert from 0..1 to -1..1
-                float n = GetSeamlessNoise(x * frequency, y * frequency, width * frequency, height * frequency, scale);
-                n = n * 2.0f - 1.0f;
-                // Create sharp ridge by inverting absolute value
-                n = 1.0f - Mathf.Abs(n);
-                n *= n; // square to sharpen
+                Vector3 randomPos = new Vector3(Random.Range(0, mapWidth), 0, Random.Range(0, mapHeight));
                 
-                n *= weight; // Octave Weighting (Gain): detail only appears on ridges
-                weight = Mathf.Clamp01(n); // Value of the previous octave limits the amplitude of the next
-                
-                total += n * amplitude;
-                amplitude *= persistence; // Prevent peaks from becoming needles
-                frequency *= 2f;
+                if (NavMesh.SamplePosition(randomPos, out NavMeshHit hit, 10f, NavMesh.AllAreas))
+                {
+                    bool tooClose = false;
+                    foreach(Vector3 pos in spawnedPositions)
+                    {
+                        if (Vector3.Distance(pos, hit.position) < minSpacing)
+                        {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+
+                    if (!tooClose)
+                    {
+                        GameObject prefab = Config.SurfaceFeaturePrefabs[Random.Range(0, Config.SurfaceFeaturePrefabs.Length)];
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, hit.position, randomRot, transform);
+                        
+                        float scaleVar = Random.Range(0.6f, 1.5f);
+                        instance.transform.localScale *= scaleVar;
+
+                        spawnedPositions.Add(hit.position);
+                        spawnedCount++;
+                    }
+                }
             }
-            return total;
-        }
-
-        private float GetSeamlessNoise(float x, float y, float width, float height, float scale)
-        {
-            float s = x / scale;
-            float t = y / scale;
-            
-            float dx = width / scale;
-            float dy = height / scale;
-
-            float n00 = Mathf.PerlinNoise(s, t);
-            float n10 = Mathf.PerlinNoise(s - dx, t);
-            float n01 = Mathf.PerlinNoise(s, t - dy);
-            float n11 = Mathf.PerlinNoise(s - dx, t - dy);
-
-            float blendX = x / width;
-            float blendY = y / height;
-
-            float valTop = Mathf.Lerp(n00, n10, blendX);
-            float valBottom = Mathf.Lerp(n01, n11, blendX);
-            return Mathf.Lerp(valTop, valBottom, blendY);
         }
     }
 }
