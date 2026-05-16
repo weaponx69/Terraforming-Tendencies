@@ -492,7 +492,6 @@ GameObject:
   - component: {fileID: 1466278591}
   - component: {fileID: 1466278590}
   - component: {fileID: 1466278589}
-  - component: {fileID: 1466278588}
   - component: {fileID: 1466278587}
   m_Layer: 0
   m_Name: PlanetManager
@@ -533,19 +532,6 @@ MonoBehaviour:
   m_MinRegionArea: 2
   m_NavMeshData: {fileID: 0}
   m_BuildHeightMesh: 0
---- !u!114 &1466278588
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1466278586}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 634b7c4d04009e84780b8b9066bb2745, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.HiddenResourceSpawner
-  resourcePrefabs: []
 --- !u!114 &1466278589
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -584,6 +570,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.PlanetGenerator
   Config: {fileID: 11400000, guid: 36307279472a2858bad4630d3ec89252, type: 2}
   CellSize: 1
+  SpawnFloraOnStart: 0
 --- !u!64 &1466278592
 MeshCollider:
   m_ObjectHideFlags: 0

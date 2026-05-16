@@ -16,8 +16,11 @@ public class AutoHookup
         PlanetConfig config = AssetDatabase.LoadAssetAtPath<PlanetConfig>("Assets/Settings/Planet 1 - Easy.asset");
         if (config != null)
         {
-            config.MapWidth = 100;
-            config.MapHeight = 100;
+            // Only auto-populate if the list is currently empty to avoid overwriting manual tweaks
+            if (config.SurfaceRockPrefabs != null && config.SurfaceRockPrefabs.Length > 0)
+            {
+                return;
+            }
 
             string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/ProceduralAssets/Prefabs", "Assets/SciFi Pack/Prefabs" });
             List<GameObject> prefabs = new List<GameObject>();
