@@ -68,12 +68,15 @@ public class TerrainCubemapPlanet : EditorWindow
             {
                 clone.transform.position = localPos;
             }
-        }
+            }
 
-        EditorUtility.DisplayDialog("Cubemap Planet Generated",
-            $"Created {faceDirections.Length} terrain copies under '{planetParent.name}'.\n" +
-            "Adjust and refine positioning as needed to reduce seams.",
-            "OK");
-        Selection.activeGameObject = planetParent;
-    }
-}
+            // Defer dialog to avoid "GUI Window tried to begin rendering while something else had not finished rendering"
+            EditorApplication.delayCall += () => {
+            EditorUtility.DisplayDialog("Cubemap Planet Generated",
+                $"Created {faceDirections.Length} terrain copies under '{planetParent.name}'.\n" +
+                "Adjust and refine positioning as needed to reduce seams.",
+                "OK");
+            };
+            Selection.activeGameObject = planetParent;
+            }
+            }

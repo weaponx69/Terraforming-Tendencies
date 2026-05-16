@@ -89,10 +89,16 @@ namespace GameDevTV.RTS.Units
                 // ── 2. Travel to the resource ──────────────────────────────────
                 State = DroneState.MovingToResource;
                 agent.stoppingDistance = stoppingDistance;
-                agent.SetDestination(currentTarget.transform.position);
+                
+                Vector3 destination = currentTarget.transform.position;
+                if (currentTarget.TryGetComponent(out Collider col))
+                {
+                    destination = col.ClosestPoint(transform.position);
+                }
+                agent.SetDestination(destination);
 
                 while (!HasArrived() && currentTarget != null)
-                {
+{
                     // Resource may be destroyed mid-travel; abort and re-search
                     if (currentTarget == null || currentTarget.Amount <= 0)
                     {

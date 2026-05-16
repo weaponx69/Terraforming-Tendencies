@@ -121,8 +121,12 @@ public class TerrainToSphericalMesh : EditorWindow
         mc.sharedMesh = mesh;
         
         Selection.activeGameObject = go;
-        EditorUtility.DisplayDialog("Conversion Complete",
-            $"Created '{goName}' with {verts.Length} vertices.\n(Heights: min={minHeight:F3}, max={maxHeight:F3})",
-            "OK");
-    }
-}
+        
+        // Defer dialog to avoid "GUI Window tried to begin rendering while something else had not finished rendering"
+        EditorApplication.delayCall += () => {
+            EditorUtility.DisplayDialog("Conversion Complete",
+                $"Created '{goName}' with {verts.Length} vertices.\n(Heights: min={minHeight:F3}, max={maxHeight:F3})",
+                "OK");
+        };
+        }
+        }

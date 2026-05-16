@@ -116,7 +116,7 @@ MonoBehaviour:
           m_Value0: 15621038980980559462
           m_Value1: 4975210152698007111
         Name: GatherSuppliesEvent
-        m_Value: {fileID: 0}
+        m_Value: {fileID: 11400000, guid: daf47300a3335ff118d5e779af14feeb, type: 2}
     - rid: 1136246808885854631
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -148,7 +148,7 @@ MonoBehaviour:
           m_Value0: 8995661604976579560
           m_Value1: 4151336400940075504
         Name: BuildingEventChannel
-        m_Value: {fileID: 0}
+        m_Value: {fileID: 11400000, guid: ccb9c2921ca07e5ae8881b8024332713, type: 2}
     - rid: 1136246808885854635
       type: {class: 'BlackboardVariable`1[[GameDevTV.RTS.Units.AttackConfigSO, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1087,7 +1087,7 @@ MonoBehaviour:
           m_Value0: 1031419179391295931
           m_Value1: 10424037502033676271
         Name: BuildingEventChannel
-        m_Value: {fileID: 0}
+        m_Value: {fileID: 11400000, guid: ccb9c2921ca07e5ae8881b8024332713, type: 2}
     - rid: 376035822170014441
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -2581,7 +2581,7 @@ MonoBehaviour:
           m_Value0: 15621038980980559462
           m_Value1: 4975210152698007111
         Name: GatherSuppliesEvent
-        m_Value: {fileID: 0}
+        m_Value: {fileID: 11400000, guid: daf47300a3335ff118d5e779af14feeb, type: 2}
     - rid: 1136246808967905503
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -2613,7 +2613,7 @@ MonoBehaviour:
           m_Value0: 8995661604976579560
           m_Value1: 4151336400940075504
         Name: BuildingEventChannel
-        m_Value: {fileID: 0}
+        m_Value: {fileID: 11400000, guid: ccb9c2921ca07e5ae8881b8024332713, type: 2}
     - rid: 1136246808967905507
       type: {class: 'BlackboardVariable`1[[GameDevTV.RTS.Units.AttackConfigSO, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:

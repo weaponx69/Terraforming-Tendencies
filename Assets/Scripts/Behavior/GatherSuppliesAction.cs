@@ -33,14 +33,23 @@ namespace GameDevTV.RTS.Behavior
             {
                 animator.SetBool(AnimationConstants.IS_GATHERING, true);
             }
-            GatherableSupplies.Value.BeginGather();
+            
+            bool canGather = GatherableSupplies.Value.BeginGather();
+            if (!canGather)
+            {
+                return Status.Failure;
+            }
+            
             SupplySO.Value = GatherableSupplies.Value.Supply;
             return Status.Running;
         }
 
         protected override Status OnUpdate()
         {
-            if (GatherableSupplies.Value.Supply.BaseGatherTime + enterTime <= Time.time)
+            if (GatherableSupplies.Value == null) return Status.Failure;
+
+            float gatherTime = GatherableSupplies.Value.Supply != null ? GatherableSupplies.Value.Supply.BaseGatherTime : 1.5f;
+            if (gatherTime + enterTime <= Time.time)
             {
                 return Status.Success;
             }
@@ -59,7 +68,8 @@ namespace GameDevTV.RTS.Behavior
 
             if (CurrentStatus == Status.Success)
             {
-                Amount.Value = GatherableSupplies.Value.EndGather();
+                int gathered = GatherableSupplies.Value.EndGather();
+                Amount.Value = gathered;
                 if (EventChannel != null && EventChannel.Value != null)
                 {
                     EventChannel.Value.SendEventMessage(Unit.Value, Amount.Value, SupplySO.Value);
@@ -70,5 +80,5 @@ namespace GameDevTV.RTS.Behavior
                 GatherableSupplies.Value.AbortGather();
             }
         }
-    }
+}
 }

@@ -17,7 +17,7 @@ namespace GameDevTV.RTS.Behavior
     {
         [SerializeReference] public BlackboardVariable<GameObject> Agent;
         [SerializeReference] public BlackboardVariable<GatherableSupply> Supply;
-        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(50f);
+        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(100f);
 
         private NavMeshAgent agent;
         private Animator animator;
@@ -48,16 +48,18 @@ namespace GameDevTV.RTS.Behavior
                 animator.SetFloat(AnimationConstants.SPEED, agent.velocity.magnitude);
             }
 
-            if (agent.remainingDistance >= agent.stoppingDistance)
+            if (agent.pathPending || agent.remainingDistance > agent.stoppingDistance + 0.1f)
             {
                 return Status.Running;
             }
+
+            if (Supply.Value == null) return Status.Failure;
 
             if (!Supply.Value.IsBusy && Supply.Value.Amount > 0)
             {
                 return Status.Success;
             }
-            Collider[] colliders = FindNearbyNotBusyColliders();
+Collider[] colliders = FindNearbyNotBusyColliders();
 
             if (colliders.Length > 0)
             {

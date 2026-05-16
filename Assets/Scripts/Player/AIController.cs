@@ -49,13 +49,13 @@ namespace GameDevTV.RTS.Units
 
         [Header("Economy Limits")]
         [Tooltip("Maximum concurrent Workers the AI will maintain.")]
-        [SerializeField] private int maxWorkers = 3;
+        [SerializeField] private int maxWorkers = 1;
 
         [Tooltip("Maximum concurrent Mining Drones the AI will maintain.")]
-        [SerializeField] private int maxMiningDrones = 4;
+        [SerializeField] private int maxMiningDrones = 6;
 
         [Tooltip("Biomass reserve to keep in hand before spending (safety buffer).")]
-        [SerializeField] private int biomassReserve = 20;
+        [SerializeField] private int biomassReserve = 0;
 
         [Header("Timing")]
         [Tooltip("How often (seconds) the AI evaluates its build/assign decisions.")]
@@ -116,28 +116,6 @@ namespace GameDevTV.RTS.Units
             {
                 workers.Add(worker);
             }
-            else if (miningDroneUnitSO != null && evt.Unit.UnitSO != null
-                     && evt.Unit.UnitSO.Equals(miningDroneUnitSO))
-            {
-                // Add MiningDrone component dynamically (keeps prefab clean)
-                if (!evt.Unit.TryGetComponent(out MiningDrone existingDrone))
-                {
-                    existingDrone = evt.Unit.gameObject.AddComponent<MiningDrone>();
-                }
-
-                // Stop the BehaviorGraph so it doesn't fight the drone's NavMeshAgent control
-                if (evt.Unit.TryGetComponent(out BehaviorGraphAgent graph))
-                {
-                    graph.SetVariableValue("Command", UnitCommands.Stop);
-                }
-
-                miningDrones.Add(existingDrone);
-
-                if (commandPost != null)
-                {
-                    existingDrone.StartMining(commandPost.gameObject);
-                }
-            }
         }
 
         private void HandleUnitDeath(UnitDeathEvent evt)
@@ -146,10 +124,6 @@ namespace GameDevTV.RTS.Units
             {
                 workers.Remove(worker);
                 busyBuilders.Remove(worker);
-            }
-            else if (evt.Unit.TryGetComponent(out MiningDrone drone))
-            {
-                miningDrones.Remove(drone);
             }
         }
 
@@ -191,6 +165,14 @@ namespace GameDevTV.RTS.Units
         // ── Main tick ──────────────────────────────────────────────────────────────
         private void Tick()
         {
+            int activeWorkers = workers.Count(w => w != null);
+            int activeDrones = miningDrones.Count(d => d != null);
+
+            if (Time.frameCount % 100 == 0) // Log occasionally
+            {
+                Debug.Log($"[AI] {aiOwner} Tick: Workers={activeWorkers}/{maxWorkers}, Drones={activeDrones}/{maxMiningDrones}, Airport={(airport != null ? "Ready" : "None")}");
+            }
+            
             // ── Priority 1: Rebuild command post if destroyed ──────────────────
             if (commandPost == null)
             {
@@ -213,18 +195,39 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            // ── Priority 2: Keep workers stocked ──────────────────────────────
-            int activeWorkers = workers.Count(w => w != null);
-            if (activeWorkers < maxWorkers && commandPost.QueueSize < BaseBuilding_MaxQueueSize())
+            // ── Priority 2: Queue Mining Drones (Absolute First Priority) ───────────────────
+            if (miningDroneUnitSO != null && activeDrones < maxMiningDrones)
             {
-                if (workerUnitSO != null && CanAfford(workerUnitSO))
+                BaseBuilding source = null;
+                if (airport != null && airport.QueueSize < BaseBuilding_MaxQueueSize()) source = airport;
+                else if (commandPost != null && commandPost.QueueSize < BaseBuilding_MaxQueueSize()) source = commandPost;
+
+                if (source != null && CanAfford(miningDroneUnitSO))
                 {
-                    commandPost.BuildUnlockable(workerUnitSO);
-                    return;
+                    if (!IsUnitInQueue(source, miningDroneUnitSO))
+                    {
+                        Debug.Log($"[AI] {aiOwner} queuing Drone at {source.name}");
+                        source.BuildUnlockable(miningDroneUnitSO);
+                        return;
+                    }
                 }
             }
 
-            // ── Priority 3: Build Airport (if not yet built and affordable) ────
+            // ── Priority 3: Keep 1 worker for building infrastructure ──────────────────
+            if (activeWorkers < maxWorkers && commandPost != null && commandPost.QueueSize < BaseBuilding_MaxQueueSize())
+            {
+                if (workerUnitSO != null && CanAfford(workerUnitSO))
+                {
+                    if (!IsUnitInQueue(commandPost, workerUnitSO))
+                    {
+                        Debug.Log($"[AI] {aiOwner} queuing Worker for infrastructure");
+                        commandPost.BuildUnlockable(workerUnitSO);
+                        return;
+                    }
+                }
+            }
+
+            // ── Priority 4: Build Airport ──────────────────────────────────────
             if (airport == null && airportSO != null)
             {
                 Worker idleBuilder = GetIdleWorker();
@@ -233,22 +236,9 @@ namespace GameDevTV.RTS.Units
                     Vector3 buildPos = FindBuildLocation(commandPost.transform.position, 20f);
                     if (buildPos != Vector3.zero)
                     {
+                        Debug.Log($"[AI] {aiOwner} building Airport");
                         idleBuilder.Build(airportSO, buildPos);
                         busyBuilders.Add(idleBuilder);
-                        return;
-                    }
-                }
-            }
-
-            // ── Priority 4: Queue Mining Drones from Airport ───────────────────
-            if (airport != null && miningDroneUnitSO != null)
-            {
-                int activeDrones = miningDrones.Count(d => d != null);
-                if (activeDrones < maxMiningDrones && airport.QueueSize < BaseBuilding_MaxQueueSize())
-                {
-                    if (CanAfford(miningDroneUnitSO))
-                    {
-                        airport.BuildUnlockable(miningDroneUnitSO);
                         return;
                     }
                 }
@@ -258,13 +248,48 @@ namespace GameDevTV.RTS.Units
             AssignIdleDronesToMine();
 
             // ── Priority 6: Assign idle workers to gather ──────────────────────
-            AssignIdleWorkersToGather();
+            // Only allow workers to gather if we have no drones yet (bootstrapping)
+            if (activeDrones == 0)
+            {
+                AssignIdleWorkersToGather();
             }
+            else
+            {
+                // If we have drones, workers should stay idle and ready to build
+                StopIdleWorkers();
+            }
+        }
+
+        private bool IsUnitInQueue(BaseBuilding building, UnlockableSO unitSO)
+        {
+            if (building == null) return false;
+            if (building.SOBeingBuilt == unitSO) return true;
+            return building.Queue.Any(u => u == unitSO);
+        }
+
+        private void StopIdleWorkers()
+        {
+            foreach (Worker worker in workers)
+            {
+                if (worker == null || worker.IsBuilding || busyBuilders.Contains(worker)) continue;
+                
+                if (worker.TryGetComponent(out BehaviorGraphAgent graph))
+                {
+                    if (graph.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
+                    {
+                        if (cmdVar.Value != UnitCommands.Stop) 
+                        {
+                            worker.Stop();
+                        }
+                    }
+                }
+            }
+        }
 
             // ── Helpers ────────────────────────────────────────────────────────────────
 
             private void AssignIdleWorkersToGather()
-            {
+{
             if (commandPost == null) return;
 
             foreach (Worker worker in workers)

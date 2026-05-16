@@ -33,9 +33,13 @@ namespace GameDevTV.RTS.Environment
             else
             {
                 // If it was pre-generated in editor, we still need to bake navmesh
-                if (TryGetComponent<NavMeshSurface>(out var navMeshSurface)) navMeshSurface.BuildNavMesh();
+                NavMeshSurface[] navMeshSurfaces = GetComponents<NavMeshSurface>();
+                foreach (var surface in navMeshSurfaces)
+                {
+                    surface.BuildNavMesh();
+                }
             }
-        }
+            }
 
         [ContextMenu("Clear Planet (Editor)")]
         public void ClearPlanet()

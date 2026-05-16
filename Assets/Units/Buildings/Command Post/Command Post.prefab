@@ -51,11 +51,16 @@ MonoBehaviour:
   m_EndAngleFade: 180
   m_UVScale: {x: 1, y: 1}
   m_UVBias: {x: 0, y: 0}
-  m_DecalLayerMask: 2
+  m_RenderingLayerMask:
+    serializedVersion: 0
+    m_Bits: 2
   m_ScaleMode: 0
   m_Offset: {x: 0, y: 0, z: 4}
   m_Size: {x: 4, y: 4, z: 8}
   m_FadeFactor: 1
+  m_VisibleInScene: 1
+  version: 1
+  m_DecalLayerMask: 2
 --- !u!1 &1589499662120937400
 GameObject:
   m_ObjectHideFlags: 0
@@ -130,8 +135,9 @@ MonoBehaviour:
   <CurrentHealth>k__BackingField: 0
   <MaxHealth>k__BackingField: 0
   <Owner>k__BackingField: 0
+  <IsVisible>k__BackingField: 1
   <AvailableCommands>k__BackingField:
-  - {fileID: 11400000, guid: e420e03df92447c44bf63b1c69bc7d5c, type: 2}
+  - {fileID: 11400000, guid: b0a82efc1c269c841a10f51737b9c172, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
   decalProjector: {fileID: 2001763502288724416}
   VisionTransform: {fileID: 7445284832703820982}
