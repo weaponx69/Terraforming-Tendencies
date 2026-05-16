@@ -182,7 +182,7 @@ namespace GameDevTV.RTS.Units
                 {
                     if (b.Owner == aiOwner && b.UnitSO != null && b.UnitSO.Name == commandPostSO.Name)
                     {
-                        Debug.Log($"[AI] {aiOwner} recovered tracking of existing Command Post: {b.name}");
+                        // Found it. 
                         commandPost = b;
                         break;
                     }
