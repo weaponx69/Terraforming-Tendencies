@@ -16,6 +16,7 @@ namespace GameDevTV.RTS.Behavior
         [SerializeReference] public BlackboardVariable<int> Amount;
         [SerializeReference] public BlackboardVariable<GatherableSupply> GatherableSupplies;
         [SerializeReference] public BlackboardVariable<SupplySO> SupplySO;
+        [SerializeReference] public BlackboardVariable<GatherSuppliesEventChannel> EventChannel;
 
         private Animator animator;
         private float enterTime;
@@ -59,6 +60,10 @@ namespace GameDevTV.RTS.Behavior
             if (CurrentStatus == Status.Success)
             {
                 Amount.Value = GatherableSupplies.Value.EndGather();
+                if (EventChannel != null && EventChannel.Value != null)
+                {
+                    EventChannel.Value.SendEventMessage(Unit.Value, Amount.Value, SupplySO.Value);
+                }
             }
             else
             {

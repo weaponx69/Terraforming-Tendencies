@@ -195,7 +195,7 @@ namespace GameDevTV.RTS.Units
             if (commandPost == null)
             {
                 // Safety check: is there one in the scene we just lost track of?
-                BaseBuilding[] allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                BaseBuilding[] allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
                 foreach (var b in allBuildings)
                 {
                     if (b.Owner == aiOwner && b.UnitSO != null && b.UnitSO.Name == commandPostSO.Name)
@@ -256,11 +256,70 @@ namespace GameDevTV.RTS.Units
 
             // ── Priority 5: Assign idle drones to mining ──────────────────────
             AssignIdleDronesToMine();
-        }
 
-        // ── Helpers ────────────────────────────────────────────────────────────────
+            // ── Priority 6: Assign idle workers to gather ──────────────────────
+            AssignIdleWorkersToGather();
+            }
 
-        private void SpawnCommandPost()
+            // ── Helpers ────────────────────────────────────────────────────────────────
+
+            private void AssignIdleWorkersToGather()
+            {
+            if (commandPost == null) return;
+
+            foreach (Worker worker in workers)
+            {
+                if (worker == null) continue;
+                if (worker.IsBuilding || busyBuilders.Contains(worker)) continue;
+
+                // Check blackboard to see if it's already doing something
+                if (worker.TryGetComponent(out BehaviorGraphAgent graph))
+                {
+                    if (graph.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
+                    {
+                        if (cmdVar.Value != UnitCommands.Stop) continue;
+                    }
+                }
+
+                // If truly idle, find something to do
+                if (worker.HasSupplies)
+                {
+                    worker.ReturnSupplies(commandPost.gameObject);
+                }
+                else
+                {
+                    GatherableSupply closest = FindClosestSupply(worker.transform.position);
+                    if (closest != null)
+                    {
+                        worker.Gather(closest);
+                    }
+                }
+            }
+            }
+
+            private GatherableSupply FindClosestSupply(Vector3 position)
+            {
+            GatherableSupply[] allSupplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
+            GatherableSupply closest = null;
+            float minDist = float.MaxValue;
+            foreach (var supply in allSupplies)
+            {
+                if (supply == null || supply.Amount <= 0) continue;
+
+                // Ignore ghosts (which are visual only and have no colliders)
+                if (supply.TryGetComponent(out GhostRock _)) continue;
+
+                float dist = Vector3.Distance(position, supply.transform.position);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    closest = supply;
+                }
+            }
+            return closest;
+            }
+
+            private void SpawnCommandPost()
         {
             if (commandPostPrefab == null) return;
             if (commandPost != null)       return;   // already exists

@@ -45,7 +45,10 @@ namespace GameDevTV.RTS.Units
             {
                 float size = UnitSO.SightConfig.SightRadius * 2;
                 VisionTransform.localScale = new Vector3(size, size, size);
-                VisionTransform.gameObject.SetActive(Owner == Owner.Player1);
+                
+                // AI units now also reveal the fog
+                bool isAI = Owner >= Owner.AI1 && Owner <= Owner.AI7;
+                VisionTransform.gameObject.SetActive(Owner == Owner.Player1 || isAI);
             }
 
             initialCommands = AvailableCommands;

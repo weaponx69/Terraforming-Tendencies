@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Behavior
     {
         [SerializeReference] public BlackboardVariable<GameObject> Unit;
         [SerializeReference] public BlackboardVariable<GameObject> CommandPost;
-        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(10);
+        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(500);
         [SerializeReference] public BlackboardVariable<BuildingSO> CommandPostBuilding;
 
         protected override Status OnStart()

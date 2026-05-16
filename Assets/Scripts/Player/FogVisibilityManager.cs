@@ -79,7 +79,8 @@ namespace GameDevTV.RTS.Player
 
         private void HandleUnitSpawn(UnitSpawnEvent evt)
         {
-            if (evt.Unit.Owner != Owner.Player1)
+            bool isAI = evt.Unit.Owner >= Owner.AI1 && evt.Unit.Owner <= Owner.AI7;
+            if (evt.Unit.Owner != Owner.Player1 && !isAI)
             {
                 hideables.Add(evt.Unit);
             }
@@ -92,7 +93,8 @@ namespace GameDevTV.RTS.Player
 
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
         {
-            if (evt.Building.Owner != Owner.Player1)
+            bool isAI = evt.Building.Owner >= Owner.AI1 && evt.Building.Owner <= Owner.AI7;
+            if (evt.Building.Owner != Owner.Player1 && !isAI)
             {
                 hideables.Add(evt.Building);
             }

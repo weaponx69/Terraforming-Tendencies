@@ -17,7 +17,7 @@ namespace GameDevTV.RTS.Behavior
     {
         [SerializeReference] public BlackboardVariable<GameObject> Agent;
         [SerializeReference] public BlackboardVariable<GatherableSupply> Supply;
-        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(7f);
+        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(50f);
 
         private NavMeshAgent agent;
         private Animator animator;

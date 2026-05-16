@@ -301,7 +301,11 @@ namespace GameDevTV.RTS.Environment
                             }
                         }
 
-                        foreach (var c in ghost.GetComponentsInChildren<Collider>()) Destroy(c);
+                        foreach (var c in ghost.GetComponentsInChildren<Collider>())
+                        {
+                            if (Application.isPlaying) Destroy(c);
+                            else DestroyImmediate(c);
+                        }
                         
                         GhostRock ghostScript = ghost.AddComponent<GhostRock>();
                         ghostScript.TargetRock = instance.transform;
@@ -370,7 +374,11 @@ namespace GameDevTV.RTS.Environment
                         GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
                         ghost.transform.localScale = instance.transform.localScale;
                         
-                        foreach (var c in ghost.GetComponentsInChildren<Collider>()) Destroy(c);
+                        foreach (var c in ghost.GetComponentsInChildren<Collider>())
+                        {
+                            if (Application.isPlaying) Destroy(c);
+                            else DestroyImmediate(c);
+                        }
                         
                         GhostRock ghostScript = ghost.AddComponent<GhostRock>();
                         ghostScript.TargetRock = instance.transform;

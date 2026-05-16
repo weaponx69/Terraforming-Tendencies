@@ -170,10 +170,43 @@ namespace GameDevTV.RTS.Units
 
                 if (SOBeingBuilt is AbstractUnitSO unitSO)
                 {
-                    GameObject instance = Instantiate(unitSO.Prefab, transform.position, Quaternion.identity);
+                    // Spawn at a random offset between 4 and 7 units to ensure they are outside the building
+                    float angle = Random.Range(0f, Mathf.PI * 2f);
+                    float distance = Random.Range(4f, 7f);
+                    Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, 0, Mathf.Sin(angle) * distance);
+                    Vector3 spawnPosition = transform.position + offset;
+                    
+                    // Snap to NavMesh if possible
+                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 10f, NavMesh.AllAreas);
+                    if (onNavMesh)
+                    {
+                        spawnPosition = hit.position;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh near spawn position {spawnPosition} for unit {unitSO.Name}. Check if NavMesh is baked.");
+                    }
+
+                    GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);
                     if (instance.TryGetComponent(out AbstractCommandable commandable))
                     {
                         commandable.Owner = Owner;
+                    }
+                    
+                    // Force NavMeshAgent to warp if it exists to ensure it's properly on the mesh
+                    if (instance.TryGetComponent(out NavMeshAgent agent))
+                    {
+                        if (onNavMesh)
+                        {
+                            agent.Warp(spawnPosition);
+                        }
+                        else
+                        {
+                            // If not on NavMesh, agent might be disabled or stuck. 
+                            // We allow it to exist but it won't be able to pathfind.
+                            agent.enabled = false; 
+                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location.");
+                        }
                     }
                 }
                 else if (SOBeingBuilt is UpgradeSO upgrade)
