@@ -16,6 +16,7 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private SupplySO biomassSO;
         [SerializeField] private float mineralsToBiomassRate = 1f;
         [SerializeField] private float gasToBiomassRate = 1f;
+        [SerializeField] private int startingBiomass = 100;
 
         // Oxygen (new)
         [SerializeField] private TextMeshProUGUI oxygenText;
@@ -66,9 +67,17 @@ namespace GameDevTV.RTS.Player
             MineralsToBiomassRateStatic = mineralsToBiomassRate;
             GasToBiomassRateStatic = gasToBiomassRate;
 
+            // Grant starting biomass to all owners
+            foreach (Owner owner in Enum.GetValues(typeof(Owner)))
+            {
+                if (Biomass.ContainsKey(owner))
+                    Biomass[owner] = startingBiomass;
+            }
+
             if (biomassText != null && Biomass.TryGetValue(Owner.Player1, out int initial))
             {
                 biomassText.SetText(initial.ToString());
+                OnBiomassChanged?.Invoke(Owner.Player1, initial);
             }
             if (oxygenText != null && Oxygen.TryGetValue(Owner.Player1, out int oxyInitial))
             {
