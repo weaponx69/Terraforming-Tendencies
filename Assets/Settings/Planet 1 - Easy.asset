@@ -20,34 +20,14 @@ MonoBehaviour:
   BaseDecayRate: 2
   ToxicityLevel: 0
   EnvironmentDensity: 400
-  EnvironmentPrefabs:
-  - {fileID: 153421202405420986, guid: 35fac6f4b2e42d84086833e25844954a, type: 3}
-  - {fileID: 6289819893858953828, guid: 0ea19ebcf842fc747be2158852be64bb, type: 3}
-  - {fileID: 5058231866567796450, guid: 63c29e4677f24764888a3a7166180a09, type: 3}
-  - {fileID: 3329769850062385620, guid: d3f56a5754cf6024fa204bf4a56b9665, type: 3}
-  - {fileID: 997180071630633055, guid: c9bc14ddd5a05e04c922524e6f501a92, type: 3}
-  - {fileID: 3337768143206374487, guid: 02342f0e8eca5e94a97c61650f817370, type: 3}
-  - {fileID: 5638374516188885760, guid: 9cd21bf41652fdf49ba05bc10fa4d90d, type: 3}
-  - {fileID: 6033048591305487977, guid: 1e8b274a6b31f5a4390966d304a28bbb, type: 3}
-  - {fileID: 1453692215176294710, guid: b6bd6740753579a4ab39206db1afcf9c, type: 3}
-  - {fileID: 9158538191287633338, guid: ade960610bc4ebd409b351e6b345be2b, type: 3}
-  - {fileID: 1934880673055340066, guid: 8e139b38913f4d64090a0e8c4bf390ea, type: 3}
-  - {fileID: 1002973695524245128, guid: ac0a0403047b90743b011c4208790b8b, type: 3}
-  - {fileID: 906453665035458005, guid: 94b30b09f83696245ad68330a40df072, type: 3}
-  - {fileID: 6502336454719581191, guid: aae526639659c5d469aa184895de4f92, type: 3}
-  - {fileID: 2270029169871243964, guid: 785ad428d49e25e45b4d4cd980b26923, type: 3}
+  EnvironmentPrefabs: []
   SurfaceFeatureDensity: 100
   SurfaceFeaturePrefabs:
-  - {fileID: 4452314058919872279, guid: b02d5ddb4f70906eeacd33c92d47650d, type: 3}
   - {fileID: 8123850839380615009, guid: 4153fabb29649133abb064ffcb6582ea, type: 3}
   - {fileID: 5614667252087818490, guid: d12c260b02305a879a72f64423ea0e2e, type: 3}
-  - {fileID: 5133834898972194269, guid: e91c85777ccec9c0bacdde533354ca87, type: 3}
+  - {fileID: 4452314058919872279, guid: b02d5ddb4f70906eeacd33c92d47650d, type: 3}
   - {fileID: 5471120279853441908, guid: 6937172c7a3d13b799e40293beea4850, type: 3}
-  - {fileID: 7429955287058143745, guid: aff9f81aebb2bb67fa6b7a428b5fe115, type: 3}
-  - {fileID: 1057796126956768270, guid: 60647cdb282c2247f930e6962a72636f, type: 3}
-  - {fileID: 7115114701424084375, guid: 1028d7ba3df54a713bdfef7a18646e42, type: 3}
-  - {fileID: 399893775162546393, guid: 62755862497c98a3c998d1b923e2d64a, type: 3}
-  - {fileID: 3933859081246712236, guid: 95864b27f4bc4575e89e05549b49b3a0, type: 3}
+  - {fileID: 5133834898972194269, guid: e91c85777ccec9c0bacdde533354ca87, type: 3}
   SurfaceRockPrefabs:
   - {fileID: 8123850839380615009, guid: 4153fabb29649133abb064ffcb6582ea, type: 3}
   - {fileID: 5614667252087818490, guid: d12c260b02305a879a72f64423ea0e2e, type: 3}
