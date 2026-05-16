@@ -47,13 +47,24 @@ namespace GameDevTV.RTS.Player
         private HashSet<AbstractUnit> addedUnits = new(24);
         private List<ISelectable> selectedUnits = new(12);
 
+        private bool hasMouseMoved;
+        private Vector2 lastMousePosition;
+
         private static readonly int TINT = Shader.PropertyToID("_Tint");
         private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
 
         private void Awake()
         {
-            if (!cinemachineCamera.TryGetComponent(out cinemachineFollow))
+            if (cameraTarget != null)
             {
+                cameraTarget.isKinematic = true;
+            }
+
+            lastMousePosition = Mouse.current.position.ReadValue();
+            hasMouseMoved = false;
+
+            if (!cinemachineCamera.TryGetComponent(out cinemachineFollow))
+{
                 Debug.LogError("Cinemachine Camera did not have CinemachineFollow. Zoom functionality will not work!");
             }
             else
@@ -89,6 +100,11 @@ namespace GameDevTV.RTS.Player
                 pos.x = mapWidth / 2f;
                 pos.z = mapHeight / 2f;
                 cameraTarget.position = pos;
+            }
+            else
+            {
+                // Retry in the next frame if not ready
+                Invoke(nameof(CenterCameraOnMap), 0.1f);
             }
         }
 
@@ -132,8 +148,18 @@ namespace GameDevTV.RTS.Player
 
         private void Update()
         {
+            if (Application.isFocused)
+            {
+                Vector2 currentMousePos = Mouse.current.position.ReadValue();
+                if (!hasMouseMoved && (currentMousePos - lastMousePosition).sqrMagnitude > 100f)
+                {
+                    hasMouseMoved = true;
+                }
+                lastMousePosition = currentMousePos;
+            }
+
             HandlePanning();
-            HandleZooming();
+HandleZooming();
             HandleRotation();
             HandleGhost();
             HandleRightClick();
@@ -460,11 +486,17 @@ namespace GameDevTV.RTS.Player
         {
             Vector2 moveAmount = Vector2.zero;
 
-            if (!cameraConfig.EnableEdgePan) { return moveAmount; }
+            if (!cameraConfig.EnableEdgePan || !Application.isFocused || !hasMouseMoved) { return moveAmount; }
 
             Vector2 mousePosition = Mouse.current.position.ReadValue();
             int screenWidth = Screen.width;
             int screenHeight = Screen.height;
+
+            // Ignore edge pan if the mouse is outside the window bounds
+            if (mousePosition.x < 0 || mousePosition.x > screenWidth || mousePosition.y < 0 || mousePosition.y > screenHeight)
+            {
+                return moveAmount;
+            }
 
             if (mousePosition.x <= cameraConfig.EdgePanSize)
             {
