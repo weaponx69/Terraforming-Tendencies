@@ -157,8 +157,9 @@ namespace GameDevTV.RTS.Units
         {
             if (evt.Building == null) return;
 
-            if (commandPostSO != null && evt.Building.UnitSO.Equals(commandPostSO))
+            if (commandPostSO != null && evt.Building.UnitSO != null && evt.Building.UnitSO.Name == commandPostSO.Name)
             {
+                Debug.Log($"[AI] {aiOwner} recognized Command Post spawn: {evt.Building.name}");
                 commandPost = evt.Building;
                 // Notify any drones that may have spawned before the post finished
                 foreach (MiningDrone drone in miningDrones)
@@ -166,16 +167,25 @@ namespace GameDevTV.RTS.Units
                     drone.SetCommandPost(commandPost.gameObject);
                 }
             }
-            else if (airportSO != null && evt.Building.UnitSO.Equals(airportSO))
+            else if (airportSO != null && evt.Building.UnitSO != null && evt.Building.UnitSO.Name == airportSO.Name)
             {
+                Debug.Log($"[AI] {aiOwner} recognized Airport spawn: {evt.Building.name}");
                 airport = evt.Building;
             }
         }
 
         private void HandleBuildingDeath(BuildingDeathEvent evt)
         {
-            if (evt.Building == commandPost)  commandPost = null;
-            if (evt.Building == airport)      airport     = null;
+            if (evt.Building == commandPost)
+            {
+                Debug.Log($"[AI] {aiOwner} Command Post destroyed!");
+                commandPost = null;
+            }
+            if (evt.Building == airport)
+            {
+                Debug.Log($"[AI] {aiOwner} Airport destroyed!");
+                airport = null;
+            }
         }
 
         // ── Main tick ──────────────────────────────────────────────────────────────
@@ -184,8 +194,23 @@ namespace GameDevTV.RTS.Units
             // ── Priority 1: Rebuild command post if destroyed ──────────────────
             if (commandPost == null)
             {
-                SpawnCommandPost();
-                return;
+                // Safety check: is there one in the scene we just lost track of?
+                BaseBuilding[] allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var b in allBuildings)
+                {
+                    if (b.Owner == aiOwner && b.UnitSO != null && b.UnitSO.Name == commandPostSO.Name)
+                    {
+                        Debug.Log($"[AI] {aiOwner} recovered tracking of existing Command Post: {b.name}");
+                        commandPost = b;
+                        break;
+                    }
+                }
+
+                if (commandPost == null)
+                {
+                    SpawnCommandPost();
+                    return;
+                }
             }
 
             // ── Priority 2: Keep workers stocked ──────────────────────────────
