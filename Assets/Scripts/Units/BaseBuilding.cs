@@ -48,6 +48,13 @@ namespace GameDevTV.RTS.Units
             {
                 MainRenderer.material = primaryMaterial;
             }
+            
+            // If the building is already completed (e.g. spawned by AI), ensure it has health
+            if (unitBuildingThis == null && CurrentHealth == 0)
+            {
+                CurrentHealth = MaxHealth;
+            }
+
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
