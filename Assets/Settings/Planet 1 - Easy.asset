@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82d784a53ab118875a8a86409a3bce3d, type: 3}
   m_Name: Planet 1 - Easy
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.PlanetConfig
-  MapWidth: 200
-  MapHeight: 200
+  MapWidth: 100
+  MapHeight: 100
   NoiseScale: 75
   HeightMultiplier: 12
   ResourceCount: 80
@@ -57,9 +57,6 @@ MonoBehaviour:
   - {fileID: 5058231866567796450, guid: 63c29e4677f24764888a3a7166180a09, type: 3}
   - {fileID: 1934880673055340066, guid: 8e139b38913f4d64090a0e8c4bf390ea, type: 3}
   - {fileID: 1002973695524245128, guid: ac0a0403047b90743b011c4208790b8b, type: 3}
-  - {fileID: 906453665035458005, guid: 94b30b09f83696245ad68330a40df072, type: 3}
-  - {fileID: 6502336454719581191, guid: aae526639659c5d469aa184895de4f92, type: 3}
-  - {fileID: 2270029169871243964, guid: 785ad428d49e25e45b4d4cd980b26923, type: 3}
   ResourcePrefabs:
   - {fileID: 2281804471223176727, guid: 72cd382a2944ed14486d3a00a5e1cedc, type: 3}
   - {fileID: 2470480825251639189, guid: 5920905e7a5364c47864b79706cb5eca, type: 3}

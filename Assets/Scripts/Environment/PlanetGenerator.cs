@@ -157,9 +157,9 @@ namespace GameDevTV.RTS.Environment
             float mapWidthWorld = width * CellSize;
             float mapHeightWorld = height * CellSize;
 
-            for (int x = -1; x <= 1; x++)
+            for (int x = -2; x <= 2; x++)
             {
-                for (int z = -1; z <= 1; z++)
+                for (int z = -2; z <= 2; z++)
                 {
                     if (x == 0 && z == 0) continue; 
                     
