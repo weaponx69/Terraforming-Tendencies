@@ -24,7 +24,7 @@ public class AutoHookup
             foreach (string guid in guids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid).ToLower();
-                if ((path.Contains("rock") || path.Contains("boulder")) && !path.Contains("tentacle"))
+                if ((path.Contains("rock") || path.Contains("boulder")) && !path.Contains("tentacle") && !path.Contains("grey") && !path.Contains("gray"))
                 {
                     GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     if (prefab != null) prefabs.Add(prefab);

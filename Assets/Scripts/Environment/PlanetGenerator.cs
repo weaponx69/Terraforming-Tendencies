@@ -180,11 +180,12 @@ namespace GameDevTV.RTS.Environment
                 navMeshSurface.BuildNavMesh();
             }
 
-            ScatterSurfaceRocks();
-        }
+            ScatterSurfaceFeatures();
+            ScatterResources();
+            }
 
-        private Texture2D GenerateHeightGradient()
-        {
+            private Texture2D GenerateHeightGradient()
+            {
             Texture2D tex = new Texture2D(1, 256);
             tex.wrapMode = TextureWrapMode.Clamp;
             tex.filterMode = FilterMode.Bilinear; // Smooth blending
@@ -209,14 +210,13 @@ namespace GameDevTV.RTS.Environment
             return tex;
         }
 
-        private void ScatterSurfaceRocks()
+        private void ScatterSurfaceFeatures()
         {
-            if (Config.SurfaceRockPrefabs == null || Config.SurfaceRockPrefabs.Length == 0) return;
+            if (Config.SurfaceFeaturePrefabs == null || Config.SurfaceFeaturePrefabs.Length == 0) return;
 
             int width = Config.MapWidth;
             int height = Config.MapHeight;
             
-            // Define an exclusion zone for the starting Command Post so they have initial room
             float exclusionRadius = 15f; 
             Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
@@ -228,15 +228,12 @@ namespace GameDevTV.RTS.Environment
 
             for (int i = 0; i < maxAttempts && spawnedCount < density; i++)
             {
-                // Calculate random world position
                 float randomX = Random.Range(0f, width * CellSize);
                 float randomZ = Random.Range(0f, height * CellSize);
                 Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
                 
-                // Exclude the center area for the base
                 if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
 
-                // Spacing check
                 bool tooClose = false;
                 foreach (Vector3 pos in spawnedPositions)
                 {
@@ -249,35 +246,36 @@ namespace GameDevTV.RTS.Environment
                 if (tooClose) continue;
                 spawnedPositions.Add(spawnPos);
 
-                // Pick random rock prefab
-                GameObject prefab = Config.SurfaceRockPrefabs[Random.Range(0, Config.SurfaceRockPrefabs.Length)];
+                GameObject prefab = Config.SurfaceFeaturePrefabs[Random.Range(0, Config.SurfaceFeaturePrefabs.Length)];
                 
-                // Random rotation and scale
                 Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
                 GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
                 
                 float scaleVar = Random.Range(0.8f, 1.3f);
                 instance.transform.localScale *= scaleVar;
 
-                // Tint rock to match ground color
-                Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+                // Tint check: minerals/crystals stay as they are
+                bool isMineral = instance.name.ToLower().Contains("crystal") || instance.name.ToLower().Contains("mineral");
                 Color groundColor = new Color(0.65f, 0.35f, 0.20f);
-                foreach (var r in renderers)
+
+                if (!isMineral)
                 {
-                    foreach (var m in r.materials)
+                    Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+                    foreach (var r in renderers)
                     {
-                        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
-                        else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                        foreach (var m in r.materials)
+                        {
+                            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                            else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                        }
                     }
                 }
 
-                // Turn it into a gatherable terraforming resource!
-                if (instance.GetComponent<HiddenResource>() == null)
+                if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
                 {
                     instance.AddComponent<HiddenResource>();
                 }
                 
-                // Clone to 8 ghost tiles
                 float mapWidthWorld = width * CellSize;
                 float mapHeightWorld = height * CellSize;
                 for (int gx = -1; gx <= 1; gx++)
@@ -290,18 +288,19 @@ namespace GameDevTV.RTS.Environment
                         GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
                         ghost.transform.localScale = instance.transform.localScale;
                         
-                        // Copy color
                         Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
                         foreach (var r in ghostRenderers)
                         {
                             foreach (var m in r.materials)
                             {
-                                if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
-                                else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                                if (!isMineral)
+                                {
+                                    if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                                    else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                                }
                             }
                         }
 
-                        // Remove physics and logic from ghost
                         foreach (var c in ghost.GetComponentsInChildren<Collider>()) Destroy(c);
                         
                         GhostRock ghostScript = ghost.AddComponent<GhostRock>();
@@ -310,7 +309,76 @@ namespace GameDevTV.RTS.Environment
                 }
 
                 spawnedCount++;
-            }
-        }
-    }
-}
+                }
+                }
+
+                private void ScatterResources()
+                {
+                if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
+
+                int width = Config.MapWidth;
+                int height = Config.MapHeight;
+                float mapWidthWorld = width * CellSize;
+                float mapHeightWorld = height * CellSize;
+            
+                float exclusionRadius = 15f; 
+                Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+
+                int count = Config.ResourceCount;
+                int maxAttempts = count * 20;
+                int spawnedCount = 0;
+                float minSpacing = 5f;
+                System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
+                {
+                float randomX = Random.Range(0f, mapWidthWorld);
+                float randomZ = Random.Range(0f, mapHeightWorld);
+                Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                
+                if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+
+                bool tooClose = false;
+                foreach (Vector3 pos in spawnedPositions)
+                {
+                    if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                    {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (tooClose) continue;
+                spawnedPositions.Add(spawnPos);
+
+                GameObject prefab = Config.ResourcePrefabs[Random.Range(0, Config.ResourcePrefabs.Length)];
+                Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                
+                if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
+                {
+                    instance.AddComponent<HiddenResource>();
+                }
+
+                // Ghost logic for wrapping
+                for (int gx = -1; gx <= 1; gx++)
+                {
+                    for (int gz = -1; gz <= 1; gz++)
+                    {
+                        if (gx == 0 && gz == 0) continue; 
+                        
+                        Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
+                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
+                        ghost.transform.localScale = instance.transform.localScale;
+                        
+                        foreach (var c in ghost.GetComponentsInChildren<Collider>()) Destroy(c);
+                        
+                        GhostRock ghostScript = ghost.AddComponent<GhostRock>();
+                        ghostScript.TargetRock = instance.transform;
+                    }
+                }
+
+                spawnedCount++;
+                }
+                }
+                }
+                }
