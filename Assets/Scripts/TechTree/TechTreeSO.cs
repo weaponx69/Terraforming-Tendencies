@@ -12,7 +12,7 @@ namespace GameDevTV.RTS.TechTree
     public class TechTreeSO : ScriptableObject
     {
         [SerializeField] private List<UnlockableSO> allUnlockables = new();
-        public IEnumerable<UnlockableSO> AllUnlockables => allUnlockables.ToList();
+        public IEnumerable<UnlockableSO> AllUnlockables => allUnlockables?.Where(u => u != null).ToList() ?? Enumerable.Empty<UnlockableSO>();
 
         private Dictionary<Owner, Dictionary<UnlockableSO, Dependency>> techTrees;
         private Dictionary<Owner, HashSet<UnlockableSO>> unlockedDependencies;
@@ -90,6 +90,7 @@ namespace GameDevTV.RTS.TechTree
 
                 foreach(UnlockableSO unlockableSO in allUnlockables)
                 {
+                    if (unlockableSO == null) continue;
                     techTrees[owner].Add(unlockableSO, new Dependency(unlockableSO));
                 }
             }

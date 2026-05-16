@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.TechTree
         [field: SerializeField] public TechTreeSO TechTree { get; private set; }
         [field: SerializeField] protected List<UnlockableSO> unlockRequirements { get; private set; } = new();
 
-        public IEnumerable<UnlockableSO> UnlockRequirements => unlockRequirements.ToList();
+        public IEnumerable<UnlockableSO> UnlockRequirements => unlockRequirements?.Where(r => r != null).ToList() ?? Enumerable.Empty<UnlockableSO>();
 
         public virtual object Clone()
         {
@@ -29,12 +29,13 @@ namespace GameDevTV.RTS.TechTree
 
         public override int GetHashCode()
         {
-            return Name.GetHashCode();
+            return (Name ?? name ?? "").GetHashCode();
         }
 
         public override bool Equals(object other)
         {
-            return other is UnlockableSO unlockableSO && GetHashCode().Equals(unlockableSO.GetHashCode());
+            if (other is not UnlockableSO otherUnlockable) return false;
+            return string.Equals(Name, otherUnlockable.Name);
         }
     }
 }
