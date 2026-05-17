@@ -3,7 +3,7 @@ using UnityEngine;
 namespace GameDevTV.RTS.Units
 {
     /// <summary>
-    /// Deprecated: Drone functionality has been fully restored to the native visual Behavior Tree
+    /// Deprecated: All drone gathering has been returned to the native visual Behavior Tree
     /// and the standard Worker class. This script is kept as a stub to prevent any missing component
     /// warnings on existing prefabs.
     /// </summary>

@@ -152,17 +152,24 @@ namespace GameDevTV.RTS.Units
 
             if (evt.Unit is Worker worker)
             {
-                // Warp onto NavMesh if not already on it
-                if (worker.TryGetComponent(out NavMeshAgent navAgent) && !navAgent.isOnNavMesh)
+                // Set the stopping distance to a larger value to prevent the drone
+                // from getting physically blocked by resource and Command Post colliders!
+                if (worker.TryGetComponent(out NavMeshAgent navAgent))
                 {
-                    if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                    navAgent.stoppingDistance = 1.5f;
+
+                    // Warp onto NavMesh if not already on it
+                    if (!navAgent.isOnNavMesh)
                     {
-                        navAgent.Warp(hit.position);
-                        Debug.Log($"[AI] Warped spawned drone {worker.name} onto NavMesh at {hit.position}");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[AI] Failed to sample NavMesh position for drone {worker.name} at {worker.transform.position}");
+                        if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                        {
+                            navAgent.Warp(hit.position);
+                            Debug.Log($"[AI] Warped spawned drone {worker.name} onto NavMesh at {hit.position}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[AI] Failed to sample NavMesh position for drone {worker.name} at {worker.transform.position}");
+                        }
                     }
                 }
 
@@ -280,13 +287,17 @@ namespace GameDevTV.RTS.Units
             {
                 if (drone == null) continue;
 
-                // Ensure it is on NavMesh
-                if (drone.TryGetComponent(out NavMeshAgent navAgent) && !navAgent.isOnNavMesh)
+                // Ensure stopping distance and NavMesh snapping
+                if (drone.TryGetComponent(out NavMeshAgent navAgent))
                 {
-                    if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                    navAgent.stoppingDistance = 1.5f;
+                    if (!navAgent.isOnNavMesh)
                     {
-                        navAgent.Warp(hit.position);
-                        Debug.Log($"[AI] Warped idle drone {drone.name} onto NavMesh at {hit.position}");
+                        if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                        {
+                            navAgent.Warp(hit.position);
+                            Debug.Log($"[AI] Warped idle drone {drone.name} onto NavMesh at {hit.position}");
+                        }
                     }
                 }
 
