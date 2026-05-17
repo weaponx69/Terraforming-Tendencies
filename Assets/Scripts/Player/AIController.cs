@@ -4,6 +4,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.TechTree;
+using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -151,6 +152,20 @@ namespace GameDevTV.RTS.Units
 
             if (evt.Unit is Worker worker)
             {
+                // Warp onto NavMesh if not already on it
+                if (worker.TryGetComponent(out NavMeshAgent navAgent) && !navAgent.isOnNavMesh)
+                {
+                    if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                    {
+                        navAgent.Warp(hit.position);
+                        Debug.Log($"[AI] Warped spawned drone {worker.name} onto NavMesh at {hit.position}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[AI] Failed to sample NavMesh position for drone {worker.name} at {worker.transform.position}");
+                    }
+                }
+
                 drones.Add(worker);
                 Debug.Log($"[AI] {aiOwner} drone tracked ({drones.Count}/{maxDrones}).");
 
@@ -224,6 +239,21 @@ namespace GameDevTV.RTS.Units
 
             Debug.Log($"[AI] {aiOwner} Tick: drones={activeDrones}/{maxDrones}, biomass={available}, droneSOset={(miningDroneUnitSO != null)}, queueSize={commandPost.QueueSize}");
 
+            // ── Diagnostic Logging for active drones ───────────────────────────
+            foreach (Worker drone in drones.ToList())
+            {
+                if (drone == null) continue;
+
+                string cmdState = "Unknown";
+                if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                {
+                    cmdState = cmd.Value.ToString();
+                }
+
+                bool onMesh = drone.TryGetComponent(out NavMeshAgent na) && na.isOnNavMesh;
+                Debug.Log($"[AI Diagnostic] Drone={drone.name}, Command={cmdState}, isOnNavMesh={onMesh}, position={drone.transform.position}");
+            }
+
             if (miningDroneUnitSO == null)
             {
                 Debug.LogWarning($"[AI] {aiOwner} miningDroneUnitSO is null — retrying discovery.");
@@ -249,6 +279,17 @@ namespace GameDevTV.RTS.Units
             foreach (Worker drone in drones.ToList())
             {
                 if (drone == null) continue;
+
+                // Ensure it is on NavMesh
+                if (drone.TryGetComponent(out NavMeshAgent navAgent) && !navAgent.isOnNavMesh)
+                {
+                    if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                    {
+                        navAgent.Warp(hit.position);
+                        Debug.Log($"[AI] Warped idle drone {drone.name} onto NavMesh at {hit.position}");
+                    }
+                }
+
                 if (drone.IsIdle)
                 {
                     GatherableSupply supply = FindNearestAvailableSupply(drone.transform.position);
