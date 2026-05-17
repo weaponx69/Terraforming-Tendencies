@@ -37,7 +37,7 @@ namespace GameDevTV.RTS.Units
 
         // ── Runtime state ──────────────────────────────────────────────────────
         private BaseBuilding commandPost;
-        private readonly System.Collections.Generic.HashSet<MiningDrone> drones = new();
+        private readonly System.Collections.Generic.HashSet<Worker> drones = new();
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
         private void Awake()
@@ -85,7 +85,7 @@ namespace GameDevTV.RTS.Units
                 {
                     string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
                     AbstractUnitSO so = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(path);
-                    if (so != null && so.Prefab != null && so.Prefab.GetComponent<MiningDrone>() != null)
+                    if (so != null && so.Prefab != null && so.Prefab.GetComponent<Worker>() != null)
                     {
                         miningDroneUnitSO = so;
                         Debug.Log($"[AI] Drone SO discovered via scan: {so.Name} at {path}");
@@ -97,7 +97,7 @@ namespace GameDevTV.RTS.Units
             // Built player: scan loaded memory.
             foreach (AbstractUnitSO so in Resources.FindObjectsOfTypeAll<AbstractUnitSO>())
             {
-                if (so.Prefab != null && so.Prefab.GetComponent<MiningDrone>() != null)
+                if (so.Prefab != null && so.Prefab.GetComponent<Worker>() != null)
                 {
                     miningDroneUnitSO = so;
                     return;
@@ -113,8 +113,6 @@ namespace GameDevTV.RTS.Units
             yield return new WaitForSeconds(startDelay);
 
             // Grant the AI its own starting biomass pool, independent of the player's.
-            // We raise a SupplyEvent using whichever SupplySO is wired to minerals conversion
-            // in the Supplies component. We find it by checking loaded SOs.
             GrantStartingBiomass();
 
             Debug.Log($"[AI] {aiOwner} starting. commandPostPrefab={(commandPostPrefab != null ? commandPostPrefab.name : "NULL")}, commandPostSO={(commandPostSO != null ? commandPostSO.Name : "NULL")}, miningDroneUnitSO={(miningDroneUnitSO != null ? miningDroneUnitSO.Name : "NULL")}, maxDrones={maxDrones}, startingBiomass={startingAIBiomass}");
@@ -151,27 +149,28 @@ namespace GameDevTV.RTS.Units
             // AbstractUnit inherits UnitSO from AbstractCommandable — access it directly.
             if (miningDroneUnitSO == null || evt.Unit.UnitSO?.Name != miningDroneUnitSO.Name) return;
 
-            // Ensure the MiningDrone brain is present — add it at runtime if the prefab
-            // doesn't have it wired in the Inspector.
-            if (!evt.Unit.TryGetComponent(out MiningDrone drone))
+            if (evt.Unit is Worker worker)
             {
-                Debug.Log($"[AI] Adding MiningDrone component to {evt.Unit.name} at runtime.");
-                drone = evt.Unit.gameObject.AddComponent<MiningDrone>();
+                drones.Add(worker);
+                Debug.Log($"[AI] {aiOwner} drone tracked ({drones.Count}/{maxDrones}).");
+
+                GatherableSupply supply = FindNearestAvailableSupply(worker.transform.position);
+                if (supply != null)
+                {
+                    worker.Gather(supply);
+                    Debug.Log($"[AI] Initialized drone {worker.name} gather task: {supply.name}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[AI] No resources found for new drone {worker.name} to gather.");
+                }
             }
-
-            drones.Add(drone);
-            Debug.Log($"[AI] {aiOwner} drone tracked ({drones.Count}/{maxDrones}). Starting mining.");
-
-            if (commandPost != null)
-                drone.StartMining(commandPost.gameObject);
-            else
-                Debug.LogWarning($"[AI] Drone spawned but commandPost is null — will wire on next tick.");
         }
 
         private void HandleUnitDeath(UnitDeathEvent evt)
         {
-            if (evt.Unit.TryGetComponent(out MiningDrone drone))
-                drones.Remove(drone);
+            if (evt.Unit is Worker worker)
+                drones.Remove(worker);
         }
 
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
@@ -188,7 +187,6 @@ namespace GameDevTV.RTS.Units
             {
                 commandPost = evt.Building;
                 Debug.Log($"[AI] {aiOwner} Command Post tracked: {evt.Building.name}");
-                WireExistingDrones();
             }
         }
 
@@ -219,8 +217,6 @@ namespace GameDevTV.RTS.Units
                     SpawnCommandPost();
                     return;
                 }
-
-                WireExistingDrones();
             }
 
             int activeDrones = drones.Count(d => d != null);
@@ -235,6 +231,7 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
+            // 1. Spawning check
             if (activeDrones < maxDrones && commandPost.QueueSize < 5)
             {
                 bool affordable = CanAfford(miningDroneUnitSO);
@@ -247,17 +244,43 @@ namespace GameDevTV.RTS.Units
                     commandPost.BuildUnlockable(miningDroneUnitSO);
                 }
             }
+
+            // 2. Idle drone reassignment
+            foreach (Worker drone in drones.ToList())
+            {
+                if (drone == null) continue;
+                if (drone.IsIdle)
+                {
+                    GatherableSupply supply = FindNearestAvailableSupply(drone.transform.position);
+                    if (supply != null)
+                    {
+                        drone.Gather(supply);
+                        Debug.Log($"[AI] Reassigned idle drone {drone.name} to gather {supply.name}.");
+                    }
+                }
+            }
         }
 
         // ── Helpers ────────────────────────────────────────────────────────────
-        private void WireExistingDrones()
+        private GatherableSupply FindNearestAvailableSupply(Vector3 position)
         {
-            if (commandPost == null) return;
-            foreach (MiningDrone drone in drones)
+            float closestDistance = float.MaxValue;
+            GatherableSupply closestSupply = null;
+
+            GatherableSupply[] supplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
+            foreach (GatherableSupply supply in supplies)
             {
-                if (drone == null) continue;
-                drone.StartMining(commandPost.gameObject);
+                if (supply == null || supply.Amount <= 0) continue;
+
+                float dist = Vector3.Distance(position, supply.transform.position);
+                if (dist < closestDistance)
+                {
+                    closestDistance = dist;
+                    closestSupply = supply;
+                }
             }
+
+            return closestSupply;
         }
 
         private bool IsInQueue(BaseBuilding building, UnlockableSO so)
