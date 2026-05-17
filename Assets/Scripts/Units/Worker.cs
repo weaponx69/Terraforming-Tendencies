@@ -12,6 +12,7 @@ namespace GameDevTV.RTS.Units
     public class Worker : AbstractUnit, IBuildingBuilder, ITransportable
     {
         public bool IsBuilding => graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> command) && command.Value == UnitCommands.BuildBuilding;
+        public bool IsIdle => graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> command) && command.Value == UnitCommands.Stop;
         public bool HasSupplies
         {
             get
