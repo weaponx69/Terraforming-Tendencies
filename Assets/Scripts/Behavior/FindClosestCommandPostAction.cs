@@ -20,6 +20,12 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
+            Owner unitOwner = Owner.Player1;
+            if (Unit.Value != null && Unit.Value.TryGetComponent(out AbstractCommandable commandableUnit))
+            {
+                unitOwner = commandableUnit.Owner;
+            }
+
             int layerMask = LayerMask.GetMask("Buildings", "Units");
             Collider[] colliders = Physics.OverlapSphere(
                 Unit.Value.transform.position, 
@@ -31,7 +37,8 @@ namespace GameDevTV.RTS.Behavior
             foreach(Collider collider in colliders)
             {
                 if (collider.TryGetComponent(out BaseBuilding building) 
-                        && (CommandPostBuilding.Value == null || building.UnitSO == CommandPostBuilding.Value)
+                        && (CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name))
+                        && building.Owner == unitOwner
                         && building.Progress.State == BuildingProgress.BuildingState.Completed)
                 {
                     nearbyCommandPosts.Add(building);
@@ -44,7 +51,8 @@ namespace GameDevTV.RTS.Behavior
                 var allBuildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsSortMode.None);
                 foreach (var building in allBuildings)
                 {
-                    if ((CommandPostBuilding.Value == null || building.UnitSO == CommandPostBuilding.Value)
+                    if ((CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name))
+                        && building.Owner == unitOwner
                         && building.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         nearbyCommandPosts.Add(building);
