@@ -70,6 +70,8 @@ namespace GameDevTV.RTS.Behavior
             {
                 int gathered = GatherableSupplies.Value.EndGather();
                 Amount.Value = gathered;
+                Debug.Log($"<color=green>[Gathering]</color> {Unit.Value.name} gathered exactly <b>{gathered}</b> {SupplySO.Value.name} from {GatherableSupplies.Value.name}");
+
                 if (EventChannel != null && EventChannel.Value != null)
                 {
                     EventChannel.Value.SendEventMessage(Unit.Value, Amount.Value, SupplySO.Value);

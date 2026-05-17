@@ -20,25 +20,41 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
+            int layerMask = LayerMask.GetMask("Buildings", "Units");
             Collider[] colliders = Physics.OverlapSphere(
                 Unit.Value.transform.position, 
                 SearchRadius.Value, 
-                LayerMask.GetMask("Buildings"));
+                layerMask);
 
             List<BaseBuilding> nearbyCommandPosts = new();
 
             foreach(Collider collider in colliders)
             {
                 if (collider.TryGetComponent(out BaseBuilding building) 
-                        && building.UnitSO.Equals(CommandPostBuilding.Value)
+                        && (CommandPostBuilding.Value == null || building.UnitSO == CommandPostBuilding.Value)
                         && building.Progress.State == BuildingProgress.BuildingState.Completed)
                 {
                     nearbyCommandPosts.Add(building);
                 }
             }
 
+            // Fallback: If nothing found in radius, try finding any Command Post in the scene
             if (nearbyCommandPosts.Count == 0)
             {
+                var allBuildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsSortMode.None);
+                foreach (var building in allBuildings)
+                {
+                    if ((CommandPostBuilding.Value == null || building.UnitSO == CommandPostBuilding.Value)
+                        && building.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        nearbyCommandPosts.Add(building);
+                    }
+                }
+            }
+
+            if (nearbyCommandPosts.Count == 0)
+            {
+                Debug.LogWarning($"[FindClosestCommandPostAction] {Unit.Value.name} failed to find any completed Command Post. SearchRadius={SearchRadius.Value}");
                 return Status.Failure;
             }
 
