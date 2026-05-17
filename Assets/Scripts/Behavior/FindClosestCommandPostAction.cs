@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Behavior
     {
         [SerializeReference] public BlackboardVariable<GameObject> Unit;
         [SerializeReference] public BlackboardVariable<GameObject> CommandPost;
-        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(500);
+        [SerializeReference] public BlackboardVariable<float> SearchRadius = new(100);
         [SerializeReference] public BlackboardVariable<BuildingSO> CommandPostBuilding;
 
         protected override Status OnStart()
@@ -81,11 +81,9 @@ namespace GameDevTV.RTS.Behavior
 
             nearbyCommandPosts.Sort(new ClosestCommandPostComparer(Unit.Value.transform.position));
             CommandPost.Value = nearbyCommandPosts[0].gameObject;
-            Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} SUCCESS! Found {CommandPost.Value.name} at {CommandPost.Value.transform.position}. Returning Running to keep WaitForAny alive.");
+            Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} SUCCESS! Found {CommandPost.Value.name} at {CommandPost.Value.transform.position}.");
 
-            // Return Running so that if this is inside a WaitForAny, it doesn't immediately 
-            // complete the composite and abort other branches (like the actual move branch).
-            return Status.Running;
+            return Status.Success;
             }
-    }
-}
+            }
+            }

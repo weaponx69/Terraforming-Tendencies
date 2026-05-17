@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Units
         [field: SerializeField] public MeshRenderer MainRenderer { get; private set; }
         [field: SerializeField]
         public BuildingProgress Progress { get; private set; } = new(
-            BuildingProgress.BuildingState.Destroyed, 0, 0
+            BuildingProgress.BuildingState.Completed, 0, 1
         );
         [field: SerializeField] public BuildingSO BuildingSO { get; private set; }
         [SerializeField] private Material primaryMaterial;

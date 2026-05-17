@@ -232,28 +232,21 @@ namespace GameDevTV.RTS.Units
         // ── Main tick ──────────────────────────────────────────────────────────
         private void Tick()
         {
-            // Recover commandPost if the event was missed
-            if (commandPost == null)
+            // Recover commandPost if the event was missed or if it's destroyed
+            if (commandPost == null || commandPost.Progress.State == BuildingProgress.BuildingState.Destroyed)
             {
                 commandPost = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include)
                     .FirstOrDefault(b => b.Owner == aiOwner &&
+                        b.Progress.State != BuildingProgress.BuildingState.Destroyed &&
                         (commandPostSO != null
                             ? b.UnitSO?.Name == commandPostSO.Name
                             : commandPostPrefab != null && b.name.StartsWith(commandPostPrefab.name)));
 
                 if (commandPost == null)
                 {
-                    Debug.Log($"[AI] {aiOwner} Tick: no Command Post found — spawning.");
+                    Debug.Log($"[AI] {aiOwner} Tick: no active Command Post found — spawning.");
                     SpawnCommandPost();
                     return;
-                }
-                else
-                {
-                    // Ensure recovered command post is completed
-                    if (commandPost.Progress.State != BuildingProgress.BuildingState.Completed)
-                    {
-                        commandPost.CompleteConstruction();
-                    }
                 }
             }
 
@@ -387,7 +380,7 @@ namespace GameDevTV.RTS.Units
             {
                 commandable.Owner = aiOwner;
             }
-        }
+            }
 
         private bool CanAfford(UnlockableSO unlockable)
         {
