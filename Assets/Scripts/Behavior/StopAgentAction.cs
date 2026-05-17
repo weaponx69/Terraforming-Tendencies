@@ -16,6 +16,12 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
+            if (Agent.Value == null)
+            {
+                Debug.LogWarning($"[StopAgentAction] Agent.Value is null!");
+                return Status.Failure;
+            }
+
             if (Agent.Value.TryGetComponent(out NavMeshAgent agent))
             {
                 if (agent.TryGetComponent(out Animator animator))
@@ -24,9 +30,11 @@ namespace GameDevTV.RTS.Behavior
                 }
 
                 agent.ResetPath();
+                Debug.Log($"[StopAgentAction] {agent.name} stopped and reset path.");
                 return Status.Success;
             }
 
+            Debug.LogWarning($"[StopAgentAction] {Agent.Value.name} has no NavMeshAgent!");
             return Status.Failure;
         }
     }

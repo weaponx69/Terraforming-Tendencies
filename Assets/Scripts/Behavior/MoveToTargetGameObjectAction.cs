@@ -22,7 +22,7 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
-            if (!Agent.Value.TryGetComponent(out agent) || TargetGameObject.Value == null)
+            if (Agent.Value == null || !Agent.Value.TryGetComponent(out agent) || TargetGameObject.Value == null)
             {
                 return Status.Failure;
             }
@@ -31,13 +31,13 @@ namespace GameDevTV.RTS.Behavior
 
             Vector3 targetPosition = GetTargetPosition();
 
-            if (Vector3.Distance(agent.transform.position, targetPosition) <= agent.stoppingDistance)
+            if (Vector3.Distance(agent.transform.position, targetPosition) <= agent.stoppingDistance + 0.5f)
             {
                 return Status.Success;
             }
 
             agent.SetDestination(targetPosition);
-            lastPosition = targetPosition;
+            lastPosition = TargetGameObject.Value.transform.position;
             return Status.Running;
         }
 
@@ -48,16 +48,26 @@ namespace GameDevTV.RTS.Behavior
                 animator.SetFloat(AnimationConstants.SPEED, agent.velocity.magnitude);
             }
 
+            if (TargetGameObject.Value == null)
+            {
+                return Status.Failure;
+            }
+
             Vector3 targetPosition = GetTargetPosition();
-            if (Vector3.Distance(targetPosition, lastPosition) >= MoveThreshold)
+            Vector3 currentTargetObjectPos = TargetGameObject.Value.transform.position;
+            
+            // Only update destination if the target object itself moves in world space
+            if (Vector3.Distance(currentTargetObjectPos, lastPosition) >= MoveThreshold)
             {
                 agent.SetDestination(targetPosition);
-                lastPosition = agent.destination;
+                lastPosition = currentTargetObjectPos;
                 return Status.Running;
             }
 
-            if (agent.remainingDistance <= agent.stoppingDistance)
+            float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
+            if (agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.5f)
             {
+                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} arrived at {TargetGameObject.Value.name} successfully. directDistance={directDistance}, remainingDistance={agent.remainingDistance}");
                 return Status.Success;
             }
 
@@ -74,7 +84,12 @@ namespace GameDevTV.RTS.Behavior
 
         private Vector3 GetTargetPosition()
         {
-            Vector3 targetPosition;
+            Vector3 targetPosition = Vector3.zero;
+            if (TargetGameObject.Value == null)
+            {
+                return targetPosition;
+            }
+
             if (TargetGameObject.Value.TryGetComponent(out Collider collider))
             {
                 targetPosition = collider.ClosestPoint(agent.transform.position);

@@ -30,7 +30,9 @@ namespace GameDevTV.RTS.Behavior
 
             if (!HasValidInputs())
             {
-                Debug.LogWarning($"[MoveToGatherableSupplyAction] {Agent.Value.name} HasValidInputs failed! Supply={Supply.Value}, supplySO={supplySO}");
+                string agentName = Agent.Value != null ? Agent.Value.name : "NullAgent";
+                string supplyName = Supply.Value != null ? Supply.Value.name : "NullSupply";
+                Debug.LogWarning($"[MoveToGatherableSupplyAction] {agentName} HasValidInputs failed! Supply={supplyName}, supplySO={supplySO}");
                 return Status.Failure;
             }
 
@@ -50,16 +52,28 @@ namespace GameDevTV.RTS.Behavior
                 animator.SetFloat(AnimationConstants.SPEED, agent.velocity.magnitude);
             }
 
-            if (agent.pathPending || agent.remainingDistance > agent.stoppingDistance + 0.1f)
+            if (Supply.Value == null) return Status.Failure;
+
+            Vector3 targetPosition = GetTargetPosition();
+            float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
+
+            if (agent.pathPending)
             {
                 return Status.Running;
             }
 
-            if (Supply.Value == null) return Status.Failure;
+            // Treat as arrived if either agent reports remainingDistance is close
+            // OR if the direct Euclidean distance is within stopping distance + 0.5f buffer.
+            bool hasArrived = (agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.5f);
+
+            if (!hasArrived)
+            {
+                return Status.Running;
+            }
 
             if (!Supply.Value.IsBusy && Supply.Value.Amount > 0)
             {
-                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} Arrived at {Supply.Value.name} successfully.");
+                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} Arrived at {Supply.Value.name} successfully. directDistance={directDistance}, remainingDistance={agent.remainingDistance}");
                 return Status.Success;
             }
             Collider[] colliders = FindNearbyNotBusyColliders();
@@ -86,7 +100,7 @@ namespace GameDevTV.RTS.Behavior
 
         private bool HasValidInputs()
         {
-            if (!Agent.Value.TryGetComponent(out agent) || (Supply.Value == null && supplySO == null))
+            if (Agent.Value == null || !Agent.Value.TryGetComponent(out agent))
             {
                 return false;
             }
@@ -102,6 +116,10 @@ namespace GameDevTV.RTS.Behavior
                 {
                     Array.Sort(colliders, new ClosestColliderComparer(agent.transform.position));
                     Supply.Value = colliders[0].GetComponent<GatherableSupply>();
+                    if (Supply.Value != null)
+                    {
+                        supplySO = Supply.Value.Supply;
+                    }
                 }
                 else
                 {
@@ -114,6 +132,11 @@ namespace GameDevTV.RTS.Behavior
 
         private Collider[] FindNearbyNotBusyColliders()
         {
+            if (Supply.Value == null || Supply.Value.Supply == null)
+            {
+                return Array.Empty<Collider>();
+            }
+
             return Physics.OverlapSphere(
                 agent.transform.position,
                 SearchRadius,
@@ -121,13 +144,19 @@ namespace GameDevTV.RTS.Behavior
             ).Where(collider =>
                     collider.TryGetComponent(out GatherableSupply supply)
                     && !supply.IsBusy
+                    && supply.Supply != null
                     && supply.Supply.Equals(Supply.Value.Supply)
             ).ToArray();
         }
 
         private Vector3 GetTargetPosition()
         {
-            Vector3 targetPosition;
+            Vector3 targetPosition = Vector3.zero;
+            if (Supply.Value == null)
+            {
+                return targetPosition;
+            }
+
             if (Supply.Value.TryGetComponent(out Collider collider))
             {
                 targetPosition = collider.ClosestPoint(agent.transform.position);

@@ -176,16 +176,24 @@ namespace GameDevTV.RTS.Units
                 drones.Add(worker);
                 Debug.Log($"[AI] {aiOwner} drone tracked ({drones.Count}/{maxDrones}).");
 
-                GatherableSupply supply = FindNearestAvailableSupply(worker.transform.position);
-                if (supply != null)
-                {
-                    worker.Gather(supply);
-                    Debug.Log($"[AI] Initialized drone {worker.name} gather task: {supply.name}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[AI] No resources found for new drone {worker.name} to gather.");
-                }
+                StartCoroutine(DeferredGatherAssignment(worker));
+            }
+        }
+
+        private System.Collections.IEnumerator DeferredGatherAssignment(Worker worker)
+        {
+            yield return null; // Wait for one frame to let BehaviorGraphAgent initialize
+            if (worker == null) yield break;
+
+            GatherableSupply supply = FindNearestAvailableSupply(worker.transform.position);
+            if (supply != null)
+            {
+                worker.Gather(supply);
+                Debug.Log($"[AI] Initialized drone {worker.name} gather task: {supply.name} (deferred)");
+            }
+            else
+            {
+                Debug.LogWarning($"[AI] No resources found for new drone {worker.name} to gather.");
             }
         }
 

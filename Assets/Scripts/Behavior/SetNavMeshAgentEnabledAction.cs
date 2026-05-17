@@ -16,9 +16,20 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
-            if (Self.Value == null || !Self.Value.TryGetComponent(out NavMeshAgent agent)) return Status.Failure;
+            if (Self.Value == null)
+            {
+                Debug.LogWarning($"[SetNavMeshAgentEnabledAction] Self.Value is null!");
+                return Status.Failure;
+            }
+
+            if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
+            {
+                Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
+                return Status.Failure;
+            }
 
             agent.enabled = Active;
+            Debug.Log($"[SetNavMeshAgentEnabledAction] {agent.name} set agent enabled to {Active.Value}");
 
             return Status.Success;
         }
