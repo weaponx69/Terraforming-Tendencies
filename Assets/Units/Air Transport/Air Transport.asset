@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   <Name>k__BackingField: Air Transport
   <IsOneTimeUnlock>k__BackingField: 0
-  <BuildTime>k__BackingField: 60
+  <BuildTime>k__BackingField: 10
   <Icon>k__BackingField: {fileID: 21300000, guid: 4d0944a6c62020d4f955f5b7174bb96f, type: 3}
   <Cost>k__BackingField: {fileID: 11400000, guid: df0bafee89701b04784fd5146a3407ab, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}

@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private SupplySO biomassSO;
         [SerializeField] private float mineralsToBiomassRate = 1f;
         [SerializeField] private float gasToBiomassRate = 1f;
-        [SerializeField] private int startingBiomass = 500;
+        [SerializeField] private int startingBiomass = 1000;
 
         // Oxygen (new)
         [SerializeField] private TextMeshProUGUI oxygenText;

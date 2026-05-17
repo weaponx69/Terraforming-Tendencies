@@ -11,50 +11,19 @@ using UnityEngine.AI;
 
 namespace GameDevTV.RTS.Units
 {
-    /// <summary>
-    /// Automated controller for Owner.AI1.
-    ///
-    /// Priority build order (each step only fires if affordable):
-    ///   1. Spawn Command Post at map center (free, one time).
-    ///   2. Build enough Workers to keep gathering / building.
-    ///   3. Build supporting infrastructure buildings (Airport, etc.).
-    ///   4. Queue Mining Drone (Air Transport) units from the Airport.
-    ///   5. Assign idle Mining Drones to gather resources.
-    ///
-    /// All spending is gated behind CanAfford() so the controller never goes
-    /// into negative Biomass.
-    /// </summary>
     public class AIController : MonoBehaviour
     {
-        // ── Inspector ──────────────────────────────────────────────────────────────
         [Header("Owner")]
-        [Tooltip("Which AI player this controller acts as.")]
         [SerializeField] private Owner aiOwner = Owner.AI1;
 
         [Header("Spawn References")]
-        [Tooltip("The Command Post prefab — instantiated for free at map center on start.")]
         [SerializeField] private GameObject commandPostPrefab;
-
-        [Tooltip("BuildingSO for the Command Post (needed to calculate costs and unlock deps).")]
         [SerializeField] private BuildingSO commandPostSO;
-
-        [Tooltip("Worker UnitSO — queued from the Command Post.")]
         [SerializeField] private AbstractUnitSO workerUnitSO;
-
-        [Tooltip("Airport BuildingSO — Workers build this before Mining Drones are available.")]
         [SerializeField] private BuildingSO airportSO;
 
-        [Tooltip("Mining Drone (Air Transport) UnitSO — queued from the Airport.")]
-        [SerializeField] private AbstractUnitSO miningDroneUnitSO;
-
         [Header("Economy Limits")]
-        [Tooltip("Maximum concurrent Workers the AI will maintain.")]
-        [SerializeField] private int maxWorkers = 1;
-
-        [Tooltip("Maximum concurrent Mining Drones the AI will maintain.")]
-        [SerializeField] private int maxMiningDrones = 6;
-
-        [Tooltip("Biomass reserve to keep in hand before spending (safety buffer).")]
+        [SerializeField] private int maxWorkers = 6;
         [SerializeField] private int biomassReserve = 0;
 
         [Header("Timing")]
@@ -68,8 +37,7 @@ namespace GameDevTV.RTS.Units
         private BaseBuilding commandPost;
         private BaseBuilding airport;
 
-        private readonly HashSet<Worker>      workers      = new();
-        private readonly HashSet<MiningDrone> miningDrones = new();
+        private readonly HashSet<Worker> workers = new();
 
         // Tracks which Workers are currently tasked with building something
         private readonly HashSet<Worker> busyBuilders = new();
@@ -130,21 +98,22 @@ namespace GameDevTV.RTS.Units
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
         {
             if (evt.Building == null) return;
-
+            
             if (commandPostSO != null && evt.Building.UnitSO != null && evt.Building.UnitSO.Name == commandPostSO.Name)
             {
-                Debug.Log($"[AI] {aiOwner} recognized Command Post spawn: {evt.Building.name}");
-                commandPost = evt.Building;
-                // Notify any drones that may have spawned before the post finished
-                foreach (MiningDrone drone in miningDrones)
+                if (evt.Building.Owner == aiOwner)
                 {
-                    drone.SetCommandPost(commandPost.gameObject);
+                    Debug.Log($"[AI] {aiOwner} tracking Command Post: {evt.Building.name}");
+                    commandPost = evt.Building;
                 }
             }
             else if (airportSO != null && evt.Building.UnitSO != null && evt.Building.UnitSO.Name == airportSO.Name)
             {
-                Debug.Log($"[AI] {aiOwner} recognized Airport spawn: {evt.Building.name}");
-                airport = evt.Building;
+                if (evt.Building.Owner == aiOwner)
+                {
+                    Debug.Log($"[AI] {aiOwner} tracking Airport: {evt.Building.name}");
+                    airport = evt.Building;
+                }
             }
         }
 
@@ -166,23 +135,19 @@ namespace GameDevTV.RTS.Units
         private void Tick()
         {
             int activeWorkers = workers.Count(w => w != null);
-            int activeDrones = miningDrones.Count(d => d != null);
 
-            if (Time.frameCount % 100 == 0) // Log occasionally
-            {
-                Debug.Log($"[AI] {aiOwner} Tick: Workers={activeWorkers}/{maxWorkers}, Drones={activeDrones}/{maxMiningDrones}, Airport={(airport != null ? "Ready" : "None")}");
-            }
+            Debug.Log($"[AI] {aiOwner} Tick: Population={activeWorkers}/{maxWorkers}, commandPost={(commandPost != null ? "Found" : "Missing")}");
             
-            // ── Priority 1: Rebuild command post if destroyed ──────────────────
             if (commandPost == null)
             {
-                // Safety check: is there one in the scene we just lost track of?
                 BaseBuilding[] allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
+                Debug.Log($"[AI] {aiOwner} searching for Command Post in {allBuildings.Length} buildings.");
                 foreach (var b in allBuildings)
                 {
+                    Debug.Log($"  - {b.name}: Owner={b.Owner}, UnitSO={b.UnitSO?.Name}");
                     if (b.Owner == aiOwner && b.UnitSO != null && b.UnitSO.Name == commandPostSO.Name)
                     {
-                        // Found it. 
+                        Debug.Log($"[AI] {aiOwner} found existing Command Post: {b.name}");
                         commandPost = b;
                         break;
                     }
@@ -190,44 +155,33 @@ namespace GameDevTV.RTS.Units
 
                 if (commandPost == null)
                 {
+                    Debug.Log($"[AI] {aiOwner} spawning new Command Post");
                     SpawnCommandPost();
                     return;
                 }
             }
 
-            // ── Priority 2: Queue Mining Drones (Absolute First Priority) ───────────────────
-            if (miningDroneUnitSO != null && activeDrones < maxMiningDrones)
+            if (activeWorkers < maxWorkers && commandPost.QueueSize < BaseBuilding_MaxQueueSize())
             {
-                BaseBuilding source = null;
-                if (airport != null && airport.QueueSize < BaseBuilding_MaxQueueSize()) source = airport;
-                else if (commandPost != null && commandPost.QueueSize < BaseBuilding_MaxQueueSize()) source = commandPost;
-
-                if (source != null && CanAfford(miningDroneUnitSO))
+                if (workerUnitSO != null)
                 {
-                    if (!IsUnitInQueue(source, miningDroneUnitSO))
+                    bool canAfford = CanAfford(workerUnitSO);
+                    bool inQueue = IsUnitInQueue(commandPost, workerUnitSO);
+                    
+                    if (canAfford && !inQueue)
                     {
-                        Debug.Log($"[AI] {aiOwner} queuing Drone at {source.name}");
-                        source.BuildUnlockable(miningDroneUnitSO);
-                        return;
-                    }
-                }
-            }
-
-            // ── Priority 3: Keep 1 worker for building infrastructure ──────────────────
-            if (activeWorkers < maxWorkers && commandPost != null && commandPost.QueueSize < BaseBuilding_MaxQueueSize())
-            {
-                if (workerUnitSO != null && CanAfford(workerUnitSO))
-                {
-                    if (!IsUnitInQueue(commandPost, workerUnitSO))
-                    {
-                        Debug.Log($"[AI] {aiOwner} queuing Worker for infrastructure");
+                        Debug.Log($"[AI] {aiOwner} queuing {workerUnitSO.Name} at {commandPost.name}");
                         commandPost.BuildUnlockable(workerUnitSO);
                         return;
                     }
-                }
+                    else if (!canAfford)
+                    {
+                        Debug.Log($"[AI] {aiOwner} cannot afford {workerUnitSO.Name} (Biomass check failed).");
+                    }
+}
             }
 
-            // ── Priority 4: Build Airport ──────────────────────────────────────
+            // ── Priority 3: Build Airport ──────────────────────────────────────
             if (airport == null && airportSO != null)
             {
                 Worker idleBuilder = GetIdleWorker();
@@ -244,20 +198,8 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            // ── Priority 5: Assign idle drones to mining ──────────────────────
-            AssignIdleDronesToMine();
-
-            // ── Priority 6: Assign idle workers to gather ──────────────────────
-            // Only allow workers to gather if we have no drones yet (bootstrapping)
-            if (activeDrones == 0)
-            {
-                AssignIdleWorkersToGather();
-            }
-            else
-            {
-                // If we have drones, workers should stay idle and ready to build
-                StopIdleWorkers();
-            }
+            // ── Priority 4: Assign idle workers (Drones) to gather ─────────────
+            AssignIdleWorkersToGather();
         }
 
         private bool IsUnitInQueue(BaseBuilding building, UnlockableSO unitSO)
@@ -393,21 +335,7 @@ namespace GameDevTV.RTS.Units
             return null;
         }
 
-        private void AssignIdleDronesToMine()
-        {
-            if (commandPost == null) return;
-
-            foreach (MiningDrone drone in miningDrones)
-            {
-                if (drone == null) continue;
-                if (drone.State == MiningDrone.DroneState.Idle)
-                {
-                    drone.StartMining(commandPost.gameObject);
-                }
-            }
-        }
-
-        /// <summary>
+/// <summary>
         /// Finds a flat NavMesh-valid build position near a given origin.
         /// Tries random offsets within the given radius.
         /// </summary>

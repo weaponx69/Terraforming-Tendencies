@@ -179,13 +179,16 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            if (TryGetComponent<NavMeshSurface>(out var navMeshSurface))
-            {
-                navMeshSurface.BuildNavMesh();
-            }
-
             ScatterSurfaceFeatures();
             ScatterResources();
+
+            // Bake all NavMesh surfaces on this object AFTER scattering
+            NavMeshSurface[] surfaces = GetComponents<NavMeshSurface>();
+            foreach (var s in surfaces)
+            {
+                s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
+                s.BuildNavMesh();
+            }
             }
 
             private Texture2D GenerateHeightGradient()
