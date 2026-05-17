@@ -257,8 +257,15 @@ namespace GameDevTV.RTS.Units
                     cmdState = cmd.Value.ToString();
                 }
 
-                bool onMesh = drone.TryGetComponent(out NavMeshAgent na) && na.isOnNavMesh;
-                Debug.Log($"[AI Diagnostic] Drone={drone.name}, Command={cmdState}, isOnNavMesh={onMesh}, position={drone.transform.position}");
+                bool onMesh = false;
+                string naDetails = "No NavMeshAgent";
+                if (drone.TryGetComponent(out NavMeshAgent na))
+                {
+                    onMesh = na.isOnNavMesh;
+                    naDetails = $"enabled={na.enabled}, isStopped={na.isStopped}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, dest={na.destination}, velocity={na.velocity}, speed={na.speed}, remainingDist={na.remainingDistance}";
+                }
+
+                Debug.Log($"[AI Diagnostic] Drone={drone.name}, Command={cmdState}, isOnNavMesh={onMesh}, position={drone.transform.position}, {naDetails}");
             }
 
             if (miningDroneUnitSO == null)
