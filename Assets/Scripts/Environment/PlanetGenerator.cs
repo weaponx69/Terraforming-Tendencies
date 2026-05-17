@@ -33,16 +33,22 @@ namespace GameDevTV.RTS.Environment
             else
             {
                 // If it was pre-generated in editor, we still need to bake navmesh
-                NavMeshSurface[] navMeshSurfaces = GetComponents<NavMeshSurface>();
-                foreach (var surface in navMeshSurfaces)
-                {
-                    surface.BuildNavMesh();
-                }
+                BakeAllNavMeshes();
             }
             }
 
-        [ContextMenu("Clear Planet (Editor)")]
-        public void ClearPlanet()
+            private void BakeAllNavMeshes()
+            {
+            NavMeshSurface[] surfaces = GetComponents<NavMeshSurface>();
+            foreach (var s in surfaces)
+            {
+                s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
+                s.BuildNavMesh();
+            }
+            }
+
+            [ContextMenu("Clear Planet (Editor)")]
+public void ClearPlanet()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
@@ -182,13 +188,7 @@ namespace GameDevTV.RTS.Environment
             ScatterSurfaceFeatures();
             ScatterResources();
 
-            // Bake all NavMesh surfaces on this object AFTER scattering
-            NavMeshSurface[] surfaces = GetComponents<NavMeshSurface>();
-            foreach (var s in surfaces)
-            {
-                s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
-                s.BuildNavMesh();
-            }
+            BakeAllNavMeshes();
             }
 
             private Texture2D GenerateHeightGradient()

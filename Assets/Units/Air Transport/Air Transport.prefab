@@ -61,7 +61,7 @@ NavMeshAgent:
   m_Height: 2
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
-  m_ObstacleAvoidanceType: 0
+  m_ObstacleAvoidanceType: 4
 --- !u!95 &1974153333601261373
 Animator:
   serializedVersion: 7
@@ -186,7 +186,7 @@ MonoBehaviour:
   VisionTransform: {fileID: 4999257484100946669}
   <AttackingParticleSystem>k__BackingField: {fileID: 0}
   DamageableSensor: {fileID: 0}
-  CancelBuildingCommand: {fileID: 0}
+  CancelBuildingCommand: {fileID: 11400000, guid: 166415456c8d4cd4282c9686f36a509b, type: 2}
 --- !u!1 &8767989424686635610
 GameObject:
   m_ObjectHideFlags: 0

@@ -25,8 +25,6 @@ public static class SetupAIAutomation
     // ── Known asset paths ──────────────────────────────────────────────────────
     private const string CMD_POST_PREFAB = "Assets/Units/Buildings/Command Post/Command Post.prefab";
     private const string CMD_POST_SO     = "Assets/Units/Buildings/Command Post/Command Post.asset";
-    private const string WORKER_SO       = "Assets/Units/Worker/Worker.asset";
-    private const string AIRPORT_SO      = "Assets/Units/Buildings/Airport/Airport.asset";
     private const string AIR_TRANSPORT_SO= "Assets/Units/Air Transport/Air Transport.asset";
 
     [MenuItem("Terraforming/Setup AI Automation")]
@@ -35,15 +33,13 @@ public static class SetupAIAutomation
         // ── 1. Load assets ─────────────────────────────────────────────────────
         GameObject cmdPostPrefab    = AssetDatabase.LoadAssetAtPath<GameObject>(CMD_POST_PREFAB);
         ScriptableObject cmdPostSO  = AssetDatabase.LoadAssetAtPath<ScriptableObject>(CMD_POST_SO);
-        ScriptableObject workerSO   = AssetDatabase.LoadAssetAtPath<ScriptableObject>(WORKER_SO);
-        ScriptableObject airportSO  = AssetDatabase.LoadAssetAtPath<ScriptableObject>(AIRPORT_SO);
         ScriptableObject droneUnitSO= AssetDatabase.LoadAssetAtPath<ScriptableObject>(AIR_TRANSPORT_SO);
 
         ReportMissing("Command Post prefab", cmdPostPrefab, CMD_POST_PREFAB);
         ReportMissing("Command Post SO",     cmdPostSO,     CMD_POST_SO);
-        ReportMissing("Worker SO",           workerSO,      WORKER_SO);
-        ReportMissing("Airport SO",          airportSO,     AIRPORT_SO);
-        ReportMissing("Air Transport SO",    droneUnitSO,   AIR_TRANSPORT_SO);
+        // Air Transport SO is optional — AIController auto-discovers it at runtime.
+        if (droneUnitSO == null)
+            Debug.Log("[AI Setup] Air Transport SO not found at known path — AIController will auto-discover it at runtime.");
 
         // ── 2. Create / find "AI Controller" host GameObject ──────────────────
         GameObject aiHost = GameObject.Find("AI Controller");
@@ -60,9 +56,9 @@ public static class SetupAIAutomation
         SerializedObject soCtrl = new SerializedObject(aiCtrl);
         SetRef(soCtrl, "commandPostPrefab", cmdPostPrefab);
         SetRef(soCtrl, "commandPostSO",     cmdPostSO);
-        SetRef(soCtrl, "workerUnitSO",      workerSO);
-        SetRef(soCtrl, "airportSO",         airportSO);
-        SetRef(soCtrl, "miningDroneUnitSO", droneUnitSO);
+        // miningDroneUnitSO is optional — left blank so auto-discovery runs at runtime.
+        // If you want to pin it explicitly, uncomment the line below:
+        // SetRef(soCtrl, "miningDroneUnitSO", droneUnitSO);
         soCtrl.ApplyModifiedProperties();
 
         // ── 4. Wire GameOverManager ────────────────────────────────────────────
