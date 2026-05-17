@@ -74,6 +74,8 @@ namespace GameDevTV.RTS.Player
                     Biomass[owner] = startingBiomass;
             }
 
+            OnBiomassChanged += HandleBiomassChanged;
+
             if (biomassText != null && Biomass.TryGetValue(Owner.Player1, out int initial))
             {
                 biomassText.SetText(initial.ToString());
@@ -89,7 +91,16 @@ namespace GameDevTV.RTS.Player
 
         private void OnDestroy()
         {
+            OnBiomassChanged -= HandleBiomassChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
+        }
+
+        private void HandleBiomassChanged(Owner owner, int value)
+        {
+            if ((owner == Owner.Player1 || owner == Owner.AI1) && biomassText != null)
+            {
+                biomassText.SetText(value.ToString());
+            }
         }
 
         private void HandleSupplyEvent(SupplyEvent evt)
@@ -102,10 +113,6 @@ namespace GameDevTV.RTS.Player
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * mineralsToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); // Raise event
-                if (Owner.Player1 == evt.Owner && biomassText != null)
-                {
-                    biomassText.SetText(Biomass[evt.Owner].ToString());
-                }
                 return; // handled centrally - don't modify Minerals/Gas
             }
             else if (evt.Supply == gasSO)
@@ -113,10 +120,6 @@ namespace GameDevTV.RTS.Player
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * gasToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); // Raise event
-                if (Owner.Player1 == evt.Owner && biomassText != null)
-                {
-                    biomassText.SetText(Biomass[evt.Owner].ToString());
-                }
                 return;
             }
             else if (evt.Supply == oxygenSO)
