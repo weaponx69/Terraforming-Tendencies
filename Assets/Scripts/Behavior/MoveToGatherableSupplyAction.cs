@@ -30,14 +30,16 @@ namespace GameDevTV.RTS.Behavior
 
             if (!HasValidInputs())
             {
+                Debug.LogWarning($"[MoveToGatherableSupplyAction] {Agent.Value.name} HasValidInputs failed! Supply={Supply.Value}, supplySO={supplySO}");
                 return Status.Failure;
             }
 
             agent.TryGetComponent(out animator);
 
             Vector3 targetPosition = GetTargetPosition();
+            bool setDestResult = agent.SetDestination(targetPosition);
 
-            agent.SetDestination(targetPosition);
+            Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} OnStart: targetPosition={targetPosition}, setDestResult={setDestResult}, agentDest={agent.destination}, supply={Supply.Value.name}, pathPending={agent.pathPending}");
             return Status.Running;
         }
 
@@ -57,9 +59,10 @@ namespace GameDevTV.RTS.Behavior
 
             if (!Supply.Value.IsBusy && Supply.Value.Amount > 0)
             {
+                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} Arrived at {Supply.Value.name} successfully.");
                 return Status.Success;
             }
-Collider[] colliders = FindNearbyNotBusyColliders();
+            Collider[] colliders = FindNearbyNotBusyColliders();
 
             if (colliders.Length > 0)
             {
