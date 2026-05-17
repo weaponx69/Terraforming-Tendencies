@@ -24,19 +24,24 @@ namespace GameDevTV.RTS.Behavior
         {
             if (Agent.Value == null || !Agent.Value.TryGetComponent(out agent) || TargetGameObject.Value == null)
             {
+                Debug.LogWarning($"[MoveToTargetGameObjectAction] {Agent.Value?.name} failed to start. TargetGameObject={TargetGameObject.Value?.name}");
                 return Status.Failure;
             }
 
             Agent.Value.TryGetComponent(out animator);
 
             Vector3 targetPosition = GetTargetPosition();
+            float distance = Vector3.Distance(agent.transform.position, targetPosition);
 
-            if (Vector3.Distance(agent.transform.position, targetPosition) <= agent.stoppingDistance + 0.5f)
+            if (distance <= agent.stoppingDistance + 0.5f)
             {
+                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} already at destination {TargetGameObject.Value.name}. distance={distance}, stoppingDistance={agent.stoppingDistance}");
                 return Status.Success;
             }
 
-            agent.SetDestination(targetPosition);
+            bool setDestResult = agent.SetDestination(targetPosition);
+            Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} started moving to {TargetGameObject.Value.name} at {targetPosition}. setDestinationResult={setDestResult}, distance={distance}");
+            
             lastPosition = TargetGameObject.Value.transform.position;
             return Status.Running;
         }

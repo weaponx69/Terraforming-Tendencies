@@ -25,6 +25,7 @@ namespace GameDevTV.RTS.Behavior
             {
                 unitOwner = commandableUnit.Owner;
             }
+            Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} starting search. UnitOwner={unitOwner}, SearchRadius={SearchRadius.Value}");
 
             int layerMask = LayerMask.GetMask("Buildings", "Units");
             Collider[] colliders = Physics.OverlapSphere(
@@ -36,12 +37,16 @@ namespace GameDevTV.RTS.Behavior
 
             foreach(Collider collider in colliders)
             {
-                if (collider.TryGetComponent(out BaseBuilding building) 
-                        && (CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name))
-                        && building.Owner == unitOwner
-                        && building.Progress.State == BuildingProgress.BuildingState.Completed)
+                if (collider.GetComponentInParent<BaseBuilding>() is BaseBuilding building) 
                 {
-                    nearbyCommandPosts.Add(building);
+                    bool soMatch = CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name);
+                    bool ownerMatch = building.Owner == unitOwner;
+                    bool stateMatch = building.Progress.State == BuildingProgress.BuildingState.Completed;
+                    
+                    if (soMatch && ownerMatch && stateMatch)
+                    {
+                        nearbyCommandPosts.Add(building);
+                    }
                 }
             }
 
@@ -51,25 +56,36 @@ namespace GameDevTV.RTS.Behavior
                 var allBuildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsSortMode.None);
                 foreach (var building in allBuildings)
                 {
-                    if ((CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name))
-                        && building.Owner == unitOwner
-                        && building.Progress.State == BuildingProgress.BuildingState.Completed)
+                    bool soMatch = CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name);
+                    bool ownerMatch = building.Owner == unitOwner;
+                    bool stateMatch = building.Progress.State == BuildingProgress.BuildingState.Completed;
+
+                    if (soMatch && ownerMatch && stateMatch)
                     {
                         nearbyCommandPosts.Add(building);
+                    }
+                    else
+                    {
+                        // Log why it didn't match
+                        Debug.Log($"[FindClosestCommandPostAction] Scene Candidate {building.name}: SOMatch={soMatch} (Building: {building.UnitSO?.Name} vs Filter: {CommandPostBuilding.Value?.Name}), OwnerMatch={ownerMatch} (Building: {building.Owner} vs Unit: {unitOwner}), StateMatch={stateMatch} (State: {building.Progress.State})");
                     }
                 }
             }
 
             if (nearbyCommandPosts.Count == 0)
             {
-                Debug.LogWarning($"[FindClosestCommandPostAction] {Unit.Value.name} failed to find any completed Command Post. SearchRadius={SearchRadius.Value}");
+                Debug.LogWarning($"[FindClosestCommandPostAction] {Unit.Value.name} failed to find any completed Command Post. " +
+                                 $"UnitOwner={unitOwner}, FilterSO={(CommandPostBuilding.Value != null ? CommandPostBuilding.Value.Name : "None")}");
                 return Status.Failure;
             }
 
             nearbyCommandPosts.Sort(new ClosestCommandPostComparer(Unit.Value.transform.position));
             CommandPost.Value = nearbyCommandPosts[0].gameObject;
+            Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} SUCCESS! Found {CommandPost.Value.name} at {CommandPost.Value.transform.position}. Returning Running to keep WaitForAny alive.");
 
-            return Status.Success;
-        }
+            // Return Running so that if this is inside a WaitForAny, it doesn't immediately 
+            // complete the composite and abort other branches (like the actual move branch).
+            return Status.Running;
+            }
     }
 }

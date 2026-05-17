@@ -247,6 +247,14 @@ namespace GameDevTV.RTS.Units
                     SpawnCommandPost();
                     return;
                 }
+                else
+                {
+                    // Ensure recovered command post is completed
+                    if (commandPost.Progress.State != BuildingProgress.BuildingState.Completed)
+                    {
+                        commandPost.CompleteConstruction();
+                    }
+                }
             }
 
             int activeDrones = drones.Count(d => d != null);
@@ -369,8 +377,16 @@ namespace GameDevTV.RTS.Units
 
             Debug.Log($"[AI] {aiOwner} spawning Command Post at {center}");
             GameObject inst = Instantiate(commandPostPrefab, center, Quaternion.identity);
-            if (inst.TryGetComponent(out AbstractCommandable commandable))
+            if (inst.TryGetComponent(out BaseBuilding building))
+            {
+                building.Owner = aiOwner;
+                building.CompleteConstruction();
+                commandPost = building;
+            }
+            else if (inst.TryGetComponent(out AbstractCommandable commandable))
+            {
                 commandable.Owner = aiOwner;
+            }
         }
 
         private bool CanAfford(UnlockableSO unlockable)

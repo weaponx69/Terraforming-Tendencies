@@ -266,7 +266,7 @@ MonoBehaviour:
           m_Value1: 4464230620376412624
         Graph:
           rid: 1136246734334460743
-        m_Parents:
+        m_Parent:
         - rid: 3824763657578087283
         - rid: 3824763657578087283
         - rid: 3824763657578087283
@@ -314,7 +314,7 @@ MonoBehaviour:
         m_Child:
           rid: 3824763657578087293
     - rid: 3824763657578087288
-      type: {class: SetAgentAvoidanceAction, ns: GameDevTV.RTS.Behavior, asm: Assembly-CSharp}
+      type: {class: SequenceComposite, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         ID:
           m_Value0: 12792184273017881926
@@ -368,7 +368,7 @@ MonoBehaviour:
           rid: -2
         m_ObserverType: 0
     - rid: 3824763657578087291
-      type: {class: SetAgentAvoidanceAction, ns: GameDevTV.RTS.Behavior, asm: Assembly-CSharp}
+      type: {class: SequenceComposite, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         ID:
           m_Value0: 15849666133696873682
@@ -389,7 +389,7 @@ MonoBehaviour:
           m_Value1: 15845711108393114147
         Graph:
           rid: 1136246734334460743
-        m_Parents:
+        m_Parent:
         - rid: 3824763657578087300
         - rid: 3824763657578087286
         m_Child:
@@ -444,7 +444,7 @@ MonoBehaviour:
           m_Value1: 828983299765228701
         Graph:
           rid: 1136246734334460743
-        m_Parents:
+        m_Parent:
         - rid: 3824763657578087296
         - rid: 3824763657578087290
         m_Child:
