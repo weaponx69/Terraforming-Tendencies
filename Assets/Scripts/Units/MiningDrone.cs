@@ -51,6 +51,18 @@ namespace GameDevTV.RTS.Units
         public void StartMining(GameObject post)
         {
             commandPost = post;
+
+            // Stop the behavior graph from fighting this C# script's NavMeshAgent commands
+            if (TryGetComponent(out Unity.Behavior.BehaviorGraphAgent graphAgent))
+            {
+                graphAgent.enabled = false;
+                if (agent != null && agent.isOnNavMesh)
+                {
+                    agent.ResetPath();
+                }
+                Debug.Log($"[AI Drone] Disabled BehaviorGraphAgent on {name} to hand over control to C#.");
+            }
+
             if (isRunning) return;
             isRunning = true;
             StartCoroutine(MiningLoop());
@@ -82,7 +94,23 @@ namespace GameDevTV.RTS.Units
                 if (currentTarget.TryGetComponent(out Collider col))
                     dest = col.ClosestPoint(transform.position);
 
-                agent.SetDestination(dest);
+                // If spawned off-mesh, warp onto closest NavMesh surface
+                if (!agent.isOnNavMesh)
+                {
+                    if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+                    {
+                        agent.Warp(hit.position);
+                    }
+                }
+
+                if (agent.isOnNavMesh)
+                {
+                    agent.SetDestination(dest);
+                }
+                else
+                {
+                    Debug.LogWarning($"[AI Drone] {name} is not on NavMesh! Cannot navigate to resource.");
+                }
 
                 while (!HasArrived() && currentTarget != null)
                 {
@@ -125,7 +153,23 @@ namespace GameDevTV.RTS.Units
                 if (commandPost != null)
                 {
                     agent.stoppingDistance = stoppingDistance;
-                    agent.SetDestination(commandPost.transform.position);
+
+                    if (!agent.isOnNavMesh)
+                    {
+                        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+                        {
+                            agent.Warp(hit.position);
+                        }
+                    }
+
+                    if (agent.isOnNavMesh)
+                    {
+                        agent.SetDestination(commandPost.transform.position);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[AI Drone] {name} is not on NavMesh! Cannot navigate to Command Post.");
+                    }
 
                     while (!HasArrived())
                     {

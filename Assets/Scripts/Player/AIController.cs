@@ -28,6 +28,8 @@ namespace GameDevTV.RTS.Units
         [Header("Economy Limits")]
         [SerializeField] private int maxDrones = 4;
         [SerializeField] private int biomassReserve = 0;
+        [Tooltip("Biomass granted to the AI at startup, independent of the player's starting biomass.")]
+        [SerializeField] private int startingAIBiomass = 500;
 
         [Header("Timing")]
         [SerializeField] private float tickRate = 3f;
@@ -59,26 +61,40 @@ namespace GameDevTV.RTS.Units
         }
 
         // ── Auto-discovery ─────────────────────────────────────────────────────
+        // Known asset path — same one used by SetupAIAutomation.cs
+        private const string DRONE_SO_PATH = "Assets/Units/Air Transport/Air Transport.asset";
+
         private void TryDiscoverDroneSO()
         {
             if (miningDroneUnitSO != null) return;
 
 #if UNITY_EDITOR
-            // In Editor / Play-in-Editor: scan all AbstractUnitSO assets on disk.
-            string[] guids = AssetDatabase.FindAssets("t:AbstractUnitSO");
-            foreach (string guid in guids)
+            // Primary: load directly from the known project path.
+            AbstractUnitSO direct = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(DRONE_SO_PATH);
+            if (direct != null)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                AbstractUnitSO so = AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(path);
-                if (so != null && so.Prefab != null && so.Prefab.GetComponent<MiningDrone>() != null)
+                miningDroneUnitSO = direct;
+                Debug.Log($"[AI] Drone SO loaded from known path: {direct.Name}");
+                return;
+            }
+
+            // Fallback: scan concrete subtype assets (t:AbstractUnitSO fails; use concrete names).
+            foreach (string typeName in new[] { "t:UnitSO", "t:BuildingSO" })
+            {
+                foreach (string guid in UnityEditor.AssetDatabase.FindAssets(typeName))
                 {
-                    miningDroneUnitSO = so;
-                    Debug.Log($"[AI] Auto-discovered drone SO: {so.Name} at {path}");
-                    return;
+                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                    AbstractUnitSO so = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(path);
+                    if (so != null && so.Prefab != null && so.Prefab.GetComponent<MiningDrone>() != null)
+                    {
+                        miningDroneUnitSO = so;
+                        Debug.Log($"[AI] Drone SO discovered via scan: {so.Name} at {path}");
+                        return;
+                    }
                 }
             }
 #else
-            // In a built player: scan everything currently in memory.
+            // Built player: scan loaded memory.
             foreach (AbstractUnitSO so in Resources.FindObjectsOfTypeAll<AbstractUnitSO>())
             {
                 if (so.Prefab != null && so.Prefab.GetComponent<MiningDrone>() != null)
@@ -88,7 +104,7 @@ namespace GameDevTV.RTS.Units
                 }
             }
 #endif
-            Debug.LogWarning("[AI] Could not auto-discover a MiningDrone SO. Assign it manually on the AIController.");
+            Debug.LogWarning($"[AI] Could not find drone SO at '{DRONE_SO_PATH}'. Assign miningDroneUnitSO manually on the AIController Inspector.");
         }
 
         // ── Boot ──────────────────────────────────────────────────────────────
@@ -96,10 +112,35 @@ namespace GameDevTV.RTS.Units
         {
             yield return new WaitForSeconds(startDelay);
 
-            Debug.Log($"[AI] {aiOwner} starting. commandPostPrefab={(commandPostPrefab != null ? commandPostPrefab.name : "NULL")}, commandPostSO={(commandPostSO != null ? commandPostSO.Name : "NULL")}, miningDroneUnitSO={(miningDroneUnitSO != null ? miningDroneUnitSO.Name : "NULL")}, maxDrones={maxDrones}");
+            // Grant the AI its own starting biomass pool, independent of the player's.
+            // We raise a SupplyEvent using whichever SupplySO is wired to minerals conversion
+            // in the Supplies component. We find it by checking loaded SOs.
+            GrantStartingBiomass();
+
+            Debug.Log($"[AI] {aiOwner} starting. commandPostPrefab={(commandPostPrefab != null ? commandPostPrefab.name : "NULL")}, commandPostSO={(commandPostSO != null ? commandPostSO.Name : "NULL")}, miningDroneUnitSO={(miningDroneUnitSO != null ? miningDroneUnitSO.Name : "NULL")}, maxDrones={maxDrones}, startingBiomass={startingAIBiomass}");
 
             SpawnCommandPost();
             InvokeRepeating(nameof(Tick), tickRate, tickRate);
+        }
+
+        /// <summary>
+        /// Grants the AI its own starting biomass by writing directly to the Supplies.Biomass
+        /// dictionary. Bypasses the SupplyEvent system entirely — no SO discovery needed.
+        /// </summary>
+        private void GrantStartingBiomass()
+        {
+            if (startingAIBiomass <= 0) return;
+            if (Player.Supplies.Biomass == null)
+            {
+                Debug.LogWarning("[AI] Supplies.Biomass dictionary is null — Supplies may not have initialized yet.");
+                return;
+            }
+
+            int current = Player.Supplies.Biomass.TryGetValue(aiOwner, out int b) ? b : 0;
+            int total   = current + startingAIBiomass;
+            Player.Supplies.Biomass[aiOwner] = total;
+            Player.Supplies.RaiseBiomassChanged(aiOwner, total);
+            Debug.Log($"[AI] {aiOwner} biomass set to {total} (was {current}, granted {startingAIBiomass}).");
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────
@@ -107,15 +148,24 @@ namespace GameDevTV.RTS.Units
         {
             if (evt.Unit.Owner != aiOwner) return;
 
-            if (evt.Unit.TryGetComponent(out MiningDrone drone))
+            // AbstractUnit inherits UnitSO from AbstractCommandable — access it directly.
+            if (miningDroneUnitSO == null || evt.Unit.UnitSO?.Name != miningDroneUnitSO.Name) return;
+
+            // Ensure the MiningDrone brain is present — add it at runtime if the prefab
+            // doesn't have it wired in the Inspector.
+            if (!evt.Unit.TryGetComponent(out MiningDrone drone))
             {
-                drones.Add(drone);
-                Debug.Log($"[AI] {aiOwner} drone spawned ({drones.Count}/{maxDrones}). commandPost={(commandPost != null ? commandPost.name : "null")}");
-                if (commandPost != null)
-                    drone.StartMining(commandPost.gameObject);
-                else
-                    Debug.LogWarning($"[AI] Drone spawned but commandPost is null — will wire on next tick.");
+                Debug.Log($"[AI] Adding MiningDrone component to {evt.Unit.name} at runtime.");
+                drone = evt.Unit.gameObject.AddComponent<MiningDrone>();
             }
+
+            drones.Add(drone);
+            Debug.Log($"[AI] {aiOwner} drone tracked ({drones.Count}/{maxDrones}). Starting mining.");
+
+            if (commandPost != null)
+                drone.StartMining(commandPost.gameObject);
+            else
+                Debug.LogWarning($"[AI] Drone spawned but commandPost is null — will wire on next tick.");
         }
 
         private void HandleUnitDeath(UnitDeathEvent evt)
@@ -211,7 +261,9 @@ namespace GameDevTV.RTS.Units
         }
 
         private bool IsInQueue(BaseBuilding building, UnlockableSO so)
-            => building.SOBeingBuilt == so || building.Queue.Contains(so);
+            // Guard SOBeingBuilt with QueueSize > 0: BaseBuilding never clears SOBeingBuilt
+            // after a build finishes, so the stale reference would block re-queuing forever.
+            => (building.QueueSize > 0 && building.SOBeingBuilt == so) || building.Queue.Contains(so);
 
         private void SpawnCommandPost()
         {
@@ -240,6 +292,8 @@ namespace GameDevTV.RTS.Units
             );
             int available = Player.Supplies.Biomass.TryGetValue(aiOwner, out int b) ? b : 0;
             bool afford   = cost + biomassReserve <= available;
+            if (!afford)
+                Debug.Log($"[AI] Cannot afford {unlockable.Name}: costs {unlockable.Cost.Minerals}min+{unlockable.Cost.Gas}gas = {cost} biomass, have {available} (reserve={biomassReserve})");
             return afford;
         }
     }
