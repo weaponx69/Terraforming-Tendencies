@@ -86,8 +86,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   <Supply>k__BackingField: {fileID: 11400000, guid: 7133a99a2b1288148aacd4bc1f66bf1f, type: 2}
-  <Amount>k__BackingField: 0
+  <Amount>k__BackingField: 1500
   <IsBusy>k__BackingField: 0
+  <IsVisible>k__BackingField: 0
 --- !u!1001 &2685076412139502142
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -212,7 +213,8 @@ PrefabInstance:
       propertyPath: m_Materials.Array.size
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 5392105738260280183, guid: 6f672a31584a6a748912a49c1dce2f0c, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

@@ -85,8 +85,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   <Supply>k__BackingField: {fileID: 11400000, guid: 0f09e06b77849bc49aa0ec4f318c0dd2, type: 2}
-  <Amount>k__BackingField: 0
+  <Amount>k__BackingField: 1500
   <IsBusy>k__BackingField: 0
+  <IsVisible>k__BackingField: 0
 --- !u!1001 &5343783336325319574
 PrefabInstance:
   m_ObjectHideFlags: 0

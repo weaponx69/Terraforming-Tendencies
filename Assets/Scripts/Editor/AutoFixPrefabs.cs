@@ -36,8 +36,36 @@ namespace GameDevTV.RTS.EditorScripts
                 .Where(p => p != null)
                 .ToArray();
 
+            SupplySO mineralSO = AssetDatabase.LoadAssetAtPath<SupplySO>("Assets/Gatherable Supplies/Minerals.asset");
+            foreach (GameObject crystalPrefab in crystalPrefabs)
+            {
+                bool changed = false;
+                if (!crystalPrefab.TryGetComponent<GatherableSupply>(out var gs))
+                {
+                    gs = crystalPrefab.AddComponent<GatherableSupply>();
+                    changed = true;
+                }
+
+                if (mineralSO != null)
+                {
+                    SerializedObject so = new SerializedObject(gs);
+                    SerializedProperty supplyProp = so.FindProperty("<Supply>k__BackingField");
+                    if (supplyProp.objectReferenceValue != mineralSO)
+                    {
+                        supplyProp.objectReferenceValue = mineralSO;
+                        so.ApplyModifiedPropertiesWithoutUndo();
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                {
+                    EditorUtility.SetDirty(crystalPrefab);
+                }
+            }
+
             // 3. Update Planet Config
-            PlanetConfig config = AssetDatabase.LoadAssetAtPath<PlanetConfig>("Assets/Settings/Planet 1 - Easy.asset");
+PlanetConfig config = AssetDatabase.LoadAssetAtPath<PlanetConfig>("Assets/Settings/Planet 1 - Easy.asset");
             if (config != null)
             {
                 config.SurfaceFeaturePrefabs = rockPrefabs.Concat(crystalPrefabs).ToArray();

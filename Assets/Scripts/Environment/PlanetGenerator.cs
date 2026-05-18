@@ -298,7 +298,8 @@ public void ClearPlanet()
                         Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
                         foreach (var r in ghostRenderers)
                         {
-                            foreach (var m in r.materials)
+                            Material[] sharedMaterials = r.sharedMaterials;
+                            foreach (var m in sharedMaterials)
                             {
                                 if (!isMineral)
                                 {
@@ -323,8 +324,33 @@ public void ClearPlanet()
                 }
                 }
 
-                private void ScatterResources()
+                private void EnsureGatherableSupply(GameObject go, string soPath)
                 {
+                    #if UNITY_EDITOR
+                    if (!go.TryGetComponent<GatherableSupply>(out var gs))
+                    {
+                        gs = go.AddComponent<GatherableSupply>();
+                    }
+
+                    if (go.GetComponent<Collider>() == null)
+                    {
+                        var col = go.AddComponent<BoxCollider>();
+                        col.size = new Vector3(2f, 2f, 2f);
+                    }
+
+                    SupplySO so = UnityEditor.AssetDatabase.LoadAssetAtPath<SupplySO>(soPath);
+                    if (so != null)
+                    {
+                        UnityEditor.SerializedObject serObj = new UnityEditor.SerializedObject(gs);
+                        serObj.FindProperty("<Supply>k__BackingField").objectReferenceValue = so;
+                        serObj.FindProperty("<Amount>k__BackingField").intValue = so.MaxAmount;
+                        serObj.ApplyModifiedPropertiesWithoutUndo();
+                    }
+                    #endif
+                }
+
+                private void ScatterResources()
+{
                 if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
 
                 int width = Config.MapWidth;

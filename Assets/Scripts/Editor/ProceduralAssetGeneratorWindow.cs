@@ -145,8 +145,23 @@ namespace GameDevTV.RTS.Environment.Editor
             MeshCollider mc = tempObj.AddComponent<MeshCollider>();
             mc.sharedMesh = generatedMesh;
 
+            if (type == AssetType.Crystal)
+            {
+                var gs = tempObj.AddComponent<GameDevTV.RTS.Environment.GatherableSupply>();
+                var mineralSO = AssetDatabase.LoadAssetAtPath<GameDevTV.RTS.Environment.SupplySO>("Assets/Gatherable Supplies/Minerals.asset");
+                if (mineralSO != null)
+                {
+                    // Use Reflection or a SerializedObject to set the private field if needed, 
+                    // but GatherableSupply.Supply has a public getter and a field that might be accessible or set via SerializedObject.
+                    // Let's use SerializedObject for safety.
+                    SerializedObject so = new SerializedObject(gs);
+                    so.FindProperty("<Supply>k__BackingField").objectReferenceValue = mineralSO;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+
             string prefabPath = $"{prefabFolder}/{fileName}.prefab";
-            PrefabUtility.SaveAsPrefabAsset(tempObj, prefabPath);
+PrefabUtility.SaveAsPrefabAsset(tempObj, prefabPath);
 
             DestroyImmediate(tempObj);
 

@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4512352820201025266}
   - component: {fileID: 1551288453234412379}
   - component: {fileID: 5272961475526034095}
+  - component: {fileID: 7479054489359591260}
   m_Layer: 0
   m_Name: RandomCrystal_Crystal_88113
   m_TagString: Untagged
@@ -113,3 +114,19 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: 641ea6cfc23c7a7caae6d6ba05c65c07, type: 2}
+--- !u!114 &7479054489359591260
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5528194672316312911}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 729bb45b4c50acd449385bcc3c54bb31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.GatherableSupply
+  <Supply>k__BackingField: {fileID: 11400000, guid: 0f09e06b77849bc49aa0ec4f318c0dd2, type: 2}
+  <Amount>k__BackingField: 1500
+  <IsBusy>k__BackingField: 0
+  <IsVisible>k__BackingField: 0

@@ -84,6 +84,6 @@ namespace GameDevTV.RTS.Behavior
             Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} SUCCESS! Found {CommandPost.Value.name} at {CommandPost.Value.transform.position}.");
 
             return Status.Success;
-            }
-            }
-            }
+        }
+    }
+}
