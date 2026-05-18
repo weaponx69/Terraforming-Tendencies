@@ -39,9 +39,10 @@ namespace GameDevTV.RTS.Units
         // ── Runtime state ──────────────────────────────────────────────────────
         private BaseBuilding commandPost;
         private readonly System.Collections.Generic.HashSet<Worker> drones = new();
+        private readonly System.Collections.Generic.Dictionary<Worker, GatherableSupply> assignedTargets = new();
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
-        private void Awake()
+private void Awake()
         {
             Bus<UnitSpawnEvent>.OnEvent[aiOwner]     += HandleUnitSpawn;
             Bus<UnitDeathEvent>.OnEvent[aiOwner]     += HandleUnitDeath;
@@ -200,7 +201,10 @@ namespace GameDevTV.RTS.Units
         private void HandleUnitDeath(UnitDeathEvent evt)
         {
             if (evt.Unit is Worker worker)
+            {
                 drones.Remove(worker);
+                assignedTargets.Remove(worker);
+            }
         }
 
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
@@ -298,11 +302,29 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            // 2. Idle drone reassignment
-            foreach (Worker drone in drones.ToList())
+            // 2. Idle drone reassignment (Greedy TSP Dispatch)
+            var idleDrones = drones.Where(d => d != null && d.IsIdle).ToList();
+            
+            // Clean up assigned targets for drones that are no longer idle or targeting that supply
+            foreach (var drone in drones.ToList())
             {
                 if (drone == null) continue;
+                if (!drone.IsIdle && assignedTargets.ContainsKey(drone))
+                {
+                    // If the drone is now moving/gathering, we keep the target tracked until it's "Done"
+                    // But if the command changed away from Gather, we should release it.
+                    if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                    {
+                        if (cmd.Value != UnitCommands.Gather)
+                        {
+                            assignedTargets.Remove(drone);
+                        }
+                    }
+                }
+            }
 
+            foreach (Worker drone in idleDrones)
+            {
                 // Ensure stopping distance and NavMesh snapping
                 if (drone.TryGetComponent(out NavMeshAgent navAgent))
                 {
@@ -317,21 +339,21 @@ namespace GameDevTV.RTS.Units
                     }
                 }
 
-                if (drone.IsIdle)
+                // Greedy selection: Find closest supply that isn't already assigned to someone else
+                GatherableSupply supply = FindNearestAvailableSupply(drone.transform.position, assignedTargets.Values.ToList());
+                
+                if (supply != null)
                 {
-                    GatherableSupply supply = FindNearestAvailableSupply(drone.transform.position);
-                    if (supply != null)
-                    {
-                        drone.Gather(supply);
-                        Debug.Log($"[AI] Reassigned idle drone {drone.name} to gather {supply.name}.");
-                    }
+                    assignedTargets[drone] = supply;
+                    drone.Gather(supply);
+                    Debug.Log($"[AI] Greedy Dispatch: Assigned {drone.name} to {supply.name}.");
                 }
             }
-        }
+            }
 
-        // ── Helpers ────────────────────────────────────────────────────────────
-        private GatherableSupply FindNearestAvailableSupply(Vector3 position)
-        {
+            // ── Helpers ────────────────────────────────────────────────────────────
+            private GatherableSupply FindNearestAvailableSupply(Vector3 position, System.Collections.Generic.List<GatherableSupply> excluded = null)
+            {
             float closestDistance = float.MaxValue;
             GatherableSupply closestSupply = null;
 
@@ -339,6 +361,7 @@ namespace GameDevTV.RTS.Units
             foreach (GatherableSupply supply in supplies)
             {
                 if (supply == null || supply.Amount <= 0) continue;
+                if (excluded != null && excluded.Contains(supply)) continue;
 
                 float dist = Vector3.Distance(position, supply.transform.position);
                 if (dist < closestDistance)
@@ -348,8 +371,14 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            // Fallback: If everything is excluded (all rocks have a drone), just pick the absolute closest un-mined rock
+            if (closestSupply == null && excluded != null && excluded.Count > 0)
+            {
+                return FindNearestAvailableSupply(position, null);
+            }
+
             return closestSupply;
-        }
+            }
 
         private bool IsInQueue(BaseBuilding building, UnlockableSO so)
             // Guard SOBeingBuilt with QueueSize > 0: BaseBuilding never clears SOBeingBuilt
