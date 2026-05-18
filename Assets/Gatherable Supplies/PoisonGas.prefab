@@ -4860,8 +4860,9 @@ GameObject:
   - component: {fileID: 4859880167833556}
   - component: {fileID: 198938402097657526}
   - component: {fileID: 199945756000676788}
-  - component: {fileID: 5392105738260280183}
   - component: {fileID: 791396712335223984}
+  - component: {fileID: 3598895241814663538}
+  - component: {fileID: 519317672925345086}
   m_Layer: 0
   m_Name: PoisonGas
   m_TagString: Untagged
@@ -9702,22 +9703,6 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
---- !u!114 &5392105738260280183
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1547757601392324}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 729bb45b4c50acd449385bcc3c54bb31, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.GatherableSupply
-  <Supply>k__BackingField: {fileID: 11400000, guid: 7133a99a2b1288148aacd4bc1f66bf1f, type: 2}
-  <Amount>k__BackingField: 1500
-  <IsBusy>k__BackingField: 0
-  <IsVisible>k__BackingField: 0
 --- !u!65 &791396712335223984
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -9739,6 +9724,34 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2, y: 2, z: 2}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &3598895241814663538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1547757601392324}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 729bb45b4c50acd449385bcc3c54bb31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.GatherableSupply
+  <Supply>k__BackingField: {fileID: 11400000, guid: 7133a99a2b1288148aacd4bc1f66bf1f, type: 2}
+  <Amount>k__BackingField: 1500
+  <IsBusy>k__BackingField: 0
+  <IsVisible>k__BackingField: 0
+--- !u!114 &519317672925345086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1547757601392324}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0dadfe932fc85d033b13f98bbc5c9b39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.HiddenResource
 --- !u!1 &1829032641278062
 GameObject:
   m_ObjectHideFlags: 0

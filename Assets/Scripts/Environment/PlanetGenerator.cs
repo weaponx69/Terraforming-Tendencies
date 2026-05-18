@@ -13,6 +13,10 @@ namespace GameDevTV.RTS.Environment
         public float CellSize = 1f;
         public bool SpawnFloraOnStart = false; // Default to barren planet
 
+        [Header("Resource Configurations")]
+        public SupplySO MineralsSupplySO;
+        public SupplySO GasSupplySO;
+
         private void Awake()
         {
             Instance = this;
@@ -25,6 +29,8 @@ namespace GameDevTV.RTS.Environment
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
             }
             
+            FixPreplacedGatherables();
+
             // Only generate if we haven't already generated it in the editor
             if (GetComponent<MeshFilter>().sharedMesh == null)
             {
@@ -35,7 +41,7 @@ namespace GameDevTV.RTS.Environment
                 // If it was pre-generated in editor, we still need to bake navmesh
                 BakeAllNavMeshes();
             }
-            }
+        }
 
             private void BakeAllNavMeshes()
             {
@@ -261,8 +267,13 @@ public void ClearPlanet()
                 float scaleVar = Random.Range(0.8f, 1.3f);
                 instance.transform.localScale *= scaleVar;
 
-                // Tint check: minerals/crystals stay as they are
+                // Ensure GatherableSupply is correctly configured if it's a mineral/crystal
                 bool isMineral = instance.name.ToLower().Contains("crystal") || instance.name.ToLower().Contains("mineral");
+                if (isMineral)
+                {
+                    EnsureGatherableSupply(instance, "Assets/Gatherable Supplies/Minerals.asset");
+                }
+                
                 Color groundColor = new Color(0.65f, 0.35f, 0.20f);
 
                 if (!isMineral)
@@ -270,7 +281,8 @@ public void ClearPlanet()
                     Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
                     foreach (var r in renderers)
                     {
-                        foreach (var m in r.materials)
+                        Material[] sharedMaterials = r.sharedMaterials;
+                        foreach (var m in sharedMaterials)
                         {
                             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
                             else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
@@ -282,7 +294,7 @@ public void ClearPlanet()
                 {
                     instance.AddComponent<HiddenResource>();
                 }
-                
+
                 float mapWidthWorld = width * CellSize;
                 float mapHeightWorld = height * CellSize;
                 for (int gx = -1; gx <= 1; gx++)
@@ -324,30 +336,61 @@ public void ClearPlanet()
                 }
                 }
 
-                private void EnsureGatherableSupply(GameObject go, string soPath)
+        private void FixPreplacedGatherables()
+        {
+            foreach (Transform child in transform)
+            {
+                if (child == null) continue;
+                string nameLower = child.name.ToLower();
+                
+                bool isMineral = nameLower.Contains("crystal") || nameLower.Contains("mineral");
+                bool isGas = nameLower.Contains("gas");
+                
+                if (isMineral || isGas)
                 {
-                    #if UNITY_EDITOR
-                    if (!go.TryGetComponent<GatherableSupply>(out var gs))
-                    {
-                        gs = go.AddComponent<GatherableSupply>();
-                    }
-
-                    if (go.GetComponent<Collider>() == null)
-                    {
-                        var col = go.AddComponent<BoxCollider>();
-                        col.size = new Vector3(2f, 2f, 2f);
-                    }
-
-                    SupplySO so = UnityEditor.AssetDatabase.LoadAssetAtPath<SupplySO>(soPath);
-                    if (so != null)
-                    {
-                        UnityEditor.SerializedObject serObj = new UnityEditor.SerializedObject(gs);
-                        serObj.FindProperty("<Supply>k__BackingField").objectReferenceValue = so;
-                        serObj.FindProperty("<Amount>k__BackingField").intValue = so.MaxAmount;
-                        serObj.ApplyModifiedPropertiesWithoutUndo();
-                    }
-                    #endif
+                    string soPath = isGas ? "Assets/Gatherable Supplies/Gas.asset" : "Assets/Gatherable Supplies/Minerals.asset";
+                    EnsureGatherableSupply(child.gameObject, soPath);
                 }
+            }
+        }
+
+        private void EnsureGatherableSupply(GameObject go, string soPath)
+        {
+            if (!go.TryGetComponent<GatherableSupply>(out var gs))
+            {
+                gs = go.AddComponent<GatherableSupply>();
+            }
+
+            if (go.GetComponent<Collider>() == null)
+            {
+                var col = go.AddComponent<BoxCollider>();
+                col.size = new Vector3(2f, 2f, 2f);
+            }
+
+            // Determine which SupplySO to use based on fields or loading path
+            SupplySO so = null;
+            if (soPath.ToLower().Contains("gas"))
+            {
+                so = GasSupplySO;
+            }
+            else
+            {
+                so = MineralsSupplySO;
+            }
+
+            #if UNITY_EDITOR
+            if (so == null)
+            {
+                so = UnityEditor.AssetDatabase.LoadAssetAtPath<SupplySO>(soPath);
+            }
+            #endif
+
+            if (so != null)
+            {
+                gs.Supply = so;
+                gs.Amount = so.MaxAmount;
+            }
+        }
 
                 private void ScatterResources()
 {
@@ -391,6 +434,10 @@ public void ClearPlanet()
                 Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
                 GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
                 
+                // Ensure GatherableSupply is correctly configured
+                string soPath = instance.name.ToLower().Contains("gas") ? "Assets/Gatherable Supplies/Gas.asset" : "Assets/Gatherable Supplies/Minerals.asset";
+                EnsureGatherableSupply(instance, soPath);
+
                 if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
                 {
                     instance.AddComponent<HiddenResource>();

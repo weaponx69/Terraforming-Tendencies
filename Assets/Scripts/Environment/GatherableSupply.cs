@@ -7,10 +7,11 @@ using UnityEngine;
 
 namespace GameDevTV.RTS.Environment
 {
+    [SelectionBase]
     public class GatherableSupply : MonoBehaviour, IGatherable, IHideable
-    {
-        [field: SerializeField] public SupplySO Supply { get; private set; }
-        [field: SerializeField] public int Amount { get; private set; }
+{
+        [field: SerializeField] public SupplySO Supply { get; set; }
+        [field: SerializeField] public int Amount { get; set; }
         [field: SerializeField] public bool IsBusy { get; private set; }
         [field: SerializeField] public bool IsVisible { get; private set; }
         public Transform Transform => this == null ? null : transform;
@@ -125,8 +126,10 @@ namespace GameDevTV.RTS.Environment
             if (culledVisuals == null)
             {
                 MeshRenderer mainRenderer = GetComponentInChildren<MeshRenderer>();
+                if (mainRenderer == null) return; // Cannot create culled visuals without a MeshRenderer
+                
                 Transform originalRendererTransform = mainRenderer.transform;
-                GameObject culledGO = new ($"Culled {name} Visuals")
+GameObject culledGO = new ($"Culled {name} Visuals")
                 {
                     layer = LayerMask.GetMask("TransparentFX"),
                     transform =

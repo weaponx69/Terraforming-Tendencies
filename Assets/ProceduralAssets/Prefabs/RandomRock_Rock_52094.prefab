@@ -12,6 +12,9 @@ GameObject:
   - component: {fileID: 2994147235883011402}
   - component: {fileID: 6589323803381817812}
   - component: {fileID: 2386645786741011654}
+  - component: {fileID: 6086753944577662882}
+  - component: {fileID: 5784848505762010966}
+  - component: {fileID: 2231696079504072944}
   m_Layer: 0
   m_Name: RandomRock_Rock_52094
   m_TagString: Untagged
@@ -113,3 +116,43 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: 18dbbce37f6cb1e518c0c6747a896755, type: 2}
+--- !u!114 &6086753944577662882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5471120279853441908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 729bb45b4c50acd449385bcc3c54bb31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.GatherableSupply
+  <Supply>k__BackingField: {fileID: 11400000, guid: 0f09e06b77849bc49aa0ec4f318c0dd2, type: 2}
+  <Amount>k__BackingField: 1500
+  <IsBusy>k__BackingField: 0
+  <IsVisible>k__BackingField: 0
+--- !u!114 &5784848505762010966
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5471120279853441908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9daf5d6a308175f93bbf4e0d70cbc0be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.DepletionVisuals
+--- !u!114 &2231696079504072944
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5471120279853441908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0dadfe932fc85d033b13f98bbc5c9b39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.HiddenResource

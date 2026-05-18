@@ -11,7 +11,8 @@ GameObject:
   - component: {fileID: 1715156035423810196}
   - component: {fileID: 156581915902003394}
   - component: {fileID: 3302149800397012042}
-  - component: {fileID: 6206672705603090112}
+  - component: {fileID: 1679232807606695370}
+  - component: {fileID: 5913413181411727376}
   m_Layer: 9
   m_Name: Gas
   m_TagString: Untagged
@@ -73,7 +74,7 @@ NavMeshObstacle:
   m_CarveOnlyStationary: 1
   m_Center: {x: 0.15, y: 0, z: 0}
   m_TimeToStationary: 0.5
---- !u!114 &6206672705603090112
+--- !u!114 &1679232807606695370
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -84,11 +85,23 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 729bb45b4c50acd449385bcc3c54bb31, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.GatherableSupply
   <Supply>k__BackingField: {fileID: 11400000, guid: 7133a99a2b1288148aacd4bc1f66bf1f, type: 2}
   <Amount>k__BackingField: 1500
   <IsBusy>k__BackingField: 0
   <IsVisible>k__BackingField: 0
+--- !u!114 &5913413181411727376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2281804471223176727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0dadfe932fc85d033b13f98bbc5c9b39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.HiddenResource
 --- !u!1001 &2685076412139502142
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -215,6 +228,9 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 5392105738260280183, guid: 6f672a31584a6a748912a49c1dce2f0c, type: 3}
+    - {fileID: 8035925059789741242, guid: 6f672a31584a6a748912a49c1dce2f0c, type: 3}
+    - {fileID: 7236576771461619764, guid: 6f672a31584a6a748912a49c1dce2f0c, type: 3}
+    - {fileID: 1920857182681827590, guid: 6f672a31584a6a748912a49c1dce2f0c, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
