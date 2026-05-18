@@ -39,6 +39,13 @@ namespace GameDevTV.RTS.Behavior
             agent.TryGetComponent(out animator);
 
             Vector3 targetPosition = GetTargetPosition();
+            float distance = Vector3.Distance(agent.transform.position, targetPosition);
+
+            if (distance <= agent.stoppingDistance + 0.1f)
+            {
+                return Status.Success;
+            }
+
             bool setDestResult = agent.SetDestination(targetPosition);
 
             Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} OnStart: targetPosition={targetPosition}, setDestResult={setDestResult}, agentDest={agent.destination}, supply={Supply.Value.name}, pathPending={agent.pathPending}");
@@ -63,8 +70,8 @@ namespace GameDevTV.RTS.Behavior
             }
 
             // Treat as arrived if either agent reports remainingDistance is close
-            // OR if the direct Euclidean distance is within stopping distance + 0.5f buffer.
-            bool hasArrived = (agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.5f);
+            // OR if the direct Euclidean distance is within stopping distance + 0.1f buffer.
+            bool hasArrived = (agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.1f);
 
             if (!hasArrived)
             {

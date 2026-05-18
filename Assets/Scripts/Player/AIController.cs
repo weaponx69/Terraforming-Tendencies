@@ -156,7 +156,7 @@ namespace GameDevTV.RTS.Units
                 // from getting physically blocked by resource and Command Post colliders!
                 if (worker.TryGetComponent(out NavMeshAgent navAgent))
                 {
-                    navAgent.stoppingDistance = 1.5f;
+                    navAgent.stoppingDistance = 0.5f;
 
                     // Warp onto NavMesh if not already on it
                     if (!navAgent.isOnNavMesh)
@@ -306,7 +306,7 @@ namespace GameDevTV.RTS.Units
                 // Ensure stopping distance and NavMesh snapping
                 if (drone.TryGetComponent(out NavMeshAgent navAgent))
                 {
-                    navAgent.stoppingDistance = 1.5f;
+                    navAgent.stoppingDistance = 0.5f;
                     if (!navAgent.isOnNavMesh)
                     {
                         if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))

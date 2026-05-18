@@ -33,7 +33,7 @@ namespace GameDevTV.RTS.Behavior
             Vector3 targetPosition = GetTargetPosition();
             float distance = Vector3.Distance(agent.transform.position, targetPosition);
 
-            if (distance <= agent.stoppingDistance + 0.5f)
+            if (distance <= agent.stoppingDistance + 0.1f)
             {
                 Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} already at destination {TargetGameObject.Value.name}. distance={distance}, stoppingDistance={agent.stoppingDistance}");
                 return Status.Success;
@@ -75,7 +75,7 @@ namespace GameDevTV.RTS.Behavior
             }
 
             float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
-            if (agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.5f)
+            if (agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.1f)
             {
                 Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} arrived at {TargetGameObject.Value.name} successfully. directDistance={directDistance}, remainingDistance={agent.remainingDistance}");
                 return Status.Success;
