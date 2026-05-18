@@ -43,6 +43,12 @@ namespace GameDevTV.RTS.Behavior
             {
                 animator.SetFloat(AnimationConstants.SPEED, agent.velocity.magnitude);
             }
+
+            if (agent.pathPending)
+            {
+                return Status.Running;
+            }
+
             if (agent.remainingDistance <= agent.stoppingDistance)
             {
                 return Status.Success;

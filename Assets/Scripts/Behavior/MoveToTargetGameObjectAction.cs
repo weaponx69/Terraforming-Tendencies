@@ -58,6 +58,11 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Failure;
             }
 
+            if (agent.pathPending)
+            {
+                return Status.Running;
+            }
+
             Vector3 targetPosition = GetTargetPosition();
             Vector3 currentTargetObjectPos = TargetGameObject.Value.transform.position;
             
