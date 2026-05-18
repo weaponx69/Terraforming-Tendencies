@@ -303,13 +303,13 @@ private void Awake()
             }
 
             // 2. Idle drone reassignment (Greedy TSP Dispatch)
-            var idleDrones = drones.Where(d => d != null && d.IsIdle).ToList();
+            var idleDrones = drones.Where(d => d != null && IsDroneEligibleForAssignment(d)).ToList();
             
-            // Clean up assigned targets for drones that are no longer idle or targeting that supply
+            // Clean up assigned targets for drones that are no longer eligible or targeting something else
             foreach (var drone in drones.ToList())
             {
                 if (drone == null) continue;
-                if (!drone.IsIdle && assignedTargets.ContainsKey(drone))
+                if (!IsDroneEligibleForAssignment(drone) && assignedTargets.ContainsKey(drone))
                 {
                     // If the drone is now moving/gathering, we keep the target tracked until it's "Done"
                     // But if the command changed away from Gather, we should release it.

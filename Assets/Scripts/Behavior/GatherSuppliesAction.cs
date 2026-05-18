@@ -5,6 +5,7 @@ using UnityEngine;
 using Action = Unity.Behavior.Action;
 using Unity.Properties;
 using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.Units;
 
 namespace GameDevTV.RTS.Behavior
 {
@@ -70,6 +71,29 @@ namespace GameDevTV.RTS.Behavior
             {
                 int gathered = GatherableSupplies.Value.EndGather();
                 Amount.Value = gathered;
+                
+                // Damage drone if mining poison gas
+                if (GatherableSupplies.Value != null && GatherableSupplies.Value.name.Contains("PoisonGas"))
+                {
+                    if (Unit.Value.TryGetComponent(out IDamageable damageable))
+                    {
+                        damageable.TakeDamage(10);
+                        Debug.Log($"<color=red>[Poison]</color> {Unit.Value.name} took 10 damage from mining {GatherableSupplies.Value.name}.");
+                    }
+                    
+                    if (Unit.Value.TryGetComponent(out BehaviorGraphAgent bgAgent))
+                    {
+                        bgAgent.SetVariableValue("IsCarryingPoison", true);
+                    }
+                }
+                else
+                {
+                    if (Unit.Value.TryGetComponent(out BehaviorGraphAgent bgAgent))
+                    {
+                        bgAgent.SetVariableValue("IsCarryingPoison", false);
+                    }
+                }
+
                 Debug.Log($"<color=green>[Gathering]</color> {Unit.Value.name} gathered exactly <b>{gathered}</b> {SupplySO.Value.name} from {GatherableSupplies.Value.name}");
 
                 if (EventChannel != null && EventChannel.Value != null)

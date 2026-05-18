@@ -143,6 +143,40 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
+            // Damage the nearest building (the delivery point) if delivering poison gas
+            bool isPoisonous = false;
+            if (graphAgent.GetVariable("IsCarryingPoison", out BlackboardVariable<bool> poisonVar))
+            {
+                isPoisonous = poisonVar.Value;
+            }
+
+            if (isPoisonous)
+            {
+                BaseBuilding[] buildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                float minDistance = 5f; // Must be close to the building to damage it
+                BaseBuilding targetBuilding = null;
+
+                foreach (var b in buildings)
+                {
+                    if (b.Owner != Owner) continue;
+                    float dist = Vector3.Distance(transform.position, b.transform.position);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        targetBuilding = b;
+                    }
+                }
+
+                if (targetBuilding != null)
+                {
+                    targetBuilding.TakeDamage(10);
+                    Debug.Log($"<color=red>[Corrosive]</color> {targetBuilding.name} took 10 damage from {name} delivering poisonous gas.");
+                }
+                
+                // Reset the flag after delivery
+                graphAgent.SetVariableValue("IsCarryingPoison", false);
+            }
+
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, amount, supply));
         }
 
