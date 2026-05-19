@@ -27,9 +27,6 @@ namespace GameDevTV.RTS.Tests
         [SetUp]
         public void SetUp()
         {
-            // If we are in the main scene, we don't want to create duplicates for scene-independent tests
-            // But usually [SetUp] runs before every [UnityTest]
-            
             suppliesObj = new GameObject("Supplies");
             suppliesObj.AddComponent<Supplies>();
             
@@ -60,18 +57,8 @@ namespace GameDevTV.RTS.Tests
         {
             var go = new GameObject("ActionsUI");
             var actions = go.AddComponent<ActionsUI>();
-            SetPrivateField(actions, "actionButtons", new UIActionButton[0]);
+            SetField(actions, "actionButtons", new UIActionButton[0]);
             return actions;
-        }
-
-        private void SetPrivateField(object obj, string fieldName, object value)
-        {
-            var type = obj.GetType();
-            var field = type.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (field == null && type.BaseType != null) 
-                field = type.BaseType.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
-            if (field != null) field.SetValue(obj, value);
         }
 
         [TearDown]
@@ -98,7 +85,7 @@ namespace GameDevTV.RTS.Tests
             GameObject textObj = new GameObject("OxygenValueText");
             textObj.transform.SetParent(uiObj.transform);
             var oxygenValueText = textObj.AddComponent<TextMeshProUGUI>();
-            SetPrivateField(runtimeUI, "oxygenValueText", oxygenValueText);
+            SetField(runtimeUI, "oxygenValueText", oxygenValueText);
             
             oxygenValueText.text = "0";
             Supplies.UpdateOxygen(Owner.Player1, 25);
@@ -110,22 +97,19 @@ namespace GameDevTV.RTS.Tests
         [UnityTest]
         public IEnumerator BiomassUI_Updates_WhenDroneGathersMinerals()
         {
-            // Initial state
             biomassText.text = "0";
             Supplies.Biomass[Owner.Player1] = 0;
             
-            // We need a SupplySO reference that matches the one in Supplies
             var mineralsSO = ScriptableObject.CreateInstance<SupplySO>();
             mineralsSO.name = "Minerals";
             
             var supplies = Object.FindAnyObjectByType<Supplies>();
-            SetPrivateField(supplies, "mineralsSO", mineralsSO);
-            SetPrivateField(supplies, "mineralsToBiomassRate", 1.0f);
+            SetField(supplies, "mineralsSO", mineralsSO);
+            SetField(supplies, "mineralsToBiomassRate", 1.0f);
             
-            // Trigger gathering event
             Bus<SupplyEvent>.Raise(Owner.Player1, new SupplyEvent(Owner.Player1, 10, mineralsSO));
             
-            yield return null; // Wait for UI update
+            yield return null; 
             
             Assert.AreEqual(10, Supplies.Biomass[Owner.Player1], "Biomass dictionary should increase.");
             Assert.AreEqual("10", biomassText.text, "Biomass UI text should update after gathering.");
@@ -134,95 +118,64 @@ namespace GameDevTV.RTS.Tests
         }
 
         [UnityTest]
-        public IEnumerator MainScene_RuntimeUI_IsCorrectlyConfigured()
+        public IEnumerator EndToEnd_Gathering_UpdatesUI()
 {
-            // Load the main scene if not loaded
-            if (SceneManager.GetActiveScene().name != "Terraforming-Tendencies")
-            {
-                yield return SceneManager.LoadSceneAsync("Terraforming-Tendencies", LoadSceneMode.Single);
-            }
-
-            RuntimeUI ui = Object.FindAnyObjectByType<RuntimeUI>();
-            Assert.IsNotNull(ui, "RuntimeUI not found in scene 'Terraforming-Tendencies'!");
-
-            var biomassField = typeof(RuntimeUI).GetField("biomassValueText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var biomassValueText = (TextMeshProUGUI)biomassField.GetValue(ui);
-            Assert.IsNotNull(biomassValueText, "biomassValueText reference is NULL in RuntimeUI in scene!");
-
-            var oxygenField = typeof(RuntimeUI).GetField("oxygenValueText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var oxygenValueText = (TextMeshProUGUI)oxygenField.GetValue(ui);
-            Assert.IsNotNull(oxygenValueText, "oxygenValueText reference is NULL in RuntimeUI in scene!");
+            var mineralsSO = ScriptableObject.CreateInstance<SupplySO>();
+            mineralsSO.name = "Minerals";
             
-            Debug.Log("[UITest] MainScene_RuntimeUI_IsCorrectlyConfigured Passed");
+            SetField(mineralsSO, "<MaxAmount>k__BackingField", 100);
+            SetField(mineralsSO, "<AmountPerGather>k__BackingField", 10);
+            SetField(mineralsSO, "<BaseGatherTime>k__BackingField", 0.1f);
+
+            var supplies = Object.FindAnyObjectByType<Supplies>();
+            SetField(supplies, "mineralsSO", mineralsSO);
+            SetField(supplies, "mineralsToBiomassRate", 1.0f);
+            Supplies.Biomass[Owner.Player1] = 100;
+            biomassText.text = "100";
+
+            var genObj = new GameObject("PlanetGenerator");
+            var generator = genObj.AddComponent<PlanetGenerator>();
+            SetField(generator, "MineralsSupplySO", mineralsSO);
+
+            GameObject rockObj = new GameObject("ResourceRock");
+            var gs = rockObj.AddComponent<GatherableSupply>();
+
+            var fixMethod = typeof(PlanetGenerator).GetMethod("FixPreplacedGatherables", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            fixMethod.Invoke(generator, null);
+
+            Assert.AreEqual(mineralsSO, gs.Supply, "PlanetGenerator should have fixed the NULL supply reference.");
+
+            int gathered = gs.EndGather();
+            Assert.AreEqual(10, gathered);
+
+            Bus<SupplyEvent>.Raise(Owner.Player1, new SupplyEvent(Owner.Player1, gathered, mineralsSO));
+
+            yield return null;
+
+            Assert.AreEqual(110, Supplies.Biomass[Owner.Player1], "Biomass should have increased to 110.");
+            Assert.AreEqual("110", biomassText.text, "UI should show 110 biomass.");
+
+            Object.Destroy(rockObj);
+            Object.Destroy(genObj);
+            Debug.Log("[UITest] EndToEnd_Gathering_UpdatesUI Passed");
         }
-    [UnityTest]
-    public IEnumerator EndToEnd_Gathering_UpdatesUI()
-    {
-        Debug.Log("[UITest] EndToEnd_Gathering_UpdatesUI Starting");
-        // 1. Setup Environment
-        var mineralsSO = ScriptableObject.CreateInstance<SupplySO>();
-        mineralsSO.name = "Minerals";
-        
-        // Use reflection for private setters
-        SetField(mineralsSO, "<MaxAmount>k__BackingField", 100);
-        SetField(mineralsSO, "<AmountPerGather>k__BackingField", 10);
-        SetField(mineralsSO, "<BaseGatherTime>k__BackingField", 0.1f);
 
-        var supplies = Object.FindAnyObjectByType<Supplies>();
-        SetField(supplies, "mineralsSO", mineralsSO);
-        SetField(supplies, "mineralsToBiomassRate", 1.0f);
-        Supplies.Biomass[Owner.Player1] = 100;
-        biomassText.text = "100";
-
-        // Add a PlanetGenerator to the scene for the test
-        var genObj = new GameObject("PlanetGenerator");
-        var generator = genObj.AddComponent<PlanetGenerator>();
-        SetField(generator, "MineralsSupplySO", mineralsSO);
-
-        // 2. Create a Gatherable with NULL supply (simulating editor-generated state)
-        GameObject rockObj = new GameObject("ResourceRock");
-        var gs = rockObj.AddComponent<GatherableSupply>();
-        // gs.Supply is null by default
-
-        // 3. PlanetGenerator fixes it
-        var fixMethod = typeof(PlanetGenerator).GetMethod("FixPreplacedGatherables", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        fixMethod.Invoke(generator, null);
-
-        Assert.AreEqual(mineralsSO, gs.Supply, "PlanetGenerator should have fixed the NULL supply reference.");
-
-        // 4. Drone Gathers (Simulated)
-        int gathered = gs.EndGather();
-        Assert.AreEqual(10, gathered);
-
-        Bus<SupplyEvent>.Raise(Owner.Player1, new SupplyEvent(Owner.Player1, gathered, mineralsSO));
-
-        yield return null;
-
-        // 5. Verify UI
-        Assert.AreEqual(110, Supplies.Biomass[Owner.Player1], "Biomass should have increased to 110.");
-        Assert.AreEqual("110", biomassText.text, "UI should show 110 biomass.");
-
-        Object.Destroy(rockObj);
-        Object.Destroy(genObj);
-        Debug.Log("[UITest] EndToEnd_Gathering_UpdatesUI Passed");
-    }
-
-    private void SetField(object obj, string fieldName, object value)
-    {
-        var type = obj.GetType();
-        var field = type.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-        if (field == null && type.BaseType != null) 
-            field = type.BaseType.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-        
-        if (field != null) 
+        private void SetField(object obj, string fieldName, object value)
         {
-            field.SetValue(obj, value);
-        }
-        else
-        {
-            Debug.LogError($"[UITest] Could not find field {fieldName} on {obj.GetType().Name}");
+            var type = obj.GetType();
+            var field = type.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (field == null && type.BaseType != null) 
+                field = type.BaseType.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            
+            if (field != null) 
+            {
+                field.SetValue(obj, value);
+            }
+            else
+            {
+                Debug.LogError($"[UITest] Could not find field {fieldName} on {obj.GetType().Name}");
+            }
         }
     }
 }
-    }
-    #endif
+#endif

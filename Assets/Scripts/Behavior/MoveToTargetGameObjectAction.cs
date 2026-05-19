@@ -143,7 +143,8 @@ namespace GameDevTV.RTS.Behavior
             targetPos += randomOffset;
 
             // Ensure the final position is valid on the NavMesh
-            if (NavMesh.SamplePosition(targetPos, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(targetPos, out NavMeshHit hit, 5.0f, filter))
             {
                 targetPos = hit.position;
             }

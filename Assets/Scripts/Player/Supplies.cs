@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
@@ -15,12 +14,10 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private float gasToBiomassRate = 1f;
         [SerializeField] private int startingBiomass = 1000;
 
-        // Oxygen (new)
         [SerializeField] private SupplySO oxygenSO;
         public static Dictionary<Owner, int> Oxygen { get; private set; }
-        public static event Action<Owner,int> OnOxygenChanged;
+        public static event Action<Owner, int> OnOxygenChanged;
 
-        // static copies of rates so other classes (commands) can compute costs
         public static float MineralsToBiomassRateStatic { get; private set; } = 1f;
         public static float GasToBiomassRateStatic { get; private set; } = 1f;
 
@@ -31,56 +28,54 @@ namespace GameDevTV.RTS.Player
         public static Dictionary<Owner, int> Population { get; private set; }
         public static Dictionary<Owner, int> PopulationLimit { get; private set; }
 
-        // Events
         public static event System.Action<Owner, int> OnBiomassChanged;
         public static event System.Action OnVictory;
 
-        // Optional helper to centralize raising the event
         public static void RaiseBiomassChanged(Owner owner, int value)
         {
             OnBiomassChanged?.Invoke(owner, value);
         }
 
+        public static Supplies Instance { get; private set; }
+
         private void Awake()
         {
-            Biomass = new Dictionary<Owner, int>();
-            Population = new Dictionary<Owner, int>();
-            PopulationLimit = new Dictionary<Owner, int>();
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning($"[Supplies] Multiple instances detected. Destroying duplicate on {gameObject.name}");
+                Destroy(this);
+                return;
+            }
+            Instance = this;
 
-            // init oxygen dictionary
-            Oxygen = new Dictionary<Owner, int>();
+            if (Biomass == null) Biomass = new Dictionary<Owner, int>();
+            if (Population == null) Population = new Dictionary<Owner, int>();
+            if (PopulationLimit == null) PopulationLimit = new Dictionary<Owner, int>();
+            if (Oxygen == null) Oxygen = new Dictionary<Owner, int>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                Biomass.Add(owner, 0);
-                Population.Add(owner, 0);
-                PopulationLimit.Add(owner, 0);
-                Oxygen.Add(owner, 0);
+                if (!Biomass.ContainsKey(owner)) Biomass.Add(owner, startingBiomass);
+                if (!Population.ContainsKey(owner)) Population.Add(owner, 0);
+                if (!PopulationLimit.ContainsKey(owner)) PopulationLimit.Add(owner, 0);
+                if (!Oxygen.ContainsKey(owner)) Oxygen.Add(owner, 0);
             }
 
-            // publish selected conversion rates for static use
             MineralsToBiomassRateStatic = mineralsToBiomassRate;
             GasToBiomassRateStatic = gasToBiomassRate;
 
-            // Grant starting biomass to all owners
-            foreach (Owner owner in Enum.GetValues(typeof(Owner)))
-            {
-                if (Biomass.ContainsKey(owner))
-                    Biomass[owner] = startingBiomass;
-            }
-
             OnOxygenChanged += HandleOxygenChanged;
 
-            if (Biomass.TryGetValue(Owner.Player1, out int initial))
-            {
-                OnBiomassChanged?.Invoke(Owner.Player1, initial);
-            }
-
+            Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent); 
             Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
+            
+            Owner displayOwner = GameOverManager.MonitoredOwner;
+            RaiseBiomassChanged(displayOwner, Biomass[displayOwner]);
         }
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             OnOxygenChanged -= HandleOxygenChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
         }
@@ -89,7 +84,6 @@ namespace GameDevTV.RTS.Player
         {
             if (owner == Owner.AI1 || owner == Owner.Player1)
             {
-                Debug.Log($"[Supplies] HandleOxygenChanged for {owner}: {value}%");
                 if (value >= 100)
                 {
                     OnVictory?.Invoke();
@@ -102,55 +96,47 @@ namespace GameDevTV.RTS.Player
             if (Oxygen != null && Oxygen.ContainsKey(owner))
             {
                 Oxygen[owner] = value;
-                Debug.Log($"[Supplies] Static UpdateOxygen called for {owner}: {value}%");
                 OnOxygenChanged?.Invoke(owner, value);
-            }
-            else
-            {
-                Debug.LogWarning($"[Supplies] Static UpdateOxygen failed. Oxygen dict null or key missing for {owner}");
             }
         }
 
         private void HandleSupplyEvent(SupplyEvent evt)
         {
-            // Defensive: evt.Supply may be null in some cases. Ignore if so.
             if (evt.Supply == null) 
             {
-                Debug.LogWarning($"[Supplies] HandleSupplyEvent received NULL supply from {evt.Owner}");
+                Biomass[evt.Owner] += evt.Amount;
+                Debug.Log($"[Supplies] {evt.Owner} received direct grant of {evt.Amount} Biomass. Total: {Biomass[evt.Owner]}");
+                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]);
                 return;
             }
 
-            Debug.Log($"[Supplies] Event received: Owner={evt.Owner}, Amount={evt.Amount}, Supply={evt.Supply.name}");
-
-            // Convert minerals/gas supply events to biomass centrally.
-            if (evt.Supply == mineralsSO)
+            string sName = evt.Supply.name.ToLower();
+            bool isMinerals = (mineralsSO != null && evt.Supply == mineralsSO) || sName.Contains("minerals");
+            bool isGas = (gasSO != null && evt.Supply == gasSO) || sName.Contains("gas");
+            bool isOxygen = (oxygenSO != null && evt.Supply == oxygenSO) || sName.Contains("oxygen");
+            
+            if (isMinerals)
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * mineralsToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
-                Debug.Log($"[Supplies] Minerals converted to {biomassAmount} biomass for {evt.Owner}. New Total={Biomass[evt.Owner]}");
-                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); // Raise event
-                return; // handled centrally - don't modify Minerals/Gas
+                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} minerals -> +{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
+                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
+                return;
             }
-            else if (evt.Supply == gasSO)
+            else if (isGas)
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * gasToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
-                Debug.Log($"[Supplies] Gas converted to {biomassAmount} biomass for {evt.Owner}. New Total={Biomass[evt.Owner]}");
-                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); // Raise event
+                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} gas -> +{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
+                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
                 return;
             }
-            else if (evt.Supply == oxygenSO)
+            else if (isOxygen)
             {
-                // oxygen is a separate resource (no conversion)
                 Oxygen[evt.Owner] += evt.Amount;
-                Debug.Log($"[Supplies] Oxygen updated for {evt.Owner}. New Total={Oxygen[evt.Owner]}");
                 OnOxygenChanged?.Invoke(evt.Owner, Oxygen[evt.Owner]);
                 return;
             }
-            else
-            {
-                Debug.LogWarning($"[Supplies] Supply type '{evt.Supply.name}' not recognized as Minerals, Gas, or Oxygen.");
-            }
         }
+    }
 }
-            }

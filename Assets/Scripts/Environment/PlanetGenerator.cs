@@ -19,6 +19,12 @@ namespace GameDevTV.RTS.Environment
 
         private void Awake()
         {
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning($"[PlanetGenerator] Multiple instances detected. Destroying duplicate on {gameObject.name}");
+                Destroy(this);
+                return;
+            }
             Instance = this;
         }
 
@@ -75,10 +81,18 @@ namespace GameDevTV.RTS.Environment
                 foreach (var s in existingSurfaces)
                 {
                     s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
-                    s.layerMask = ~(1 << LayerMask.NameToLayer("TransparentFX"));
+                    
+                    int mask = ~0;
+int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+                    int buildingsLayer = LayerMask.NameToLayer("Buildings");
+                    
+                    if (transparentLayer != -1) mask &= ~(1 << transparentLayer);
+                    if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
+                    
+                    s.layerMask = mask;
                     s.BuildNavMesh();
                 }
-                }
+}
 
                 [ContextMenu("Clear Planet (Editor)")]
                 public void ClearPlanet()
@@ -201,30 +215,40 @@ namespace GameDevTV.RTS.Environment
                 float mapHeightWorld = height * CellSize;
 
                 int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+                if (transparentLayer == -1) transparentLayer = 1; // Fallback to layer 1
 
                 for (int x = -2; x <= 2; x++)
                 {
-                for (int z = -2; z <= 2; z++)
-                {
-                    if (x == 0 && z == 0) continue; 
-                    
-                    GameObject ghost = new GameObject($"Terrain Ghost ({x},{z})");
-                    ghost.transform.parent = transform;
-                    ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
-                    ghost.layer = transparentLayer;
-                    
-                    MeshFilter mf = ghost.AddComponent<MeshFilter>();
-                    mf.sharedMesh = mesh;
-                    
-                    MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
-                    mr.sharedMaterial = renderer.sharedMaterial;
-                }
+                    for (int z = -2; z <= 2; z++)
+                    {
+                        if (x == 0 && z == 0) continue; 
+                        
+                        GameObject ghost = new GameObject($"Terrain Ghost ({x},{z})");
+                        ghost.transform.parent = transform;
+                        ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
+                        SetLayerRecursive(ghost, transparentLayer);
+                        
+                        MeshFilter mf = ghost.AddComponent<MeshFilter>();
+                        mf.sharedMesh = mesh;
+                        
+                        MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
+                        mr.sharedMaterial = renderer.sharedMaterial;
+                    }
                 }
 
                 ScatterSurfaceFeatures();
                 ScatterResources();
 
                 BakeAllNavMeshes();
+                }
+
+                private void SetLayerRecursive(GameObject obj, int layer)
+                {
+                obj.layer = layer;
+                foreach (Transform child in obj.transform)
+                {
+                    SetLayerRecursive(child.gameObject, layer);
+                }
                 }
 
                 private Texture2D GenerateHeightGradient()
@@ -338,10 +362,10 @@ namespace GameDevTV.RTS.Environment
                         Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
                         GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
                         ghost.transform.localScale = instance.transform.localScale;
-                        ghost.layer = transparentLayer;
+                        SetLayerRecursive(ghost, transparentLayer);
                         
                         Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
-                        foreach (var r in ghostRenderers)
+foreach (var r in ghostRenderers)
                         {
                             Material[] sharedMaterials = r.sharedMaterials;
                             foreach (var m in sharedMaterials)
@@ -373,16 +397,22 @@ namespace GameDevTV.RTS.Environment
                 {
                     foreach (GatherableSupply gs in GetComponentsInChildren<GatherableSupply>(true))
                     {
-                        if (gs.Supply == null)
+                        string nameLower = gs.name.ToLower();
+                        bool isGas = nameLower.Contains("gas");
+                        bool isMinerals = nameLower.Contains("crystal") || nameLower.Contains("mineral") || nameLower.Contains("rock");
+
+                        if (isGas && (gs.Supply == null || gs.Supply.name != "Gas"))
                         {
-                            string nameLower = gs.name.ToLower();
-                            bool isGas = nameLower.Contains("gas");
-                            gs.Supply = isGas ? GasSupplySO : MineralsSupplySO;
+                            gs.Supply = GasSupplySO;
+                        }
+                        else if (isMinerals && (gs.Supply == null || gs.Supply.name != "Minerals"))
+                        {
+                            gs.Supply = MineralsSupplySO;
+                        }
                     
-                            if (gs.Supply != null && gs.Amount <= 0)
-                            {
-                                gs.Amount = gs.Supply.MaxAmount;
-                            }
+                        if (gs.Supply != null && gs.Amount <= 0)
+                        {
+                            gs.Amount = gs.Supply.MaxAmount;
                         }
                     }
                 }
@@ -470,10 +500,10 @@ namespace GameDevTV.RTS.Environment
                         Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
                         GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
                         ghost.transform.localScale = instance.transform.localScale;
-                        ghost.layer = transparentLayer;
+                        SetLayerRecursive(ghost, transparentLayer);
                         
                         foreach (var c in ghost.GetComponentsInChildren<Collider>())
-                        {
+{
                             if (Application.isPlaying) c.enabled = false;
                             else DestroyImmediate(c);
                         }

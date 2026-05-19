@@ -129,7 +129,8 @@ namespace GameDevTV.RTS.Units
 
                     if (!navAgent.isOnNavMesh)
                     {
-                        if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
+                        NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = navAgent.agentTypeID, areaMask = NavMesh.AllAreas };
+                        if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, filter))
                         {
                             navAgent.enabled = false;
                             worker.transform.position = hit.position;
@@ -137,7 +138,7 @@ namespace GameDevTV.RTS.Units
                             navAgent.Warp(hit.position);
                         }
                     }
-                }
+}
 
                 // Assign to closest node
                 AINode node = activeNodes.OrderBy(n => Vector3.Distance(worker.transform.position, n.CommandPost.transform.position)).FirstOrDefault();
@@ -295,27 +296,44 @@ namespace GameDevTV.RTS.Units
 
                 private void ProcessNodeDrones(AINode node)
                 {
-                foreach (Worker drone in node.Drones.ToList())
-                {
-                if (drone == null) continue;
-                if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
-                {
-                    if (drone.TryGetComponent(out NavMeshAgent na) && na.isOnNavMesh)
+                    foreach (Worker drone in node.Drones.ToList())
                     {
-                        if (cmd.Value == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
-                        else if (cmd.Value == UnitCommands.Gather) na.stoppingDistance = 1.5f;
-
-                        if (cmd.Value != UnitCommands.Stop && na.velocity.sqrMagnitude < 0.01f && na.remainingDistance > na.stoppingDistance + 0.2f)
-                            drone.Stop();
-
-                        if (cmd.Value == UnitCommands.ReturnSupplies && na.remainingDistance <= na.stoppingDistance + 0.1f)
+                        if (drone == null) continue;
+                        if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
                         {
-                            if (drone.HasSupplies) drone.ClearSupplies();
-                            drone.Stop();
+                            if (drone.TryGetComponent(out NavMeshAgent na))
+                            {
+                                if (!na.isOnNavMesh && na.isActiveAndEnabled)
+                                {
+                                    // Try to recover agent if it fell off or NavMesh changed under it
+                                    NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
+                                    if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
+                                    {
+                                        na.Warp(hit.position);
+                                    }
+                                }
+
+                                if (na.isOnNavMesh)
+                                {
+                                    if (cmd.Value == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
+                                    else if (cmd.Value == UnitCommands.Gather) na.stoppingDistance = 1.5f;
+
+                                    // Stuck detection: velocity low but distance remaining
+                                    if (cmd.Value != UnitCommands.Stop && na.velocity.sqrMagnitude < 0.01f && na.remainingDistance > na.stoppingDistance + 0.5f)
+                                    {
+                                        // Only stop if we've been stuck for a bit? No, Tick is 3s, that's enough time.
+                                        drone.Stop();
+                                    }
+
+                                    if (cmd.Value == UnitCommands.ReturnSupplies && na.remainingDistance <= na.stoppingDistance + 0.1f)
+                                    {
+                                        if (drone.HasSupplies) drone.ClearSupplies();
+                                        drone.Stop();
+                                    }
+                                }
+                            }
                         }
                     }
-                }
-                }
                 }
 
         private void DispatchIdleDronesInNode(AINode node)

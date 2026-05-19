@@ -31,17 +31,44 @@ namespace GameDevTV.RTS.UI
         private HashSet<AbstractCommandable> selectedUnits = new(12);
         private Owner displayedOwner = Owner.Player1;
 
+        private void OnEnable()
+        {
+            displayedOwner = GameOverManager.MonitoredOwner;
+
+            Bus<UnitSelectedEvent>.OnEvent[displayedOwner] += HandleUnitSelected;
+            Bus<UnitDeselectedEvent>.OnEvent[displayedOwner] += HandleUnitDeselected;
+            Bus<UnitDeathEvent>.OnEvent[displayedOwner] += HandleUnitDeath;
+            Bus<SupplyEvent>.OnEvent[displayedOwner] += HandleSupplyChange;
+            Bus<UnitLoadEvent>.OnEvent[displayedOwner] += HandleLoadUnit;
+            Bus<UnitUnloadEvent>.OnEvent[displayedOwner] += HandleUnloadUnit;
+            Bus<BuildingSpawnEvent>.OnEvent[displayedOwner] += HandleBuildingSpawn;
+            Bus<UpgradeResearchedEvent>.OnEvent[displayedOwner] += HandleUpgradeResearched;
+            Bus<BuildingDeathEvent>.OnEvent[displayedOwner] += HandleBuildingDeath;
+
+            Supplies.OnOxygenChanged += HandleOxygenChanged;
+            Supplies.OnBiomassChanged += HandleBiomassChanged;
+
+            InitializeUI();
+        }
+
+        private void OnDisable()
+        {
+            Bus<UnitSelectedEvent>.OnEvent[displayedOwner] -= HandleUnitSelected;
+            Bus<UnitDeselectedEvent>.OnEvent[displayedOwner] -= HandleUnitDeselected;
+            Bus<UnitDeathEvent>.OnEvent[displayedOwner] -= HandleUnitDeath;
+            Bus<SupplyEvent>.OnEvent[displayedOwner] -= HandleSupplyChange;
+            Bus<UnitLoadEvent>.OnEvent[displayedOwner] -= HandleLoadUnit;
+            Bus<UnitUnloadEvent>.OnEvent[displayedOwner] -= HandleUnloadUnit;
+            Bus<BuildingSpawnEvent>.OnEvent[displayedOwner] -= HandleBuildingSpawn;
+            Bus<UpgradeResearchedEvent>.OnEvent[displayedOwner] -= HandleUpgradeResearched;
+            Bus<BuildingDeathEvent>.OnEvent[displayedOwner] -= HandleBuildingDeath;
+
+            Supplies.OnOxygenChanged -= HandleOxygenChanged;
+            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+        }
+
         private void Awake()
         {
-            Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] += HandleUnitSelected;
-            Bus<UnitDeselectedEvent>.OnEvent[Owner.Player1] += HandleUnitDeselected;
-            Bus<UnitDeathEvent>.OnEvent[Owner.Player1] += HandleUnitDeath;
-            Bus<SupplyEvent>.OnEvent[Owner.Player1] += HandleSupplyChange;
-            Bus<UnitLoadEvent>.OnEvent[Owner.Player1] += HandleLoadUnit;
-            Bus<UnitUnloadEvent>.OnEvent[Owner.Player1] += HandleUnloadUnit;
-            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += HandleBuildingSpawn;
-            Bus<UpgradeResearchedEvent>.OnEvent[Owner.Player1] += HandleUpgradeResearched;
-            Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] += HandleBuildingDeath;
         }
 
         private void Start()
@@ -51,22 +78,22 @@ namespace GameDevTV.RTS.UI
             unitIconUI.Disable();
             singleUnitSelectedUI.Disable();
             unitTransportUI.Disable();
+        }
 
+        private void InitializeUI()
+        {
             displayedOwner = GameOverManager.MonitoredOwner;
 
             if (biomassLabelText != null) biomassLabelText.SetText("Biomass");
-            if (biomassValueText != null && Supplies.Biomass.TryGetValue(displayedOwner, out int initial))
+            if (biomassValueText != null && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(displayedOwner, out int initial))
                 biomassValueText.SetText(initial.ToString());
 
             if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
-            if (oxygenValueText != null && Supplies.Oxygen.TryGetValue(displayedOwner, out int oxyInitial))
+            if (oxygenValueText != null && Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(displayedOwner, out int oxyInitial))
             {
                 oxygenValueText.SetText(oxyInitial.ToString());
                 if (populationText != null) populationText.SetText($"{oxyInitial}%");
             }
-
-            Supplies.OnOxygenChanged += HandleOxygenChanged;
-            Supplies.OnBiomassChanged += HandleBiomassChanged;
         }
 
         private void OnDestroy()

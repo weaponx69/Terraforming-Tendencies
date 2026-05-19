@@ -94,13 +94,13 @@ namespace GameDevTV.RTS.Behavior
                     }
                 }
 
-                Debug.Log($"<color=green>[Gathering]</color> {Unit.Value.name} gathered exactly <b>{gathered}</b> {SupplySO.Value.name} from {GatherableSupplies.Value.name}");
+                Debug.Log($"<color=green>[Gathering]</color> {Unit.Value.name} gathered exactly <b>{gathered}</b> {(SupplySO.Value != null ? SupplySO.Value.name : "NULL")} from {GatherableSupplies.Value.name}");
 
                 if (EventChannel != null && EventChannel.Value != null)
                 {
                     EventChannel.Value.SendEventMessage(Unit.Value, Amount.Value, SupplySO.Value);
                 }
-            }
+}
             else
             {
                 GatherableSupplies.Value.AbortGather();

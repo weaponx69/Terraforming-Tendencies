@@ -28,8 +28,8 @@ namespace GameDevTV.RTS.Tests
             
             // Mock a basic PlanetConfig so it doesn't crash
             generator.Config = ScriptableObject.CreateInstance<PlanetConfig>();
-            generator.Config.MapWidth = 10;
-            generator.Config.MapHeight = 10;
+            generator.Config.MapWidth = 50;
+            generator.Config.MapHeight = 50;
             generator.Config.SurfaceFeatureDensity = 0; // No features to speed up test
             
             // Give it time to generate the planet and bake NavMeshes (Start method execution)
@@ -61,8 +61,8 @@ namespace GameDevTV.RTS.Tests
                 
                 // Create a test agent of this type
                 GameObject testAgentObj = new GameObject($"TestAgent_Type_{settings.agentTypeID}");
-                testAgentObj.transform.position = new Vector3(5, 0.1f, 5); // Center of the 10x10 map
-                
+                testAgentObj.transform.position = new Vector3(25, 0.1f, 25); // Center of the 50x50 map
+
                 NavMeshAgent agent = testAgentObj.AddComponent<NavMeshAgent>();
                 agent.agentTypeID = settings.agentTypeID;
                 
@@ -83,11 +83,11 @@ namespace GameDevTV.RTS.Tests
             generatorObj = new GameObject("PlanetGenerator");
             var generator = generatorObj.AddComponent<PlanetGenerator>();
             generator.Config = ScriptableObject.CreateInstance<PlanetConfig>();
-            generator.Config.MapWidth = 10;
-            generator.Config.MapHeight = 10;
+            generator.Config.MapWidth = 50;
+            generator.Config.MapHeight = 50;
             generator.Config.SurfaceFeatureDensity = 2; // Spawn some features to create ghosts
             generator.Config.SurfaceFeaturePrefabs = new GameObject[] { new GameObject("TestFeature") };
-            
+
             yield return null;
             yield return null;
 
@@ -99,8 +99,12 @@ namespace GameDevTV.RTS.Tests
                 if (child.name.Contains("Ghost"))
                 {
                     foundGhost = true;
-                    Assert.AreEqual(transparentLayer, child.gameObject.layer, 
-                        $"Ghost object '{child.name}' is not on the TransparentFX layer! This will cause massive performance hangs during NavMesh bakes.");
+                    // Check root and all children
+                    foreach (var r in child.GetComponentsInChildren<Transform>(true))
+                    {
+                        Assert.AreEqual(transparentLayer, r.gameObject.layer, 
+                            $"Object '{r.name}' (child of {child.name}) is not on the TransparentFX layer! This will cause massive performance hangs during NavMesh bakes.");
+                    }
                 }
             }
 
