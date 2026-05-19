@@ -131,6 +131,9 @@ namespace GameDevTV.RTS.Units
                     {
                         if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
                         {
+                            navAgent.enabled = false;
+                            worker.transform.position = hit.position;
+                            navAgent.enabled = true;
                             navAgent.Warp(hit.position);
                         }
                     }

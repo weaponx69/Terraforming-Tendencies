@@ -211,6 +211,7 @@ namespace GameDevTV.RTS.Units
                         if (onNavMesh) spawnPosition = hit.position;
                     }
 
+                    // We instantiate the prefab disabled, or we just disable the agent immediately
                     GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);
                     if (instance.TryGetComponent(out AbstractCommandable commandable))
                     {
@@ -219,13 +220,16 @@ namespace GameDevTV.RTS.Units
                     
                     if (instance.TryGetComponent(out NavMeshAgent agent))
                     {
-                        if (onNavMesh && agent.isActiveAndEnabled)
+                        agent.enabled = false; // Disable it so we can safely warp/move it
+                        instance.transform.position = spawnPosition;
+                        
+                        if (onNavMesh)
                         {
+                            agent.enabled = true;
                             agent.Warp(spawnPosition);
                         }
-                        else if (!onNavMesh)
+                        else
                         {
-                            agent.enabled = false; 
                             Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location.");
                         }
                     }
