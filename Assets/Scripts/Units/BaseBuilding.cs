@@ -191,9 +191,9 @@ namespace GameDevTV.RTS.Units
 
                 if (SOBeingBuilt is AbstractUnitSO unitSO)
                 {
-                    // Spawn at a random offset between 4 and 7 units to ensure they are outside the building
+                    // Spawn at a random offset to ensure they are completely outside the building's NavMeshObstacle
                     float angle = Random.Range(0f, Mathf.PI * 2f);
-                    float distance = Random.Range(4f, 7f);
+                    float distance = Random.Range(12f, 18f); // Increased distance to prevent "not close enough" NavMesh errors
                     Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, 0, Mathf.Sin(angle) * distance);
                     Vector3 spawnPosition = transform.position + offset;
                     
