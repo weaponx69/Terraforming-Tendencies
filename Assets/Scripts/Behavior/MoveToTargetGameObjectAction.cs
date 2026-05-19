@@ -20,6 +20,7 @@ namespace GameDevTV.RTS.Behavior
         private Animator animator;
         private Vector3 lastPosition;
         private Vector3 randomOffset;
+        private Vector3 targetPosition;
 
         protected override Status OnStart()
         {
@@ -35,7 +36,7 @@ namespace GameDevTV.RTS.Behavior
             float offsetAmount = 0.2f;
             randomOffset = new Vector3(UnityEngine.Random.Range(-offsetAmount, offsetAmount), 0, UnityEngine.Random.Range(-offsetAmount, offsetAmount));
 
-            Vector3 targetPosition = GetTargetPosition();
+            targetPosition = GetTargetPosition();
             float distance = Vector3.Distance(agent.transform.position, targetPosition);
 
             // Use a small buffer for arrival.
@@ -81,12 +82,12 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Running;
             }
 
-            Vector3 targetPosition = GetTargetPosition();
             Vector3 currentTargetObjectPos = TargetGameObject.Value.transform.position;
             
             // Only update destination if the target object itself moves in world space
             if (Vector3.Distance(currentTargetObjectPos, lastPosition) >= MoveThreshold)
             {
+                targetPosition = GetTargetPosition();
                 agent.SetDestination(targetPosition);
                 lastPosition = currentTargetObjectPos;
                 return Status.Running;
@@ -95,7 +96,7 @@ namespace GameDevTV.RTS.Behavior
             float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
             bool arrived = false;
             
-            if (agent.isOnNavMesh)
+            if (agent.isOnNavMesh && agent.hasPath)
             {
                 arrived = agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.1f;
             }
@@ -123,31 +124,31 @@ namespace GameDevTV.RTS.Behavior
 
         private Vector3 GetTargetPosition()
         {
-            Vector3 targetPosition = Vector3.zero;
+            Vector3 targetPos = Vector3.zero;
             if (TargetGameObject.Value == null)
             {
-                return targetPosition;
+                return targetPos;
             }
 
             if (TargetGameObject.Value.TryGetComponent(out Collider collider))
             {
-                targetPosition = collider.ClosestPoint(agent.transform.position);
+                targetPos = collider.bounds.ClosestPoint(agent.transform.position);
             }
             else
             {
-                targetPosition = TargetGameObject.Value.transform.position;
+                targetPos = TargetGameObject.Value.transform.position;
             }
 
             // Apply pre-calculated random offset to prevent jitter
-            targetPosition += randomOffset;
+            targetPos += randomOffset;
 
             // Ensure the final position is valid on the NavMesh
-            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(targetPos, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
             {
-                targetPosition = hit.position;
+                targetPos = hit.position;
             }
 
-            return targetPosition;
-            }
-}
+            return targetPos;
+        }
+    }
 }

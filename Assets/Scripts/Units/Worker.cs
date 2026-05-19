@@ -154,6 +154,8 @@ namespace GameDevTV.RTS.Units
 
         private void HandleGatherSupplies(GameObject self, int amount, SupplySO supply)
         {
+            if (self != gameObject) return; // Ignore events triggered by other drones
+            
             if (supply == null)
             {
                 Debug.LogWarning($"HandleGatherSupplies called with null supply. Owner={Owner}, Self={(self != null ? self.name : "null")}, Amount={amount}");

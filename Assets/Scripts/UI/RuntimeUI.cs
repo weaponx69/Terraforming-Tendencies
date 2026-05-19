@@ -29,6 +29,7 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private Image iconImage;
 
         private HashSet<AbstractCommandable> selectedUnits = new(12);
+        private Owner displayedOwner = Owner.Player1;
 
         private void Awake()
         {
@@ -51,19 +52,20 @@ namespace GameDevTV.RTS.UI
             singleUnitSelectedUI.Disable();
             unitTransportUI.Disable();
 
+            displayedOwner = GameOverManager.MonitoredOwner;
+
             if (biomassLabelText != null) biomassLabelText.SetText("Biomass");
-            if (biomassValueText != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int initial))
+            if (biomassValueText != null && Supplies.Biomass.TryGetValue(displayedOwner, out int initial))
                 biomassValueText.SetText(initial.ToString());
 
             if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
-            if (oxygenValueText != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out int oxyInitial))
+            if (oxygenValueText != null && Supplies.Oxygen.TryGetValue(displayedOwner, out int oxyInitial))
             {
                 oxygenValueText.SetText(oxyInitial.ToString());
                 if (populationText != null) populationText.SetText($"{oxyInitial}%");
             }
 
             Supplies.OnOxygenChanged += HandleOxygenChanged;
-
             Supplies.OnBiomassChanged += HandleBiomassChanged;
         }
 
@@ -75,7 +77,7 @@ namespace GameDevTV.RTS.UI
 
         private void HandleOxygenChanged(Owner owner, int newValue)
         {
-            if (owner != Owner.Player1) return;
+            if (owner != displayedOwner) return;
             if (oxygenValueText != null)
                 oxygenValueText.SetText(newValue.ToString());
             if (populationText != null)
@@ -84,7 +86,7 @@ namespace GameDevTV.RTS.UI
 
         private void HandleBiomassChanged(Owner owner, int newValue)
         {
-            if (owner != Owner.Player1) return;
+            if (owner != displayedOwner) return;
             if (biomassValueText == null) return;
             biomassValueText.SetText(newValue.ToString());
         }

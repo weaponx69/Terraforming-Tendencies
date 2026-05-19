@@ -75,49 +75,50 @@ namespace GameDevTV.RTS.Environment
                 foreach (var s in existingSurfaces)
                 {
                     s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
+                    s.layerMask = ~(1 << LayerMask.NameToLayer("TransparentFX"));
                     s.BuildNavMesh();
                 }
-            }
+                }
 
-            [ContextMenu("Clear Planet (Editor)")]
-public void ClearPlanet()
-        {
-            for (int i = transform.childCount - 1; i >= 0; i--)
-            {
+                [ContextMenu("Clear Planet (Editor)")]
+                public void ClearPlanet()
+                {
+                for (int i = transform.childCount - 1; i >= 0; i--)
+                {
                 DestroyImmediate(transform.GetChild(i).gameObject);
-            }
-            if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
-            if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
-        }
+                }
+                if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
+                if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
+                }
 
-        [ContextMenu("Generate Planet (Editor)")]
-        public void GeneratePlanetEditor()
-        {
-            ClearPlanet();
-            GeneratePlanet();
-        }
+                [ContextMenu("Generate Planet (Editor)")]
+                public void GeneratePlanetEditor()
+                {
+                ClearPlanet();
+                GeneratePlanet();
+                }
 
-        public void GeneratePlanet()
-        {
-            if (Config == null) return;
+                public void GeneratePlanet()
+                {
+                if (Config == null) return;
 
-            Mesh mesh = new Mesh();
-            mesh.name = "Procedural Planet Surface";
-            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                Mesh mesh = new Mesh();
+                mesh.name = "Procedural Planet Surface";
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
 
-            int width = Config.MapWidth;
-            int height = Config.MapHeight;
+                int width = Config.MapWidth;
+                int height = Config.MapHeight;
 
-            int vertexCount = (width + 1) * (height + 1);
-            Vector3[] vertices = new Vector3[vertexCount];
-            Vector2[] uvs = new Vector2[vertexCount];
-            int[] triangles = new int[width * height * 6];
+                int vertexCount = (width + 1) * (height + 1);
+                Vector3[] vertices = new Vector3[vertexCount];
+                Vector2[] uvs = new Vector2[vertexCount];
+                int[] triangles = new int[width * height * 6];
 
-            float minHeight = 0f;
-            float maxHeight = 0.1f; // Avoid divide by zero in UV mapping
+                float minHeight = 0f;
+                float maxHeight = 0.1f; // Avoid divide by zero in UV mapping
 
-            for (int i = 0, y = 0; y <= height; y++)
-            {
+                for (int i = 0, y = 0; y <= height; y++)
+                {
                 for (int x = 0; x <= width; x++, i++)
                 {
                     // Flat terrain
@@ -125,10 +126,10 @@ public void ClearPlanet()
 
                     vertices[i] = new Vector3(x * CellSize, yPos, y * CellSize);
                 }
-            }
+                }
 
-            for (int ti = 0, vi = 0, y = 0; y < height; y++, vi++)
-            {
+                for (int ti = 0, vi = 0, y = 0; y < height; y++, vi++)
+                {
                 for (int x = 0; x < width; x++, ti += 6, vi++)
                 {
                     triangles[ti] = vi;
@@ -136,71 +137,73 @@ public void ClearPlanet()
                     triangles[ti + 4] = triangles[ti + 1] = vi + width + 1;
                     triangles[ti + 5] = vi + width + 2;
                 }
-            }
+                }
 
-            // Assign UVs strictly based on normalized height for the gradient mapping
-            for (int i = 0; i < vertices.Length; i++)
-            {
+                // Assign UVs strictly based on normalized height for the gradient mapping
+                for (int i = 0; i < vertices.Length; i++)
+                {
                 float normHeight = Mathf.InverseLerp(minHeight, maxHeight, vertices[i].y);
                 uvs[i] = new Vector2(0, normHeight);
-            }
+                }
 
-            mesh.vertices = vertices;
-            mesh.triangles = triangles;
-            mesh.uv = uvs;
-            mesh.RecalculateNormals();
+                mesh.vertices = vertices;
+                mesh.triangles = triangles;
+                mesh.uv = uvs;
+                mesh.RecalculateNormals();
 
-            // Fix lighting seams by averaging the normals on the opposite edges
-            Vector3[] normals = mesh.normals;
-            for (int y = 0; y <= height; y++)
-            {
+                // Fix lighting seams by averaging the normals on the opposite edges
+                Vector3[] normals = mesh.normals;
+                for (int y = 0; y <= height; y++)
+                {
                 int idxLeft = y * (width + 1);
                 int idxRight = idxLeft + width;
                 Vector3 avgNormalX = (normals[idxLeft] + normals[idxRight]).normalized;
                 normals[idxLeft] = avgNormalX;
                 normals[idxRight] = avgNormalX;
-            }
-            for (int x = 0; x <= width; x++)
-            {
+                }
+                for (int x = 0; x <= width; x++)
+                {
                 int idxBottom = x;
                 int idxTop = height * (width + 1) + x;
                 Vector3 avgNormalZ = (normals[idxBottom] + normals[idxTop]).normalized;
                 normals[idxBottom] = avgNormalZ;
                 normals[idxTop] = avgNormalZ;
-            }
-            // Fix the 4 corners
-            int c00 = 0;
-            int c10 = width;
-            int c01 = height * (width + 1);
-            int c11 = height * (width + 1) + width;
-            Vector3 avgCorner = (normals[c00] + normals[c10] + normals[c01] + normals[c11]).normalized;
-            normals[c00] = avgCorner;
-            normals[c10] = avgCorner;
-            normals[c01] = avgCorner;
-            normals[c11] = avgCorner;
+                }
+                // Fix the 4 corners
+                int c00 = 0;
+                int c10 = width;
+                int c01 = height * (width + 1);
+                int c11 = height * (width + 1) + width;
+                Vector3 avgCorner = (normals[c00] + normals[c10] + normals[c01] + normals[c11]).normalized;
+                normals[c00] = avgCorner;
+                normals[c10] = avgCorner;
+                normals[c01] = avgCorner;
+                normals[c11] = avgCorner;
             
-            mesh.normals = normals;
+                mesh.normals = normals;
 
-            GetComponent<MeshFilter>().mesh = mesh;
-            GetComponent<MeshCollider>().sharedMesh = mesh;
+                GetComponent<MeshFilter>().mesh = mesh;
+                GetComponent<MeshCollider>().sharedMesh = mesh;
 
-            MeshRenderer renderer = GetComponent<MeshRenderer>();
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null) shader = Shader.Find("Standard");
-            if (shader != null)
-            {
+                MeshRenderer renderer = GetComponent<MeshRenderer>();
+                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                if (shader == null) shader = Shader.Find("Standard");
+                if (shader != null)
+                {
                 Material mat = new Material(shader);
                 mat.mainTexture = GenerateHeightGradient();
                 mat.SetFloat("_Smoothness", 0.1f); // Smooth but not shiny
                 renderer.sharedMaterial = mat;
-            }
+                }
 
-            // Create 8 visual ghosts for seamless wrapping
-            float mapWidthWorld = width * CellSize;
-            float mapHeightWorld = height * CellSize;
+                // Create 8 visual ghosts for seamless wrapping
+                float mapWidthWorld = width * CellSize;
+                float mapHeightWorld = height * CellSize;
 
-            for (int x = -2; x <= 2; x++)
-            {
+                int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+
+                for (int x = -2; x <= 2; x++)
+                {
                 for (int z = -2; z <= 2; z++)
                 {
                     if (x == 0 && z == 0) continue; 
@@ -208,6 +211,7 @@ public void ClearPlanet()
                     GameObject ghost = new GameObject($"Terrain Ghost ({x},{z})");
                     ghost.transform.parent = transform;
                     ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
+                    ghost.layer = transparentLayer;
                     
                     MeshFilter mf = ghost.AddComponent<MeshFilter>();
                     mf.sharedMesh = mesh;
@@ -215,27 +219,27 @@ public void ClearPlanet()
                     MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
                     mr.sharedMaterial = renderer.sharedMaterial;
                 }
-            }
+                }
 
-            ScatterSurfaceFeatures();
-            ScatterResources();
+                ScatterSurfaceFeatures();
+                ScatterResources();
 
-            BakeAllNavMeshes();
-            }
+                BakeAllNavMeshes();
+                }
 
-            private Texture2D GenerateHeightGradient()
-            {
-            Texture2D tex = new Texture2D(1, 256);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Bilinear; // Smooth blending
+                private Texture2D GenerateHeightGradient()
+                {
+                Texture2D tex = new Texture2D(1, 256);
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Bilinear; // Smooth blending
             
-            // Muted Mars Palette: Subtle contrast limited to a few specific tones
-            Color colorLow = new Color(0.55f, 0.25f, 0.15f);   // Deep plains
-            Color colorMid = new Color(0.65f, 0.35f, 0.20f);   // Slopes
-            Color colorHigh = new Color(0.75f, 0.45f, 0.25f);  // Peaks
+                // Muted Mars Palette: Subtle contrast limited to a few specific tones
+                Color colorLow = new Color(0.55f, 0.25f, 0.15f);   // Deep plains
+                Color colorMid = new Color(0.65f, 0.35f, 0.20f);   // Slopes
+                Color colorHigh = new Color(0.75f, 0.45f, 0.25f);  // Peaks
 
-            for (int i = 0; i < 256; i++)
-            {
+                for (int i = 0; i < 256; i++)
+                {
                 float t = i / 255f;
                 Color c;
                 
@@ -244,29 +248,31 @@ public void ClearPlanet()
                 else c = Color.Lerp(colorMid, colorHigh, (t - 0.5f) * 2f);
                 
                 tex.SetPixel(0, i, c);
-            }
-            tex.Apply();
-            return tex;
-        }
+                }
+                tex.Apply();
+                return tex;
+                }
 
-        private void ScatterSurfaceFeatures()
-        {
-            if (Config.SurfaceFeaturePrefabs == null || Config.SurfaceFeaturePrefabs.Length == 0) return;
+                private void ScatterSurfaceFeatures()
+                {
+                if (Config.SurfaceFeaturePrefabs == null || Config.SurfaceFeaturePrefabs.Length == 0) return;
 
-            int width = Config.MapWidth;
-            int height = Config.MapHeight;
+                int width = Config.MapWidth;
+                int height = Config.MapHeight;
             
-            float exclusionRadius = 15f; 
-            Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+                float exclusionRadius = 15f; 
+                Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-            int density = Config.SurfaceFeatureDensity;
-            int maxAttempts = density * 10;
-            int spawnedCount = 0;
-            float minSpacing = 4f;
-            System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+                int density = Config.SurfaceFeatureDensity;
+                int maxAttempts = density * 10;
+                int spawnedCount = 0;
+                float minSpacing = 4f;
+                System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
 
-            for (int i = 0; i < maxAttempts && spawnedCount < density; i++)
-            {
+                int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+
+                for (int i = 0; i < maxAttempts && spawnedCount < density; i++)
+                {
                 float randomX = Random.Range(0f, width * CellSize);
                 float randomZ = Random.Range(0f, height * CellSize);
                 Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
@@ -332,6 +338,7 @@ public void ClearPlanet()
                         Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
                         GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
                         ghost.transform.localScale = instance.transform.localScale;
+                        ghost.layer = transparentLayer;
                         
                         Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
                         foreach (var r in ghostRenderers)
@@ -362,10 +369,10 @@ public void ClearPlanet()
                 }
                 }
 
-        private void FixPreplacedGatherables()
-        {
-            foreach (Transform child in transform)
-            {
+                private void FixPreplacedGatherables()
+                {
+                foreach (Transform child in transform)
+                {
                 if (child == null) continue;
                 string nameLower = child.name.ToLower();
                 
@@ -377,31 +384,31 @@ public void ClearPlanet()
                     SupplySO so = isGas ? GasSupplySO : MineralsSupplySO;
                     EnsureGatherableSupply(child.gameObject, so);
                 }
-            }
-        }
+                }
+                }
 
-        private void EnsureGatherableSupply(GameObject go, SupplySO so)
-        {
-            if (!go.TryGetComponent<GatherableSupply>(out var gs))
-            {
+                private void EnsureGatherableSupply(GameObject go, SupplySO so)
+                {
+                if (!go.TryGetComponent<GatherableSupply>(out var gs))
+                {
                 gs = go.AddComponent<GatherableSupply>();
-            }
+                }
 
-            if (go.GetComponent<Collider>() == null)
-            {
+                if (go.GetComponent<Collider>() == null)
+                {
                 var col = go.AddComponent<BoxCollider>();
                 col.size = new Vector3(2f, 2f, 2f);
-            }
+                }
 
-            if (so != null)
-            {
+                if (so != null)
+                {
                 gs.Supply = so;
                 gs.Amount = so.MaxAmount;
-            }
-        }
+                }
+                }
 
                 private void ScatterResources()
-{
+                {
                 if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
 
                 int width = Config.MapWidth;
@@ -417,6 +424,8 @@ public void ClearPlanet()
                 int spawnedCount = 0;
                 float minSpacing = 5f;
                 System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                int transparentLayer = LayerMask.NameToLayer("TransparentFX");
 
                 for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
                 {
@@ -461,6 +470,7 @@ public void ClearPlanet()
                         Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
                         GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
                         ghost.transform.localScale = instance.transform.localScale;
+                        ghost.layer = transparentLayer;
                         
                         foreach (var c in ghost.GetComponentsInChildren<Collider>())
                         {
@@ -476,5 +486,6 @@ public void ClearPlanet()
                 spawnedCount++;
                 }
                 }
+
                 }
                 }

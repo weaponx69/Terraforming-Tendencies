@@ -43,11 +43,18 @@ namespace GameDevTV.RTS.Player
         public static event System.Action OnGameOver;
         public static event System.Action OnVictory;
 
+        public static Owner MonitoredOwner { get; private set; } = Owner.Player1;
+
         // ── State ──────────────────────────────────────────────────────────────────
         private bool gameOverTriggered;
         private bool inGracePeriod;
 
         // ── Lifecycle ──────────────────────────────────────────────────────────────
+        private void Awake()
+        {
+            MonitoredOwner = monitoredOwner;
+        }
+
         private void OnEnable()
         {
             Supplies.OnBiomassChanged += HandleBiomassChanged;

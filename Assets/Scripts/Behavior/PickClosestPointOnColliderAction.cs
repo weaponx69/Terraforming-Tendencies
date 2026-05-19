@@ -21,7 +21,7 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Failure;
             }
 
-            TargetLocation.Value = collider.ClosestPoint(Target.Value.transform.position);
+            TargetLocation.Value = collider.bounds.ClosestPoint(Target.Value.transform.position);
 
             return Status.Success;
         }

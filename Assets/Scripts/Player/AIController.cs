@@ -440,7 +440,7 @@ namespace GameDevTV.RTS.Units
                     }
                     else
                     {
-                        s.BuildNavMesh(); // Synchronous fallback if uninitialized
+                        Debug.LogWarning($"[AI] NavMeshSurface on {s.gameObject.name} has no NavMeshData asset! Synchronous bake skipped to prevent hang.");
                     }
                 }
                 foreach (var op in ops)

@@ -23,6 +23,7 @@ namespace GameDevTV.RTS.Behavior
         private Animator animator;
         private LayerMask suppliesMask;
         private SupplySO supplySO;
+        private Vector3 targetPosition;
         private Vector3 randomOffset;
 
         protected override Status OnStart()
@@ -43,7 +44,7 @@ namespace GameDevTV.RTS.Behavior
             float offsetAmount = 0.2f;
             randomOffset = new Vector3(UnityEngine.Random.Range(-offsetAmount, offsetAmount), 0, UnityEngine.Random.Range(-offsetAmount, offsetAmount));
 
-            Vector3 targetPosition = GetTargetPosition();
+            targetPosition = GetTargetPosition();
             float distance = Vector3.Distance(agent.transform.position, targetPosition);
 
             if (distance <= agent.stoppingDistance + 0.1f)
@@ -75,7 +76,6 @@ namespace GameDevTV.RTS.Behavior
 
             if (!agent.isOnNavMesh) return Status.Running;
 
-            Vector3 targetPosition = GetTargetPosition();
             float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
 
             if (agent.pathPending)
@@ -85,7 +85,7 @@ namespace GameDevTV.RTS.Behavior
 
             // Treat as arrived if either agent reports remainingDistance is close
             // OR if the direct Euclidean distance is within stopping distance + 0.1f buffer.
-            bool hasArrived = (agent.isOnNavMesh && agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.1f);
+            bool hasArrived = (agent.isOnNavMesh && agent.hasPath && agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.1f);
 
             if (!hasArrived)
             {
@@ -183,7 +183,7 @@ namespace GameDevTV.RTS.Behavior
 
             if (Supply.Value.TryGetComponent(out Collider collider))
             {
-                targetPosition = collider.ClosestPoint(agent.transform.position);
+                targetPosition = collider.bounds.ClosestPoint(agent.transform.position);
             }
             else
             {
