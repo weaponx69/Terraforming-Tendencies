@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Commands
             Hit = hit;
             UnitIndex = unitIndex;
             Button = mouseButton;
-            Owner = Owner.Player1;
+            Owner = commandable != null ? commandable.Owner : Owner.Player1;
         }
 
         public CommandContext(Owner owner, AbstractCommandable commandable, RaycastHit hit, int unitIndex = 0, MouseButton mouseButton = MouseButton.Left)

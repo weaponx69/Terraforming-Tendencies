@@ -53,8 +53,7 @@ namespace GameDevTV.RTS.Behavior
             // Fallback: If nothing found in radius, try finding any Command Post in the scene
             if (nearbyCommandPosts.Count == 0)
             {
-                var allBuildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsSortMode.None);
-                foreach (var building in allBuildings)
+                foreach (var building in BaseBuilding.ActiveBuildings)
                 {
                     bool soMatch = CommandPostBuilding.Value == null || (building.UnitSO != null && building.UnitSO.Name == CommandPostBuilding.Value.Name);
                     bool ownerMatch = building.Owner == unitOwner;

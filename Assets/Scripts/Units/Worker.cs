@@ -169,13 +169,12 @@ namespace GameDevTV.RTS.Units
 
             if (isPoisonous)
             {
-                BaseBuilding[] buildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 float minDistance = 5f; // Must be close to the building to damage it
                 BaseBuilding targetBuilding = null;
 
-                foreach (var b in buildings)
+                foreach (var b in BaseBuilding.ActiveBuildings)
                 {
-                    if (b.Owner != Owner) continue;
+                    if (b == null || b.Owner != Owner) continue;
                     float dist = Vector3.Distance(transform.position, b.transform.position);
                     if (dist < minDistance)
                     {

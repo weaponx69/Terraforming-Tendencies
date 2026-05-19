@@ -271,7 +271,7 @@ public void ClearPlanet()
                 bool isMineral = instance.name.ToLower().Contains("crystal") || instance.name.ToLower().Contains("mineral");
                 if (isMineral)
                 {
-                    EnsureGatherableSupply(instance, "Assets/Gatherable Supplies/Minerals.asset");
+                    EnsureGatherableSupply(instance, MineralsSupplySO);
                 }
                 
                 Color groundColor = new Color(0.65f, 0.35f, 0.20f);
@@ -348,13 +348,13 @@ public void ClearPlanet()
                 
                 if (isMineral || isGas)
                 {
-                    string soPath = isGas ? "Assets/Gatherable Supplies/Gas.asset" : "Assets/Gatherable Supplies/Minerals.asset";
-                    EnsureGatherableSupply(child.gameObject, soPath);
+                    SupplySO so = isGas ? GasSupplySO : MineralsSupplySO;
+                    EnsureGatherableSupply(child.gameObject, so);
                 }
             }
         }
 
-        private void EnsureGatherableSupply(GameObject go, string soPath)
+        private void EnsureGatherableSupply(GameObject go, SupplySO so)
         {
             if (!go.TryGetComponent<GatherableSupply>(out var gs))
             {
@@ -366,24 +366,6 @@ public void ClearPlanet()
                 var col = go.AddComponent<BoxCollider>();
                 col.size = new Vector3(2f, 2f, 2f);
             }
-
-            // Determine which SupplySO to use based on fields or loading path
-            SupplySO so = null;
-            if (soPath.ToLower().Contains("gas"))
-            {
-                so = GasSupplySO;
-            }
-            else
-            {
-                so = MineralsSupplySO;
-            }
-
-            #if UNITY_EDITOR
-            if (so == null)
-            {
-                so = UnityEditor.AssetDatabase.LoadAssetAtPath<SupplySO>(soPath);
-            }
-            #endif
 
             if (so != null)
             {
@@ -435,8 +417,8 @@ public void ClearPlanet()
                 GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
                 
                 // Ensure GatherableSupply is correctly configured
-                string soPath = instance.name.ToLower().Contains("gas") ? "Assets/Gatherable Supplies/Gas.asset" : "Assets/Gatherable Supplies/Minerals.asset";
-                EnsureGatherableSupply(instance, soPath);
+                SupplySO so = instance.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
+                EnsureGatherableSupply(instance, so);
 
                 if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
                 {

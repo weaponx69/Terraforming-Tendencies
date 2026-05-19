@@ -19,6 +19,7 @@ namespace GameDevTV.RTS.UI
         // Oxygen UI
         [SerializeField] private TextMeshProUGUI oxygenLabelText;
         [SerializeField] private TextMeshProUGUI oxygenValueText;
+        [SerializeField] private TextMeshProUGUI populationText;
 
         [SerializeField] private ActionsUI actionsUI;
         [SerializeField] private BuildingSelectedUI buildingSelectedUI;
@@ -56,7 +57,10 @@ namespace GameDevTV.RTS.UI
 
             if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
             if (oxygenValueText != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out int oxyInitial))
+            {
                 oxygenValueText.SetText(oxyInitial.ToString());
+                if (populationText != null) populationText.SetText($"{oxyInitial}%");
+            }
 
             Supplies.OnOxygenChanged += HandleOxygenChanged;
 
@@ -72,8 +76,10 @@ namespace GameDevTV.RTS.UI
         private void HandleOxygenChanged(Owner owner, int newValue)
         {
             if (owner != Owner.Player1) return;
-            if (oxygenValueText == null) return;
-            oxygenValueText.SetText(newValue.ToString());
+            if (oxygenValueText != null)
+                oxygenValueText.SetText(newValue.ToString());
+            if (populationText != null)
+                populationText.SetText($"{newValue}%");
         }
 
         private void HandleBiomassChanged(Owner owner, int newValue)

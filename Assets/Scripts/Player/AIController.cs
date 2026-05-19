@@ -60,8 +60,6 @@ namespace GameDevTV.RTS.Units
             Bus<UnitDeathEvent>.OnEvent[aiOwner]     += HandleUnitDeath;
             Bus<BuildingSpawnEvent>.OnEvent[aiOwner] += HandleBuildingSpawn;
             Bus<BuildingDeathEvent>.OnEvent[aiOwner] += HandleBuildingDeath;
-
-            TryDiscoverDroneSO();
         }
 
         private void Start() => StartCoroutine(DelayedStart());
@@ -72,49 +70,6 @@ namespace GameDevTV.RTS.Units
             Bus<UnitDeathEvent>.OnEvent[aiOwner]     -= HandleUnitDeath;
             Bus<BuildingSpawnEvent>.OnEvent[aiOwner] -= HandleBuildingSpawn;
             Bus<BuildingDeathEvent>.OnEvent[aiOwner] -= HandleBuildingDeath;
-        }
-
-        // ── Auto-discovery ─────────────────────────────────────────────────────
-        private const string DRONE_SO_PATH = "Assets/Units/Air Transport/Air Transport.asset";
-
-        private void TryDiscoverDroneSO()
-        {
-            if (miningDroneUnitSO != null) return;
-
-#if UNITY_EDITOR
-            AbstractUnitSO direct = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(DRONE_SO_PATH);
-            if (direct != null)
-            {
-                miningDroneUnitSO = direct;
-                Debug.Log($"[AI] Drone SO loaded from known path: {direct.Name}");
-                return;
-            }
-
-            foreach (string typeName in new[] { "t:UnitSO", "t:BuildingSO" })
-            {
-                foreach (string guid in UnityEditor.AssetDatabase.FindAssets(typeName))
-                {
-                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-                    AbstractUnitSO so = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(path);
-                    if (so != null && so.Prefab != null && so.Prefab.GetComponent<Worker>() != null)
-                    {
-                        miningDroneUnitSO = so;
-                        Debug.Log($"[AI] Drone SO discovered via scan: {so.Name} at {path}");
-                        return;
-                    }
-                }
-            }
-#else
-            foreach (AbstractUnitSO so in Resources.FindObjectsOfTypeAll<AbstractUnitSO>())
-            {
-                if (so.Prefab != null && so.Prefab.GetComponent<Worker>() != null)
-                {
-                    miningDroneUnitSO = so;
-                    return;
-                }
-            }
-#endif
-            Debug.LogWarning($"[AI] Could not find drone SO at '{DRONE_SO_PATH}'. Assign miningDroneUnitSO manually on the AIController Inspector.");
         }
 
         // ── Boot ──────────────────────────────────────────────────────────────
@@ -250,8 +205,8 @@ namespace GameDevTV.RTS.Units
 
         private List<BaseBuilding> GetBuildingsInScene()
         {
-             return Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include)
-                .Where(b => b.Owner == aiOwner && b.Progress.State != BuildingProgress.BuildingState.Destroyed)
+             return BaseBuilding.ActiveBuildings
+                .Where(b => b != null && b.Owner == aiOwner && b.Progress.State != BuildingProgress.BuildingState.Destroyed)
                 .ToList();
         }
 

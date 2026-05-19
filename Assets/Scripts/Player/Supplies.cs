@@ -12,14 +12,12 @@ namespace GameDevTV.RTS.Player
 {
     public class Supplies : MonoBehaviour
     {
-        [SerializeField] private TextMeshProUGUI biomassText;
         [SerializeField] private SupplySO biomassSO;
         [SerializeField] private float mineralsToBiomassRate = 1f;
         [SerializeField] private float gasToBiomassRate = 1f;
         [SerializeField] private int startingBiomass = 1000;
 
         // Oxygen (new)
-        [SerializeField] private TextMeshProUGUI oxygenText;
         [SerializeField] private SupplySO oxygenSO;
         public static Dictionary<Owner, int> Oxygen { get; private set; }
         public static event Action<Owner,int> OnOxygenChanged;
@@ -27,8 +25,6 @@ namespace GameDevTV.RTS.Player
         // static copies of rates so other classes (commands) can compute costs
         public static float MineralsToBiomassRateStatic { get; private set; } = 1f;
         public static float GasToBiomassRateStatic { get; private set; } = 1f;
-
-        [SerializeField] private TextMeshProUGUI populationText;
 
         [SerializeField] private SupplySO mineralsSO;
         [SerializeField] private SupplySO gasSO;
@@ -75,29 +71,25 @@ namespace GameDevTV.RTS.Player
                     Biomass[owner] = startingBiomass;
             }
 
-            OnBiomassChanged += HandleBiomassChanged;
             OnOxygenChanged += HandleOxygenChanged;
 
-            if (biomassText != null && Biomass.TryGetValue(Owner.Player1, out int initial))
+            if (Biomass.TryGetValue(Owner.Player1, out int initial))
             {
-                biomassText.SetText(initial.ToString());
                 OnBiomassChanged?.Invoke(Owner.Player1, initial);
             }
-            if (oxygenText != null && Oxygen.TryGetValue(Owner.Player1, out int oxyInitial))
-            {
-                oxygenText.SetText(oxyInitial.ToString());
-            }
-
-            UpdateHabitabilityUI(0);
 
             Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
         }
 
         private void OnDestroy()
         {
-            OnBiomassChanged -= HandleBiomassChanged;
             OnOxygenChanged -= HandleOxygenChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
+
+            Biomass?.Clear();
+            Oxygen?.Clear();
+            Population?.Clear();
+            PopulationLimit?.Clear();
         }
 
         private void HandleOxygenChanged(Owner owner, int value)
@@ -105,24 +97,10 @@ namespace GameDevTV.RTS.Player
             if (owner == Owner.AI1 || owner == Owner.Player1)
             {
                 Debug.Log($"[Supplies] HandleOxygenChanged for {owner}: {value}%");
-                UpdateHabitabilityUI(value);
                 if (value >= 100)
                 {
                     OnVictory?.Invoke();
                 }
-            }
-        }
-
-        private void UpdateHabitabilityUI(int percent)
-        {
-            if (populationText != null)
-            {
-                Debug.Log($"[Supplies] Updating populationText to {percent}%");
-                populationText.SetText($"{percent}%");
-            }
-            else
-            {
-                Debug.LogWarning("[Supplies] populationText is NULL in UpdateHabitabilityUI!");
             }
         }
 
@@ -137,14 +115,6 @@ namespace GameDevTV.RTS.Player
             else
             {
                 Debug.LogWarning($"[Supplies] Static UpdateOxygen failed. Oxygen dict null or key missing for {owner}");
-            }
-        }
-
-        private void HandleBiomassChanged(Owner owner, int value)
-        {
-            if ((owner == Owner.Player1 || owner == Owner.AI1) && biomassText != null)
-            {
-                biomassText.SetText(value.ToString());
             }
         }
 
@@ -171,9 +141,6 @@ namespace GameDevTV.RTS.Player
             {
                 // oxygen is a separate resource (no conversion)
                 Oxygen[evt.Owner] += evt.Amount;
-
-                if (evt.Owner == Owner.Player1 && oxygenText != null)
-                    oxygenText.SetText(Oxygen[evt.Owner].ToString());
 
                 OnOxygenChanged?.Invoke(evt.Owner, Oxygen[evt.Owner]);
                 return;

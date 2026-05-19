@@ -11,6 +11,7 @@ namespace GameDevTV.RTS.Units
 {
     public class BaseBuilding : AbstractCommandable
     {
+        public static readonly List<BaseBuilding> ActiveBuildings = new();
         public int QueueSize => buildingQueue.Count;
         public UnlockableSO[] Queue => buildingQueue.ToArray();
         [field: SerializeField] public float CurrentQueueStartTime { get; private set; }
@@ -39,6 +40,19 @@ namespace GameDevTV.RTS.Units
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO.Health;
             // Current health is set as the building is being built via Heal()
+        }
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            if (!ActiveBuildings.Contains(this))
+                ActiveBuildings.Add(this);
+        }
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            ActiveBuildings.Remove(this);
         }
 
         protected override void Start()
