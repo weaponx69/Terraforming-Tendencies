@@ -11,4 +11,4 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ca71c407d8ab65b41baf54bea144b561, type: 3}
   m_Name: GatherSuppliesEventChannel
-  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Behavior.GatherSuppliesEventChannel
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Behavior.GatherSuppliesEventChannel

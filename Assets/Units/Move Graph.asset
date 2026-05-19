@@ -45,8 +45,8 @@ MonoBehaviour:
           rid: 1136247005849583642
         BlackboardGroupReferences: []
         Root:
-          rid: 3824763657578086837
-        m_VersionTimestamp: 639142731960834280
+          rid: 3824763784635613431
+        m_VersionTimestamp: 639147653037792170
     - rid: 1136247005849583642
       type: {class: BlackboardReference, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -84,7 +84,7 @@ MonoBehaviour:
           m_Value1: 16494631426614825938
         Name: TargetLocation
         m_Value: {x: 0, y: 0, z: 0}
-    - rid: 3824763657578086837
+    - rid: 3824763784635613431
       type: {class: Start, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         ID:
@@ -95,10 +95,10 @@ MonoBehaviour:
         m_Parent:
           rid: -2
         m_Child:
-          rid: 3824763657578086838
+          rid: 3824763784635613432
         Repeat: 1
         AllowMultipleRepeatsPerTick: 0
-    - rid: 3824763657578086838
+    - rid: 3824763784635613432
       type: {class: SequenceComposite, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         ID:
@@ -107,13 +107,13 @@ MonoBehaviour:
         Graph:
           rid: 1136247005849583640
         m_Parent:
-          rid: 3824763657578086837
+          rid: 3824763784635613431
         m_Children:
-        - rid: 3824763657578086839
-        - rid: 3824763657578086840
+        - rid: 3824763784635613433
+        - rid: 3824763784635613434
         m_RegisteredObservers: []
-    - rid: 3824763657578086839
-      type: {class: SetAgentAvoidanceAction, ns: GameDevTV.RTS.Behavior, asm: Assembly-CSharp}
+    - rid: 3824763784635613433
+      type: {class: SetAgentAvoidanceAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
       data:
         ID:
           m_Value0: 17168751118883163336
@@ -121,12 +121,12 @@ MonoBehaviour:
         Graph:
           rid: 1136247005849583640
         m_Parent:
-          rid: 3824763657578086838
+          rid: 3824763784635613432
         Agent:
           rid: 1136247005849583647
         AvoidanceQuality:
-          rid: 3824763657578086841
-    - rid: 3824763657578086840
+          rid: 3824763784635613435
+    - rid: 3824763784635613434
       type: {class: AbortModifier, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         ID:
@@ -135,15 +135,15 @@ MonoBehaviour:
         Graph:
           rid: 1136247005849583640
         m_Parent:
-          rid: 3824763657578086838
+          rid: 3824763784635613432
         m_Child:
-          rid: 3824763657578086842
+          rid: 3824763784635613436
         m_Conditions:
-        - rid: 3824763657578086843
-        - rid: 3824763657578086844
+        - rid: 3824763784635613437
+        - rid: 3824763784635613438
         m_RequiresAllConditions: 0
         m_ObserverType: 0
-    - rid: 3824763657578086841
+    - rid: 3824763784635613435
       type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         GUID:
@@ -151,7 +151,7 @@ MonoBehaviour:
           m_Value1: 0
         Name: 
         m_Value: 4
-    - rid: 3824763657578086842
+    - rid: 3824763784635613436
       type: {class: BranchingConditionComposite, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         ID:
@@ -160,37 +160,37 @@ MonoBehaviour:
         Graph:
           rid: 1136247005849583640
         m_Parent:
-          rid: 3824763657578086840
+          rid: 3824763784635613434
         m_Children:
-        - rid: 3824763657578086845
-        - rid: 3824763657578086846
+        - rid: 3824763784635613439
+        - rid: 3824763784635613440
         m_RegisteredObservers: []
         m_Conditions:
-        - rid: 3824763657578086847
+        - rid: 3824763784635613441
         m_RequiresAllConditions: 0
         True:
-          rid: 3824763657578086845
+          rid: 3824763784635613439
         False:
-          rid: 3824763657578086846
+          rid: 3824763784635613440
         m_CurrentChild:
           rid: -2
         m_ObserverType: 0
-    - rid: 3824763657578086843
+    - rid: 3824763784635613437
       type: {class: VariableValueChangedCondition, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         Graph:
           rid: 1136247005849583640
         Variable:
           rid: 1136247005849583648
-    - rid: 3824763657578086844
+    - rid: 3824763784635613438
       type: {class: VariableValueChangedCondition, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         Graph:
           rid: 1136247005849583640
         Variable:
           rid: 1136247005849583649
-    - rid: 3824763657578086845
-      type: {class: MoveToTargetGameObjectAction, ns: GameDevTV.RTS.Behavior, asm: Assembly-CSharp}
+    - rid: 3824763784635613439
+      type: {class: MoveToTargetGameObjectAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
       data:
         ID:
           m_Value0: 18187335654107427031
@@ -198,15 +198,15 @@ MonoBehaviour:
         Graph:
           rid: 1136247005849583640
         m_Parent:
-          rid: 3824763657578086842
+          rid: 3824763784635613436
         Agent:
           rid: 1136247005849583647
         TargetGameObject:
           rid: 1136247005849583648
         MoveThreshold:
-          rid: 3824763657578086848
-    - rid: 3824763657578086846
-      type: {class: MoveToTargetLocationAction, ns: GameDevTV.RTS.Behavior, asm: Assembly-CSharp}
+          rid: 3824763784635613442
+    - rid: 3824763784635613440
+      type: {class: MoveToTargetLocationAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
       data:
         ID:
           m_Value0: 2519416350292766815
@@ -214,12 +214,12 @@ MonoBehaviour:
         Graph:
           rid: 1136247005849583640
         m_Parent:
-          rid: 3824763657578086842
+          rid: 3824763784635613436
         Agent:
           rid: 1136247005849583647
         TargetLocation:
           rid: 1136247005849583649
-    - rid: 3824763657578086847
+    - rid: 3824763784635613441
       type: {class: VariableComparisonCondition, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         Graph:
@@ -227,10 +227,10 @@ MonoBehaviour:
         Variable:
           rid: 1136247005849583648
         Operator:
-          rid: 3824763657578086849
+          rid: 3824763784635613443
         ComparisonValue:
-          rid: 3824763657578086850
-    - rid: 3824763657578086848
+          rid: 3824763784635613444
+    - rid: 3824763784635613442
       type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         GUID:
@@ -238,7 +238,7 @@ MonoBehaviour:
           m_Value1: 0
         Name: 
         m_Value: 0.25
-    - rid: 3824763657578086849
+    - rid: 3824763784635613443
       type: {class: 'BlackboardVariable`1[[Unity.Behavior.ConditionOperator, Unity.Behavior]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         GUID:
@@ -246,7 +246,7 @@ MonoBehaviour:
           m_Value1: 0
         Name: 
         m_Value: 1
-    - rid: 3824763657578086850
+    - rid: 3824763784635613444
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         GUID:
@@ -326,7 +326,7 @@ MonoBehaviour:
   - rid: 1136246808885854287
   - rid: 1136246808885854296
   - rid: 1136246808885854304
-  m_VersionTimestamp: 639142731960834280
+  m_VersionTimestamp: 639147653037792170
   m_SerializedVersion: 2
   m_DebugInfo: {fileID: -6122282589062855206}
   m_RuntimeGraph: {fileID: -5328308619305698752}
@@ -350,7 +350,7 @@ MonoBehaviour:
     IsPlaceholder: 0
   - Name: Set Agent Avoidance
     Story: Set [Agent] avoidance quality to [AvoidanceQuality] .
-    RuntimeTypeString: GameDevTV.RTS.Behavior.SetAgentAvoidanceAction, Assembly-CSharp,
+    RuntimeTypeString: GameDevTV.RTS.Behavior.SetAgentAvoidanceAction, MainGame,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     RuntimeTypeID:
       m_Value0: 9723688957723168570
@@ -382,7 +382,7 @@ MonoBehaviour:
     IsPlaceholder: 0
   - Name: Move to Target GameObject
     Story: '[Agent] moves to [TargetGameObject] .'
-    RuntimeTypeString: GameDevTV.RTS.Behavior.MoveToTargetGameObjectAction, Assembly-CSharp,
+    RuntimeTypeString: GameDevTV.RTS.Behavior.MoveToTargetGameObjectAction, MainGame,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     RuntimeTypeID:
       m_Value0: 3556089021087054576
@@ -407,7 +407,7 @@ MonoBehaviour:
     IsPlaceholder: 0
   - Name: Move to Target Location
     Story: '[Agent] moves to [TargetLocation] .'
-    RuntimeTypeString: GameDevTV.RTS.Behavior.MoveToTargetLocationAction, Assembly-CSharp,
+    RuntimeTypeString: GameDevTV.RTS.Behavior.MoveToTargetLocationAction, MainGame,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     RuntimeTypeID:
       m_Value0: 4424869556648109001
@@ -489,7 +489,7 @@ MonoBehaviour:
         - rid: 1136246808885854258
         - rid: 1136246808885854259
         NodeType:
-          m_SerializableType: GameDevTV.RTS.Behavior.SetAgentAvoidanceAction, Assembly-CSharp,
+          m_SerializableType: GameDevTV.RTS.Behavior.SetAgentAvoidanceAction, MainGame,
             Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
         NodeTypeID:
           m_Value0: 9723688957723168570
@@ -772,7 +772,7 @@ MonoBehaviour:
         - rid: 1136246808885854289
         NodeType:
           m_SerializableType: GameDevTV.RTS.Behavior.MoveToTargetGameObjectAction,
-            Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+            MainGame, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
         NodeTypeID:
           m_Value0: 3556089021087054576
           m_Value1: 11541138098326877023
@@ -869,7 +869,7 @@ MonoBehaviour:
         - rid: 1136246808885854298
         NodeType:
           m_SerializableType: GameDevTV.RTS.Behavior.MoveToTargetLocationAction,
-            Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+            MainGame, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
         NodeTypeID:
           m_Value0: 4424869556648109001
           m_Value1: 18033205196971482648

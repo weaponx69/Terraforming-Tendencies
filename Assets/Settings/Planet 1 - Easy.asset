@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 82d784a53ab118875a8a86409a3bce3d, type: 3}
   m_Name: Planet 1 - Easy
-  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.PlanetConfig
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.PlanetConfig
   MapWidth: 100
   MapHeight: 100
   NoiseScale: 75

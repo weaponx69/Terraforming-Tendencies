@@ -11,4 +11,4 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 09553acf951b0e747a1a9d40a2091c1d, type: 3}
   m_Name: BuildingEventChannel
-  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Behavior.BuildingEventChannel
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Behavior.BuildingEventChannel
