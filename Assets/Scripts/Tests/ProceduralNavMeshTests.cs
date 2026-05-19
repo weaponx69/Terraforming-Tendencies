@@ -1,0 +1,72 @@
+#if UNITY_INCLUDE_TESTS
+using System.Collections;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+using UnityEngine.AI;
+using GameDevTV.RTS.Environment;
+using Unity.AI.Navigation;
+
+namespace GameDevTV.RTS.Tests
+{
+    public class ProceduralNavMeshTests
+    {
+        private GameObject generatorObj;
+
+        [TearDown]
+        public void TearDown()
+        {
+            if (generatorObj != null) Object.Destroy(generatorObj);
+        }
+
+        [UnityTest]
+        public IEnumerator PlanetGenerator_BakesNavMesh_ForAllRegisteredAgentTypes()
+        {
+            // Setup a minimal PlanetGenerator
+            generatorObj = new GameObject("PlanetGenerator");
+            var generator = generatorObj.AddComponent<PlanetGenerator>();
+            
+            // Mock a basic PlanetConfig so it doesn't crash
+            generator.Config = ScriptableObject.CreateInstance<PlanetConfig>();
+            generator.Config.MapWidth = 10;
+            generator.Config.MapHeight = 10;
+            generator.Config.SurfaceFeatureDensity = 0; // No features to speed up test
+            
+            // Give it time to generate the planet and bake NavMeshes (Start method execution)
+            yield return null;
+            yield return null;
+
+            // Get all NavMesh surfaces on the generator
+            var surfaces = generatorObj.GetComponents<NavMeshSurface>();
+            
+            // Check how many agent types are actually registered in the project settings
+            int registeredAgentCount = NavMesh.GetSettingsCount();
+
+            // Assert that the generator dynamically added a surface for EVERY agent type
+            Assert.AreEqual(registeredAgentCount, surfaces.Length, 
+                $"PlanetGenerator should have {registeredAgentCount} NavMeshSurfaces, one for each agent type, but found {surfaces.Length}.");
+
+            // Verify each agent type actually has a valid NavMesh baked
+            for (int i = 0; i < registeredAgentCount; i++)
+            {
+                NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
+                
+                // Create a test agent of this type
+                GameObject testAgentObj = new GameObject($"TestAgent_Type_{settings.agentTypeID}");
+                testAgentObj.transform.position = new Vector3(5, 0.1f, 5); // Center of the 10x10 map
+                
+                NavMeshAgent agent = testAgentObj.AddComponent<NavMeshAgent>();
+                agent.agentTypeID = settings.agentTypeID;
+                
+                // Wait one frame for the agent to initialize against the NavMesh
+                yield return null;
+                
+                Assert.IsTrue(agent.isOnNavMesh, 
+                    $"NavMeshAgent of Type ID {settings.agentTypeID} failed to bind to the NavMesh! The Procedural Generation didn't bake its layer.");
+                
+                Object.Destroy(testAgentObj);
+            }
+        }
+    }
+}
+#endif

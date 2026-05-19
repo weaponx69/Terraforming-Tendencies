@@ -53,12 +53,30 @@ namespace GameDevTV.RTS.Environment
 
             private void BakeAllNavMeshes()
             {
-            NavMeshSurface[] surfaces = GetComponents<NavMeshSurface>();
-            foreach (var s in surfaces)
-            {
-                s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
-                s.BuildNavMesh();
-            }
+                Physics.SyncTransforms(); // Ensure the procedural colliders are registered with the physics engine
+
+                int agentTypeCount = NavMesh.GetSettingsCount();
+                var existingSurfaces = new System.Collections.Generic.List<NavMeshSurface>(GetComponents<NavMeshSurface>());
+
+                for (int i = 0; i < agentTypeCount; i++)
+                {
+                    NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
+                    
+                    // Ensure we have a NavMeshSurface for this specific Agent Type
+                    NavMeshSurface surface = existingSurfaces.Find(s => s.agentTypeID == settings.agentTypeID);
+                    if (surface == null)
+                    {
+                        surface = gameObject.AddComponent<NavMeshSurface>();
+                        surface.agentTypeID = settings.agentTypeID;
+                        existingSurfaces.Add(surface);
+                    }
+                }
+
+                foreach (var s in existingSurfaces)
+                {
+                    s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
+                    s.BuildNavMesh();
+                }
             }
 
             [ContextMenu("Clear Planet (Editor)")]
