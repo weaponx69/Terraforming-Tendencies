@@ -46,6 +46,14 @@ namespace GameDevTV.RTS.Tests
             Assert.AreEqual(registeredAgentCount, surfaces.Length, 
                 $"PlanetGenerator should have {registeredAgentCount} NavMeshSurfaces, one for each agent type, but found {surfaces.Length}.");
 
+            // --- Regression Test: Verify TransparentFX is excluded ---
+            int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+            foreach (var s in surfaces)
+            {
+                Assert.AreEqual(0, (s.layerMask.value & (1 << transparentLayer)), 
+                    $"NavMeshSurface for agent {s.agentTypeID} MUST exclude the TransparentFX layer to avoid baking thousands of ghosts!");
+            }
+
             // Verify each agent type actually has a valid NavMesh baked
             for (int i = 0; i < registeredAgentCount; i++)
             {
@@ -67,6 +75,37 @@ namespace GameDevTV.RTS.Tests
                 Object.Destroy(testAgentObj);
             }
         }
-    }
-}
+
+        [UnityTest]
+        public IEnumerator PlanetGenerator_AssignsTransparentFXLayer_ToGhosts()
+        {
+            // Setup a minimal PlanetGenerator
+            generatorObj = new GameObject("PlanetGenerator");
+            var generator = generatorObj.AddComponent<PlanetGenerator>();
+            generator.Config = ScriptableObject.CreateInstance<PlanetConfig>();
+            generator.Config.MapWidth = 10;
+            generator.Config.MapHeight = 10;
+            generator.Config.SurfaceFeatureDensity = 2; // Spawn some features to create ghosts
+            generator.Config.SurfaceFeaturePrefabs = new GameObject[] { new GameObject("TestFeature") };
+            
+            yield return null;
+            yield return null;
+
+            int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+            bool foundGhost = false;
+
+            foreach (Transform child in generatorObj.transform)
+            {
+                if (child.name.Contains("Ghost"))
+                {
+                    foundGhost = true;
+                    Assert.AreEqual(transparentLayer, child.gameObject.layer, 
+                        $"Ghost object '{child.name}' is not on the TransparentFX layer! This will cause massive performance hangs during NavMesh bakes.");
+                }
+            }
+
+            Assert.IsTrue(foundGhost, "Test setup failed: No ghost objects were created to verify.");
+        }
+        }
+        }
 #endif

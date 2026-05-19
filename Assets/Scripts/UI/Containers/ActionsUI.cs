@@ -40,14 +40,17 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void Disable()
         {
-            foreach(UIActionButton button in actionButtons)
+            if (actionButtons != null)
             {
-                button.Disable();
+                foreach(UIActionButton button in actionButtons)
+                {
+                    if (button != null) button.Disable();
+                }
             }
 
             foreach (BaseBuilding building in selectedBuildings)
             {
-                building.OnQueueUpdated -= OnBuildingQueueUpdated;
+                if (building != null) building.OnQueueUpdated -= OnBuildingQueueUpdated;
             }
             selectedBuildings.Clear();
         }

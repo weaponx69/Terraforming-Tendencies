@@ -371,20 +371,20 @@ namespace GameDevTV.RTS.Environment
 
                 private void FixPreplacedGatherables()
                 {
-                foreach (Transform child in transform)
-                {
-                if (child == null) continue;
-                string nameLower = child.name.ToLower();
-                
-                bool isMineral = nameLower.Contains("crystal") || nameLower.Contains("mineral");
-                bool isGas = nameLower.Contains("gas");
-                
-                if (isMineral || isGas)
-                {
-                    SupplySO so = isGas ? GasSupplySO : MineralsSupplySO;
-                    EnsureGatherableSupply(child.gameObject, so);
-                }
-                }
+                    foreach (GatherableSupply gs in GetComponentsInChildren<GatherableSupply>(true))
+                    {
+                        if (gs.Supply == null)
+                        {
+                            string nameLower = gs.name.ToLower();
+                            bool isGas = nameLower.Contains("gas");
+                            gs.Supply = isGas ? GasSupplySO : MineralsSupplySO;
+                    
+                            if (gs.Supply != null && gs.Amount <= 0)
+                            {
+                                gs.Amount = gs.Supply.MaxAmount;
+                            }
+                        }
+                    }
                 }
 
                 private void EnsureGatherableSupply(GameObject go, SupplySO so)

@@ -114,12 +114,20 @@ namespace GameDevTV.RTS.Player
         private void HandleSupplyEvent(SupplyEvent evt)
         {
             // Defensive: evt.Supply may be null in some cases. Ignore if so.
-            if (evt.Supply == null) return;
+            if (evt.Supply == null) 
+            {
+                Debug.LogWarning($"[Supplies] HandleSupplyEvent received NULL supply from {evt.Owner}");
+                return;
+            }
+
+            Debug.Log($"[Supplies] Event received: Owner={evt.Owner}, Amount={evt.Amount}, Supply={evt.Supply.name}");
+
             // Convert minerals/gas supply events to biomass centrally.
             if (evt.Supply == mineralsSO)
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * mineralsToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
+                Debug.Log($"[Supplies] Minerals converted to {biomassAmount} biomass for {evt.Owner}. New Total={Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); // Raise event
                 return; // handled centrally - don't modify Minerals/Gas
             }
@@ -127,6 +135,7 @@ namespace GameDevTV.RTS.Player
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * gasToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
+                Debug.Log($"[Supplies] Gas converted to {biomassAmount} biomass for {evt.Owner}. New Total={Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); // Raise event
                 return;
             }
@@ -134,12 +143,14 @@ namespace GameDevTV.RTS.Player
             {
                 // oxygen is a separate resource (no conversion)
                 Oxygen[evt.Owner] += evt.Amount;
-
+                Debug.Log($"[Supplies] Oxygen updated for {evt.Owner}. New Total={Oxygen[evt.Owner]}");
                 OnOxygenChanged?.Invoke(evt.Owner, Oxygen[evt.Owner]);
                 return;
             }
-
-            // Other supply types (if any) can be handled here in future.
+            else
+            {
+                Debug.LogWarning($"[Supplies] Supply type '{evt.Supply.name}' not recognized as Minerals, Gas, or Oxygen.");
             }
-            }
+        }
+}
             }

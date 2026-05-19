@@ -36,9 +36,9 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void Disable()
         {
-            buildingBuildingUI.Disable();
-            singleUnitSelectedUI.Disable();
-            buildingUnderConstructionUI.Disable();
+            if (buildingBuildingUI != null) buildingBuildingUI.Disable();
+            if (singleUnitSelectedUI != null) singleUnitSelectedUI.Disable();
+            if (buildingUnderConstructionUI != null) buildingUnderConstructionUI.Disable();
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= HandleBuildingSpawn;
             if (selectedBuilding != null)
             {

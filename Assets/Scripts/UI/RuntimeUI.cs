@@ -86,8 +86,19 @@ namespace GameDevTV.RTS.UI
 
         private void HandleBiomassChanged(Owner owner, int newValue)
         {
-            if (owner != displayedOwner) return;
-            if (biomassValueText == null) return;
+            if (owner != displayedOwner) 
+            {
+                // Debug.Log($"[RuntimeUI] Biomass changed for {owner} to {newValue}, but HUD is showing {displayedOwner}. Ignoring.");
+                return;
+            }
+
+            if (biomassValueText == null) 
+            {
+                Debug.LogWarning("[RuntimeUI] HandleBiomassChanged: biomassValueText is NULL!");
+                return;
+            }
+
+            // Debug.Log($"[RuntimeUI] Updating HUD biomass text to {newValue}");
             biomassValueText.SetText(newValue.ToString());
         }
 
@@ -245,11 +256,6 @@ namespace GameDevTV.RTS.UI
         private void HandleSupplyChange(SupplyEvent evt)
         {
             actionsUI.EnableFor(selectedUnits);
-            // Update biomass HUD for Player1
-            if (Owner.Player1 == evt.Owner && biomassValueText != null)
-            {
-                biomassValueText.SetText(GameDevTV.RTS.Player.Supplies.Biomass[evt.Owner].ToString());
-            }
         }
 
         private void SetIcon(Sprite icon)
