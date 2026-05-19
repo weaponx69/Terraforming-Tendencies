@@ -42,16 +42,14 @@ namespace GameDevTV.RTS.Units
             // Current health is set as the building is being built via Heal()
         }
 
-        protected override void OnEnable()
+        protected virtual void OnEnable()
         {
-            base.OnEnable();
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
         }
 
-        protected override void OnDisable()
+        protected virtual void OnDisable()
         {
-            base.OnDisable();
             ActiveBuildings.Remove(this);
         }
 
