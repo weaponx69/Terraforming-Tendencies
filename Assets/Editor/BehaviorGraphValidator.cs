@@ -12,7 +12,12 @@ public class BehaviorGraphValidator
 
     private static void ValidateGraphs()
     {
-        if (SessionState.GetBool("BehaviorGraphsValidated", false))
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return; // Cannot reserialize during play mode
+        }
+
+        if (SessionState.GetBool("BehaviorGraphsValidated_V2", false))
         {
             return; // Only run once per editor session
         }
@@ -30,7 +35,7 @@ public class BehaviorGraphValidator
         {
             Debug.Log($"[BehaviorGraphValidator] Force reserializing {paths.Count} Behavior Graphs to fix assembly references...");
             AssetDatabase.ForceReserializeAssets(paths, ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata);
-            SessionState.SetBool("BehaviorGraphsValidated", true);
+            SessionState.SetBool("BehaviorGraphsValidated_V2", true);
             Debug.Log("[BehaviorGraphValidator] Successfully validated Behavior Graphs!");
         }
     }
