@@ -1,0 +1,20 @@
+{
+    "name": "MainGame",
+    "rootNamespace": "GameDevTV.RTS",
+    "references": [
+        "Unity.AI.Navigation",
+        "Unity.Behavior",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
