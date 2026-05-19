@@ -13,7 +13,7 @@ namespace GameDevTV.RTS.Environment
         public float CellSize = 1f;
         public bool SpawnFloraOnStart = false; // Default to barren planet
 
-        [Header("Resource Configurations")]
+        [Header("Resource Configurations (Now auto-loaded from Resources)")]
         public SupplySO MineralsSupplySO;
         public SupplySO GasSupplySO;
 
@@ -27,6 +27,14 @@ namespace GameDevTV.RTS.Environment
             if (GameDevTV.RTS.Player.CampaignManager.Instance != null && GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet != null)
             {
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
+            }
+
+            if (MineralsSupplySO == null) MineralsSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Minerals");
+            if (GasSupplySO == null) GasSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Gas");
+            
+            if (MineralsSupplySO == null || GasSupplySO == null)
+            {
+                Debug.LogWarning("[PlanetGenerator] Could not load SupplySOs from Resources! Ensure they exist in Assets/Resources/Gatherable Supplies/");
             }
             
             FixPreplacedGatherables();

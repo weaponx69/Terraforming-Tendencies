@@ -24,7 +24,7 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private GameObject commandPostPrefab;
         [SerializeField] private BuildingSO commandPostSO;
 
-        [Tooltip("Air Transport SO. Auto-discovered at runtime if left blank.")]
+        [Tooltip("Air Transport SO. Auto-loaded from Resources/Units/MiningDrone if left blank.")]
         [SerializeField] private AbstractUnitSO miningDroneUnitSO;
 
         [Header("Economy Limits")]
@@ -60,6 +60,15 @@ namespace GameDevTV.RTS.Units
             Bus<UnitDeathEvent>.OnEvent[aiOwner]     += HandleUnitDeath;
             Bus<BuildingSpawnEvent>.OnEvent[aiOwner] += HandleBuildingSpawn;
             Bus<BuildingDeathEvent>.OnEvent[aiOwner] += HandleBuildingDeath;
+
+            if (miningDroneUnitSO == null)
+            {
+                miningDroneUnitSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+                if (miningDroneUnitSO == null)
+                {
+                    Debug.LogWarning("[AIController] Could not load MiningDrone from Resources! Ensure it exists in Assets/Resources/Units/");
+                }
+            }
         }
 
         private void Start() => StartCoroutine(DelayedStart());
