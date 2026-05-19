@@ -1096,7 +1096,7 @@ MonoBehaviour:
     m_Value: 0
   OutputChannel: 1
   StandbyUpdate: 2
-  m_StreamingVersion: 20230301
+  m_StreamingVersion: 20241001
   m_LegacyPriority: 0
   Target:
     TrackingTarget: {fileID: 1546859730}
@@ -2691,7 +2691,7 @@ MonoBehaviour:
   startingBiomass: 100
   oxygenText: {fileID: 0}
   oxygenSO: {fileID: 0}
-  populationText: {fileID: 0}
+  populationText: {fileID: 893058838}
   mineralsSO: {fileID: 11400000, guid: 0f09e06b77849bc49aa0ec4f318c0dd2, type: 2}
   gasSO: {fileID: 11400000, guid: 7133a99a2b1288148aacd4bc1f66bf1f, type: 2}
 --- !u!1 &678677020
@@ -3944,7 +3944,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 200/200
+  m_text: 0%
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: de5a42f739cb1344b8c4fac04113013b, type: 2}
   m_sharedMaterial: {fileID: 4660662461759981731, guid: de5a42f739cb1344b8c4fac04113013b, type: 2}
@@ -5403,6 +5403,8 @@ MonoBehaviour:
   Config: {fileID: 11400000, guid: 36307279472a2858bad4630d3ec89252, type: 2}
   CellSize: 1
   SpawnFloraOnStart: 0
+  MineralsSupplySO: {fileID: 0}
+  GasSupplySO: {fileID: 0}
 --- !u!64 &1337197719
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -8042,7 +8044,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.2, g: 0.7, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

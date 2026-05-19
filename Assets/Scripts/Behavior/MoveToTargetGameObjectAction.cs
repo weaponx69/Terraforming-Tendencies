@@ -19,6 +19,7 @@ namespace GameDevTV.RTS.Behavior
         private NavMeshAgent agent;
         private Animator animator;
         private Vector3 lastPosition;
+        private Vector3 randomOffset;
 
         protected override Status OnStart()
         {
@@ -30,17 +31,29 @@ namespace GameDevTV.RTS.Behavior
 
             Agent.Value.TryGetComponent(out animator);
 
+            // Calculate random offset once to prevent jitter. Keep it small to avoid circling.
+            float offsetAmount = 0.2f;
+            randomOffset = new Vector3(UnityEngine.Random.Range(-offsetAmount, offsetAmount), 0, UnityEngine.Random.Range(-offsetAmount, offsetAmount));
+
             Vector3 targetPosition = GetTargetPosition();
             float distance = Vector3.Distance(agent.transform.position, targetPosition);
 
+            // Use a small buffer for arrival.
             if (distance <= agent.stoppingDistance + 0.1f)
             {
                 Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} already at destination {TargetGameObject.Value.name}. distance={distance}, stoppingDistance={agent.stoppingDistance}");
                 return Status.Success;
             }
 
-            bool setDestResult = agent.SetDestination(targetPosition);
-            Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} started moving to {TargetGameObject.Value.name} at {targetPosition}. setDestinationResult={setDestResult}, distance={distance}");
+            if (agent.isOnNavMesh)
+            {
+                bool setDestResult = agent.SetDestination(targetPosition);
+                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} started moving to {TargetGameObject.Value.name} at {targetPosition}. setDestinationResult={setDestResult}, distance={distance}");
+            }
+            else
+            {
+                Debug.LogWarning($"[MoveToTargetGameObjectAction] {agent.name} is not on NavMesh. Cannot set destination.");
+            }
             
             lastPosition = TargetGameObject.Value.transform.position;
             return Status.Running;
@@ -56,6 +69,11 @@ namespace GameDevTV.RTS.Behavior
             if (TargetGameObject.Value == null)
             {
                 return Status.Failure;
+            }
+
+            if (!agent.isOnNavMesh)
+            {
+                return Status.Running;
             }
 
             if (agent.pathPending)
@@ -75,9 +93,20 @@ namespace GameDevTV.RTS.Behavior
             }
 
             float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
-            if (agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.1f)
+            bool arrived = false;
+            
+            if (agent.isOnNavMesh)
             {
-                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} arrived at {TargetGameObject.Value.name} successfully. directDistance={directDistance}, remainingDistance={agent.remainingDistance}");
+                arrived = agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.1f;
+            }
+            else
+            {
+                arrived = directDistance <= agent.stoppingDistance + 0.1f;
+            }
+
+            if (arrived)
+            {
+                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} arrived at {TargetGameObject.Value.name} successfully. directDistance={directDistance}");
                 return Status.Success;
             }
 
@@ -109,7 +138,16 @@ namespace GameDevTV.RTS.Behavior
                 targetPosition = TargetGameObject.Value.transform.position;
             }
 
+            // Apply pre-calculated random offset to prevent jitter
+            targetPosition += randomOffset;
+
+            // Ensure the final position is valid on the NavMesh
+            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            {
+                targetPosition = hit.position;
+            }
+
             return targetPosition;
-        }
-    }
+            }
+}
 }

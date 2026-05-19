@@ -49,6 +49,11 @@ namespace GameDevTV.RTS.Units
 
         public void Gather(GatherableSupply supply)
         {
+            if (Agent != null)
+            {
+                // Set stopping distance for resources (radius 0.2 + agent radius 1.0 + buffer)
+                Agent.stoppingDistance = 1.5f;
+            }
             graphAgent.SetVariableValue("Supply", supply);
             graphAgent.SetVariableValue("TargetGameObject", supply.gameObject);
             graphAgent.SetVariableValue("Command", UnitCommands.Gather);
@@ -56,6 +61,11 @@ namespace GameDevTV.RTS.Units
 
         public void ReturnSupplies(GameObject commandPost)
         {
+            if (Agent != null)
+            {
+                // Set stopping distance for buildings (radius 2.0 + hole 2.75 + agent radius 1.0 + buffer)
+                Agent.stoppingDistance = 2.5f;
+            }
             graphAgent.SetVariableValue("CommandPost", commandPost);
             graphAgent.SetVariableValue("Command", UnitCommands.ReturnSupplies);
         }
@@ -117,6 +127,13 @@ namespace GameDevTV.RTS.Units
 
             SetCommandOverrides(Array.Empty<BaseCommand>());
             Stop();
+        }
+
+        public void ClearSupplies()
+        {
+            graphAgent.SetVariableValue("SupplyAmountHeld", 0);
+            graphAgent.SetVariableValue<GameObject>("Supply", null);
+            graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
         }
 
         public override void Deselect()

@@ -37,8 +37,9 @@ namespace GameDevTV.RTS.Player
         public static Dictionary<Owner, int> Population { get; private set; }
         public static Dictionary<Owner, int> PopulationLimit { get; private set; }
 
-        // Biomass changed event
+        // Events
         public static event System.Action<Owner, int> OnBiomassChanged;
+        public static event System.Action OnVictory;
 
         // Optional helper to centralize raising the event
         public static void RaiseBiomassChanged(Owner owner, int value)
@@ -75,6 +76,7 @@ namespace GameDevTV.RTS.Player
             }
 
             OnBiomassChanged += HandleBiomassChanged;
+            OnOxygenChanged += HandleOxygenChanged;
 
             if (biomassText != null && Biomass.TryGetValue(Owner.Player1, out int initial))
             {
@@ -86,13 +88,56 @@ namespace GameDevTV.RTS.Player
                 oxygenText.SetText(oxyInitial.ToString());
             }
 
+            UpdateHabitabilityUI(0);
+
             Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
         }
 
         private void OnDestroy()
         {
             OnBiomassChanged -= HandleBiomassChanged;
+            OnOxygenChanged -= HandleOxygenChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
+        }
+
+        private void HandleOxygenChanged(Owner owner, int value)
+        {
+            if (owner == Owner.AI1 || owner == Owner.Player1)
+            {
+                Debug.Log($"[Supplies] HandleOxygenChanged for {owner}: {value}%");
+                UpdateHabitabilityUI(value);
+                if (value >= 100)
+                {
+                    OnVictory?.Invoke();
+                }
+            }
+        }
+
+        private void UpdateHabitabilityUI(int percent)
+        {
+            if (populationText != null)
+            {
+                Debug.Log($"[Supplies] Updating populationText to {percent}%");
+                populationText.SetText($"{percent}%");
+            }
+            else
+            {
+                Debug.LogWarning("[Supplies] populationText is NULL in UpdateHabitabilityUI!");
+            }
+        }
+
+        public static void UpdateOxygen(Owner owner, int value)
+        {
+            if (Oxygen != null && Oxygen.ContainsKey(owner))
+            {
+                Oxygen[owner] = value;
+                Debug.Log($"[Supplies] Static UpdateOxygen called for {owner}: {value}%");
+                OnOxygenChanged?.Invoke(owner, value);
+            }
+            else
+            {
+                Debug.LogWarning($"[Supplies] Static UpdateOxygen failed. Oxygen dict null or key missing for {owner}");
+            }
         }
 
         private void HandleBiomassChanged(Owner owner, int value)
@@ -135,6 +180,6 @@ namespace GameDevTV.RTS.Player
             }
 
             // Other supply types (if any) can be handled here in future.
-        }
-    }
-}
+            }
+            }
+            }

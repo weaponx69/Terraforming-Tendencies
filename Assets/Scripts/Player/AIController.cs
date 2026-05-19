@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
@@ -27,7 +28,6 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private AbstractUnitSO miningDroneUnitSO;
 
         [Header("Economy Limits")]
-        [SerializeField] private int maxDrones = 4;
         [SerializeField] private int biomassReserve = 0;
         [Tooltip("Biomass granted to the AI at startup, independent of the player's starting biomass.")]
         [SerializeField] private int startingAIBiomass = 500;
@@ -36,13 +36,25 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private float tickRate = 3f;
         [SerializeField] private float startDelay = 2f;
 
+        [Header("Node Settings")]
+        [SerializeField] private float nodeRadius = 35f;
+        [SerializeField] private float minNodeSpacing = 80f;
+
         // ── Runtime state ──────────────────────────────────────────────────────
-        private BaseBuilding commandPost;
-        private readonly System.Collections.Generic.HashSet<Worker> drones = new();
+        private class AINode
+        {
+            public BaseBuilding CommandPost;
+            public readonly List<Worker> Drones = new();
+            public readonly HashSet<GatherableSupply> ResourcesInRange = new();
+            public int TargetDroneCount => 4;
+            }
+
+        private readonly List<AINode> activeNodes = new();
         private readonly System.Collections.Generic.Dictionary<Worker, GatherableSupply> assignedTargets = new();
+        private bool isSpawning = false;
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
-private void Awake()
+        private void Awake()
         {
             Bus<UnitSpawnEvent>.OnEvent[aiOwner]     += HandleUnitSpawn;
             Bus<UnitDeathEvent>.OnEvent[aiOwner]     += HandleUnitDeath;
@@ -63,7 +75,6 @@ private void Awake()
         }
 
         // ── Auto-discovery ─────────────────────────────────────────────────────
-        // Known asset path — same one used by SetupAIAutomation.cs
         private const string DRONE_SO_PATH = "Assets/Units/Air Transport/Air Transport.asset";
 
         private void TryDiscoverDroneSO()
@@ -71,7 +82,6 @@ private void Awake()
             if (miningDroneUnitSO != null) return;
 
 #if UNITY_EDITOR
-            // Primary: load directly from the known project path.
             AbstractUnitSO direct = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>(DRONE_SO_PATH);
             if (direct != null)
             {
@@ -80,7 +90,6 @@ private void Awake()
                 return;
             }
 
-            // Fallback: scan concrete subtype assets (t:AbstractUnitSO fails; use concrete names).
             foreach (string typeName in new[] { "t:UnitSO", "t:BuildingSO" })
             {
                 foreach (string guid in UnityEditor.AssetDatabase.FindAssets(typeName))
@@ -96,7 +105,6 @@ private void Awake()
                 }
             }
 #else
-            // Built player: scan loaded memory.
             foreach (AbstractUnitSO so in Resources.FindObjectsOfTypeAll<AbstractUnitSO>())
             {
                 if (so.Prefab != null && so.Prefab.GetComponent<Worker>() != null)
@@ -112,89 +120,85 @@ private void Awake()
         // ── Boot ──────────────────────────────────────────────────────────────
         private IEnumerator DelayedStart()
         {
+            Debug.Log($"[AI] {aiOwner} starting DelayedStart. delay={startDelay}");
             yield return new WaitForSeconds(startDelay);
-
-            // Grant the AI its own starting biomass pool, independent of the player's.
             GrantStartingBiomass();
-
-            Debug.Log($"[AI] {aiOwner} starting. commandPostPrefab={(commandPostPrefab != null ? commandPostPrefab.name : "NULL")}, commandPostSO={(commandPostSO != null ? commandPostSO.Name : "NULL")}, miningDroneUnitSO={(miningDroneUnitSO != null ? miningDroneUnitSO.Name : "NULL")}, maxDrones={maxDrones}, startingBiomass={startingAIBiomass}");
-
-            SpawnCommandPost();
+            Debug.Log($"[AI] {aiOwner} biomass granted. startingBiomass={startingAIBiomass}");
+            
+            // Only spawn if nothing exists
+            if (GetBuildingsInScene().Count == 0)
+            {
+                Debug.Log($"[AI] No buildings found, spawning initial Command Post.");
+                SpawnCommandPost();
+            }
+            
+            Debug.Log($"[AI] Starting Tick repetition every {tickRate}s.");
             InvokeRepeating(nameof(Tick), tickRate, tickRate);
         }
 
-        /// <summary>
-        /// Grants the AI its own starting biomass by writing directly to the Supplies.Biomass
-        /// dictionary. Bypasses the SupplyEvent system entirely — no SO discovery needed.
-        /// </summary>
         private void GrantStartingBiomass()
         {
             if (startingAIBiomass <= 0) return;
-            if (Player.Supplies.Biomass == null)
-            {
-                Debug.LogWarning("[AI] Supplies.Biomass dictionary is null — Supplies may not have initialized yet.");
-                return;
-            }
+            if (Player.Supplies.Biomass == null) return;
 
-            int current = Player.Supplies.Biomass.TryGetValue(aiOwner, out int b) ? b : 0;
+            int current = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
             int total   = current + startingAIBiomass;
             Player.Supplies.Biomass[aiOwner] = total;
             Player.Supplies.RaiseBiomassChanged(aiOwner, total);
-            Debug.Log($"[AI] {aiOwner} biomass set to {total} (was {current}, granted {startingAIBiomass}).");
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────
         private void HandleUnitSpawn(UnitSpawnEvent evt)
         {
             if (evt.Unit.Owner != aiOwner) return;
-
-            // AbstractUnit inherits UnitSO from AbstractCommandable — access it directly.
             if (miningDroneUnitSO == null || evt.Unit.UnitSO?.Name != miningDroneUnitSO.Name) return;
 
             if (evt.Unit is Worker worker)
             {
-                // Set the stopping distance to a larger value to prevent the drone
-                // from getting physically blocked by resource and Command Post colliders!
                 if (worker.TryGetComponent(out NavMeshAgent navAgent))
                 {
                     navAgent.stoppingDistance = 0.5f;
+                    float baseSpeed = navAgent.speed;
+                    navAgent.speed = baseSpeed * Random.Range(0.9f, 1.1f);
+                    navAgent.avoidancePriority = Random.Range(30, 71);
+                    navAgent.acceleration *= Random.Range(0.8f, 1.2f);
 
-                    // Warp onto NavMesh if not already on it
                     if (!navAgent.isOnNavMesh)
                     {
                         if (NavMesh.SamplePosition(worker.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
                         {
                             navAgent.Warp(hit.position);
-                            Debug.Log($"[AI] Warped spawned drone {worker.name} onto NavMesh at {hit.position}");
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[AI] Failed to sample NavMesh position for drone {worker.name} at {worker.transform.position}");
                         }
                     }
                 }
 
-                drones.Add(worker);
-                Debug.Log($"[AI] {aiOwner} drone tracked ({drones.Count}/{maxDrones}).");
+                // Assign to closest node
+                AINode node = activeNodes.OrderBy(n => Vector3.Distance(worker.transform.position, n.CommandPost.transform.position)).FirstOrDefault();
+                if (node != null)
+                {
+                    node.Drones.Add(worker);
+                }
 
                 StartCoroutine(DeferredGatherAssignment(worker));
             }
         }
 
-        private System.Collections.IEnumerator DeferredGatherAssignment(Worker worker)
+        private IEnumerator DeferredGatherAssignment(Worker worker)
         {
-            yield return null; // Wait for one frame to let BehaviorGraphAgent initialize
+            yield return null; 
             if (worker == null) yield break;
 
-            GatherableSupply supply = FindNearestAvailableSupply(worker.transform.position);
+            AINode node = activeNodes.FirstOrDefault(n => n.Drones.Contains(worker));
+            if (node == null) yield break;
+
+            // Try to find a resource that isn't globally assigned yet
+            HashSet<GatherableSupply> excluded = new HashSet<GatherableSupply>(assignedTargets.Values);
+            GatherableSupply supply = FindNearestAvailableSupplyInNode(worker.transform.position, node, excluded, worker.Agent.agentTypeID);
+            
             if (supply != null)
             {
+                assignedTargets[worker] = supply;
                 worker.Gather(supply);
-                Debug.Log($"[AI] Initialized drone {worker.name} gather task: {supply.name} (deferred)");
-            }
-            else
-            {
-                Debug.LogWarning($"[AI] No resources found for new drone {worker.name} to gather.");
             }
         }
 
@@ -202,7 +206,7 @@ private void Awake()
         {
             if (evt.Unit is Worker worker)
             {
-                drones.Remove(worker);
+                foreach (var node in activeNodes) node.Drones.Remove(worker);
                 assignedTargets.Remove(worker);
             }
         }
@@ -211,184 +215,267 @@ private void Awake()
         {
             if (evt.Building == null || evt.Building.Owner != aiOwner) return;
 
-            // Match on commandPostSO name if wired, otherwise fall back to checking
-            // whether the prefab type has commandPostPrefab as the source.
             bool isCommandPost = commandPostSO != null
                 ? evt.Building.UnitSO?.Name == commandPostSO.Name
                 : commandPostPrefab != null && evt.Building.name.StartsWith(commandPostPrefab.name);
 
             if (isCommandPost)
             {
-                commandPost = evt.Building;
-                Debug.Log($"[AI] {aiOwner} Command Post tracked: {evt.Building.name}");
+                // Ensure we don't double-register
+                if (activeNodes.Any(n => n.CommandPost == evt.Building)) return;
+
+                AINode node = new AINode { CommandPost = evt.Building };
+                RefreshNodeResources(node);
+                activeNodes.Add(node);
+                Debug.Log($"[AI] {aiOwner} Node created around: {evt.Building.name} with {node.ResourcesInRange.Count} resources.");
             }
         }
 
         private void HandleBuildingDeath(BuildingDeathEvent evt)
         {
-            if (evt.Building == commandPost)
-            {
-                Debug.Log($"[AI] {aiOwner} Command Post destroyed.");
-                commandPost = null;
-            }
+            activeNodes.RemoveAll(n => n.CommandPost == evt.Building);
         }
 
-        // ── Main tick ──────────────────────────────────────────────────────────
+        private void RefreshNodeResources(AINode node)
+        {
+            node.ResourcesInRange.Clear();
+            Vector3 pos = node.CommandPost.transform.position;
+            var supplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude)
+                .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null)
+                .Where(s => Vector3.Distance(s.transform.position, pos) <= nodeRadius)
+                .OrderBy(s => Vector3.Distance(s.transform.position, pos))
+                .Take(4);
+
+            foreach (var s in supplies) node.ResourcesInRange.Add(s);
+        }
+
+        private List<BaseBuilding> GetBuildingsInScene()
+        {
+             return Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include)
+                .Where(b => b.Owner == aiOwner && b.Progress.State != BuildingProgress.BuildingState.Destroyed)
+                .ToList();
+        }
+
         private void Tick()
         {
-            // Recover commandPost if the event was missed or if it's destroyed
-            if (commandPost == null || commandPost.Progress.State == BuildingProgress.BuildingState.Destroyed)
-            {
-                commandPost = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include)
-                    .FirstOrDefault(b => b.Owner == aiOwner &&
-                        b.Progress.State != BuildingProgress.BuildingState.Destroyed &&
-                        (commandPostSO != null
-                            ? b.UnitSO?.Name == commandPostSO.Name
-                            : commandPostPrefab != null && b.name.StartsWith(commandPostPrefab.name)));
+            // Update node list based on scene objects to handle any missed events or lag
+            var sceneBuildings = GetBuildingsInScene();
+            
+            // Remove nodes whose buildings are gone
+            int removed = activeNodes.RemoveAll(n => n.CommandPost == null || !sceneBuildings.Contains(n.CommandPost));
+            if (removed > 0) Debug.Log($"[AI] {aiOwner} removed {removed} nodes. Remaining: {activeNodes.Count}");
 
-                if (commandPost == null)
+            // Add nodes for buildings that aren't tracked yet
+            foreach (var b in sceneBuildings)
+            {
+                if (!activeNodes.Any(n => n.CommandPost == b))
                 {
-                    Debug.Log($"[AI] {aiOwner} Tick: no active Command Post found — spawning.");
-                    SpawnCommandPost();
-                    return;
+                    AINode node = new AINode { CommandPost = b };
+                    RefreshNodeResources(node);
+                    activeNodes.Add(node);
+                    Debug.Log($"[AI] {aiOwner} discovered existing building, added node: {b.name}");
                 }
             }
 
-            int activeDrones = drones.Count(d => d != null);
-            int available    = Player.Supplies.Biomass.TryGetValue(aiOwner, out int b) ? b : 0;
-
-            Debug.Log($"[AI] {aiOwner} Tick: drones={activeDrones}/{maxDrones}, biomass={available}, droneSOset={(miningDroneUnitSO != null)}, queueSize={commandPost.QueueSize}");
-
-            // ── Diagnostic Logging for active drones ───────────────────────────
-            foreach (Worker drone in drones.ToList())
+            if (activeNodes.Count == 0)
             {
-                if (drone == null) continue;
-
-                string cmdState = "Unknown";
-                if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
-                {
-                    cmdState = cmd.Value.ToString();
-                }
-
-                bool onMesh = false;
-                string naDetails = "No NavMeshAgent";
-                if (drone.TryGetComponent(out NavMeshAgent na))
-                {
-                    onMesh = na.isOnNavMesh;
-                    naDetails = $"enabled={na.enabled}, isStopped={na.isStopped}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, dest={na.destination}, velocity={na.velocity}, speed={na.speed}, remainingDist={na.remainingDistance}";
-                }
-
-                Debug.Log($"[AI Diagnostic] Drone={drone.name}, Command={cmdState}, isOnNavMesh={onMesh}, position={drone.transform.position}, {naDetails}");
-            }
-
-            if (miningDroneUnitSO == null)
-            {
-                Debug.LogWarning($"[AI] {aiOwner} miningDroneUnitSO is null — retrying discovery.");
-                TryDiscoverDroneSO();
+                if (!isSpawning) SpawnCommandPost();
                 return;
             }
 
-            // 1. Spawning check
-            if (activeDrones < maxDrones && commandPost.QueueSize < 5)
+            int availableBiomass = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            bool allNodesMaxed = true;
+
+            foreach (var node in activeNodes.ToList())
             {
-                bool affordable = CanAfford(miningDroneUnitSO);
-                bool inQueue    = IsInQueue(commandPost, miningDroneUnitSO);
-                Debug.Log($"[AI] {aiOwner} drone check: affordable={affordable}, inQueue={inQueue}");
+                node.ResourcesInRange.RemoveWhere(s => s == null || s.Amount <= 0);
 
-                if (affordable && !inQueue)
+                // Re-fill resources if the cell's pocket has more available within its radius
+                if (node.ResourcesInRange.Count < 4)
                 {
-                    Debug.Log($"[AI] {aiOwner} queuing {miningDroneUnitSO.Name} ({activeDrones}/{maxDrones})");
-                    commandPost.BuildUnlockable(miningDroneUnitSO);
+                    RefreshNodeResources(node);
                 }
-            }
 
-            // 2. Idle drone reassignment (Greedy TSP Dispatch)
-            var idleDrones = drones.Where(d => d != null && IsDroneEligibleForAssignment(d)).ToList();
-            
-            // Clean up assigned targets for drones that are no longer eligible or targeting something else
-            foreach (var drone in drones.ToList())
+                int droneCount = node.Drones.Count(d => d != null);
+                int targetCount = node.TargetDroneCount;
+
+                if (droneCount < targetCount)
+                {
+                    allNodesMaxed = false;
+                    if (node.CommandPost.QueueSize < 5 && CanAfford(miningDroneUnitSO) && !IsInQueue(node.CommandPost, miningDroneUnitSO))
+                    {
+                        node.CommandPost.BuildUnlockable(miningDroneUnitSO);
+                    }
+                }
+
+                ProcessNodeDrones(node);
+                DispatchIdleDronesInNode(node);
+                }
+
+                UpdateOxygenLevel();
+
+                if (allNodesMaxed && activeNodes.Count < 20 && !isSpawning) 
+                {
+                TryExpand();
+                }
+                }
+
+                private void UpdateOxygenLevel()
+                {
+                // Each node contributes 5% to the habitability
+                int oxygenPercent = activeNodes.Count * 5;
+                Player.Supplies.UpdateOxygen(aiOwner, oxygenPercent);
+                }
+
+                private void ProcessNodeDrones(AINode node)
+                {
+                foreach (Worker drone in node.Drones.ToList())
+                {
+                if (drone == null) continue;
+                if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                {
+                    if (drone.TryGetComponent(out NavMeshAgent na) && na.isOnNavMesh)
+                    {
+                        if (cmd.Value == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
+                        else if (cmd.Value == UnitCommands.Gather) na.stoppingDistance = 1.5f;
+
+                        if (cmd.Value != UnitCommands.Stop && na.velocity.sqrMagnitude < 0.01f && na.remainingDistance > na.stoppingDistance + 0.2f)
+                            drone.Stop();
+
+                        if (cmd.Value == UnitCommands.ReturnSupplies && na.remainingDistance <= na.stoppingDistance + 0.1f)
+                        {
+                            if (drone.HasSupplies) drone.ClearSupplies();
+                            drone.Stop();
+                        }
+                    }
+                }
+                }
+                }
+
+        private void DispatchIdleDronesInNode(AINode node)
+        {
+            foreach (Worker drone in node.Drones.ToList())
             {
                 if (drone == null) continue;
-                if (!IsDroneEligibleForAssignment(drone) && assignedTargets.ContainsKey(drone))
+
+                // 1. Check if the drone already has a sticky assignment
+                if (assignedTargets.TryGetValue(drone, out var currentTarget))
                 {
-                    // If the drone is now moving/gathering, we keep the target tracked until it's "Done"
-                    // But if the command changed away from Gather, we should release it.
-                    if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                    // If target is gone or depleted, clear the assignment
+                    if (currentTarget == null || currentTarget.Amount <= 0)
                     {
-                        if (cmd.Value != UnitCommands.Gather)
-                        {
-                            assignedTargets.Remove(drone);
-                        }
+                        assignedTargets.Remove(drone);
+                    }
+                    else if (IsDroneEligibleForAssignment(drone))
+                    {
+                        // Drone is idle but still owns a valid resource. Go back to it!
+                        drone.Gather(currentTarget);
                     }
                 }
-            }
-
-            foreach (Worker drone in idleDrones)
-            {
-                // Ensure stopping distance and NavMesh snapping
-                if (drone.TryGetComponent(out NavMeshAgent navAgent))
-                {
-                    navAgent.stoppingDistance = 0.5f;
-                    if (!navAgent.isOnNavMesh)
-                    {
-                        if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 25f, NavMesh.AllAreas))
-                        {
-                            navAgent.Warp(hit.position);
-                            Debug.Log($"[AI] Warped idle drone {drone.name} onto NavMesh at {hit.position}");
-                        }
-                    }
-                }
-
-                // Greedy selection: Find closest supply that isn't already assigned to someone else
-                GatherableSupply supply = FindNearestAvailableSupply(drone.transform.position, assignedTargets.Values.ToList());
                 
-                if (supply != null)
+                // 2. If it still doesn't have an assignment and is eligible, find it a unique one
+                if (!assignedTargets.ContainsKey(drone) && IsDroneEligibleForAssignment(drone))
                 {
-                    assignedTargets[drone] = supply;
-                    drone.Gather(supply);
-                    Debug.Log($"[AI] Greedy Dispatch: Assigned {drone.name} to {supply.name}.");
+                    // Filter resources to find one that isn't globally assigned to ANY drone
+                    HashSet<GatherableSupply> globallyTargeted = new HashSet<GatherableSupply>(assignedTargets.Values);
+                    GatherableSupply supply = FindNearestAvailableSupplyInNode(drone.transform.position, node, globallyTargeted, drone.Agent.agentTypeID);
+                    
+                    if (supply != null)
+                    {
+                        assignedTargets[drone] = supply;
+                        drone.Gather(supply);
+                        Debug.Log($"[AI] Node {node.CommandPost.name} sticky dispatch: {drone.name} -> {supply.name}.");
+                    }
                 }
             }
+        }
+
+        private GatherableSupply FindNearestAvailableSupplyInNode(Vector3 position, AINode node, HashSet<GatherableSupply> excluded = null, int agentTypeId = -1)
+        {
+            var candidates = node.ResourcesInRange
+                .Where(s => s != null && s.Amount > 0 && !s.IsBusy)
+                .Where(s => excluded == null || !excluded.Contains(s))
+                .Select(s => new { Supply = s, DistSq = (s.transform.position - position).sqrMagnitude })
+                .OrderBy(x => x.DistSq)
+                .Take(20).ToList();
+
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { areaMask = NavMesh.AllAreas };
+            if (agentTypeId != -1) filter.agentTypeID = agentTypeId;
+
+            foreach (var item in candidates)
+            {
+                NavMeshPath path = new NavMeshPath();
+                if (NavMesh.CalculatePath(position, item.Supply.transform.position, filter, path))
+                    if (path.status == NavMeshPathStatus.PathComplete) return item.Supply;
             }
+            return null;
+        }
 
-            // ── Helpers ────────────────────────────────────────────────────────────
-            private GatherableSupply FindNearestAvailableSupply(Vector3 position, System.Collections.Generic.List<GatherableSupply> excluded = null)
+        private void TryExpand()
+        {
+            var allSupplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude)
+                .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null).ToList();
+
+            Vector3 bestPos = Vector3.zero;
+            int maxNearby = 0;
+
+            var currentBuildings = GetBuildingsInScene();
+
+            foreach (var s in allSupplies.OrderBy(x => Random.value).Take(50))
             {
-            float closestDistance = float.MaxValue;
-            GatherableSupply closestSupply = null;
-
-            GatherableSupply[] supplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
-            foreach (GatherableSupply supply in supplies)
-            {
-                if (supply == null || supply.Amount <= 0) continue;
-                if (excluded != null && excluded.Contains(supply)) continue;
-
-                float dist = Vector3.Distance(position, supply.transform.position);
-                if (dist < closestDistance)
+                Vector3 candidate = s.transform.position;
+                
+                // Check distance from all existing buildings in scene to enforce territorial separation
+                if (currentBuildings.Any(b => Vector3.Distance(candidate, b.transform.position) < minNodeSpacing)) continue;
+                
+                int count = allSupplies.Count(other => Vector3.Distance(candidate, other.transform.position) <= nodeRadius);
+                if (count >= 4 && count > maxNearby)
                 {
-                    closestDistance = dist;
-                    closestSupply = supply;
+                    maxNearby = count;
+                    bestPos = candidate;
                 }
             }
 
-            // Fallback: If everything is excluded (all rocks have a drone), just pick the absolute closest un-mined rock
-            if (closestSupply == null && excluded != null && excluded.Count > 0)
-            {
-                return FindNearestAvailableSupply(position, null);
+            if (maxNearby >= 4) SpawnCommandPostAt(bestPos);
             }
 
-            return closestSupply;
+        private void SpawnCommandPostAt(Vector3 position)
+        {
+            if (commandPostPrefab == null || isSpawning) return;
+            
+            isSpawning = true;
+            if (NavMesh.SamplePosition(position, out NavMeshHit hit, 20f, NavMesh.AllAreas)) position = hit.position;
+            
+            Debug.Log($"[AI] Spawning expansion Command Post at {position}");
+            GameObject inst = Instantiate(commandPostPrefab, position, Quaternion.identity);
+            
+            if (inst.TryGetComponent(out BaseBuilding building))
+            {
+                building.Owner = aiOwner;
+                building.CompleteConstruction();
             }
+            
+            StartCoroutine(RebakeAndUnlockSpawning());
+        }
+
+        private IEnumerator RebakeAndUnlockSpawning()
+        {
+            yield return new WaitForEndOfFrame();
+            if (PlanetGenerator.Instance != null)
+            {
+                var surfaces = PlanetGenerator.Instance.GetComponents<Unity.AI.Navigation.NavMeshSurface>();
+                foreach (var s in surfaces) s.BuildNavMesh();
+            }
+            // Hold the lock for a second to let everything settle
+            yield return new WaitForSeconds(1f);
+            isSpawning = false;
+        }
 
         private bool IsInQueue(BaseBuilding building, UnlockableSO so)
-            // Guard SOBeingBuilt with QueueSize > 0: BaseBuilding never clears SOBeingBuilt
-            // after a build finishes, so the stale reference would block re-queuing forever.
             => (building.QueueSize > 0 && building.SOBeingBuilt == so) || building.Queue.Contains(so);
 
         private void SpawnCommandPost()
         {
-            if (commandPostPrefab == null || commandPost != null) return;
-
             Vector3 center = Vector3.zero;
             if (PlanetGenerator.Instance?.Config != null)
             {
@@ -397,32 +484,27 @@ private void Awake()
                 center = new Vector3(w / 2f, 0f, h / 2f);
             }
 
-            Debug.Log($"[AI] {aiOwner} spawning Command Post at {center}");
-            GameObject inst = Instantiate(commandPostPrefab, center, Quaternion.identity);
-            if (inst.TryGetComponent(out BaseBuilding building))
+            // Check if we already have a Command Post at the center to prevent "reappearing" flickering or duplicates
+            if (GetBuildingsInScene().Any(b => Vector3.Distance(b.transform.position, center) < 10f))
             {
-                building.Owner = aiOwner;
-                building.CompleteConstruction();
-                commandPost = building;
+                return;
             }
-            else if (inst.TryGetComponent(out AbstractCommandable commandable))
-            {
-                commandable.Owner = aiOwner;
-            }
-            }
+
+            SpawnCommandPostAt(center);
+        }
 
         private bool CanAfford(UnlockableSO unlockable)
         {
             if (unlockable?.Cost == null) return true;
-            int cost = Mathf.FloorToInt(
-                unlockable.Cost.Minerals * Player.Supplies.MineralsToBiomassRateStatic
-              + unlockable.Cost.Gas      * Player.Supplies.GasToBiomassRateStatic
-            );
-            int available = Player.Supplies.Biomass.TryGetValue(aiOwner, out int b) ? b : 0;
-            bool afford   = cost + biomassReserve <= available;
-            if (!afford)
-                Debug.Log($"[AI] Cannot afford {unlockable.Name}: costs {unlockable.Cost.Minerals}min+{unlockable.Cost.Gas}gas = {cost} biomass, have {available} (reserve={biomassReserve})");
-            return afford;
+            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Player.Supplies.MineralsToBiomassRateStatic + unlockable.Cost.Gas * Player.Supplies.GasToBiomassRateStatic);
+            int available = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            return cost + biomassReserve <= available;
+        }
+
+        private bool IsDroneEligibleForAssignment(Worker drone)
+        {
+            if (drone == null) return false;
+            return drone.IsIdle && !drone.HasSupplies;
         }
     }
 }

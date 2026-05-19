@@ -23,6 +23,7 @@ namespace GameDevTV.RTS.Behavior
         private Animator animator;
         private LayerMask suppliesMask;
         private SupplySO supplySO;
+        private Vector3 randomOffset;
 
         protected override Status OnStart()
         {
@@ -38,6 +39,10 @@ namespace GameDevTV.RTS.Behavior
 
             agent.TryGetComponent(out animator);
 
+            // Calculate random offset once to prevent jitter. Keep it small to avoid circling.
+            float offsetAmount = 0.2f;
+            randomOffset = new Vector3(UnityEngine.Random.Range(-offsetAmount, offsetAmount), 0, UnityEngine.Random.Range(-offsetAmount, offsetAmount));
+
             Vector3 targetPosition = GetTargetPosition();
             float distance = Vector3.Distance(agent.transform.position, targetPosition);
 
@@ -46,9 +51,16 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Success;
             }
 
-            bool setDestResult = agent.SetDestination(targetPosition);
+            if (agent.isOnNavMesh)
+            {
+                bool setDestResult = agent.SetDestination(targetPosition);
+                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} OnStart: targetPosition={targetPosition}, setDestResult={setDestResult}, agentDest={agent.destination}, supply={Supply.Value.name}, pathPending={agent.pathPending}");
+            }
+            else
+            {
+                Debug.LogWarning($"[MoveToGatherableSupplyAction] {agent.name} is not on NavMesh. Cannot set destination.");
+            }
 
-            Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} OnStart: targetPosition={targetPosition}, setDestResult={setDestResult}, agentDest={agent.destination}, supply={Supply.Value.name}, pathPending={agent.pathPending}");
             return Status.Running;
         }
 
@@ -61,6 +73,8 @@ namespace GameDevTV.RTS.Behavior
 
             if (Supply.Value == null) return Status.Failure;
 
+            if (!agent.isOnNavMesh) return Status.Running;
+
             Vector3 targetPosition = GetTargetPosition();
             float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
 
@@ -71,7 +85,7 @@ namespace GameDevTV.RTS.Behavior
 
             // Treat as arrived if either agent reports remainingDistance is close
             // OR if the direct Euclidean distance is within stopping distance + 0.1f buffer.
-            bool hasArrived = (agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.1f);
+            bool hasArrived = (agent.isOnNavMesh && agent.remainingDistance <= agent.stoppingDistance + 0.1f) || (directDistance <= agent.stoppingDistance + 0.1f);
 
             if (!hasArrived)
             {
@@ -80,7 +94,7 @@ namespace GameDevTV.RTS.Behavior
 
             if (!Supply.Value.IsBusy && Supply.Value.Amount > 0)
             {
-                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} Arrived at {Supply.Value.name} successfully. directDistance={directDistance}, remainingDistance={agent.remainingDistance}");
+                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} Arrived at {Supply.Value.name} successfully. directDistance={directDistance}");
                 return Status.Success;
             }
             Collider[] colliders = FindNearbyNotBusyColliders();
@@ -90,7 +104,10 @@ namespace GameDevTV.RTS.Behavior
                 Array.Sort(colliders, new ClosestColliderComparer(agent.transform.position));
 
                 Supply.Value = colliders[0].GetComponent<GatherableSupply>();
-                agent.SetDestination(GetTargetPosition());
+                if (agent.isOnNavMesh)
+                {
+                    agent.SetDestination(GetTargetPosition());
+                }
                 return Status.Running;
             }
 
@@ -173,7 +190,16 @@ namespace GameDevTV.RTS.Behavior
                 targetPosition = Supply.Value.transform.position;
             }
 
+            // Apply pre-calculated random offset to prevent jitter
+            targetPosition += randomOffset;
+
+            // Ensure the final position is valid on the NavMesh
+            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            {
+                targetPosition = hit.position;
+            }
+
             return targetPosition;
-        }
-    }
+            }
+}
 }

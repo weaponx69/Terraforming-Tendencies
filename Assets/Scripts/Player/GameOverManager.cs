@@ -41,6 +41,7 @@ namespace GameDevTV.RTS.Player
         // ── Public event ───────────────────────────────────────────────────────────
         /// <summary>Raised once when the game-over condition is confirmed.</summary>
         public static event System.Action OnGameOver;
+        public static event System.Action OnVictory;
 
         // ── State ──────────────────────────────────────────────────────────────────
         private bool gameOverTriggered;
@@ -50,12 +51,14 @@ namespace GameDevTV.RTS.Player
         private void OnEnable()
         {
             Supplies.OnBiomassChanged += HandleBiomassChanged;
+            Supplies.OnVictory += HandleVictory;
             Bus<SupplyDepletedEvent>.RegisterForAll(HandleSupplyDepleted);
         }
 
         private void OnDisable()
         {
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnVictory -= HandleVictory;
             Bus<SupplyDepletedEvent>.UnregisterForAll(HandleSupplyDepleted);
         }
 
@@ -65,6 +68,12 @@ namespace GameDevTV.RTS.Player
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────────
+
+        private void HandleVictory()
+        {
+            if (gameOverTriggered) return;
+            TriggerVictory();
+        }
 
         /// <summary>Every time Player1 biomass changes, check if it just hit 0.</summary>
         private void HandleBiomassChanged(Owner owner, int newValue)
@@ -161,5 +170,16 @@ namespace GameDevTV.RTS.Player
 
             OnGameOver?.Invoke();
         }
-    }
-}
+
+        private void TriggerVictory()
+        {
+            if (gameOverTriggered) return;
+            gameOverTriggered = true;
+
+            CancelInvoke(nameof(CheckNoRecovery));
+            StopAllCoroutines();
+
+            OnVictory?.Invoke();
+        }
+        }
+        }

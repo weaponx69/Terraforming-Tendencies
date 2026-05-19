@@ -38,11 +38,13 @@ namespace GameDevTV.RTS.UI
         private void OnEnable()
         {
             GameOverManager.OnGameOver += HandleGameOver;
+            GameOverManager.OnVictory += HandleVictory;
         }
 
         private void OnDisable()
         {
             GameOverManager.OnGameOver -= HandleGameOver;
+            GameOverManager.OnVictory -= HandleVictory;
         }
 
         private void Start()
@@ -56,7 +58,18 @@ namespace GameDevTV.RTS.UI
                 quitButton.onClick.AddListener(QuitGame);
         }
 
-        // ── Handler ────────────────────────────────────────────────────────────────
+        // ── Handlers ────────────────────────────────────────────────────────────────
+        private void HandleVictory()
+        {
+            if (headlineText != null)
+                headlineText.SetText("MISSION SUCCESSFUL");
+
+            if (reasonText != null)
+                reasonText.SetText("The planet is now human habitable.\nTerraforming complete.");
+
+            ShowGameOverUI();
+        }
+
         private void HandleGameOver()
         {
             if (headlineText != null)
@@ -65,6 +78,11 @@ namespace GameDevTV.RTS.UI
             if (reasonText != null)
                 reasonText.SetText("The planet's resources are gone.\nTerraforming has ceased.");
 
+            ShowGameOverUI();
+        }
+
+        private void ShowGameOverUI()
+        {
             if (overlayPanel != null)
                 overlayPanel.SetActive(true);
 
