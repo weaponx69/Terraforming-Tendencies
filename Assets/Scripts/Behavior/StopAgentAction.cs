@@ -29,8 +29,15 @@ namespace GameDevTV.RTS.Behavior
                     animator.SetFloat(AnimationConstants.SPEED, 0);
                 }
 
-                agent.ResetPath();
-                Debug.Log($"[StopAgentAction] {agent.name} stopped and reset path.");
+                if (agent.isActiveAndEnabled && agent.isOnNavMesh)
+                {
+                    agent.ResetPath();
+                    Debug.Log($"[StopAgentAction] {agent.name} stopped and reset path.");
+                }
+                else
+                {
+                    Debug.LogWarning($"[StopAgentAction] {agent.name} is not on NavMesh or inactive. Cannot reset path.");
+                }
                 return Status.Success;
             }
 

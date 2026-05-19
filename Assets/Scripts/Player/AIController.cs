@@ -405,6 +405,7 @@ namespace GameDevTV.RTS.Units
             
             if (inst.TryGetComponent(out BaseBuilding building))
             {
+                building.enabled = true;
                 building.Owner = aiOwner;
                 building.CompleteConstruction();
             }

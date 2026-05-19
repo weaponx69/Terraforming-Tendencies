@@ -42,13 +42,13 @@ namespace GameDevTV.RTS.Units
             // Current health is set as the building is being built via Heal()
         }
 
-        protected virtual void OnEnable()
+        private void OnEnable()
         {
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
         }
 
-        protected virtual void OnDisable()
+        private void OnDisable()
         {
             ActiveBuildings.Remove(this);
         }
@@ -198,14 +198,17 @@ namespace GameDevTV.RTS.Units
                     Vector3 spawnPosition = transform.position + offset;
                     
                     // Snap to NavMesh if possible
-                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 10f, NavMesh.AllAreas);
+                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 20f, NavMesh.AllAreas);
                     if (onNavMesh)
                     {
                         spawnPosition = hit.position;
                     }
                     else
                     {
-                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh near spawn position {spawnPosition} for unit {unitSO.Name}. Check if NavMesh is baked.");
+                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh near spawn position {spawnPosition} for unit {unitSO.Name} within 20 units. Spawning at building center.");
+                        spawnPosition = transform.position; // Fallback to building center
+                        onNavMesh = NavMesh.SamplePosition(spawnPosition, out hit, 10f, NavMesh.AllAreas);
+                        if (onNavMesh) spawnPosition = hit.position;
                     }
 
                     GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);
@@ -214,19 +217,16 @@ namespace GameDevTV.RTS.Units
                         commandable.Owner = Owner;
                     }
                     
-                    // Force NavMeshAgent to warp if it exists to ensure it's properly on the mesh
                     if (instance.TryGetComponent(out NavMeshAgent agent))
                     {
                         if (onNavMesh && agent.isActiveAndEnabled)
                         {
                             agent.Warp(spawnPosition);
                         }
-                        else
+                        else if (!onNavMesh)
                         {
-                            // If not on NavMesh, agent might be disabled or stuck. 
-                            // We allow it to exist but it won't be able to pathfind.
                             agent.enabled = false; 
-                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location or agent is inactive.");
+                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location.");
                         }
                     }
                 }

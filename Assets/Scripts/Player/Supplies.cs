@@ -1,5 +1,4 @@
 using System;
-using TMPro;
 using UnityEngine;
 
 using GameDevTV.RTS.Environment;
@@ -12,7 +11,6 @@ namespace GameDevTV.RTS.Player
 {
     public class Supplies : MonoBehaviour
     {
-        [SerializeField] private SupplySO biomassSO;
         [SerializeField] private float mineralsToBiomassRate = 1f;
         [SerializeField] private float gasToBiomassRate = 1f;
         [SerializeField] private int startingBiomass = 1000;
