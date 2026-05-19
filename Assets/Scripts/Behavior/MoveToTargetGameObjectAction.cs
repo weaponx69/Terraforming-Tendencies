@@ -91,19 +91,21 @@ namespace GameDevTV.RTS.Behavior
                 agent.SetDestination(targetPosition);
                 lastPosition = currentTargetObjectPos;
                 return Status.Running;
-            }
+                }
 
-            float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
-            bool arrived = false;
+                Vector2 agentPos2D = new Vector2(agent.transform.position.x, agent.transform.position.z);
+                Vector2 targetPos2D = new Vector2(targetPosition.x, targetPosition.z);
+                float directDistance = Vector2.Distance(agentPos2D, targetPos2D);
+                bool arrived = false;
             
-            if (agent.isOnNavMesh && agent.hasPath)
-            {
+                if (agent.isOnNavMesh && agent.hasPath)
+                {
                 arrived = agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.1f;
-            }
-            else
-            {
+                }
+                else
+                {
                 arrived = directDistance <= agent.stoppingDistance + 0.1f;
-            }
+                }
 
             if (arrived)
             {

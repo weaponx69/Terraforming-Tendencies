@@ -124,7 +124,18 @@ namespace GameDevTV.RTS.Units
                     navAgent.stoppingDistance = 0.5f;
                     float baseSpeed = navAgent.speed;
                     navAgent.speed = baseSpeed * Random.Range(0.9f, 1.1f);
-                    navAgent.avoidancePriority = Random.Range(30, 71);
+                    
+                    // Flyers should not avoid each other or ground obstacles
+                    if (navAgent.agentTypeID != 0) // Air Units
+                    {
+                        navAgent.obstacleAvoidanceType = ObstacleAvoidanceType.NoObstacleAvoidance;
+                        navAgent.avoidancePriority = 0; 
+                    }
+                    else
+                    {
+                        navAgent.avoidancePriority = Random.Range(30, 71);
+                    }
+                    
                     navAgent.acceleration *= Random.Range(0.8f, 1.2f);
 
                     if (!navAgent.isOnNavMesh)

@@ -45,7 +45,11 @@ namespace GameDevTV.RTS.Behavior
             randomOffset = new Vector3(UnityEngine.Random.Range(-offsetAmount, offsetAmount), 0, UnityEngine.Random.Range(-offsetAmount, offsetAmount));
 
             targetPosition = GetTargetPosition();
-            float distance = Vector3.Distance(agent.transform.position, targetPosition);
+            
+            // Use horizontal distance for arrival checks to accommodate Air Units flying at high altitude
+            Vector2 agentPos2D = new Vector2(agent.transform.position.x, agent.transform.position.z);
+            Vector2 targetPos2D = new Vector2(targetPosition.x, targetPosition.z);
+            float distance = Vector2.Distance(agentPos2D, targetPos2D);
 
             if (distance <= agent.stoppingDistance + 0.1f)
             {
@@ -76,12 +80,14 @@ namespace GameDevTV.RTS.Behavior
 
             if (!agent.isOnNavMesh) return Status.Running;
 
-            float directDistance = Vector3.Distance(agent.transform.position, targetPosition);
-
             if (agent.pathPending)
             {
                 return Status.Running;
             }
+
+            Vector2 agentPos2D = new Vector2(agent.transform.position.x, agent.transform.position.z);
+            Vector2 targetPos2D = new Vector2(targetPosition.x, targetPosition.z);
+            float directDistance = Vector2.Distance(agentPos2D, targetPos2D);
 
             // Treat as arrived if either agent reports remainingDistance is close
             // OR if the direct Euclidean distance is within stopping distance + 0.1f buffer.
@@ -194,7 +200,8 @@ namespace GameDevTV.RTS.Behavior
             targetPosition += randomOffset;
 
             // Ensure the final position is valid on the NavMesh
-            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 5.0f, filter))
             {
                 targetPosition = hit.position;
             }

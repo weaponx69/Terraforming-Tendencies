@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+using System.Linq;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -59,40 +60,57 @@ namespace GameDevTV.RTS.Environment
 
             private void BakeAllNavMeshes()
             {
-                Physics.SyncTransforms(); // Ensure the procedural colliders are registered with the physics engine
+                Physics.SyncTransforms(); 
 
                 int agentTypeCount = NavMesh.GetSettingsCount();
                 var existingSurfaces = new System.Collections.Generic.List<NavMeshSurface>(GetComponents<NavMeshSurface>());
 
+                // Create or find FlyZone child for Air Units
+                Transform flyZone = transform.Find("FlyZone");
+                if (flyZone == null)
+                {
+                    flyZone = new GameObject("FlyZone").transform;
+                    flyZone.parent = transform;
+                    flyZone.localPosition = new Vector3(0, 10f, 0); // Fly at y=10
+                    flyZone.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
+                }
+
+                // Ensure FlyZone has the terrain mesh for baking
+                if (!flyZone.TryGetComponent<MeshFilter>(out var ff)) ff = flyZone.gameObject.AddComponent<MeshFilter>();
+                if (!flyZone.TryGetComponent<MeshCollider>(out var fc)) fc = flyZone.gameObject.AddComponent<MeshCollider>();
+                ff.sharedMesh = GetComponent<MeshFilter>().sharedMesh;
+                fc.sharedMesh = GetComponent<MeshCollider>().sharedMesh;
+
                 for (int i = 0; i < agentTypeCount; i++)
                 {
                     NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
+                    bool isAirAgent = settings.agentTypeID != 0; // Assuming 0 is Humanoid
+
+                    // Find where this surface should live
+                    GameObject targetObj = isAirAgent ? flyZone.gameObject : gameObject;
                     
-                    // Ensure we have a NavMeshSurface for this specific Agent Type
-                    NavMeshSurface surface = existingSurfaces.Find(s => s.agentTypeID == settings.agentTypeID);
+                    NavMeshSurface surface = targetObj.GetComponents<NavMeshSurface>().FirstOrDefault(s => s.agentTypeID == settings.agentTypeID);
                     if (surface == null)
                     {
-                        surface = gameObject.AddComponent<NavMeshSurface>();
+                        surface = targetObj.AddComponent<NavMeshSurface>();
                         surface.agentTypeID = settings.agentTypeID;
-                        existingSurfaces.Add(surface);
                     }
-                }
 
-                foreach (var s in existingSurfaces)
-                {
-                    s.collectObjects = CollectObjects.All; // Ensure we see the planet mesh and features
+                    surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
                     
                     int mask = ~0;
-int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+                    int transparentLayer = LayerMask.NameToLayer("TransparentFX");
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
+                    int suppliesLayer = LayerMask.NameToLayer("Supplies");
                     
                     if (transparentLayer != -1) mask &= ~(1 << transparentLayer);
                     if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
+                    if (isAirAgent && suppliesLayer != -1) mask &= ~(1 << suppliesLayer);
                     
-                    s.layerMask = mask;
-                    s.BuildNavMesh();
+                    surface.layerMask = mask;
+                    surface.BuildNavMesh();
                 }
-}
+            }
 
                 [ContextMenu("Clear Planet (Editor)")]
                 public void ClearPlanet()
