@@ -243,8 +243,7 @@ namespace GameDevTV.RTS.Units
             var supplies = GatherableSupply.ActiveSupplies
                 .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null)
                 .Where(s => Vector3.Distance(s.transform.position, pos) <= nodeRadius)
-                .OrderBy(s => Vector3.Distance(s.transform.position, pos))
-                .Take(4);
+                .OrderBy(s => Vector3.Distance(s.transform.position, pos));
 
             foreach (var s in supplies) node.ResourcesInRange.Add(s);
         }
