@@ -83,11 +83,6 @@ namespace GameDevTV.RTS.Player
         {
             OnOxygenChanged -= HandleOxygenChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
-
-            Biomass?.Clear();
-            Oxygen?.Clear();
-            Population?.Clear();
-            PopulationLimit?.Clear();
         }
 
         private void HandleOxygenChanged(Owner owner, int value)
