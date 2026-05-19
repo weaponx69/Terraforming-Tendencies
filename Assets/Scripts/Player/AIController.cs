@@ -155,7 +155,7 @@ namespace GameDevTV.RTS.Units
 
             if (evt.Unit is Worker worker)
             {
-                if (worker.TryGetComponent(out NavMeshAgent navAgent))
+                if (worker.TryGetComponent(out NavMeshAgent navAgent) && navAgent.isActiveAndEnabled)
                 {
                     navAgent.stoppingDistance = 0.5f;
                     float baseSpeed = navAgent.speed;
@@ -240,7 +240,7 @@ namespace GameDevTV.RTS.Units
         {
             node.ResourcesInRange.Clear();
             Vector3 pos = node.CommandPost.transform.position;
-            var supplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude)
+            var supplies = GatherableSupply.ActiveSupplies
                 .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null)
                 .Where(s => Vector3.Distance(s.transform.position, pos) <= nodeRadius)
                 .OrderBy(s => Vector3.Distance(s.transform.position, pos))
@@ -413,7 +413,7 @@ namespace GameDevTV.RTS.Units
 
         private void TryExpand()
         {
-            var allSupplies = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude)
+            var allSupplies = GatherableSupply.ActiveSupplies
                 .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null).ToList();
 
             Vector3 bestPos = Vector3.zero;
@@ -464,10 +464,28 @@ namespace GameDevTV.RTS.Units
             if (PlanetGenerator.Instance != null)
             {
                 var surfaces = PlanetGenerator.Instance.GetComponents<Unity.AI.Navigation.NavMeshSurface>();
-                foreach (var s in surfaces) s.BuildNavMesh();
+                var ops = new System.Collections.Generic.List<AsyncOperation>();
+                foreach (var s in surfaces)
+                {
+                    if (s.navMeshData != null)
+                    {
+                        ops.Add(s.UpdateNavMesh(s.navMeshData));
+                    }
+                    else
+                    {
+                        s.BuildNavMesh(); // Synchronous fallback if uninitialized
+                    }
+                }
+                foreach (var op in ops)
+                {
+                    while (op != null && !op.isDone)
+                    {
+                        yield return null;
+                    }
+                }
             }
-            // Hold the lock for a second to let everything settle
-            yield return new WaitForSeconds(1f);
+            // Hold the lock for half a second to let everything settle
+            yield return new WaitForSeconds(0.5f);
             isSpawning = false;
         }
 

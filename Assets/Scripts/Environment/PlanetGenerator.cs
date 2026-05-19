@@ -323,7 +323,7 @@ public void ClearPlanet()
 
                         foreach (var c in ghost.GetComponentsInChildren<Collider>())
                         {
-                            if (Application.isPlaying) Destroy(c);
+                            if (Application.isPlaying) c.enabled = false;
                             else DestroyImmediate(c);
                         }
                         
@@ -456,7 +456,7 @@ public void ClearPlanet()
                         
                         foreach (var c in ghost.GetComponentsInChildren<Collider>())
                         {
-                            if (Application.isPlaying) Destroy(c);
+                            if (Application.isPlaying) c.enabled = false;
                             else DestroyImmediate(c);
                         }
                         

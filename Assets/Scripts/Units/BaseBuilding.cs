@@ -205,7 +205,7 @@ namespace GameDevTV.RTS.Units
                     // Force NavMeshAgent to warp if it exists to ensure it's properly on the mesh
                     if (instance.TryGetComponent(out NavMeshAgent agent))
                     {
-                        if (onNavMesh)
+                        if (onNavMesh && agent.isActiveAndEnabled)
                         {
                             agent.Warp(spawnPosition);
                         }
@@ -214,7 +214,7 @@ namespace GameDevTV.RTS.Units
                             // If not on NavMesh, agent might be disabled or stuck. 
                             // We allow it to exist but it won't be able to pathfind.
                             agent.enabled = false; 
-                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location.");
+                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location or agent is inactive.");
                         }
                     }
                 }

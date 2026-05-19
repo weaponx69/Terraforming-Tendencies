@@ -16,6 +16,21 @@ namespace GameDevTV.RTS.Environment
         [field: SerializeField] public bool IsVisible { get; private set; }
         public Transform Transform => this == null ? null : transform;
         
+        public static readonly System.Collections.Generic.List<GatherableSupply> ActiveSupplies = new();
+
+        private void OnEnable()
+        {
+            if (!ActiveSupplies.Contains(this))
+            {
+                ActiveSupplies.Add(this);
+            }
+        }
+
+        private void OnDisable()
+        {
+            ActiveSupplies.Remove(this);
+        }
+
         private Placeholder culledVisuals;
         private Renderer[] renderers = Array.Empty<Renderer>();
         private ParticleSystem[] particleSystems = Array.Empty<ParticleSystem>();
