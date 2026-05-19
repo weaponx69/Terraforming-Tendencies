@@ -4,6 +4,7 @@
     "references": [
         "Unity.AI.Navigation",
         "Unity.Behavior",
+        "Unity.Behavior.GraphFramework",
         "Unity.TextMeshPro",
         "Unity.InputSystem",
         "Unity.RenderPipelines.Universal.Runtime",
