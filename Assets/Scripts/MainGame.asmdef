@@ -5,6 +5,7 @@
         "Unity.AI.Navigation",
         "Unity.Behavior",
         "Unity.Behavior.GraphFramework",
+        "Unity.Behavior.SerializableGUID",
         "Unity.TextMeshPro",
         "Unity.InputSystem",
         "Unity.RenderPipelines.Universal.Runtime",
