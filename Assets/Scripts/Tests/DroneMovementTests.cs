@@ -4,6 +4,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.AI;
+using Unity.AI.Navigation;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
@@ -12,53 +13,144 @@ namespace GameDevTV.RTS.Tests
 {
     public class DroneMovementTests
     {
-        private GameObject droneObj;
-        private NavMeshAgent agent;
+        private GameObject floor;
+        private GameObject flyZone;
+        private GameObject groundSurfaceObj;
+        private GameObject airSurfaceObj;
 
         [SetUp]
         public void SetUp()
         {
-            // Setup a basic floor
-            GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            // Setup ground floor
+            floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.transform.position = Vector3.zero;
             floor.transform.localScale = new Vector3(10, 1, 10);
             
-            // Note: In a real PlayMode test, we'd need a NavMesh Surface to bake here.
-            // Since Unity.AI.Navigation is used, we might need a NavMeshSurface component.
-            // We'll add the necessary components for testing.
-            droneObj = new GameObject("TestDrone");
-            droneObj.transform.position = new Vector3(0, 0.5f, 0);
-            agent = droneObj.AddComponent<NavMeshAgent>();
+            // Setup ground NavMesh
+            groundSurfaceObj = new GameObject("GroundSurface");
+            var groundSurface = groundSurfaceObj.AddComponent<NavMeshSurface>();
+            groundSurface.agentTypeID = 0; // Humanoid
+            groundSurface.collectObjects = CollectObjects.All;
+            groundSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+            groundSurface.BuildNavMesh();
+            
+            // Setup elevated flyZone
+            flyZone = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            flyZone.transform.position = new Vector3(0, 4f, 0);
+            flyZone.transform.localScale = new Vector3(10, 1, 10);
+            
+            // Setup air NavMesh
+            airSurfaceObj = new GameObject("AirSurface");
+            var airSurface = airSurfaceObj.AddComponent<NavMeshSurface>();
+            
+            // Get Air Agent ID
+            int agentCount = NavMesh.GetSettingsCount();
+            int airAgentTypeID = 0;
+            for (int i = 0; i < agentCount; i++)
+            {
+                int id = NavMesh.GetSettingsByIndex(i).agentTypeID;
+                if (id != 0)
+                {
+                    airAgentTypeID = id;
+                    break;
+                }
+            }
+            
+            airSurface.agentTypeID = airAgentTypeID;
+            airSurface.collectObjects = CollectObjects.All;
+            airSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+            airSurface.BuildNavMesh();
         }
 
         [TearDown]
         public void TearDown()
         {
-            Object.Destroy(droneObj);
+            if (floor != null) Object.DestroyImmediate(floor);
+            if (flyZone != null) Object.DestroyImmediate(flyZone);
+            if (groundSurfaceObj != null) Object.DestroyImmediate(groundSurfaceObj);
+            if (airSurfaceObj != null) Object.DestroyImmediate(airSurfaceObj);
         }
 
         [UnityTest]
-        public IEnumerator Drone_WhenTargetSet_UpdatesRemainingDistance()
+        public IEnumerator GroundAgent_WhenTargetSet_MovesToDestination()
         {
-            // Given a destination
-            Vector3 targetPosition = new Vector3(5f, 0.5f, 5f);
+            GameObject agentObj = new GameObject("TestGroundAgent");
+            agentObj.transform.position = new Vector3(0, 0.1f, 0);
+            NavMeshAgent agent = agentObj.AddComponent<NavMeshAgent>();
+            agent.agentTypeID = 0;
             
-            // When setting destination
-            agent.SetDestination(targetPosition);
+            yield return null; // Wait for agent to initialize on NavMesh
             
-            // We must wait at least 1-2 frames for NavMesh to calculate path asynchronously
-            yield return null;
-            yield return null;
+            Assert.IsTrue(agent.isOnNavMesh, "Ground agent should be on NavMesh.");
             
-            // Then
-            Assert.IsTrue(agent.hasPath || agent.pathPending, "Agent should have a path or be calculating one.");
+            Vector3 startPos = agentObj.transform.position;
+            Vector3 targetPosition = new Vector3(2f, startPos.y, 2f);
+            
+            bool setDestSuccess = agent.SetDestination(targetPosition);
+            Assert.IsTrue(setDestSuccess, "Ground agent SetDestination failed; destination was rejected.");
+            
+            // Wait a few frames for path calculation and physical movement
+            for (int i = 0; i < 15; i++)
+            {
+                yield return null;
+            }
+            
+            Assert.IsTrue(agent.hasPath, "Ground agent has no path.");
+            
+            float distanceMoved = Vector3.Distance(startPos, agentObj.transform.position);
+            Assert.Greater(distanceMoved, 0.05f, "Ground agent GameObject did not move visually (transform remained stationary).");
+            
+            Object.DestroyImmediate(agentObj);
         }
 
-        [Test]
-        public void Drone_HasValidInputs_WhenSupplyIsMissing_FailsValidation()
+        [UnityTest]
+        public IEnumerator AirAgent_WhenTargetSet_MovesToDestination()
         {
-            // This is an EditMode-compatible logic test that would verify HasValidInputs.
-            // (Will require exposing internal logic or using reflection if it's private).
-            Assert.Pass("Placeholder for logic isolation test.");
+            int agentCount = NavMesh.GetSettingsCount();
+            int airAgentTypeID = 0;
+            for (int i = 0; i < agentCount; i++)
+            {
+                int id = NavMesh.GetSettingsByIndex(i).agentTypeID;
+                if (id != 0)
+                {
+                    airAgentTypeID = id;
+                    break;
+                }
+            }
+            
+            if (airAgentTypeID == 0)
+            {
+                Assert.Fail("Air Agent settings not found in project config. The game requires Air Agent settings.");
+                yield break;
+            }
+            
+            GameObject agentObj = new GameObject("TestAirAgent");
+            agentObj.transform.position = new Vector3(0, 4.1f, 0); // Spawns near elevated flyZone
+            NavMeshAgent agent = agentObj.AddComponent<NavMeshAgent>();
+            agent.agentTypeID = airAgentTypeID;
+            
+            yield return null; // Wait for agent to initialize on NavMesh
+            
+            Assert.IsTrue(agent.isOnNavMesh, "Air agent should be on NavMesh.");
+            
+            Vector3 startPos = agentObj.transform.position;
+            Vector3 targetPosition = new Vector3(2f, startPos.y, 2f);
+            
+            bool setDestSuccess = agent.SetDestination(targetPosition);
+            Assert.IsTrue(setDestSuccess, "Air agent SetDestination failed; destination was rejected.");
+            
+            // Wait a few frames for path calculation and physical movement
+            for (int i = 0; i < 15; i++)
+            {
+                yield return null;
+            }
+            
+            Assert.IsTrue(agent.hasPath, "Air agent has no path.");
+            
+            float distanceMoved = Vector3.Distance(startPos, agentObj.transform.position);
+            Assert.Greater(distanceMoved, 0.05f, "Air agent GameObject did not move visually (transform remained stationary).");
+            
+            Object.DestroyImmediate(agentObj);
         }
     }
 }
