@@ -152,11 +152,11 @@ namespace GameDevTV.RTS.Units
 
             Progress = new BuildingProgress(
                 BuildingProgress.BuildingState.Building,
-                Time.time - BuildingSO.BuildTime * Progress.Progress,
-                Progress.Progress
+                Time.time - BuildingSO.BuildTime * Progress.Completion,
+                Progress.Completion
             );
 
-            if (Progress.Progress == 0)
+            if (Progress.Completion == 0)
             {
                 Heal(1);
             }
@@ -193,25 +193,33 @@ namespace GameDevTV.RTS.Units
                 {
                     // Spawn at a random offset to ensure they are completely outside the building's NavMeshObstacle
                     float angle = Random.Range(0f, Mathf.PI * 2f);
-                    float distance = Random.Range(12f, 18f); // Increased distance to prevent "not close enough" NavMesh errors
+                    float distance = Random.Range(12f, 18f); 
                     Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, 0, Mathf.Sin(angle) * distance);
                     Vector3 spawnPosition = transform.position + offset;
                     
-                    // Snap to NavMesh if possible
-                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 20f, NavMesh.AllAreas);
+                    // Determine AgentTypeID from the prefab
+                    int agentTypeID = 0; // Default to Humanoid
+                    if (unitSO.Prefab.TryGetComponent(out NavMeshAgent prefabAgent))
+                    {
+                        agentTypeID = prefabAgent.agentTypeID;
+                    }
+
+                    // Snap to NavMesh for the specific agent type
+                    NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeID, areaMask = NavMesh.AllAreas };
+                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 25f, filter);
+                    
                     if (onNavMesh)
                     {
                         spawnPosition = hit.position;
                     }
                     else
                     {
-                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh near spawn position {spawnPosition} for unit {unitSO.Name} within 20 units. Spawning at building center.");
-                        spawnPosition = transform.position; // Fallback to building center
-                        onNavMesh = NavMesh.SamplePosition(spawnPosition, out hit, 10f, NavMesh.AllAreas);
+                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh for type {agentTypeID} near spawn position {spawnPosition} for unit {unitSO.Name}. Spawning at building center.");
+                        spawnPosition = transform.position; 
+                        onNavMesh = NavMesh.SamplePosition(spawnPosition, out hit, 15f, filter);
                         if (onNavMesh) spawnPosition = hit.position;
                     }
 
-                    // We instantiate the prefab disabled, or we just disable the agent immediately
                     GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);
                     if (instance.TryGetComponent(out AbstractCommandable commandable))
                     {
@@ -220,7 +228,7 @@ namespace GameDevTV.RTS.Units
                     
                     if (instance.TryGetComponent(out NavMeshAgent agent))
                     {
-                        agent.enabled = false; // Disable it so we can safely warp/move it
+                        agent.enabled = false; 
                         instance.transform.position = spawnPosition;
                         
                         if (onNavMesh)
@@ -230,11 +238,11 @@ namespace GameDevTV.RTS.Units
                         }
                         else
                         {
-                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found at spawn location.");
+                            Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found for type {agentTypeID} at spawn location.");
                         }
                     }
                 }
-                else if (SOBeingBuilt is UpgradeSO upgrade)
+else if (SOBeingBuilt is UpgradeSO upgrade)
                 {
                     Bus<UpgradeResearchedEvent>.Raise(Owner, new UpgradeResearchedEvent(Owner, upgrade));
                 }

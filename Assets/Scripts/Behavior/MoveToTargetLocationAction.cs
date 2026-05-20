@@ -32,7 +32,14 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Success;
             }
 
-            agent.SetDestination(TargetLocation.Value);
+            Vector3 targetPosition = TargetLocation.Value;
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 15.0f, filter))
+            {
+                targetPosition = hit.position;
+            }
+
+            agent.SetDestination(targetPosition);
 
             return Status.Running;
         }

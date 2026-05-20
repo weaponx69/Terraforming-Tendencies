@@ -199,9 +199,10 @@ namespace GameDevTV.RTS.Behavior
             // Apply pre-calculated random offset to prevent jitter
             targetPosition += randomOffset;
 
-            // Ensure the final position is valid on the NavMesh
+            // Ensure the final position is valid on the NavMesh. 
+            // We use a large vertical radius (15.0f) because Air units fly at y=10 on a separate NavMesh surface.
             NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
-            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 5.0f, filter))
+            if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 15.0f, filter))
             {
                 targetPosition = hit.position;
             }

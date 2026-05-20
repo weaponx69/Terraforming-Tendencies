@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         private IEnumerator AnimateBuildingProgress(BaseBuilding building)
         {
-            while(enabled && building.Progress.Progress < 1)
+            while(enabled && building.Progress.Completion < 1)
             {
                 if (building.Progress.State != BuildingProgress.BuildingState.Building)
                 {

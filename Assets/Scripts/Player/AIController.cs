@@ -66,7 +66,12 @@ namespace GameDevTV.RTS.Units
                 miningDroneUnitSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
                 if (miningDroneUnitSO == null)
                 {
-                    Debug.LogWarning("[AIController] Could not load MiningDrone from Resources! Ensure it exists in Assets/Resources/Units/");
+                    miningDroneUnitSO = Resources.Load<AbstractUnitSO>("Units/Air Transport");
+                }
+
+                if (miningDroneUnitSO == null)
+                {
+                    Debug.LogWarning("[AIController] Could not load MiningDrone or Air Transport from Resources! AI will attempt to auto-discover unit type from spawned Workers.");
                 }
             }
         }
@@ -115,6 +120,14 @@ namespace GameDevTV.RTS.Units
         private void HandleUnitSpawn(UnitSpawnEvent evt)
         {
             if (evt.Unit.Owner != aiOwner) return;
+            
+            // Auto-discover miningDroneUnitSO if not set
+            if (miningDroneUnitSO == null && evt.Unit is Worker workerDiscover)
+            {
+                miningDroneUnitSO = evt.Unit.UnitSO;
+                Debug.Log($"[AI] Auto-discovered drone unit type: {miningDroneUnitSO.Name}");
+            }
+
             if (miningDroneUnitSO == null || evt.Unit.UnitSO?.Name != miningDroneUnitSO.Name) return;
 
             if (evt.Unit is Worker worker)
@@ -399,8 +412,14 @@ namespace GameDevTV.RTS.Units
 
             foreach (var item in candidates)
             {
+                Vector3 targetPos = item.Supply.transform.position;
+                if (NavMesh.SamplePosition(targetPos, out NavMeshHit hit, 15f, filter))
+                {
+                    targetPos = hit.position;
+                }
+
                 NavMeshPath path = new NavMeshPath();
-                if (NavMesh.CalculatePath(position, item.Supply.transform.position, filter, path))
+                if (NavMesh.CalculatePath(position, targetPos, filter, path))
                     if (path.status == NavMeshPathStatus.PathComplete) return item.Supply;
             }
             return null;
@@ -439,11 +458,12 @@ namespace GameDevTV.RTS.Units
             if (commandPostPrefab == null || isSpawning) return;
             
             isSpawning = true;
-            if (NavMesh.SamplePosition(position, out NavMeshHit hit, 20f, NavMesh.AllAreas)) position = hit.position;
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = 0, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(position, out NavMeshHit hit, 20f, filter)) position = hit.position;
             
             Debug.Log($"[AI] Spawning expansion Command Post at {position}");
             GameObject inst = Instantiate(commandPostPrefab, position, Quaternion.identity);
-            
+
             if (inst.TryGetComponent(out BaseBuilding building))
             {
                 building.enabled = true;

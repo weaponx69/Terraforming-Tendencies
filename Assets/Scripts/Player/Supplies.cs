@@ -119,7 +119,7 @@ namespace GameDevTV.RTS.Player
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * mineralsToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
-                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} minerals -> +{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
+                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} minerals -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
                 return;
             }
@@ -127,7 +127,7 @@ namespace GameDevTV.RTS.Player
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * gasToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
-                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} gas -> +{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
+                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} gas -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
                 return;
             }
