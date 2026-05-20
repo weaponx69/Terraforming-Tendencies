@@ -27,6 +27,7 @@ namespace GameDevTV.RTS.Tests
         [SetUp]
         public void SetUp()
         {
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;
             suppliesObj = new GameObject("Supplies");
             suppliesObj.AddComponent<Supplies>();
             

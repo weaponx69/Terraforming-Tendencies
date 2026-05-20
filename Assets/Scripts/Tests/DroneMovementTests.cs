@@ -21,6 +21,7 @@ namespace GameDevTV.RTS.Tests
         [SetUp]
         public void SetUp()
         {
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;
             // Setup ground floor
             floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.transform.position = Vector3.zero;

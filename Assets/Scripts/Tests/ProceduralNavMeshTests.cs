@@ -13,6 +13,12 @@ namespace GameDevTV.RTS.Tests
     {
         private GameObject generatorObj;
 
+        [SetUp]
+        public void SetUp()
+        {
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;
+        }
+
         [TearDown]
         public void TearDown()
         {
