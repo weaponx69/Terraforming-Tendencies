@@ -61,7 +61,7 @@ NavMeshAgent:
   m_Height: 2
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
-  m_ObstacleAvoidanceType: 0
+  m_ObstacleAvoidanceType: 4
 --- !u!95 &1974153333601261373
 Animator:
   serializedVersion: 7
@@ -147,22 +147,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Graph: {fileID: 4598362100129326914, guid: 10e583af0fed7ba439be975c79f1f0fc, type: 2}
-  m_BlackboardVariableOverridesList:
-  - rid: 1136246709164704603
+  m_BlackboardVariableOverridesList: []
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
   references:
     version: 2
-    RefIds:
-    - rid: 1136246709164704603
-      type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 1
-          m_Value1: 0
-        Name: Self
-        m_Value: {fileID: 1076983579694789324}
+    RefIds: []
 --- !u!114 &5976561534443479384
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -176,8 +167,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Units.Worker
   <IsSelected>k__BackingField: 0
-  <CurrentHealth>k__BackingField: 0
-  <MaxHealth>k__BackingField: 0
+  <CurrentHealth>k__BackingField: 100
+  <MaxHealth>k__BackingField: 100
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
   <AvailableCommands>k__BackingField: []
