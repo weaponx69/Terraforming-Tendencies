@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.Player
     {
         [SerializeField] private Rigidbody cameraTarget;
         [SerializeField] private CinemachineCamera cinemachineCamera;
-        [SerializeField] private new Camera camera;
+        [SerializeField] private Camera playerCamera;
         [SerializeField] private CameraConfig cameraConfig;
         [SerializeField] private LayerMask selectableUnitsLayers;
         [SerializeField] private LayerMask interactableLayers;
@@ -178,7 +178,7 @@ HandleZooming();
                 return;
             }
 
-            Ray cameraRay = camera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
             if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, floorLayers))
             {
                 ghostInstance.transform.position = hit.point;
@@ -232,7 +232,7 @@ HandleZooming();
             Bounds selectionBoxBounds = ResizeSelectionBox();
             foreach (AbstractUnit unit in aliveUnits.Where(aliveUnits => aliveUnits.gameObject.activeInHierarchy))
             {
-                Vector2 unitPosition = camera.WorldToScreenPoint(unit.transform.position);
+                Vector2 unitPosition = playerCamera.WorldToScreenPoint(unit.transform.position);
 
                 if (selectionBoxBounds.Contains(unitPosition))
                 {
@@ -276,7 +276,7 @@ HandleZooming();
         {
             if (selectedUnits.Count == 0) { return; }
 
-            Ray cameraRay = camera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
             if (Mouse.current.rightButton.wasReleasedThisFrame
                 && Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
@@ -334,9 +334,9 @@ HandleZooming();
 
         private void HandleLeftClick()
         {
-            if (camera == null) { return ; }
+            if (playerCamera == null) { return ; }
 
-            Ray cameraRay = camera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
             if (activeCommand == null
                 && Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, selectableUnitsLayers)
