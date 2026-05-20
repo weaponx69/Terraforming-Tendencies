@@ -164,6 +164,11 @@ namespace GameDevTV.RTS.Environment
                     surface.layerMask = mask;
                     surface.BuildNavMesh();
                 }
+
+                if (Application.isPlaying)
+                {
+                    GameDevTV.RTS.Utilities.NavMeshVisualizer.Create(gameObject);
+                }
                 }
 
                 [ContextMenu("Clear Planet (Editor)")]
