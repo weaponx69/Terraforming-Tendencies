@@ -79,6 +79,8 @@ namespace GameDevTV.RTS.Tests
             agentObj.transform.position = new Vector3(0, 0.1f, 0);
             NavMeshAgent agent = agentObj.AddComponent<NavMeshAgent>();
             agent.agentTypeID = 0;
+            agent.speed = 10f;
+            agent.acceleration = 100f;
             
             yield return null; // Wait for agent to initialize on NavMesh
             
@@ -129,6 +131,8 @@ namespace GameDevTV.RTS.Tests
             agentObj.transform.position = new Vector3(0, 4.1f, 0); // Spawns near elevated flyZone
             NavMeshAgent agent = agentObj.AddComponent<NavMeshAgent>();
             agent.agentTypeID = airAgentTypeID;
+            agent.speed = 10f;
+            agent.acceleration = 100f;
             
             yield return null; // Wait for agent to initialize on NavMesh
             
