@@ -191,18 +191,34 @@ namespace GameDevTV.RTS.Units
 
                 if (SOBeingBuilt is AbstractUnitSO unitSO)
                 {
-                    // Spawn at a random offset to ensure they are completely outside the building's NavMeshObstacle
-                    float angle = Random.Range(0f, Mathf.PI * 2f);
-                    float distance = Random.Range(12f, 18f); 
-                    Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, 0, Mathf.Sin(angle) * distance);
-                    Vector3 spawnPosition = transform.position + offset;
-                    
                     // Determine AgentTypeID from the prefab
                     int agentTypeID = 0; // Default to Humanoid
                     if (unitSO.Prefab.TryGetComponent(out NavMeshAgent prefabAgent))
                     {
                         agentTypeID = prefabAgent.agentTypeID;
                     }
+
+                    bool isAirUnit = agentTypeID != 0;
+
+                    // Calculate building footprint radius to ensure ground units spawn outside the NavMeshObstacle
+                    float buildingRadius = 4f; // Safe fallback
+                    if (navMeshObstacle != null)
+                    {
+                        if (navMeshObstacle.shape == NavMeshObstacleShape.Capsule)
+                        {
+                            buildingRadius = navMeshObstacle.radius + 1f;
+                        }
+                        else if (navMeshObstacle.shape == NavMeshObstacleShape.Box)
+                        {
+                            buildingRadius = Mathf.Max(navMeshObstacle.size.x, navMeshObstacle.size.z) * 0.5f + 1f;
+                        }
+                    }
+
+                    // Air units can spawn much closer since they occupy elevated space, while ground units spawn just outside the obstacle
+                    float angle = Random.Range(0f, Mathf.PI * 2f);
+                    float distance = isAirUnit ? Random.Range(3f, 5f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
+                    Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, 0, Mathf.Sin(angle) * distance);
+                    Vector3 spawnPosition = transform.position + offset;
 
                     // Snap to NavMesh for the specific agent type
                     NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeID, areaMask = NavMesh.AllAreas };

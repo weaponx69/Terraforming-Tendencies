@@ -14,6 +14,9 @@ namespace GameDevTV.RTS.Environment
         public float CellSize = 1f;
         public bool SpawnFloraOnStart = false; // Default to barren planet
 
+        [Header("Air Unit Settings")]
+        [SerializeField] private float airUnitFlightHeight = 4f;
+
         [Header("Resource Configurations (Now auto-loaded from Resources)")]
         public SupplySO MineralsSupplySO;
         public SupplySO GasSupplySO;
@@ -71,9 +74,9 @@ namespace GameDevTV.RTS.Environment
                 {
                     flyZone = new GameObject("FlyZone").transform;
                     flyZone.parent = transform;
-                    flyZone.localPosition = new Vector3(0, 10f, 0); // Fly at y=10
                     flyZone.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
                 }
+                flyZone.localPosition = new Vector3(0, airUnitFlightHeight, 0); // Fly at airUnitFlightHeight
 
                 // Clean up any obsolete components on FlyZone itself if they were created by old code
                 if (flyZone.TryGetComponent<MeshCollider>(out var oldFc)) DestroyImmediate(oldFc);
@@ -117,6 +120,7 @@ namespace GameDevTV.RTS.Environment
                     }
 
                     surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
+                    surface.useGeometry = isAirAgent ? NavMeshCollectGeometry.PhysicsColliders : NavMeshCollectGeometry.RenderMeshes;
                     
                     int mask = ~0;
                     int transparentLayer = LayerMask.NameToLayer("TransparentFX");

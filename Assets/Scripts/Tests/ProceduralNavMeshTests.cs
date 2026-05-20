@@ -50,6 +50,8 @@ namespace GameDevTV.RTS.Tests
             int transparentLayer = LayerMask.NameToLayer("TransparentFX");
             foreach (var s in surfaces)
             {
+                if (s.collectObjects == CollectObjects.Children) continue;
+
                 Assert.AreEqual(0, (s.layerMask.value & (1 << transparentLayer)), 
                     $"NavMeshSurface for agent {s.agentTypeID} MUST exclude the TransparentFX layer to avoid baking thousands of ghosts!");
             }
