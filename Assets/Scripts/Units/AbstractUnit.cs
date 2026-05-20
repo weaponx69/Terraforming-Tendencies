@@ -6,6 +6,7 @@ using GameDevTV.RTS.Utilities;
 using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
+using TMPro;
 
 namespace GameDevTV.RTS.Units
 {
@@ -79,29 +80,55 @@ namespace GameDevTV.RTS.Units
         private void UpdateStatusIndicator()
         {
             Color statusColor = Color.red; // Default to "No-Go"
+            string reason = "STUCK / NO PATH";
 
-            if (Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+            if (Agent == null)
             {
-                if (graphAgent != null && graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                reason = "NO AGENT";
+            }
+            else if (!Agent.isActiveAndEnabled)
+            {
+                reason = "AGENT DISABLED";
+            }
+            else if (!Agent.isOnNavMesh)
+            {
+                reason = "OFF NAVMESH";
+            }
+            else if (graphAgent == null)
+            {
+                reason = "NO BEHAVIOR";
+            }
+            else if (!graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+            {
+                reason = "NO COMMAND";
+            }
+            else
+            {
+                if (cmd.Value == UnitCommands.Stop)
                 {
-                    if (cmd.Value == UnitCommands.Stop)
-                    {
-                        statusColor = Color.cyan; // Idle/Healthy
-                    }
-                    else if (Agent.pathPending || (Agent.hasPath && Agent.pathStatus == NavMeshPathStatus.PathComplete))
-                    {
-                        statusColor = Color.green; // Active/Go
-                    }
+                    statusColor = Color.cyan; // Idle/Healthy
+                    reason = "IDLE";
+                }
+                else if (Agent.pathPending || (Agent.hasPath && Agent.pathStatus == NavMeshPathStatus.PathComplete))
+                {
+                    statusColor = Color.green; // Active/Go
+                    reason = "ACTIVE";
                 }
             }
 
-            SetStatusColor(statusColor);
+            if (statusColor == Color.red)
+            {
+                Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason}");
+            }
+
+            SetStatusColor(statusColor, reason);
         }
 
         private GameObject statusIndicator;
         private Material indicatorMaterial;
+        private TextMeshPro statusText;
 
-        public void SetStatusColor(Color color)
+        public void SetStatusColor(Color color, string reason = "")
         {
             if (statusIndicator == null)
             {
@@ -133,6 +160,18 @@ namespace GameDevTV.RTS.Units
                 indicatorMaterial = new Material(shader);
                 indicatorMaterial.renderQueue = 3100; // Render on top
                 r.sharedMaterial = indicatorMaterial;
+
+                // Create text child
+                GameObject textObj = new GameObject("StatusText");
+                textObj.transform.SetParent(statusIndicator.transform);
+                textObj.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // Face up
+                textObj.transform.localPosition = new Vector3(0f, 0.51f, 0f); // Just above cube surface
+                
+                statusText = textObj.AddComponent<TextMeshPro>();
+                statusText.fontSize = 5f;
+                statusText.alignment = TextAlignmentOptions.Center;
+                statusText.color = Color.black;
+                statusText.enableWordWrapping = false;
             }
 
             if (indicatorMaterial != null)
@@ -147,6 +186,13 @@ namespace GameDevTV.RTS.Units
                 indicatorMaterial.color = displayColor;
                 
                 statusIndicator.SetActive(true);
+            }
+
+            if (statusText != null)
+            {
+                statusText.text = reason;
+                // Only show text if status is red, as requested
+                statusText.gameObject.SetActive(color == Color.red);
             }
         }
 
