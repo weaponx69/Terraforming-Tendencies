@@ -21,12 +21,12 @@ namespace GameDevTV.RTS.Behavior
         private Vector3 lastPosition;
         private Vector3 randomOffset;
         private Vector3 targetPosition;
+        private bool destinationSet;
 
         protected override Status OnStart()
         {
             if (Agent.Value == null || !Agent.Value.TryGetComponent(out agent) || TargetGameObject.Value == null)
             {
-                Debug.LogWarning($"[MoveToTargetGameObjectAction] {Agent.Value?.name} failed to start. TargetGameObject={TargetGameObject.Value?.name}");
                 return Status.Failure;
             }
 
@@ -42,18 +42,16 @@ namespace GameDevTV.RTS.Behavior
             // Use a small buffer for arrival.
             if (distance <= agent.stoppingDistance + 0.1f)
             {
-                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} already at destination {TargetGameObject.Value.name}. distance={distance}, stoppingDistance={agent.stoppingDistance}");
                 return Status.Success;
             }
 
             if (agent.isOnNavMesh)
             {
-                bool setDestResult = agent.SetDestination(targetPosition);
-                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} started moving to {TargetGameObject.Value.name} at {targetPosition}. setDestinationResult={setDestResult}, distance={distance}");
+                destinationSet = agent.SetDestination(targetPosition);
             }
             else
             {
-                Debug.LogWarning($"[MoveToTargetGameObjectAction] {agent.name} is not on NavMesh. Cannot set destination.");
+                destinationSet = false;
             }
             
             lastPosition = TargetGameObject.Value.transform.position;
@@ -77,6 +75,13 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Running;
             }
 
+            if (!destinationSet)
+            {
+                targetPosition = GetTargetPosition();
+                destinationSet = agent.SetDestination(targetPosition);
+                if (!destinationSet) return Status.Running;
+            }
+
             if (agent.pathPending)
             {
                 return Status.Running;
@@ -88,28 +93,27 @@ namespace GameDevTV.RTS.Behavior
             if (Vector3.Distance(currentTargetObjectPos, lastPosition) >= MoveThreshold)
             {
                 targetPosition = GetTargetPosition();
-                agent.SetDestination(targetPosition);
+                destinationSet = agent.SetDestination(targetPosition);
                 lastPosition = currentTargetObjectPos;
                 return Status.Running;
-                }
+            }
 
-                Vector2 agentPos2D = new Vector2(agent.transform.position.x, agent.transform.position.z);
-                Vector2 targetPos2D = new Vector2(targetPosition.x, targetPosition.z);
-                float directDistance = Vector2.Distance(agentPos2D, targetPos2D);
-                bool arrived = false;
-            
-                if (agent.isOnNavMesh && agent.hasPath)
-                {
+            Vector2 agentPos2D = new Vector2(agent.transform.position.x, agent.transform.position.z);
+            Vector2 targetPos2D = new Vector2(targetPosition.x, targetPosition.z);
+            float directDistance = Vector2.Distance(agentPos2D, targetPos2D);
+            bool arrived = false;
+        
+            if (agent.isOnNavMesh && agent.hasPath)
+            {
                 arrived = agent.remainingDistance <= agent.stoppingDistance || directDistance <= agent.stoppingDistance + 0.1f;
-                }
-                else
-                {
+            }
+            else
+            {
                 arrived = directDistance <= agent.stoppingDistance + 0.1f;
-                }
+            }
 
             if (arrived)
             {
-                Debug.Log($"[MoveToTargetGameObjectAction] {agent.name} arrived at {TargetGameObject.Value.name} successfully. directDistance={directDistance}");
                 return Status.Success;
             }
 

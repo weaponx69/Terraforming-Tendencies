@@ -25,6 +25,7 @@ namespace GameDevTV.RTS.Behavior
         private SupplySO supplySO;
         private Vector3 targetPosition;
         private Vector3 randomOffset;
+        private bool destinationSet;
 
         protected override Status OnStart()
         {
@@ -32,9 +33,6 @@ namespace GameDevTV.RTS.Behavior
 
             if (!HasValidInputs())
             {
-                string agentName = Agent.Value != null ? Agent.Value.name : "NullAgent";
-                string supplyName = Supply.Value != null ? Supply.Value.name : "NullSupply";
-                Debug.LogWarning($"[MoveToGatherableSupplyAction] {agentName} HasValidInputs failed! Supply={supplyName}, supplySO={supplySO}");
                 return Status.Failure;
             }
 
@@ -58,12 +56,11 @@ namespace GameDevTV.RTS.Behavior
 
             if (agent.isOnNavMesh)
             {
-                bool setDestResult = agent.SetDestination(targetPosition);
-                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} OnStart: targetPosition={targetPosition}, setDestResult={setDestResult}, agentDest={agent.destination}, supply={Supply.Value.name}, pathPending={agent.pathPending}");
+                destinationSet = agent.SetDestination(targetPosition);
             }
             else
             {
-                Debug.LogWarning($"[MoveToGatherableSupplyAction] {agent.name} is not on NavMesh. Cannot set destination.");
+                destinationSet = false;
             }
 
             return Status.Running;
@@ -79,6 +76,13 @@ namespace GameDevTV.RTS.Behavior
             if (Supply.Value == null) return Status.Failure;
 
             if (!agent.isOnNavMesh) return Status.Running;
+
+            if (!destinationSet)
+            {
+                targetPosition = GetTargetPosition();
+                destinationSet = agent.SetDestination(targetPosition);
+                if (!destinationSet) return Status.Running;
+            }
 
             if (agent.pathPending)
             {
@@ -100,7 +104,6 @@ namespace GameDevTV.RTS.Behavior
 
             if (!Supply.Value.IsBusy && Supply.Value.Amount > 0)
             {
-                Debug.Log($"[MoveToGatherableSupplyAction] {agent.name} Arrived at {Supply.Value.name} successfully. directDistance={directDistance}");
                 return Status.Success;
             }
             Collider[] colliders = FindNearbyNotBusyColliders();
@@ -112,7 +115,8 @@ namespace GameDevTV.RTS.Behavior
                 Supply.Value = colliders[0].GetComponent<GatherableSupply>();
                 if (agent.isOnNavMesh)
                 {
-                    agent.SetDestination(GetTargetPosition());
+                    targetPosition = GetTargetPosition();
+                    destinationSet = agent.SetDestination(targetPosition);
                 }
                 return Status.Running;
             }

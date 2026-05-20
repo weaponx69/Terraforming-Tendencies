@@ -55,6 +55,11 @@ namespace GameDevTV.RTS.Player
 
         private void Awake()
         {
+            if (playerCamera == null)
+            {
+                playerCamera = GetComponent<Camera>();
+            }
+
             if (cameraTarget != null)
             {
                 cameraTarget.isKinematic = true;

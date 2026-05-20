@@ -133,8 +133,12 @@ namespace GameDevTV.RTS.Units
 
             if (evt.Unit is Worker worker)
             {
-                if (worker.TryGetComponent(out NavMeshAgent navAgent) && navAgent.isActiveAndEnabled)
+                if (worker.TryGetComponent(out NavMeshAgent navAgent))
                 {
+                    if (!navAgent.enabled)
+                    {
+                        navAgent.enabled = true;
+                    }
                     navAgent.stoppingDistance = 0.5f;
                     float baseSpeed = navAgent.speed;
                     navAgent.speed = baseSpeed * Random.Range(0.9f, 1.1f);
@@ -163,7 +167,7 @@ namespace GameDevTV.RTS.Units
                             navAgent.Warp(hit.position);
                         }
                     }
-}
+                }
 
                 // Assign to closest node
                 AINode node = activeNodes.OrderBy(n => Vector3.Distance(worker.transform.position, n.CommandPost.transform.position)).FirstOrDefault();
@@ -329,6 +333,10 @@ namespace GameDevTV.RTS.Units
                         {
                             if (drone.TryGetComponent(out NavMeshAgent na))
                             {
+                                if (!na.enabled)
+                                {
+                                    na.enabled = true;
+                                }
                                 if (!na.isOnNavMesh && na.isActiveAndEnabled)
                                 {
                                     // Try to recover agent if it fell off or NavMesh changed under it
