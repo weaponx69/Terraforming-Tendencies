@@ -24,6 +24,21 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
+            if (EventChannel.Value == null)
+            {
+                EventChannel.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
+            }
+
+            // Ensure the Unit variable is correctly pointing to this unit
+            if (Unit.Value == null)
+            {
+                // In Unity Behavior, the Action has access to the agent's GameObject
+                // but we must be careful how we retrieve it. 
+                // We'll try to get it from the blackboard or fallback to logging.
+                Debug.LogWarning("[GatherSuppliesAction] Unit variable was null in blackboard. Cannot identify miner.");
+                return Status.Failure;
+            }
+
             if (GatherableSupplies.Value == null) 
             {
                 return Status.Failure;

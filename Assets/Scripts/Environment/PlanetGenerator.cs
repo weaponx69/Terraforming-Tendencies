@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Environment
         public bool SpawnFloraOnStart = false; // Default to barren planet
 
         [Header("Air Unit Settings")]
-        [SerializeField] private float airUnitFlightHeight = 4f;
+        public float AirUnitFlightHeight = 4f;
 
         [Header("Resource Configurations (Now auto-loaded from Resources)")]
         public SupplySO MineralsSupplySO;
@@ -49,17 +49,20 @@ namespace GameDevTV.RTS.Environment
             
             FixPreplacedGatherables();
 
-            // Only generate if we haven't already generated it in the editor
-            if (GetComponent<MeshFilter>().sharedMesh == null)
+            if (Application.isPlaying)
+            {
+                ClearPlanet();
+                GeneratePlanet();
+            }
+            else if (GetComponent<MeshFilter>().sharedMesh == null)
             {
                 GeneratePlanet();
             }
             else
             {
-                // If it was pre-generated in editor, we still need to bake navmesh
                 BakeAllNavMeshes();
             }
-        }
+            }
 
             private void BakeAllNavMeshes()
             {
@@ -76,7 +79,7 @@ namespace GameDevTV.RTS.Environment
                     flyZone.parent = transform;
                     flyZone.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
                 }
-                flyZone.localPosition = new Vector3(0, airUnitFlightHeight, 0); // Fly at airUnitFlightHeight
+                flyZone.localPosition = new Vector3(0, AirUnitFlightHeight, 0); // Fly at AirUnitFlightHeight
 
                 // Clean up any obsolete components on FlyZone itself if they were created by old code
                 if (flyZone.TryGetComponent<MeshCollider>(out var oldFc)) DestroyImmediate(oldFc);
@@ -104,6 +107,32 @@ namespace GameDevTV.RTS.Environment
                 ff.sharedMesh = GetComponent<MeshFilter>().sharedMesh;
                 fc.sharedMesh = GetComponent<MeshCollider>().sharedMesh;
 
+                // Ghosting for Air NavMesh wrapping
+                float mapWidthWorld = Config.MapWidth * CellSize;
+                float mapHeightWorld = Config.MapHeight * CellSize;
+                for (int x = -2; x <= 2; x++)
+                {
+                    for (int z = -2; z <= 2; z++)
+                    {
+                        if (x == 0 && z == 0) continue;
+                        string ghostName = $"BakeMesh Ghost ({x},{z})";
+                        Transform ghost = flyZone.Find(ghostName);
+                        if (ghost == null)
+                        {
+                            ghost = new GameObject(ghostName).transform;
+                            ghost.parent = flyZone;
+                        }
+                        ghost.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
+                        ghost.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
+                        if (!ghost.TryGetComponent<MeshFilter>(out var gff)) gff = ghost.gameObject.AddComponent<MeshFilter>();
+                        if (!ghost.TryGetComponent<MeshCollider>(out var gfc)) gfc = ghost.gameObject.AddComponent<MeshCollider>();
+                        gff.sharedMesh = ff.sharedMesh;
+                        gfc.sharedMesh = fc.sharedMesh;
+                    }
+                }
+
+                Physics.SyncTransforms(); 
+
                 for (int i = 0; i < agentTypeCount; i++)
                 {
                     NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
@@ -119,32 +148,34 @@ namespace GameDevTV.RTS.Environment
                         surface.agentTypeID = settings.agentTypeID;
                     }
 
-                    surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
+                    // Use All to ensure we pick up ghosts and environment features accurately
+                    surface.collectObjects = CollectObjects.All;
                     surface.useGeometry = isAirAgent ? NavMeshCollectGeometry.PhysicsColliders : NavMeshCollectGeometry.RenderMeshes;
                     
                     int mask = ~0;
-                    int transparentLayer = LayerMask.NameToLayer("TransparentFX");
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
                     int suppliesLayer = LayerMask.NameToLayer("Supplies");
                     
-                    if (!isAirAgent && transparentLayer != -1) mask &= ~(1 << transparentLayer);
+                    // Exclude buildings from Air/Ground bakes (buildings use NavMeshObstacles)
                     if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
+                    // Air units ignore supplies on the ground
                     if (isAirAgent && suppliesLayer != -1) mask &= ~(1 << suppliesLayer);
                     
                     surface.layerMask = mask;
                     surface.BuildNavMesh();
                 }
-            }
+                }
 
                 [ContextMenu("Clear Planet (Editor)")]
                 public void ClearPlanet()
                 {
-                for (int i = transform.childCount - 1; i >= 0; i--)
-                {
-                DestroyImmediate(transform.GetChild(i).gameObject);
-                }
-                if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
-                if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
+                    for (int i = transform.childCount - 1; i >= 0; i--)
+                    {
+                        if (Application.isPlaying) Destroy(transform.GetChild(i).gameObject);
+                        else DestroyImmediate(transform.GetChild(i).gameObject);
+                    }
+                    if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
+                    if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
                 }
 
                 [ContextMenu("Generate Planet (Editor)")]

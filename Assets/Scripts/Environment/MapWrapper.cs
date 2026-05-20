@@ -22,28 +22,10 @@ namespace GameDevTV.RTS.Environment
         {
             if (mapWidthWorld <= 0 || mapHeightWorld <= 0) return;
 
-            // Wrap Units
-            AbstractUnit[] units = FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude);
-            foreach (var unit in units)
-            {
-                if (unit.Agent != null)
-                {
-                    Vector3 pos = unit.transform.position;
-                    bool wrapped = false;
-
-                    if (pos.x < 0) { pos.x += mapWidthWorld; wrapped = true; }
-                    else if (pos.x > mapWidthWorld) { pos.x -= mapWidthWorld; wrapped = true; }
-
-                    if (pos.z < 0) { pos.z += mapHeightWorld; wrapped = true; }
-                    else if (pos.z > mapHeightWorld) { pos.z -= mapHeightWorld; wrapped = true; }
-
-                    if (wrapped)
-                    {
-                        // Warp the NavMeshAgent safely
-                        unit.Agent.Warp(pos);
-                    }
-                }
-            }
+            // --- REMOVED: Unit Wrapping ---
+            // Units should not be wrapped automatically because they may be pathing 
+            // to expansion/ghost resources outside the 0-100 bounds.
+            // Tiled NavMesh handles the edge crossing naturally.
 
             // Wrap Camera (Assumes Camera is attached to a Player/Camera Rig)
             Camera mainCam = Camera.main;

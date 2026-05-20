@@ -343,7 +343,11 @@ namespace GameDevTV.RTS.Units
                                     NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
                                     if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
                                     {
-                                        na.Warp(hit.position);
+                                        // Only warp if really far from NavMesh to avoid jitter
+                                        if (Vector3.Distance(drone.transform.position, hit.position) > 1.0f)
+                                        {
+                                            na.Warp(hit.position);
+                                        }
                                     }
                                 }
 

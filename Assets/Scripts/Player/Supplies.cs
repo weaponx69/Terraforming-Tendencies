@@ -48,10 +48,11 @@ namespace GameDevTV.RTS.Player
             }
             Instance = this;
 
-            if (Biomass == null) Biomass = new Dictionary<Owner, int>();
-            if (Population == null) Population = new Dictionary<Owner, int>();
-            if (PopulationLimit == null) PopulationLimit = new Dictionary<Owner, int>();
-            if (Oxygen == null) Oxygen = new Dictionary<Owner, int>();
+            // Clear static dictionaries to prevent persistence across Play Mode sessions
+            Biomass = new Dictionary<Owner, int>();
+            Population = new Dictionary<Owner, int>();
+            PopulationLimit = new Dictionary<Owner, int>();
+            Oxygen = new Dictionary<Owner, int>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {

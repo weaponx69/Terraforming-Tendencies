@@ -292,6 +292,63 @@ namespace GameDevTV.RTS.Tests
             
             Object.DestroyImmediate(agentObj);
         }
+
+        [UnityTest]
+        public IEnumerator MiningDrone_WithCurrentGameSettings_StartsOnNavMesh()
+        {
+            UnitSO droneSO = Resources.Load<UnitSO>("Units/MiningDrone");
+            Assert.IsNotNull(droneSO, "MiningDrone.asset not found in Resources/Units/.");
+            Assert.IsNotNull(droneSO.Prefab, "MiningDrone prefab not assigned on UnitSO.");
+
+            GameObject droneObj = Object.Instantiate(droneSO.Prefab);
+            
+            // Simulating spawn position calculation & warp logic using active project settings and baked NavMesh
+            NavMeshAgent agent = droneObj.GetComponent<NavMeshAgent>();
+            Assert.IsNotNull(agent, "MiningDrone prefab has no NavMeshAgent component.");
+
+            // Spawn at ground level (like Command Post)
+            droneObj.transform.position = new Vector3(0, 0.1f, 0);
+
+            // Wait 1 frame
+            yield return null;
+
+            // Retrieve the active filter matching the actual drone agentTypeID
+            int agentTypeID = agent.agentTypeID;
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeID, areaMask = NavMesh.AllAreas };
+            
+            // Query the NavMesh using the actual agentTypeID and project settings
+            bool sampleSuccess = NavMesh.SamplePosition(droneObj.transform.position, out NavMeshHit hit, 25f, filter);
+            Assert.IsTrue(sampleSuccess, $"NavMesh.SamplePosition failed for agentTypeID {agentTypeID} (Air Agent) at ground level. No valid Air NavMesh found within range.");
+
+            // Apply warp
+            agent.enabled = false;
+            droneObj.transform.position = hit.position;
+            agent.enabled = true;
+            agent.Warp(hit.position);
+
+            yield return null;
+
+            Assert.IsTrue(agent.isOnNavMesh, "MiningDrone agent is not on NavMesh after executing spawn warp flow with active settings.");
+            Assert.IsTrue(agent.enabled, "MiningDrone agent component is disabled after spawn warp flow.");
+
+            // Verify actual movement to a destination on the NavMesh
+            Vector3 startPos = droneObj.transform.position;
+            Vector3 targetPosition = new Vector3(2f, startPos.y, 2f);
+            
+            bool setDestSuccess = agent.SetDestination(targetPosition);
+            Assert.IsTrue(setDestSuccess, "MiningDrone SetDestination failed; destination was rejected.");
+
+            for (int i = 0; i < 15; i++)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(agent.hasPath, "MiningDrone agent has no path.");
+            float distanceMoved = Vector3.Distance(startPos, droneObj.transform.position);
+            Assert.Greater(distanceMoved, 0.05f, "MiningDrone did not move visually (transform remained stationary).");
+
+            Object.DestroyImmediate(droneObj);
+        }
     }
 }
 #endif

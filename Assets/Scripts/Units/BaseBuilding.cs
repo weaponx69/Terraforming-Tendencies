@@ -4,6 +4,7 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.TechTree;
+using GameDevTV.RTS.Environment;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -216,13 +217,20 @@ namespace GameDevTV.RTS.Units
 
                     // Air units can spawn much closer since they occupy elevated space, while ground units spawn just outside the obstacle
                     float angle = Random.Range(0f, Mathf.PI * 2f);
-                    float distance = isAirUnit ? Random.Range(3f, 5f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
-                    Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, 0, Mathf.Sin(angle) * distance);
+                    float distance = isAirUnit ? Random.Range(4f, 6f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
+                    
+                    float heightOffset = 0f;
+                    if (isAirUnit && PlanetGenerator.Instance != null)
+                    {
+                        heightOffset = PlanetGenerator.Instance.AirUnitFlightHeight;
+                    }
+
+                    Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, heightOffset, Mathf.Sin(angle) * distance);
                     Vector3 spawnPosition = transform.position + offset;
 
                     // Snap to NavMesh for the specific agent type
                     NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeID, areaMask = NavMesh.AllAreas };
-                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 25f, filter);
+                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 15f, filter);
                     
                     if (onNavMesh)
                     {
@@ -230,10 +238,9 @@ namespace GameDevTV.RTS.Units
                     }
                     else
                     {
-                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh for type {agentTypeID} near spawn position {spawnPosition} for unit {unitSO.Name}. Spawning at building center.");
-                        spawnPosition = transform.position; 
-                        onNavMesh = NavMesh.SamplePosition(spawnPosition, out hit, 15f, filter);
-                        if (onNavMesh) spawnPosition = hit.position;
+                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh for type {agentTypeID} near spawn position {spawnPosition} for unit {unitSO.Name}. Using fallback spread.");
+                        // Ensure we use the calculated offset (with height for air units)
+                        spawnPosition = transform.position + offset;
                     }
 
                     GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);

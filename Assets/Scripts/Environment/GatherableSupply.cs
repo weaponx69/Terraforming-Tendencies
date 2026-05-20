@@ -78,6 +78,16 @@ namespace GameDevTV.RTS.Environment
             int amountGathered = Mathf.Min(gatherRate, Amount);
             Amount -= amountGathered;
 
+            // --- FIX: Deplete TargetRock if this is a ghost ---
+            if (TryGetComponent<GhostRock>(out var ghost) && ghost.TargetRock != null)
+            {
+                if (ghost.TargetRock.TryGetComponent<GatherableSupply>(out var original))
+                {
+                    original.Amount -= amountGathered;
+                    if (original.Amount <= 0) Destroy(original.gameObject);
+                }
+            }
+
             if (Amount <= 0)
             {
                 Destroy(gameObject);

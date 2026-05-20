@@ -31,9 +31,30 @@ namespace GameDevTV.RTS.Units
         protected override void Start()
         {
             base.Start();
+            
+            // Fix: Ensure the Behavior Tree knows which unit it is on
+            if (graphAgent != null)
+            {
+                graphAgent.SetVariableValue("Unit", gameObject);
+            }
+
             if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> eventChannelVariable))
             {
-                eventChannelVariable.Value.Event += HandleGatherSupplies;
+                if (eventChannelVariable.Value == null)
+                {
+                    eventChannelVariable.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
+                    if (eventChannelVariable.Value == null)
+                    {
+                        // Fallback search if not in Resources
+                        string[] guids = UnityEngine.AI.NavMesh.GetSettingsCount() > 0 ? new string[0] : null; // Dummy to use namespace
+                        Debug.LogWarning($"[Worker] GatherSuppliesEventChannel is null on {name}. Ensure it is assigned in the Behavior Tree blackboard or exists in Resources/Events/");
+                    }
+                }
+
+                if (eventChannelVariable.Value != null)
+                {
+                    eventChannelVariable.Value.Event += HandleGatherSupplies;
+                }
             }
             if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildingEventChannelVariable))
             {
@@ -154,7 +175,11 @@ namespace GameDevTV.RTS.Units
 
         private void HandleGatherSupplies(GameObject self, int amount, SupplySO supply)
         {
-            if (self != gameObject) return; // Ignore events triggered by other drones
+            if (self != gameObject) 
+            {
+                // Debug.Log($"[Worker] {name} ignoring event for {self?.name ?? "null"}");
+                return; 
+            }
             
             if (supply == null)
             {
@@ -162,39 +187,7 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
-            // Damage the nearest building (the delivery point) if delivering poison gas
-            bool isPoisonous = false;
-            if (graphAgent.GetVariable("IsCarryingPoison", out BlackboardVariable<bool> poisonVar))
-            {
-                isPoisonous = poisonVar.Value;
-            }
-
-            if (isPoisonous)
-            {
-                float minDistance = 5f; // Must be close to the building to damage it
-                BaseBuilding targetBuilding = null;
-
-                foreach (var b in BaseBuilding.ActiveBuildings)
-                {
-                    if (b == null || b.Owner != Owner) continue;
-                    float dist = Vector3.Distance(transform.position, b.transform.position);
-                    if (dist < minDistance)
-                    {
-                        minDistance = dist;
-                        targetBuilding = b;
-                    }
-                }
-
-                if (targetBuilding != null)
-                {
-                    targetBuilding.TakeDamage(10);
-                    Debug.Log($"<color=red>[Corrosive]</color> {targetBuilding.name} took 10 damage from {name} delivering poisonous gas.");
-                }
-                
-                // Reset the flag after delivery
-                graphAgent.SetVariableValue("IsCarryingPoison", false);
-            }
-
+            Debug.Log($"[Worker] {name} received gather event: amount={amount}, biomassDictExists={GameDevTV.RTS.Player.Supplies.Biomass != null}");
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, amount, supply));
         }
 
