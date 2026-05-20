@@ -102,10 +102,17 @@ namespace GameDevTV.RTS.Environment
                 }
                 bakeMeshObj.layer = LayerMask.NameToLayer("TransparentFX");
 
+                var tempRenderers = new System.Collections.Generic.List<MeshRenderer>();
+
                 if (!bakeMeshObj.TryGetComponent<MeshFilter>(out var ff)) ff = bakeMeshObj.AddComponent<MeshFilter>();
                 if (!bakeMeshObj.TryGetComponent<MeshCollider>(out var fc)) fc = bakeMeshObj.AddComponent<MeshCollider>();
                 ff.sharedMesh = GetComponent<MeshFilter>().sharedMesh;
                 fc.sharedMesh = GetComponent<MeshCollider>().sharedMesh;
+
+                if (!bakeMeshObj.TryGetComponent<MeshRenderer>(out var mr)) mr = bakeMeshObj.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
+                mr.enabled = true;
+                tempRenderers.Add(mr);
 
                 // Ghosting for Air NavMesh wrapping
                 float mapWidthWorld = Config.MapWidth * CellSize;
@@ -128,6 +135,11 @@ namespace GameDevTV.RTS.Environment
                         if (!ghost.TryGetComponent<MeshCollider>(out var gfc)) gfc = ghost.gameObject.AddComponent<MeshCollider>();
                         gff.sharedMesh = ff.sharedMesh;
                         gfc.sharedMesh = fc.sharedMesh;
+
+                        if (!ghost.TryGetComponent<MeshRenderer>(out var gmr)) gmr = ghost.gameObject.AddComponent<MeshRenderer>();
+                        gmr.sharedMaterial = mr.sharedMaterial;
+                        gmr.enabled = true;
+                        tempRenderers.Add(gmr);
                     }
                 }
 
@@ -148,9 +160,9 @@ namespace GameDevTV.RTS.Environment
                         surface.agentTypeID = settings.agentTypeID;
                     }
 
-                    // Use All to ensure we pick up ghosts and environment features accurately
-                    surface.collectObjects = CollectObjects.All;
-                    surface.useGeometry = isAirAgent ? NavMeshCollectGeometry.PhysicsColliders : NavMeshCollectGeometry.RenderMeshes;
+                    // Use Children for Air Agent to isolate it, and All for ground agent
+                    surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
+                    surface.useGeometry = NavMeshCollectGeometry.RenderMeshes; // Always use RenderMeshes for reliability
                     
                     int mask = ~0;
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
@@ -163,6 +175,12 @@ namespace GameDevTV.RTS.Environment
                     
                     surface.layerMask = mask;
                     surface.BuildNavMesh();
+                }
+
+                // Disable the renderers immediately after baking so they are never drawn
+                foreach (var renderer in tempRenderers)
+                {
+                    renderer.enabled = false;
                 }
 
                 if (Application.isPlaying)
