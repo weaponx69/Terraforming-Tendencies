@@ -343,11 +343,7 @@ namespace GameDevTV.RTS.Units
                                     NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
                                     if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
                                     {
-                                        // Only warp if really far from NavMesh to avoid jitter
-                                        if (Vector3.Distance(drone.transform.position, hit.position) > 1.0f)
-                                        {
-                                            na.Warp(hit.position);
-                                        }
+                                        na.Warp(hit.position);
                                     }
                                 }
 
@@ -374,9 +370,8 @@ namespace GameDevTV.RTS.Units
                                         lastDronePositions.Remove(drone);
                                     }
 
-                                    if (cmd.Value == UnitCommands.ReturnSupplies && na.remainingDistance <= na.stoppingDistance + 0.1f)
+                                    if (cmd.Value == UnitCommands.ReturnSupplies && !drone.HasSupplies)
                                     {
-                                        if (drone.HasSupplies) drone.ClearSupplies();
                                         drone.Stop();
                                     }
                                 }

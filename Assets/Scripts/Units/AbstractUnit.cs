@@ -57,6 +57,18 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        protected virtual void Update()
+        {
+            if (Agent != null && Agent.isActiveAndEnabled && !Agent.isOnNavMesh)
+            {
+                NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas };
+                if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 15f, filter))
+                {
+                    Agent.Warp(hit.position);
+                }
+            }
+        }
+
         public void MoveTo(Vector3 position)
         {
             graphAgent.SetVariableValue("TargetLocation", position);
