@@ -21,7 +21,7 @@ namespace GameDevTV.RTS.Utilities
         public static void CreateAll()
         {
             // Find all NavMeshSurface components in the scene
-            NavMeshSurface[] surfaces = Object.FindObjectsOfType<NavMeshSurface>();
+            NavMeshSurface[] surfaces = Object.FindObjectsByType<NavMeshSurface>(FindObjectsInactive.Exclude);
             if (surfaces == null || surfaces.Length == 0) return;
 
             // Store original active states
