@@ -72,6 +72,30 @@ namespace GameDevTV.RTS.Units
                     Agent.Warp(hit.position);
                 }
             }
+
+            UpdateStatusIndicator();
+        }
+
+        private void UpdateStatusIndicator()
+        {
+            Color statusColor = Color.red; // Default to "No-Go"
+
+            if (Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+            {
+                if (graphAgent != null && graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                {
+                    if (cmd.Value == UnitCommands.Stop)
+                    {
+                        statusColor = Color.cyan; // Idle/Healthy
+                    }
+                    else if (Agent.pathPending || (Agent.hasPath && Agent.pathStatus == NavMeshPathStatus.PathComplete))
+                    {
+                        statusColor = Color.green; // Active/Go
+                    }
+                }
+            }
+
+            SetStatusColor(statusColor);
         }
 
         private GameObject statusIndicator;
@@ -81,22 +105,48 @@ namespace GameDevTV.RTS.Units
         {
             if (statusIndicator == null)
             {
-                statusIndicator = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                Destroy(statusIndicator.GetComponent<Collider>());
+                // Create the indicator as a large flat cube for high visibility
+                statusIndicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                statusIndicator.name = "StatusIndicator";
+                statusIndicator.layer = 0; // Default layer
+
+                if (Application.isPlaying)
+                {
+                    Destroy(statusIndicator.GetComponent<Collider>());
+                }
+                else
+                {
+                    DestroyImmediate(statusIndicator.GetComponent<Collider>());
+                }
+
                 statusIndicator.transform.SetParent(transform);
-                // Float above unit. Drones visually float at y=4, so y=5 places it above them.
-                statusIndicator.transform.localPosition = new Vector3(0f, 5.0f, 0f);
-                statusIndicator.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+                // Position it clearly above the drone height (which is at 2.0)
+                statusIndicator.transform.localPosition = new Vector3(0f, 4.5f, 0f);
+                statusIndicator.transform.localScale = new Vector3(4.0f, 0.4f, 4.0f); 
                 
                 Renderer r = statusIndicator.GetComponent<Renderer>();
-                Shader unlitShader = Shader.Find("Unlit/Color");
-                if (unlitShader == null) unlitShader = Shader.Find("Sprites/Default");
-                indicatorMaterial = new Material(unlitShader);
+                
+                Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+                if (shader == null) shader = Shader.Find("Unlit/Color");
+                if (shader == null) shader = Shader.Find("Sprites/Default");
+                
+                indicatorMaterial = new Material(shader);
+                indicatorMaterial.renderQueue = 3100; // Render on top
                 r.sharedMaterial = indicatorMaterial;
             }
+
             if (indicatorMaterial != null)
             {
-                indicatorMaterial.color = color;
+                // Use bright neon colors
+                Color displayColor = color;
+                if (color == Color.red) displayColor = new Color(1f, 0.1f, 0.1f, 1f);
+                else if (color == Color.green) displayColor = new Color(0.1f, 1f, 0.1f, 1f);
+                else if (color == Color.cyan) displayColor = new Color(0.1f, 0.8f, 1f, 1f);
+
+                if (indicatorMaterial.HasProperty("_BaseColor")) indicatorMaterial.SetColor("_BaseColor", displayColor);
+                indicatorMaterial.color = displayColor;
+                
+                statusIndicator.SetActive(true);
             }
         }
 

@@ -325,18 +325,28 @@ namespace GameDevTV.RTS.Units
         }
 
         private void ProcessNodeDrones(AINode node)
+        {
+            if (node.Drones.Count > 0)
+            {
+                Debug.Log($"[AI Debug] Node at {node.CommandPost.transform.position} processing {node.Drones.Count} drones.");
+            }
+
+            foreach (Worker drone in node.Drones.ToList())
+            {
+                if (drone == null)
                 {
-                    foreach (Worker drone in node.Drones.ToList())
+                    node.Drones.Remove(null);
+                    continue;
+                }
+
+                if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                {
+                    if (drone.TryGetComponent(out NavMeshAgent na))
                     {
-                        if (drone == null) continue;
-                        if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                        if (!na.enabled)
                         {
-                            if (drone.TryGetComponent(out NavMeshAgent na))
-                            {
-                                if (!na.enabled)
-                                {
-                                    na.enabled = true;
-                                }
+                            na.enabled = true;
+                        }
 
                                 Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Pos: {drone.transform.position} | Command: {cmd.Value} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
 
