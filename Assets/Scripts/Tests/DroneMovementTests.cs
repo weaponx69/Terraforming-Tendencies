@@ -157,6 +157,141 @@ namespace GameDevTV.RTS.Tests
             
             Object.DestroyImmediate(agentObj);
         }
+
+        [UnityTest]
+        public IEnumerator AirAgent_SpawnedAtGround_WhenWarpedAndTargetSet_MovesToDestination()
+        {
+            int agentCount = NavMesh.GetSettingsCount();
+            int airAgentTypeID = 0;
+            for (int i = 0; i < agentCount; i++)
+            {
+                int id = NavMesh.GetSettingsByIndex(i).agentTypeID;
+                if (id != 0)
+                {
+                    airAgentTypeID = id;
+                    break;
+                }
+            }
+            
+            if (airAgentTypeID == 0)
+            {
+                Assert.Fail("Air Agent settings not found in project config. The game requires Air Agent settings.");
+                yield break;
+            }
+            
+            GameObject agentObj = new GameObject("TestAirAgentSpawnGround");
+            agentObj.transform.position = new Vector3(0, 0.1f, 0); // Spawns on ground
+            NavMeshAgent agent = agentObj.AddComponent<NavMeshAgent>();
+            agent.agentTypeID = airAgentTypeID;
+            agent.speed = 10f;
+            agent.acceleration = 100f;
+            
+            yield return null; // Wait 1 frame
+            
+            // Simulates spawning at ground where there is no air NavMesh
+            Assert.IsFalse(agent.isOnNavMesh, "Air agent should NOT be on NavMesh at ground level.");
+            
+            // Recover/warp logic as done by AIController
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(agentObj.transform.position, out NavMeshHit hit, 25f, filter))
+            {
+                agent.enabled = false;
+                agentObj.transform.position = hit.position;
+                agent.enabled = true;
+                agent.Warp(hit.position);
+            }
+            
+            Assert.IsTrue(agent.isOnNavMesh, "Air agent should be on NavMesh after recovery warp.");
+            
+            Vector3 startPos = agentObj.transform.position;
+            Vector3 targetPosition = new Vector3(2f, startPos.y, 2f);
+            
+            bool setDestSuccess = agent.SetDestination(targetPosition);
+            Assert.IsTrue(setDestSuccess, "Air agent SetDestination failed after recovery; destination was rejected.");
+            
+            for (int i = 0; i < 15; i++)
+            {
+                yield return null;
+            }
+            
+            Assert.IsTrue(agent.hasPath, "Air agent has no path after recovery.");
+            
+            float distanceMoved = Vector3.Distance(startPos, agentObj.transform.position);
+            Assert.Greater(distanceMoved, 0.05f, "Air agent GameObject did not move visually after recovery warp.");
+            
+            Object.DestroyImmediate(agentObj);
+        }
+
+        [UnityTest]
+        public IEnumerator AirAgent_WhenSpawningWithDisabledAgent_IsSuccessfullyEnabledAndMoves()
+        {
+            int agentCount = NavMesh.GetSettingsCount();
+            int airAgentTypeID = 0;
+            for (int i = 0; i < agentCount; i++)
+            {
+                int id = NavMesh.GetSettingsByIndex(i).agentTypeID;
+                if (id != 0)
+                {
+                    airAgentTypeID = id;
+                    break;
+                }
+            }
+            
+            if (airAgentTypeID == 0)
+            {
+                Assert.Fail("Air Agent settings not found in project config.");
+                yield break;
+            }
+            
+            GameObject agentObj = new GameObject("TestAirAgentDisabledSpawn");
+            agentObj.transform.position = new Vector3(0, 0.1f, 0); // Spawns on ground
+            NavMeshAgent agent = agentObj.AddComponent<NavMeshAgent>();
+            agent.agentTypeID = airAgentTypeID;
+            agent.speed = 10f;
+            agent.acceleration = 100f;
+            agent.enabled = false; // Starts disabled as if BaseBuilding couldn't find NavMesh
+            
+            yield return null;
+            
+            // Simulates AIController forcing the agent to enable and recover
+            if (!agent.enabled)
+            {
+                agent.enabled = true;
+            }
+            
+            if (!agent.isOnNavMesh)
+            {
+                NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
+                if (NavMesh.SamplePosition(agentObj.transform.position, out NavMeshHit hit, 25f, filter))
+                {
+                    agent.enabled = false;
+                    agentObj.transform.position = hit.position;
+                    agent.enabled = true;
+                    agent.Warp(hit.position);
+                }
+            }
+            
+            Assert.IsTrue(agent.isOnNavMesh, "Disabled agent should be on NavMesh after force-enable and recovery warp.");
+            Assert.IsTrue(agent.enabled, "Agent should be enabled.");
+            
+            Vector3 startPos = agentObj.transform.position;
+            Vector3 targetPosition = new Vector3(2f, startPos.y, 2f);
+            
+            bool setDestSuccess = agent.SetDestination(targetPosition);
+            Assert.IsTrue(setDestSuccess, "Air agent SetDestination failed after force-enable recovery.");
+            
+            for (int i = 0; i < 15; i++)
+            {
+                yield return null;
+            }
+            
+            Assert.IsTrue(agent.hasPath, "Air agent has no path after force-enable recovery.");
+            
+            float distanceMoved = Vector3.Distance(startPos, agentObj.transform.position);
+            Assert.Greater(distanceMoved, 0.05f, "Air agent GameObject did not move visually after force-enable recovery.");
+            
+            Object.DestroyImmediate(agentObj);
+        }
     }
 }
 #endif

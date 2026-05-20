@@ -17,6 +17,7 @@ namespace GameDevTV.RTS.Behavior
 
         private NavMeshAgent agent;
         private Animator animator;
+        private bool destinationSet;
 
         protected override Status OnStart()
         {
@@ -27,11 +28,6 @@ namespace GameDevTV.RTS.Behavior
 
             Agent.Value.TryGetComponent(out animator);
 
-            if (Vector3.Distance(agent.transform.position, TargetLocation.Value) <= agent.stoppingDistance)
-            {
-                return Status.Success;
-            }
-
             Vector3 targetPosition = TargetLocation.Value;
             NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
             if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 15.0f, filter))
@@ -39,7 +35,19 @@ namespace GameDevTV.RTS.Behavior
                 targetPosition = hit.position;
             }
 
-            agent.SetDestination(targetPosition);
+            if (Vector3.Distance(agent.transform.position, targetPosition) <= agent.stoppingDistance)
+            {
+                return Status.Success;
+            }
+
+            if (agent.isOnNavMesh)
+            {
+                destinationSet = agent.SetDestination(targetPosition);
+            }
+            else
+            {
+                destinationSet = false;
+            }
 
             return Status.Running;
         }
@@ -49,6 +57,23 @@ namespace GameDevTV.RTS.Behavior
             if (animator != null)
             {
                 animator.SetFloat(AnimationConstants.SPEED, agent.velocity.magnitude);
+            }
+
+            if (!agent.isOnNavMesh)
+            {
+                return Status.Running;
+            }
+
+            if (!destinationSet)
+            {
+                Vector3 targetPosition = TargetLocation.Value;
+                NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = NavMesh.AllAreas };
+                if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 15.0f, filter))
+                {
+                    targetPosition = hit.position;
+                }
+                destinationSet = agent.SetDestination(targetPosition);
+                if (!destinationSet) return Status.Running;
             }
 
             if (agent.pathPending)
