@@ -66,51 +66,51 @@ namespace GameDevTV.RTS.Environment
 
             private void BakeAllNavMeshes()
             {
+                // Ensure physics system is aware of feature colliders before bake
                 Physics.SyncTransforms(); 
 
                 int agentTypeCount = NavMesh.GetSettingsCount();
-                var existingSurfaces = new System.Collections.Generic.List<NavMeshSurface>(GetComponents<NavMeshSurface>());
 
                 // Create or find FlyZone child for Air Units
                 Transform flyZone = transform.Find("FlyZone");
+                if (flyZone != null)
+                {
+                    // If it was marked for destruction, it might still be found. Destroy it immediately.
+                    DestroyImmediate(flyZone.gameObject);
+                    flyZone = null;
+                }
+            
                 if (flyZone == null)
                 {
                     flyZone = new GameObject("FlyZone").transform;
                     flyZone.parent = transform;
                     flyZone.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
                 }
-                flyZone.localPosition = new Vector3(0, AirUnitFlightHeight, 0); // Fly at AirUnitFlightHeight
-
-                // Clean up any obsolete components on FlyZone itself if they were created by old code
-                if (flyZone.TryGetComponent<MeshCollider>(out var oldFc)) DestroyImmediate(oldFc);
-                if (flyZone.TryGetComponent<MeshFilter>(out var oldFf)) DestroyImmediate(oldFf);
+            
+                flyZone.localPosition = new Vector3(0, AirUnitFlightHeight, 0); 
+                flyZone.localRotation = Quaternion.identity;
+                flyZone.localScale = Vector3.one;
 
                 // Ensure FlyZone has the terrain mesh child for baking
-                Transform bakeMeshTransform = flyZone.Find("BakeMesh");
-                GameObject bakeMeshObj;
-                if (bakeMeshTransform == null)
-                {
-                    bakeMeshObj = new GameObject("BakeMesh");
-                    bakeMeshObj.transform.parent = flyZone;
-                    bakeMeshObj.transform.localPosition = Vector3.zero;
-                    bakeMeshObj.transform.localRotation = Quaternion.identity;
-                    bakeMeshObj.transform.localScale = Vector3.one;
-                }
-                else
-                {
-                    bakeMeshObj = bakeMeshTransform.gameObject;
-                }
+                GameObject bakeMeshObj = new GameObject("BakeMesh");
+                bakeMeshObj.transform.parent = flyZone;
+                bakeMeshObj.transform.localPosition = Vector3.zero;
+                bakeMeshObj.transform.localRotation = Quaternion.identity;
+                bakeMeshObj.transform.localScale = Vector3.one;
                 bakeMeshObj.layer = LayerMask.NameToLayer("TransparentFX");
 
                 var tempRenderers = new System.Collections.Generic.List<MeshRenderer>();
 
+                Mesh terrainMesh = GetComponent<MeshFilter>().sharedMesh;
+                Material terrainMat = GetComponent<MeshRenderer>().sharedMaterial;
+
                 if (!bakeMeshObj.TryGetComponent<MeshFilter>(out var ff)) ff = bakeMeshObj.AddComponent<MeshFilter>();
                 if (!bakeMeshObj.TryGetComponent<MeshCollider>(out var fc)) fc = bakeMeshObj.AddComponent<MeshCollider>();
-                ff.sharedMesh = GetComponent<MeshFilter>().sharedMesh;
-                fc.sharedMesh = GetComponent<MeshCollider>().sharedMesh;
+                ff.sharedMesh = terrainMesh;
+                fc.sharedMesh = terrainMesh;
 
                 if (!bakeMeshObj.TryGetComponent<MeshRenderer>(out var mr)) mr = bakeMeshObj.AddComponent<MeshRenderer>();
-                mr.sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
+                mr.sharedMaterial = terrainMat;
                 mr.enabled = true;
                 tempRenderers.Add(mr);
 
@@ -122,27 +122,26 @@ namespace GameDevTV.RTS.Environment
                     for (int z = -2; z <= 2; z++)
                     {
                         if (x == 0 && z == 0) continue;
-                        string ghostName = $"BakeMesh Ghost ({x},{z})";
-                        Transform ghost = flyZone.Find(ghostName);
-                        if (ghost == null)
-                        {
-                            ghost = new GameObject(ghostName).transform;
-                            ghost.parent = flyZone;
-                        }
-                        ghost.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
+                        GameObject ghost = new GameObject($"BakeMesh Ghost ({x},{z})");
+                        ghost.transform.parent = flyZone;
+                        ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
+                        ghost.transform.localRotation = Quaternion.identity;
+                        ghost.transform.localScale = Vector3.one;
                         ghost.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
-                        if (!ghost.TryGetComponent<MeshFilter>(out var gff)) gff = ghost.gameObject.AddComponent<MeshFilter>();
-                        if (!ghost.TryGetComponent<MeshCollider>(out var gfc)) gfc = ghost.gameObject.AddComponent<MeshCollider>();
-                        gff.sharedMesh = ff.sharedMesh;
-                        gfc.sharedMesh = fc.sharedMesh;
+                    
+                        var gff = ghost.AddComponent<MeshFilter>();
+                        var gfc = ghost.AddComponent<MeshCollider>();
+                        gff.sharedMesh = terrainMesh;
+                        gfc.sharedMesh = terrainMesh;
 
-                        if (!ghost.TryGetComponent<MeshRenderer>(out var gmr)) gmr = ghost.gameObject.AddComponent<MeshRenderer>();
-                        gmr.sharedMaterial = mr.sharedMaterial;
+                        var gmr = ghost.AddComponent<MeshRenderer>();
+                        gmr.sharedMaterial = terrainMat;
                         gmr.enabled = true;
                         tempRenderers.Add(gmr);
                     }
                 }
 
+                // Sync transforms so bakes see the newly created/moved ghosts
                 Physics.SyncTransforms(); 
 
                 for (int i = 0; i < agentTypeCount; i++)
@@ -152,27 +151,23 @@ namespace GameDevTV.RTS.Environment
 
                     // Find where this surface should live
                     GameObject targetObj = isAirAgent ? flyZone.gameObject : gameObject;
-                    
-                    NavMeshSurface surface = targetObj.GetComponents<NavMeshSurface>().FirstOrDefault(s => s.agentTypeID == settings.agentTypeID);
-                    if (surface == null)
-                    {
-                        surface = targetObj.AddComponent<NavMeshSurface>();
-                        surface.agentTypeID = settings.agentTypeID;
-                    }
+                
+                    NavMeshSurface surface = targetObj.AddComponent<NavMeshSurface>();
+                    surface.agentTypeID = settings.agentTypeID;
 
-                    // Use Children for Air Agent to isolate it, and All for ground agent
-                    surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
-                    surface.useGeometry = NavMeshCollectGeometry.RenderMeshes; // Always use RenderMeshes for reliability
-                    
+                    // Use All for everything to ensure ghosts and expansion features are caught
+                    surface.collectObjects = CollectObjects.All;
+                    surface.useGeometry = NavMeshCollectGeometry.RenderMeshes; 
+                
                     int mask = ~0;
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
                     int suppliesLayer = LayerMask.NameToLayer("Supplies");
-                    
-                    // Exclude buildings from Air/Ground bakes (buildings use NavMeshObstacles)
+                
+                    // Exclude buildings from static bake (they use NavMeshObstacles)
                     if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
                     // Air units ignore supplies on the ground
                     if (isAirAgent && suppliesLayer != -1) mask &= ~(1 << suppliesLayer);
-                    
+                
                     surface.layerMask = mask;
                     surface.BuildNavMesh();
                 }
@@ -187,18 +182,23 @@ namespace GameDevTV.RTS.Environment
                 {
                     GameDevTV.RTS.Utilities.NavMeshVisualizer.Create(gameObject);
                 }
-                }
+            }
 
-                [ContextMenu("Clear Planet (Editor)")]
                 public void ClearPlanet()
                 {
+                    // Use DestroyImmediate to ensure hierarchy is clean for immediate reconstruction
                     for (int i = transform.childCount - 1; i >= 0; i--)
                     {
-                        if (Application.isPlaying) Destroy(transform.GetChild(i).gameObject);
-                        else DestroyImmediate(transform.GetChild(i).gameObject);
+                        DestroyImmediate(transform.GetChild(i).gameObject);
                     }
                     if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
                     if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
+
+                    // Also clear any existing NavMeshSurfaces to avoid stale data
+                    foreach (var surface in GetComponents<NavMeshSurface>())
+                    {
+                        DestroyImmediate(surface);
+                    }
                 }
 
                 [ContextMenu("Generate Planet (Editor)")]

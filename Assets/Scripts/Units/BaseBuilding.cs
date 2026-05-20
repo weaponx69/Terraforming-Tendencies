@@ -238,8 +238,9 @@ namespace GameDevTV.RTS.Units
                     }
                     else
                     {
-                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh for type {agentTypeID} near spawn position {spawnPosition} for unit {unitSO.Name}. Using fallback spread.");
-                        // Ensure we use the calculated offset (with height for air units)
+                        Debug.LogWarning($"[BaseBuilding] Could not find NavMesh for type {agentTypeID} near spawn position {spawnPosition} for unit {unitSO.Name}. Using fallback spread at flight height.");
+                        // CRITICAL: Ensure the fallback spawn position is at the flight height for Air units
+                        // so they are close enough to the Air NavMesh even if SamplePosition fails.
                         spawnPosition = transform.position + offset;
                     }
 

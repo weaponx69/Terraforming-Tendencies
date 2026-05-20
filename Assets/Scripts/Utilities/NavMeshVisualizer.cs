@@ -7,7 +7,7 @@ namespace GameDevTV.RTS.Utilities
 {
     public class NavMeshVisualizer : MonoBehaviour
     {
-        [SerializeField] private Color navMeshColor = new Color(0f, 0.6f, 1f, 0.25f);
+        [SerializeField] private Color navMeshColor = new Color(0f, 0.6f, 1f, 0.08f);
         
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
