@@ -119,6 +119,49 @@ namespace GameDevTV.RTS.Units
             if (statusColor == Color.red)
             {
                 Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason}");
+                if (reason == "NO COMMAND" && unitSO != null && (unitSO.Name == "Mining Drone" || unitSO.Name == "Worker"))
+                {
+                    try
+                    {
+                        var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        object blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                        if (blackboardObj == null)
+                        {
+                            var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                            blackboardObj = blackboardField != null ? blackboardField.GetValue(graphAgent) : null;
+                        }
+
+                        if (blackboardObj != null)
+                        {
+                            var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
+                            if (variablesList != null)
+                            {
+                                foreach (var variable in variablesList)
+                                {
+                                    var nameProp = variable.GetType().GetProperty("Name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                    var valueProp = variable.GetType().GetProperty("Value", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                    string varName = nameProp != null ? nameProp.GetValue(variable)?.ToString() : "Unknown";
+                                    string varType = valueProp != null ? valueProp.PropertyType.ToString() : "UnknownType";
+                                    string varValue = valueProp != null ? valueProp.GetValue(variable)?.ToString() : "null";
+                                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Name: {varName} | Type: {varType} | Value: {varValue}");
+                                }
+                            }
+                            else
+                            {
+                                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Variables list is null");
+                            }
+                        }
+                        else
+                        {
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Blackboard is null");
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Exception: {ex.Message}");
+                    }
+                }
             }
 
             SetStatusColor(statusColor, reason);
