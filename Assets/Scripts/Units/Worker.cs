@@ -11,8 +11,8 @@ namespace GameDevTV.RTS.Units
 {
     public class Worker : AbstractUnit, IBuildingBuilder, ITransportable
     {
-        public bool IsBuilding => graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> command) && command.Value == UnitCommands.BuildBuilding;
-        public bool IsIdle => graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> command) && command.Value == UnitCommands.Stop;
+        public bool IsBuilding => GetCurrentCommand() == UnitCommands.BuildBuilding;
+        public bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
         public bool HasSupplies
         {
             get
@@ -77,7 +77,7 @@ namespace GameDevTV.RTS.Units
             }
             graphAgent.SetVariableValue("Supply", supply);
             graphAgent.SetVariableValue("TargetGameObject", supply.gameObject);
-            graphAgent.SetVariableValue("Command", UnitCommands.Gather);
+            SetCurrentCommand(UnitCommands.Gather);
         }
 
         public void ReturnSupplies(GameObject commandPost)
@@ -88,7 +88,7 @@ namespace GameDevTV.RTS.Units
                 Agent.stoppingDistance = 2.5f;
             }
             graphAgent.SetVariableValue("CommandPost", commandPost);
-            graphAgent.SetVariableValue("Command", UnitCommands.ReturnSupplies);
+            SetCurrentCommand(UnitCommands.ReturnSupplies);
         }
 
         public GameObject Build(BuildingSO building, Vector3 targetLocation)
@@ -103,7 +103,7 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("BuildingSO", building);
             graphAgent.SetVariableValue("TargetLocation", targetLocation);
             graphAgent.SetVariableValue("Ghost", instance);
-            graphAgent.SetVariableValue("Command", UnitCommands.BuildBuilding);
+            SetCurrentCommand(UnitCommands.BuildBuilding);
 
             SetCommandOverrides(new BaseCommand[] { CancelBuildingCommand });
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -building.Cost.Minerals, building.Cost.MineralsSO));
@@ -118,7 +118,7 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("BuildingUnderConstruction", building);
             graphAgent.SetVariableValue("BuildingSO", building.BuildingSO);
             graphAgent.SetVariableValue<GameObject>("Ghost", null);
-            graphAgent.SetVariableValue("Command", UnitCommands.BuildBuilding);
+            SetCurrentCommand(UnitCommands.BuildBuilding);
         }
 
         public void CancelBuilding()

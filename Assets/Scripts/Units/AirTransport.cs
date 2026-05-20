@@ -29,7 +29,7 @@ namespace GameDevTV.RTS.Units
                 graphAgent.SetVariableValue("LoadUnitTargets", loadUnitVariable.Value);
             }
             
-            graphAgent.SetVariableValue("Command", UnitCommands.LoadUnits);
+            SetCurrentCommand(UnitCommands.LoadUnits);
         }
 
         public void Load(ITransportable[] units)
@@ -110,7 +110,7 @@ namespace GameDevTV.RTS.Units
 
             if (UsedCapacity >= Capacity)
             {
-                graphAgent.SetVariableValue("Command", UnitCommands.Stop);
+                SetCurrentCommand(UnitCommands.Stop);
                 graphAgent.SetVariableValue("LoadUnitTargets", new List<GameObject>(unitSO.TransportConfig.Capacity));
             }
         }

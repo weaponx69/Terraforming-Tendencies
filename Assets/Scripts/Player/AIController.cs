@@ -339,77 +339,62 @@ namespace GameDevTV.RTS.Units
                     continue;
                 }
 
-                if (drone.TryGetComponent(out BehaviorGraphAgent ga) && ga.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+                UnitCommands droneCmd = drone.GetCurrentCommand();
+                if (drone.TryGetComponent(out NavMeshAgent na))
                 {
-                    if (drone.TryGetComponent(out NavMeshAgent na))
+                    if (!na.enabled)
                     {
-                        if (!na.enabled)
+                        na.enabled = true;
+                    }
+
+                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Pos: {drone.transform.position} | Command: {droneCmd} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
+
+                    if (!na.isOnNavMesh && na.isActiveAndEnabled)
+                    {
+                        // Try to recover agent if it fell off or NavMesh changed under it
+                        NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
+                        if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
                         {
-                            na.enabled = true;
+                            Debug.Log($"[AI Debug] Drone #{drone.UnitID} is not on NavMesh. Warping to {hit.position}.");
+                            na.Warp(hit.position);
+                        }
+                    }
+
+                    if (na.isOnNavMesh)
+                    {
+                        if (droneCmd == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
+                        else if (droneCmd == UnitCommands.Gather) na.stoppingDistance = 1.5f;
+
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} path stats: pathPending={na.pathPending}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, remainingDistance={na.remainingDistance}, stoppingDistance={na.stoppingDistance}");
+
+                        // Stuck detection: position unchanged between Ticks but distance remaining
+                        if (droneCmd != UnitCommands.Stop && !na.pathPending)
+                        {
+                            if (lastDronePositions.TryGetValue(drone, out Vector3 lastPos))
+                            {
+                                float movementDist = Vector3.Distance(drone.transform.position, lastPos);
+                                if (movementDist < 0.2f && na.remainingDistance > na.stoppingDistance + 0.5f)
+                                {
+                                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} stuck detected! (moved {movementDist}m, remaining {na.remainingDistance}m). Stopping drone.");
+                                    drone.Stop();
+                                }
+                            }
+                            lastDronePositions[drone] = drone.transform.position;
+                        }
+                        else
+                        {
+                            lastDronePositions.Remove(drone);
                         }
 
-                                Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Pos: {drone.transform.position} | Command: {cmd.Value} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
-
-                                if (!na.isOnNavMesh && na.isActiveAndEnabled)
-                                {
-                                    // Try to recover agent if it fell off or NavMesh changed under it
-                                    NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
-                                    if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
-                                    {
-                                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} is not on NavMesh. Warping to {hit.position}.");
-                                        na.Warp(hit.position);
-                                    }
-                                }
-
-                                if (na.isOnNavMesh)
-                                {
-                                    if (cmd.Value == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
-                                    else if (cmd.Value == UnitCommands.Gather) na.stoppingDistance = 1.5f;
-
-                                     Debug.Log($"[AI Debug] Drone #{drone.UnitID} path stats: pathPending={na.pathPending}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, remainingDistance={na.remainingDistance}, stoppingDistance={na.stoppingDistance}");
-
-                                    // Stuck detection: position unchanged between Ticks but distance remaining
-                                    if (cmd.Value != UnitCommands.Stop && !na.pathPending)
-                                    {
-                                        if (lastDronePositions.TryGetValue(drone, out Vector3 lastPos))
-                                        {
-                                            float movementDist = Vector3.Distance(drone.transform.position, lastPos);
-                                            if (movementDist < 0.2f && na.remainingDistance > na.stoppingDistance + 0.5f)
-                                            {
-                                                Debug.Log($"[AI Debug] Drone #{drone.UnitID} stuck detected! (moved {movementDist}m, remaining {na.remainingDistance}m). Stopping drone.");
-                                                drone.Stop();
-                                            }
-                                        }
-                                        lastDronePositions[drone] = drone.transform.position;
-                                    }
-                                    else
-                                    {
-                                        lastDronePositions.Remove(drone);
-                                    }
-
-                                    if (cmd.Value == UnitCommands.ReturnSupplies && !drone.HasSupplies)
-                                    {
-                                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} finished returning supplies. Stopping drone.");
-                                        drone.Stop();
-                                    }
-                                }
-
-                                bool isFunctional = false;
-                                if (na.enabled && na.isOnNavMesh)
-                                {
-                                    if (cmd.Value != UnitCommands.Stop)
-                                    {
-                                        if (na.pathPending || (na.hasPath && na.pathStatus == NavMeshPathStatus.PathComplete))
-                                        {
-                                            isFunctional = true;
-                                        }
-                                    }
-                                }
-                                drone.SetStatusColor(isFunctional ? Color.green : Color.red);
-                            }
+                        if (droneCmd == UnitCommands.ReturnSupplies && !drone.HasSupplies)
+                        {
+                            Debug.Log($"[AI Debug] Drone #{drone.UnitID} finished returning supplies. Stopping drone.");
+                            drone.Stop();
                         }
                     }
                 }
+            }
+        }
 
         private void DispatchIdleDronesInNode(AINode node)
         {

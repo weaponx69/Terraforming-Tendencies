@@ -35,7 +35,7 @@ namespace GameDevTV.RTS.Units
 
             unitSO = UnitSO as UnitSO;
 
-            graphAgent.SetVariableValue("Command", UnitCommands.Stop);
+            SetCurrentCommand(UnitCommands.Stop);
             graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
         }
 
@@ -74,7 +74,10 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            UpdateStatusIndicator();
+            if (this is Worker)
+            {
+                UpdateStatusIndicator();
+            }
         }
 
         private void UpdateStatusIndicator()
@@ -98,13 +101,13 @@ namespace GameDevTV.RTS.Units
             {
                 reason = "NO BEHAVIOR";
             }
-            else if (!graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmd))
+            else if (!TryGetCurrentCommand(out UnitCommands cmd))
             {
                 reason = "NO COMMAND";
             }
             else
             {
-                if (cmd.Value == UnitCommands.Stop)
+                if (cmd == UnitCommands.Stop)
                 {
                     statusColor = Color.cyan; // Idle/Healthy
                     reason = "IDLE";
@@ -165,6 +168,166 @@ namespace GameDevTV.RTS.Units
             }
 
             SetStatusColor(statusColor, reason);
+        }
+
+        public bool TryGetCurrentCommand(out UnitCommands cmd)
+        {
+            cmd = UnitCommands.Stop;
+            if (graphAgent == null) return false;
+
+            // 1. Try standard GetVariable with UnitCommands
+            if (graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
+            {
+                cmd = cmdVar.Value;
+                return true;
+            }
+
+            // 2. Try GetVariable with int
+            if (graphAgent.GetVariable("Command", out BlackboardVariable<int> cmdInt))
+            {
+                cmd = (UnitCommands)cmdInt.Value;
+                return true;
+            }
+
+            // 3. Fallback: Use reflection to get the value
+            try
+            {
+                var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                object blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                if (blackboardObj == null)
+                {
+                    var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    blackboardObj = blackboardField != null ? blackboardField.GetValue(graphAgent) : null;
+                }
+
+                if (blackboardObj != null)
+                {
+                    var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
+                    if (variablesList != null)
+                    {
+                        foreach (var variable in variablesList)
+                        {
+                            var nameProp = variable.GetType().GetProperty("Name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            string varName = nameProp != null ? nameProp.GetValue(variable)?.ToString() : null;
+                            if (varName == "Command")
+                            {
+                                var valueProp = variable.GetType().GetProperty("Value", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (valueProp != null)
+                                {
+                                    object val = valueProp.GetValue(variable);
+                                    if (val != null)
+                                    {
+                                        if (val is UnitCommands ucmd)
+                                        {
+                                            cmd = ucmd;
+                                            return true;
+                                        }
+                                        if (val is int valInt)
+                                        {
+                                            cmd = (UnitCommands)valInt;
+                                            return true;
+                                        }
+                                        if (val.GetType().IsEnum)
+                                        {
+                                            cmd = (UnitCommands)System.Convert.ToInt32(val);
+                                            return true;
+                                        }
+                                        
+                                        string valStr = val.ToString();
+                                        if (System.Enum.TryParse(valStr, out UnitCommands parsedCmd))
+                                        {
+                                            cmd = parsedCmd;
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch {}
+
+            return false;
+        }
+
+        public UnitCommands GetCurrentCommand()
+        {
+            if (TryGetCurrentCommand(out UnitCommands cmd))
+            {
+                return cmd;
+            }
+            return UnitCommands.Stop;
+        }
+
+        public void SetCurrentCommand(UnitCommands cmd)
+        {
+            if (graphAgent == null) return;
+
+            // 1. Try standard SetVariableValue
+            try
+            {
+                graphAgent.SetVariableValue("Command", cmd);
+                return;
+            }
+            catch {}
+
+            // 2. Try SetVariableValue with int
+            try
+            {
+                graphAgent.SetVariableValue("Command", (int)cmd);
+                return;
+            }
+            catch {}
+
+            // 3. Fallback: Use reflection to set the value
+            try
+            {
+                var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                object blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                if (blackboardObj == null)
+                {
+                    var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    blackboardObj = blackboardField != null ? blackboardField.GetValue(graphAgent) : null;
+                }
+
+                if (blackboardObj != null)
+                {
+                    var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
+                    if (variablesList != null)
+                    {
+                        foreach (var variable in variablesList)
+                        {
+                            var nameProp = variable.GetType().GetProperty("Name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            string varName = nameProp != null ? nameProp.GetValue(variable)?.ToString() : null;
+                            if (varName == "Command")
+                            {
+                                var valueProp = variable.GetType().GetProperty("Value", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (valueProp != null)
+                                {
+                                    System.Type targetType = valueProp.PropertyType;
+                                    if (targetType == typeof(UnitCommands))
+                                    {
+                                        valueProp.SetValue(variable, cmd);
+                                    }
+                                    else if (targetType == typeof(int))
+                                    {
+                                        valueProp.SetValue(variable, (int)cmd);
+                                    }
+                                    else if (targetType.IsEnum)
+                                    {
+                                        object enumVal = System.Enum.ToObject(targetType, (int)cmd);
+                                        valueProp.SetValue(variable, enumVal);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch {}
         }
 
         private GameObject statusIndicator;
@@ -243,32 +406,32 @@ namespace GameDevTV.RTS.Units
         {
             graphAgent.SetVariableValue("TargetLocation", position);
             graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
-            graphAgent.SetVariableValue("Command", UnitCommands.Move);
+            SetCurrentCommand(UnitCommands.Move);
         }
 
         public void MoveTo(Transform transform)
         {
             graphAgent.SetVariableValue("TargetGameObject", transform.gameObject);
-            graphAgent.SetVariableValue("Command", UnitCommands.Move);
+            SetCurrentCommand(UnitCommands.Move);
         }
 
         public void Stop()
         {
             SetCommandOverrides(null);
-            graphAgent.SetVariableValue("Command", UnitCommands.Stop);
+            SetCurrentCommand(UnitCommands.Stop);
         }
 
         public void Attack(IDamageable damageable)
         {
             graphAgent.SetVariableValue("TargetGameObject", damageable.Transform.gameObject);
-            graphAgent.SetVariableValue("Command", UnitCommands.Attack);
+            SetCurrentCommand(UnitCommands.Attack);
         }
 
         public void Attack(Vector3 location)
         {
             graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
             graphAgent.SetVariableValue("TargetLocation", location);
-            graphAgent.SetVariableValue("Command", UnitCommands.Attack);
+            SetCurrentCommand(UnitCommands.Attack);
         }
 
         private void HandleUnitEnter(IDamageable damageable)

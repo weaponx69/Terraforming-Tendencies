@@ -8,7 +8,7 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
 
-            graphAgent.SetVariableValue("Command", UnitCommands.Attack);
+            SetCurrentCommand(UnitCommands.Attack);
         }
 
         public void LoadInto(ITransporter transporter)
