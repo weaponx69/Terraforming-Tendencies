@@ -18,13 +18,13 @@ namespace GameDevTV.RTS.Units
         public event UnitDetectionEvent OnUnitEnter;
         public event UnitDetectionEvent OnUnitExit;
 
-        private new SphereCollider collider;
+        private SphereCollider sphereCollider;
         private HashSet<IDamageable> visibleDamageables = new();
         private HashSet<IDamageable> allDamageables = new();
 
         private void Awake()
         {
-            collider = GetComponent<SphereCollider>();
+            sphereCollider = GetComponent<SphereCollider>();
         }
 
         private void OnTriggerEnter(Collider collider)
@@ -110,7 +110,7 @@ namespace GameDevTV.RTS.Units
 
         public void SetupFrom(AttackConfigSO attackConfig)
         {
-            collider.radius = attackConfig.AttackRange;
+            sphereCollider.radius = attackConfig.AttackRange;
         }
     }
 }
