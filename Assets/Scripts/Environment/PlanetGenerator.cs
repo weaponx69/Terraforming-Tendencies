@@ -177,11 +177,6 @@ namespace GameDevTV.RTS.Environment
                 {
                     renderer.enabled = false;
                 }
-
-                if (Application.isPlaying)
-                {
-                    GameDevTV.RTS.Utilities.NavMeshVisualizer.Create(gameObject);
-                }
             }
 
                 public void ClearPlanet()
