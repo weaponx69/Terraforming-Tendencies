@@ -20,9 +20,14 @@ namespace GameDevTV.RTS.Units
         protected BehaviorGraphAgent graphAgent;
         protected UnitSO unitSO;
 
+        private static int nextUnitId = 1;
+        public int UnitID { get; private set; }
+
         protected override void Awake()
         {
             base.Awake();
+
+            UnitID = nextUnitId++;
 
             Agent = GetComponent<NavMeshAgent>();
             graphAgent = GetComponent<BehaviorGraphAgent>();
@@ -66,6 +71,32 @@ namespace GameDevTV.RTS.Units
                 {
                     Agent.Warp(hit.position);
                 }
+            }
+        }
+
+        private GameObject statusIndicator;
+        private Material indicatorMaterial;
+
+        public void SetStatusColor(Color color)
+        {
+            if (statusIndicator == null)
+            {
+                statusIndicator = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(statusIndicator.GetComponent<Collider>());
+                statusIndicator.transform.SetParent(transform);
+                // Float above unit. Drones visually float at y=4, so y=5 places it above them.
+                statusIndicator.transform.localPosition = new Vector3(0f, 5.0f, 0f);
+                statusIndicator.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+                
+                Renderer r = statusIndicator.GetComponent<Renderer>();
+                Shader unlitShader = Shader.Find("Unlit/Color");
+                if (unlitShader == null) unlitShader = Shader.Find("Sprites/Default");
+                indicatorMaterial = new Material(unlitShader);
+                r.sharedMaterial = indicatorMaterial;
+            }
+            if (indicatorMaterial != null)
+            {
+                indicatorMaterial.color = color;
             }
         }
 

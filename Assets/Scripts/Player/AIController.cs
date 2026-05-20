@@ -307,24 +307,24 @@ namespace GameDevTV.RTS.Units
 
                 ProcessNodeDrones(node);
                 DispatchIdleDronesInNode(node);
-                }
+            }
 
-                UpdateOxygenLevel();
+            UpdateOxygenLevel();
 
-                if (allNodesMaxed && activeNodes.Count < 20 && !isSpawning) 
-                {
+            if (allNodesMaxed && activeNodes.Count < 20 && !isSpawning) 
+            {
                 TryExpand();
-                }
-                }
+            }
+        }
 
-                private void UpdateOxygenLevel()
-                {
-                // Each node contributes 5% to the habitability
-                int oxygenPercent = activeNodes.Count * 5;
-                Player.Supplies.UpdateOxygen(aiOwner, oxygenPercent);
-                }
+        private void UpdateOxygenLevel()
+        {
+            // Each node contributes 5% to the habitability
+            int oxygenPercent = activeNodes.Count * 5;
+            Player.Supplies.UpdateOxygen(aiOwner, oxygenPercent);
+        }
 
-                private void ProcessNodeDrones(AINode node)
+        private void ProcessNodeDrones(AINode node)
                 {
                     foreach (Worker drone in node.Drones.ToList())
                     {
@@ -337,12 +337,16 @@ namespace GameDevTV.RTS.Units
                                 {
                                     na.enabled = true;
                                 }
+
+                                Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Pos: {drone.transform.position} | Command: {cmd.Value} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
+
                                 if (!na.isOnNavMesh && na.isActiveAndEnabled)
                                 {
                                     // Try to recover agent if it fell off or NavMesh changed under it
                                     NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
                                     if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
                                     {
+                                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} is not on NavMesh. Warping to {hit.position}.");
                                         na.Warp(hit.position);
                                     }
                                 }
@@ -352,6 +356,8 @@ namespace GameDevTV.RTS.Units
                                     if (cmd.Value == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
                                     else if (cmd.Value == UnitCommands.Gather) na.stoppingDistance = 1.5f;
 
+                                     Debug.Log($"[AI Debug] Drone #{drone.UnitID} path stats: pathPending={na.pathPending}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, remainingDistance={na.remainingDistance}, stoppingDistance={na.stoppingDistance}");
+
                                     // Stuck detection: position unchanged between Ticks but distance remaining
                                     if (cmd.Value != UnitCommands.Stop && !na.pathPending)
                                     {
@@ -360,6 +366,7 @@ namespace GameDevTV.RTS.Units
                                             float movementDist = Vector3.Distance(drone.transform.position, lastPos);
                                             if (movementDist < 0.2f && na.remainingDistance > na.stoppingDistance + 0.5f)
                                             {
+                                                Debug.Log($"[AI Debug] Drone #{drone.UnitID} stuck detected! (moved {movementDist}m, remaining {na.remainingDistance}m). Stopping drone.");
                                                 drone.Stop();
                                             }
                                         }
@@ -372,9 +379,23 @@ namespace GameDevTV.RTS.Units
 
                                     if (cmd.Value == UnitCommands.ReturnSupplies && !drone.HasSupplies)
                                     {
+                                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} finished returning supplies. Stopping drone.");
                                         drone.Stop();
                                     }
                                 }
+
+                                bool isFunctional = false;
+                                if (na.enabled && na.isOnNavMesh)
+                                {
+                                    if (cmd.Value != UnitCommands.Stop)
+                                    {
+                                        if (na.pathPending || (na.hasPath && na.pathStatus == NavMeshPathStatus.PathComplete))
+                                        {
+                                            isFunctional = true;
+                                        }
+                                    }
+                                }
+                                drone.SetStatusColor(isFunctional ? Color.green : Color.red);
                             }
                         }
                     }
@@ -392,11 +413,12 @@ namespace GameDevTV.RTS.Units
                     // If target is gone or depleted, clear the assignment
                     if (currentTarget == null || currentTarget.Amount <= 0)
                     {
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} sticky target is null or depleted. Clearing target.");
                         assignedTargets.Remove(drone);
                     }
                     else if (IsDroneEligibleForAssignment(drone))
                     {
-                        // Drone is idle but still owns a valid resource. Go back to it!
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} returning to current sticky target: {currentTarget.name} at {currentTarget.transform.position}.");
                         drone.Gather(currentTarget);
                     }
                 }
@@ -404,6 +426,7 @@ namespace GameDevTV.RTS.Units
                 // 2. If it still doesn't have an assignment and is eligible, find it a unique one
                 if (!assignedTargets.ContainsKey(drone) && IsDroneEligibleForAssignment(drone))
                 {
+                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} is eligible for assignment. Searching for nearest supply in node...");
                     // Filter resources to find one that isn't globally assigned to ANY drone
                     HashSet<GatherableSupply> globallyTargeted = new HashSet<GatherableSupply>(assignedTargets.Values);
                     GatherableSupply supply = FindNearestAvailableSupplyInNode(drone.transform.position, node, globallyTargeted, drone.Agent.agentTypeID);
@@ -412,7 +435,11 @@ namespace GameDevTV.RTS.Units
                     {
                         assignedTargets[drone] = supply;
                         drone.Gather(supply);
-                        Debug.Log($"[AI] Node {node.CommandPost.name} sticky dispatch: {drone.name} -> {supply.name}.");
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} sticky dispatch: {drone.name} -> {supply.name} at {supply.transform.position}.");
+                    }
+                    else
+                    {
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} found no reachable supply in range. Node resources count: {node.ResourcesInRange.Count}");
                     }
                 }
             }
@@ -439,8 +466,13 @@ namespace GameDevTV.RTS.Units
                 }
 
                 NavMeshPath path = new NavMeshPath();
-                if (NavMesh.CalculatePath(position, targetPos, filter, path))
-                    if (path.status == NavMeshPathStatus.PathComplete) return item.Supply;
+                bool pathCalculated = NavMesh.CalculatePath(position, targetPos, filter, path);
+                Debug.Log($"[AI Debug] Checking path to {item.Supply.name} at {targetPos}. Calculated: {pathCalculated}, Status: {path.status}");
+                
+                if (pathCalculated && path.status == NavMeshPathStatus.PathComplete) 
+                {
+                    return item.Supply;
+                }
             }
             return null;
         }
