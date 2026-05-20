@@ -51,6 +51,7 @@ namespace GameDevTV.RTS.Units
 
         private readonly List<AINode> activeNodes = new();
         private readonly System.Collections.Generic.Dictionary<Worker, GatherableSupply> assignedTargets = new();
+        private readonly System.Collections.Generic.Dictionary<Worker, UnityEngine.Vector3> lastDronePositions = new();
         private bool isSpawning = false;
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -200,6 +201,7 @@ namespace GameDevTV.RTS.Units
             {
                 foreach (var node in activeNodes) node.Drones.Remove(worker);
                 assignedTargets.Remove(worker);
+                lastDronePositions.Remove(worker);
             }
         }
 
@@ -342,11 +344,22 @@ namespace GameDevTV.RTS.Units
                                     if (cmd.Value == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
                                     else if (cmd.Value == UnitCommands.Gather) na.stoppingDistance = 1.5f;
 
-                                    // Stuck detection: velocity low but distance remaining
-                                    if (cmd.Value != UnitCommands.Stop && na.velocity.sqrMagnitude < 0.01f && na.remainingDistance > na.stoppingDistance + 0.5f)
+                                    // Stuck detection: position unchanged between Ticks but distance remaining
+                                    if (cmd.Value != UnitCommands.Stop && !na.pathPending)
                                     {
-                                        // Only stop if we've been stuck for a bit? No, Tick is 3s, that's enough time.
-                                        drone.Stop();
+                                        if (lastDronePositions.TryGetValue(drone, out Vector3 lastPos))
+                                        {
+                                            float movementDist = Vector3.Distance(drone.transform.position, lastPos);
+                                            if (movementDist < 0.2f && na.remainingDistance > na.stoppingDistance + 0.5f)
+                                            {
+                                                drone.Stop();
+                                            }
+                                        }
+                                        lastDronePositions[drone] = drone.transform.position;
+                                    }
+                                    else
+                                    {
+                                        lastDronePositions.Remove(drone);
                                     }
 
                                     if (cmd.Value == UnitCommands.ReturnSupplies && na.remainingDistance <= na.stoppingDistance + 0.1f)
