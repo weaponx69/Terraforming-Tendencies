@@ -75,9 +75,29 @@ namespace GameDevTV.RTS.Environment
                     flyZone.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
                 }
 
-                // Ensure FlyZone has the terrain mesh for baking
-                if (!flyZone.TryGetComponent<MeshFilter>(out var ff)) ff = flyZone.gameObject.AddComponent<MeshFilter>();
-                if (!flyZone.TryGetComponent<MeshCollider>(out var fc)) fc = flyZone.gameObject.AddComponent<MeshCollider>();
+                // Clean up any obsolete components on FlyZone itself if they were created by old code
+                if (flyZone.TryGetComponent<MeshCollider>(out var oldFc)) DestroyImmediate(oldFc);
+                if (flyZone.TryGetComponent<MeshFilter>(out var oldFf)) DestroyImmediate(oldFf);
+
+                // Ensure FlyZone has the terrain mesh child for baking
+                Transform bakeMeshTransform = flyZone.Find("BakeMesh");
+                GameObject bakeMeshObj;
+                if (bakeMeshTransform == null)
+                {
+                    bakeMeshObj = new GameObject("BakeMesh");
+                    bakeMeshObj.transform.parent = flyZone;
+                    bakeMeshObj.transform.localPosition = Vector3.zero;
+                    bakeMeshObj.transform.localRotation = Quaternion.identity;
+                    bakeMeshObj.transform.localScale = Vector3.one;
+                }
+                else
+                {
+                    bakeMeshObj = bakeMeshTransform.gameObject;
+                }
+                bakeMeshObj.layer = LayerMask.NameToLayer("TransparentFX");
+
+                if (!bakeMeshObj.TryGetComponent<MeshFilter>(out var ff)) ff = bakeMeshObj.AddComponent<MeshFilter>();
+                if (!bakeMeshObj.TryGetComponent<MeshCollider>(out var fc)) fc = bakeMeshObj.AddComponent<MeshCollider>();
                 ff.sharedMesh = GetComponent<MeshFilter>().sharedMesh;
                 fc.sharedMesh = GetComponent<MeshCollider>().sharedMesh;
 
@@ -103,7 +123,7 @@ namespace GameDevTV.RTS.Environment
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
                     int suppliesLayer = LayerMask.NameToLayer("Supplies");
                     
-                    if (transparentLayer != -1) mask &= ~(1 << transparentLayer);
+                    if (!isAirAgent && transparentLayer != -1) mask &= ~(1 << transparentLayer);
                     if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
                     if (isAirAgent && suppliesLayer != -1) mask &= ~(1 << suppliesLayer);
                     

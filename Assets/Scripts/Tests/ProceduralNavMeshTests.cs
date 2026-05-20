@@ -37,7 +37,7 @@ namespace GameDevTV.RTS.Tests
             yield return null;
 
             // Get all NavMesh surfaces on the generator
-            var surfaces = generatorObj.GetComponents<NavMeshSurface>();
+            var surfaces = generatorObj.GetComponentsInChildren<NavMeshSurface>();
             
             // Check how many agent types are actually registered in the project settings
             int registeredAgentCount = NavMesh.GetSettingsCount();
