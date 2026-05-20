@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 2115234063178354583}
   - component: {fileID: 5976561534443479384}
   m_Layer: 6
-  m_Name: Air Transport
+  m_Name: Mining Drone
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -31,7 +31,7 @@ Transform:
   m_GameObject: {fileID: 1076983579694789324}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 6.75, y: 1, z: 53.5}
+  m_LocalPosition: {x: 6.75, y: 1.5, z: 53.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -52,7 +52,7 @@ NavMeshAgent:
   m_Radius: 1
   m_Speed: 10
   m_Acceleration: 20
-  avoidancePriority: 50
+  avoidancePriority: 0
   m_AngularSpeed: 360
   m_StoppingDistance: 0.25
   m_AutoTraverseOffMeshLink: 1
@@ -61,7 +61,7 @@ NavMeshAgent:
   m_Height: 2
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
-  m_ObstacleAvoidanceType: 4
+  m_ObstacleAvoidanceType: 0
 --- !u!95 &1974153333601261373
 Animator:
   serializedVersion: 7
