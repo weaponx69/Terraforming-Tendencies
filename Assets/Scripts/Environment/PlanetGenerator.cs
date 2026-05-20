@@ -148,6 +148,7 @@ namespace GameDevTV.RTS.Environment
                 {
                     NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
                     bool isAirAgent = settings.agentTypeID != 0; // Assuming 0 is Humanoid
+                    if (isAirAgent) continue;
 
                     // Find where this surface should live
                     GameObject targetObj = isAirAgent ? flyZone.gameObject : gameObject;
