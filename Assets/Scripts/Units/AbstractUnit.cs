@@ -112,7 +112,7 @@ namespace GameDevTV.RTS.Units
                     statusColor = Color.cyan; // Idle/Healthy
                     reason = "IDLE";
                 }
-                else if (Agent.pathPending || (Agent.hasPath && Agent.pathStatus == NavMeshPathStatus.PathComplete))
+                else if (Agent.pathPending || (Agent.hasPath && (Agent.pathStatus == NavMeshPathStatus.PathComplete || Agent.pathStatus == NavMeshPathStatus.PathPartial)))
                 {
                     statusColor = Color.green; // Active/Go
                     reason = "ACTIVE";

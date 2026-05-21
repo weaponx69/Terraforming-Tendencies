@@ -190,7 +190,12 @@ namespace GameDevTV.RTS.Units
 
             // Try to find a resource that isn't globally assigned yet
             HashSet<GatherableSupply> excluded = new HashSet<GatherableSupply>(assignedTargets.Values);
-            GatherableSupply supply = FindNearestAvailableSupplyInNode(worker.transform.position, node, excluded, worker.Agent.agentTypeID);
+            Vector3 queryPos = worker.transform.position;
+            if (worker.Agent != null)
+            {
+                queryPos.y -= worker.Agent.baseOffset;
+            }
+            GatherableSupply supply = FindNearestAvailableSupplyInNode(queryPos, node, excluded, worker.Agent.agentTypeID);
             
             if (supply != null)
             {
@@ -424,7 +429,12 @@ namespace GameDevTV.RTS.Units
                     Debug.Log($"[AI Debug] Drone #{drone.UnitID} is eligible for assignment. Searching for nearest supply in node...");
                     // Filter resources to find one that isn't globally assigned to ANY drone
                     HashSet<GatherableSupply> globallyTargeted = new HashSet<GatherableSupply>(assignedTargets.Values);
-                    GatherableSupply supply = FindNearestAvailableSupplyInNode(drone.transform.position, node, globallyTargeted, drone.Agent.agentTypeID);
+                    Vector3 queryPos = drone.transform.position;
+                    if (drone.Agent != null)
+                    {
+                        queryPos.y -= drone.Agent.baseOffset;
+                    }
+                    GatherableSupply supply = FindNearestAvailableSupplyInNode(queryPos, node, globallyTargeted, drone.Agent.agentTypeID);
                     
                     if (supply != null)
                     {
@@ -464,9 +474,20 @@ namespace GameDevTV.RTS.Units
                 bool pathCalculated = NavMesh.CalculatePath(position, targetPos, filter, path);
                 Debug.Log($"[AI Debug] Checking path to {item.Supply.name} at {targetPos}. Calculated: {pathCalculated}, Status: {path.status}");
                 
-                if (pathCalculated && path.status == NavMeshPathStatus.PathComplete) 
+                if (pathCalculated)
                 {
-                    return item.Supply;
+                    if (path.status == NavMeshPathStatus.PathComplete)
+                    {
+                        return item.Supply;
+                    }
+                    else if (path.status == NavMeshPathStatus.PathPartial && path.corners.Length > 0)
+                    {
+                        float distToEnd = Vector3.Distance(path.corners[path.corners.Length - 1], targetPos);
+                        if (distToEnd <= 5f)
+                        {
+                            return item.Supply;
+                        }
+                    }
                 }
             }
             return null;
