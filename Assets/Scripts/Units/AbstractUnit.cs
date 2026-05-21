@@ -35,8 +35,27 @@ namespace GameDevTV.RTS.Units
 
             unitSO = UnitSO as UnitSO;
 
+            // BehaviorGraphAgent might need manual Init if we access it in Awake
+            if (graphAgent != null)
+            {
+                try
+                {
+                    // Use reflection to call Init to avoid compilation issues if it's internal or version-specific
+                    var initMethod = graphAgent.GetType().GetMethod("Init", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (initMethod != null) initMethod.Invoke(graphAgent, null);
+                }
+                catch {}
+            }
+            
             SetCurrentCommand(UnitCommands.Stop);
-            graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
+            if (graphAgent != null && unitSO != null && unitSO.AttackConfig != null)
+            {
+                try
+                {
+                    graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
+                }
+                catch {}
+            }
         }
 
         protected override void Start()
@@ -126,8 +145,25 @@ namespace GameDevTV.RTS.Units
                 {
                     try
                     {
+                        object blackboardObj = null;
+                        
+                        // 1. Try Blackboard property
                         var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        object blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                        blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                        
+                        // 2. Try BlackboardReference property
+                        if (blackboardObj == null)
+                        {
+                            var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            object bbRef = bbRefProp != null ? bbRefProp.GetValue(graphAgent) : null;
+                            if (bbRef != null)
+                            {
+                                var innerBBProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                blackboardObj = innerBBProp != null ? innerBBProp.GetValue(bbRef) : null;
+                            }
+                        }
+
+                        // 3. Try private m_Blackboard field
                         if (blackboardObj == null)
                         {
                             var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -192,8 +228,19 @@ namespace GameDevTV.RTS.Units
             // 3. Fallback: Use reflection to get the value
             try
             {
+                object blackboardObj = null;
                 var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                object blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                if (blackboardObj == null)
+                {
+                    var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    object bbRef = bbRefProp != null ? bbRefProp.GetValue(graphAgent) : null;
+                    if (bbRef != null)
+                    {
+                        var innerBBProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        blackboardObj = innerBBProp != null ? innerBBProp.GetValue(bbRef) : null;
+                    }
+                }
                 if (blackboardObj == null)
                 {
                     var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -201,7 +248,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 if (blackboardObj != null)
-                {
+{
                     var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                     var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
                     if (variablesList != null)
@@ -284,8 +331,19 @@ namespace GameDevTV.RTS.Units
             // 3. Fallback: Use reflection to set the value
             try
             {
+                object blackboardObj = null;
                 var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                object blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
+                if (blackboardObj == null)
+                {
+                    var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    object bbRef = bbRefProp != null ? bbRefProp.GetValue(graphAgent) : null;
+                    if (bbRef != null)
+                    {
+                        var innerBBProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        blackboardObj = innerBBProp != null ? innerBBProp.GetValue(bbRef) : null;
+                    }
+                }
                 if (blackboardObj == null)
                 {
                     var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -293,7 +351,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 if (blackboardObj != null)
-                {
+{
                     var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                     var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
                     if (variablesList != null)
@@ -377,7 +435,7 @@ namespace GameDevTV.RTS.Units
                 statusText.fontSize = 5f;
                 statusText.alignment = TextAlignmentOptions.Center;
                 statusText.color = Color.black;
-                statusText.enableWordWrapping = false;
+                statusText.textWrappingMode = TextWrappingModes.NoWrap;
             }
 
             if (indicatorMaterial != null)
