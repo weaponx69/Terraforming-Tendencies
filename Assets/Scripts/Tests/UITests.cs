@@ -88,10 +88,10 @@ namespace GameDevTV.RTS.Tests
             var oxygenValueText = textObj.AddComponent<TextMeshProUGUI>();
             SetField(runtimeUI, "oxygenValueText", oxygenValueText);
             
-            oxygenValueText.text = "0";
-            Supplies.UpdateOxygen(Owner.Player1, 25);
+            oxygenValueText.text = "0.000";
+            Supplies.UpdateOxygen(Owner.Player1, 25f);
             yield return null; 
-            Assert.AreEqual("25", oxygenValueText.text, "Oxygen UI text should update to match the new oxygen value.");
+            Assert.AreEqual("25.000", oxygenValueText.text, "Oxygen UI text should update to match the new oxygen value.");
             Debug.Log("[UITest] OxygenUI_Updates_WhenOxygenChanges Passed");
         }
 

@@ -15,8 +15,8 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private int startingBiomass = 1000;
 
         [SerializeField] private SupplySO oxygenSO;
-        public static Dictionary<Owner, int> Oxygen { get; private set; }
-        public static event Action<Owner, int> OnOxygenChanged;
+        public static Dictionary<Owner, float> Oxygen { get; private set; }
+        public static event Action<Owner, float> OnOxygenChanged;
 
         public static float MineralsToBiomassRateStatic { get; private set; } = 1f;
         public static float GasToBiomassRateStatic { get; private set; } = 1f;
@@ -52,14 +52,14 @@ namespace GameDevTV.RTS.Player
             Biomass = new Dictionary<Owner, int>();
             Population = new Dictionary<Owner, int>();
             PopulationLimit = new Dictionary<Owner, int>();
-            Oxygen = new Dictionary<Owner, int>();
+            Oxygen = new Dictionary<Owner, float>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
                 if (!Biomass.ContainsKey(owner)) Biomass.Add(owner, startingBiomass);
                 if (!Population.ContainsKey(owner)) Population.Add(owner, 0);
                 if (!PopulationLimit.ContainsKey(owner)) PopulationLimit.Add(owner, 0);
-                if (!Oxygen.ContainsKey(owner)) Oxygen.Add(owner, 0);
+                if (!Oxygen.ContainsKey(owner)) Oxygen.Add(owner, 0f);
             }
 
             MineralsToBiomassRateStatic = mineralsToBiomassRate;
@@ -81,7 +81,7 @@ namespace GameDevTV.RTS.Player
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
         }
 
-        private void HandleOxygenChanged(Owner owner, int value)
+        private void HandleOxygenChanged(Owner owner, float value)
         {
             if (owner == Owner.AI1 || owner == Owner.Player1)
             {
@@ -92,7 +92,7 @@ namespace GameDevTV.RTS.Player
             }
         }
 
-        public static void UpdateOxygen(Owner owner, int value)
+        public static void UpdateOxygen(Owner owner, float value)
         {
             if (Oxygen != null && Oxygen.ContainsKey(owner))
             {

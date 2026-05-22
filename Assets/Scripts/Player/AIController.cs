@@ -324,19 +324,12 @@ namespace GameDevTV.RTS.Units
                 DispatchIdleDronesInNode(node);
             }
 
-            UpdateOxygenLevel();
+            TryExpand();
 
             if (allNodesMaxed && activeNodes.Count < 20 && !isSpawning) 
             {
                 TryExpand();
             }
-        }
-
-        private void UpdateOxygenLevel()
-        {
-            // Each node contributes 5% to the habitability
-            int oxygenPercent = activeNodes.Count * 5;
-            Player.Supplies.UpdateOxygen(aiOwner, oxygenPercent);
         }
 
         private void ProcessNodeDrones(AINode node)

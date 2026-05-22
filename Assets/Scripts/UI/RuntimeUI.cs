@@ -89,10 +89,10 @@ namespace GameDevTV.RTS.UI
                 biomassValueText.SetText(initial.ToString());
 
             if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
-            if (oxygenValueText != null && Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(displayedOwner, out int oxyInitial))
+            if (oxygenValueText != null && Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(displayedOwner, out float oxyInitial))
             {
-                oxygenValueText.SetText(oxyInitial.ToString());
-                if (populationText != null) populationText.SetText($"{oxyInitial}%");
+                oxygenValueText.SetText(oxyInitial.ToString("F3"));
+                if (populationText != null) populationText.SetText($"{oxyInitial:F3}%");
             }
         }
 
@@ -102,13 +102,13 @@ namespace GameDevTV.RTS.UI
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
         }
 
-        private void HandleOxygenChanged(Owner owner, int newValue)
+        private void HandleOxygenChanged(Owner owner, float newValue)
         {
             if (owner != displayedOwner) return;
             if (oxygenValueText != null)
-                oxygenValueText.SetText(newValue.ToString());
+                oxygenValueText.SetText(newValue.ToString("F3"));
             if (populationText != null)
-                populationText.SetText($"{newValue}%");
+                populationText.SetText($"{newValue:F3}%");
         }
 
         private void HandleBiomassChanged(Owner owner, int newValue)
