@@ -16,11 +16,10 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
+            // Self is set by Worker.Start() which may run after BehaviorGraphAgent.Start().
+            // Return Running so the BT retries next tick rather than failing the whole sequence.
             if (Self.Value == null)
-            {
-                Debug.LogWarning($"[SetNavMeshAgentEnabledAction] Self.Value is null!");
-                return Status.Failure;
-            }
+                return Status.Running;
 
             if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
             {
@@ -28,9 +27,23 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Failure;
             }
 
-            agent.enabled = Active;
-            Debug.Log($"[SetNavMeshAgentEnabledAction] {agent.name} set agent enabled to {Active.Value}");
+            agent.enabled = Active.Value;
+            return Status.Success;
+        }
 
+        protected override Status OnUpdate()
+        {
+            // Keep waiting until Self is populated.
+            if (Self.Value == null)
+                return Status.Running;
+
+            if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
+            {
+                Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
+                return Status.Failure;
+            }
+
+            agent.enabled = Active.Value;
             return Status.Success;
         }
     }

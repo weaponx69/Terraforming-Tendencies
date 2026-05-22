@@ -90,6 +90,8 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("Supply", supply);
             graphAgent.SetVariableValue("TargetGameObject", supply.gameObject);
             SetCurrentCommand(UnitCommands.Gather);
+
+            brain.StartGather(supply);
         }
 
         public void ReturnSupplies(GameObject commandPost)
