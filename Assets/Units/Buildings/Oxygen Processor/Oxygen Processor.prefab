@@ -69,7 +69,7 @@ GameObject:
   - component: {fileID: 7460994627033053413}
   - component: {fileID: 4254886847077615162}
   m_Layer: 7
-  m_Name: Supply Hut
+  m_Name: Oxygen Processor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
