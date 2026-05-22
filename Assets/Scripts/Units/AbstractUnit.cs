@@ -434,7 +434,7 @@ namespace GameDevTV.RTS.Units
             SetCurrentCommand(UnitCommands.Move);
         }
 
-        public void Stop()
+        public virtual void Stop()
         {
             SetCommandOverrides(null);
             SetCurrentCommand(UnitCommands.Stop);
