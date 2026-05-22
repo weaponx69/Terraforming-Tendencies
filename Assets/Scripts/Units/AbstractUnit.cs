@@ -371,73 +371,49 @@ namespace GameDevTV.RTS.Units
 
         private GameObject statusIndicator;
         private Material indicatorMaterial;
-        private TextMeshPro statusText;
 
         public void SetStatusColor(Color color, string reason = "")
         {
             if (statusIndicator == null)
             {
-                // Create the indicator as a large flat cube for high visibility
-                statusIndicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                // Small sphere dot — replace the flat cube
+                statusIndicator = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 statusIndicator.name = "StatusIndicator";
-                statusIndicator.layer = 0; // Default layer
+                statusIndicator.layer = 0;
 
                 if (Application.isPlaying)
-                {
                     Destroy(statusIndicator.GetComponent<Collider>());
-                }
                 else
-                {
                     DestroyImmediate(statusIndicator.GetComponent<Collider>());
-                }
 
                 statusIndicator.transform.SetParent(transform);
-                // Position it clearly above the drone height (which is at 2.0)
-                statusIndicator.transform.localPosition = new Vector3(0f, 4.5f, 0f);
-                statusIndicator.transform.localScale = new Vector3(4.0f, 0.4f, 4.0f); 
-                
+                // Sit just above the drone body (drones hover at ~2 units)
+                statusIndicator.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+                statusIndicator.transform.localScale    = new Vector3(0.35f, 0.35f, 0.35f);
+
                 Renderer r = statusIndicator.GetComponent<Renderer>();
-                
+
                 Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
                 if (shader == null) shader = Shader.Find("Unlit/Color");
                 if (shader == null) shader = Shader.Find("Sprites/Default");
-                
-                indicatorMaterial = new Material(shader);
-                indicatorMaterial.renderQueue = 3100; // Render on top
-                r.sharedMaterial = indicatorMaterial;
 
-                // Create text child
-                GameObject textObj = new GameObject("StatusText");
-                textObj.transform.SetParent(statusIndicator.transform);
-                textObj.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // Face up
-                textObj.transform.localPosition = new Vector3(0f, 0.51f, 0f); // Just above cube surface
-                
-                statusText = textObj.AddComponent<TextMeshPro>();
-                statusText.fontSize = 5f;
-                statusText.alignment = TextAlignmentOptions.Center;
-                statusText.color = Color.black;
-                statusText.textWrappingMode = TextWrappingModes.NoWrap;
+                indicatorMaterial = new Material(shader);
+                indicatorMaterial.renderQueue = 3100;
+                r.sharedMaterial = indicatorMaterial;
             }
 
             if (indicatorMaterial != null)
             {
-                // Use bright neon colors
                 Color displayColor = color;
-                if (color == Color.red) displayColor = new Color(1f, 0.1f, 0.1f, 1f);
-                else if (color == Color.green) displayColor = new Color(0.1f, 1f, 0.1f, 1f);
-                else if (color == Color.cyan) displayColor = new Color(0.1f, 0.8f, 1f, 1f);
+                if (color == Color.red)    displayColor = new Color(1f,   0.1f, 0.1f, 1f);
+                else if (color == Color.green)  displayColor = new Color(0.1f, 1f,   0.1f, 1f);
+                else if (color == Color.yellow) displayColor = new Color(1f,   0.85f, 0f,  1f);
+                else if (color == Color.cyan)   displayColor = new Color(0.1f, 0.8f, 1f,  1f);
 
                 if (indicatorMaterial.HasProperty("_BaseColor")) indicatorMaterial.SetColor("_BaseColor", displayColor);
                 indicatorMaterial.color = displayColor;
-                
-                statusIndicator.SetActive(true);
-            }
 
-            if (statusText != null)
-            {
-                statusText.text = reason;
-                // Only show text if status is red, as requested
-                statusText.gameObject.SetActive(color == Color.red);
+                statusIndicator.SetActive(true);
             }
         }
 
