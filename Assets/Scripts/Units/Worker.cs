@@ -32,10 +32,10 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
             
-            // Fix: Ensure the Behavior Tree knows which unit it is on
+            // Fix: Ensure the Behavior Tree knows which unit it is on (Variable name is 'Self' in the BT)
             if (graphAgent != null)
             {
-                graphAgent.SetVariableValue("Unit", gameObject);
+                graphAgent.SetVariableValue("Self", gameObject);
             }
 
             if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> eventChannelVariable))

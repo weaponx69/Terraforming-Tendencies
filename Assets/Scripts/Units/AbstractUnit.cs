@@ -35,17 +35,8 @@ namespace GameDevTV.RTS.Units
 
             unitSO = UnitSO as UnitSO;
 
-            // BehaviorGraphAgent might need manual Init if we access it in Awake
-            if (graphAgent != null)
-            {
-                try
-                {
-                    // Use reflection to call Init to avoid compilation issues if it's internal or version-specific
-                    var initMethod = graphAgent.GetType().GetMethod("Init", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (initMethod != null) initMethod.Invoke(graphAgent, null);
-                }
-                catch {}
-            }
+            // IMPORTANT: Removed manual graphAgent.Init() to prevent "Clone(Clone)" issues in Unity 6.
+            // The BehaviorGraphAgent handles its own initialization.
             
             SetCurrentCommand(UnitCommands.Stop);
             if (graphAgent != null && unitSO != null && unitSO.AttackConfig != null)
