@@ -147,13 +147,30 @@ namespace GameDevTV.RTS.Units
         {
             try
             {
-                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Inspecting variables...");
-                if (graphAgent == null) return;
-                
+                if (graphAgent == null)
+                {
+                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | graphAgent IS NULL");
+                    return;
+                }
+
+                // Check initialization state — root cause suspect for all NOT FOUND
+                bool isInit = false, isStarted = false;
+                try
+                {
+                    var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    var f1 = graphAgent.GetType().GetField("m_IsInitialised", bf);
+                    var f2 = graphAgent.GetType().GetField("m_IsStarted", bf);
+                    if (f1 != null) isInit = (bool)f1.GetValue(graphAgent);
+                    if (f2 != null) isStarted = (bool)f2.GetValue(graphAgent);
+                }
+                catch {}
+
+                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | m_IsInitialised={isInit} | m_IsStarted={isStarted}");
+                if (!isInit) return;
+
                 string[] vars = { "Command", "Self", "Unit", "Supply", "TargetGameObject", "TargetLocation" };
                 foreach (var vName in vars)
                 {
-                    // Use reflection-less API as much as possible for stability
                     try {
                         if (graphAgent.GetVariable(vName, out Unity.Behavior.BlackboardVariable bbVar))
                         {
@@ -162,7 +179,7 @@ namespace GameDevTV.RTS.Units
                         }
                         else
                         {
-                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND");
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
                         }
                     } catch {}
                 }
