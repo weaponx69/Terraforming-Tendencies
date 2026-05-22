@@ -42,17 +42,19 @@ namespace GameDevTV.RTS.Behavior
             float offsetAmount = 0.2f;
             randomOffset = new Vector3(UnityEngine.Random.Range(-offsetAmount, offsetAmount), 0, UnityEngine.Random.Range(-offsetAmount, offsetAmount));
 
-            targetPosition = GetTargetPosition();
-            
-            // Use horizontal distance for arrival checks to accommodate Air Units flying at high altitude
+            // Early-exit: use the supply's raw world position (NOT the NavMesh-sampled point)
+            // to avoid air-unit NavMesh snapping making the distance appear smaller than it is.
+            Vector3 rawSupplyPos = Supply.Value != null ? Supply.Value.transform.position : Vector3.zero;
             Vector2 agentPos2D = new Vector2(agent.transform.position.x, agent.transform.position.z);
-            Vector2 targetPos2D = new Vector2(targetPosition.x, targetPosition.z);
-            float distance = Vector2.Distance(agentPos2D, targetPos2D);
+            Vector2 rawTargetPos2D = new Vector2(rawSupplyPos.x, rawSupplyPos.z);
+            float distance = Vector2.Distance(agentPos2D, rawTargetPos2D);
 
             if (distance <= agent.stoppingDistance + 0.1f)
             {
                 return Status.Success;
             }
+
+            targetPosition = GetTargetPosition();
 
             if (agent.isOnNavMesh)
             {

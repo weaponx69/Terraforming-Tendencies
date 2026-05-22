@@ -33,6 +33,7 @@ namespace GameDevTV.RTS.Units
         private IBuildingBuilder unitBuildingThis;
         private List<UnlockableSO> buildingQueue = new(MAX_QUEUE_SIZE);
         private const int MAX_QUEUE_SIZE = 5;
+        private int spawnCount = 0; // Tracks how many units have been spawned, for angle distribution
 
         protected override void Awake()
         {
@@ -215,9 +216,16 @@ namespace GameDevTV.RTS.Units
                         }
                     }
 
-                    // Air units can spawn much closer since they occupy elevated space, while ground units spawn just outside the obstacle
-                    float angle = Random.Range(0f, Mathf.PI * 2f);
-                    float distance = isAirUnit ? Random.Range(4f, 6f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
+                    // Distribute drones evenly around the building to prevent overlap.
+                    // Each unit gets a base angle of (360 / goldenRatio) * spawnCount to spread them
+                    // naturally, plus a small random jitter to avoid perfect symmetry.
+                    float goldenAngle = 137.508f * Mathf.Deg2Rad; // Golden angle for natural spread
+                    float baseAngle = goldenAngle * spawnCount;
+                    float jitter = Random.Range(-0.2f, 0.2f);
+                    float angle = baseAngle + jitter;
+                    spawnCount++;
+
+                    float distance = isAirUnit ? Random.Range(4f, 8f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
                     
                     float heightOffset = 0f;
                     if (isAirUnit && PlanetGenerator.Instance != null)
