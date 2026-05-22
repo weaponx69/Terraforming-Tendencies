@@ -56,6 +56,11 @@ namespace GameDevTV.RTS.Units
             MaxHealth = UnitSO.Health;
             Bus<UnitSpawnEvent>.Raise(Owner, new UnitSpawnEvent(this));
 
+            // The BehaviorGraphAgent.Init() clones the graph but leaves each module's
+            // m_Blackboard.m_Variables empty — variables are in m_Source (RuntimeBlackboardAsset).
+            // We call GenerateInstanceData via reflection to populate the live blackboard.
+            RepairBlackboards();
+
             if (DamageableSensor != null)
             {
                 DamageableSensor.OnUnitEnter += HandleUnitEnter;
@@ -71,6 +76,67 @@ namespace GameDevTV.RTS.Units
                     upgrade.Apply(unitSO);
                 }
             }
+        }
+
+        private void RepairBlackboards()
+        {
+            if (graphAgent == null) return;
+
+            try
+            {
+                var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var graphField = graphAgent.GetType().GetField("m_Graph", bf);
+                if (graphField == null) return;
+
+                var graph = graphField.GetValue(graphAgent) as Unity.Behavior.BehaviorGraph;
+                if (graph == null) return;
+
+                // Access BehaviorGraph.Graphs (internal List<BehaviorGraphModule>)
+                var graphsField = graph.GetType().GetField("Graphs",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public);
+                if (graphsField == null) return;
+
+                var modules = graphsField.GetValue(graph) as System.Collections.IList;
+                if (modules == null) return;
+
+                // For each module, repopulate its BlackboardReference.m_Blackboard from m_Source
+                var bbRefField = typeof(Unity.Behavior.BehaviorGraphModule).GetField("BlackboardReference",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                var mSourceField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Source", bf);
+                var mBlackboardField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Blackboard", bf);
+                var generateMethod = typeof(Unity.Behavior.Blackboard).GetMethod("GenerateInstanceData", bf);
+
+                if (bbRefField == null || mSourceField == null || mBlackboardField == null || generateMethod == null) return;
+
+                for (int i = 0; i < modules.Count; i++)
+                {
+                    var module = modules[i];
+                    if (module == null) continue;
+
+                    var bbRef = bbRefField.GetValue(module);
+                    if (bbRef == null) continue;
+
+                    var source = mSourceField.GetValue(bbRef);
+                    if (source == null) continue;
+
+                    var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
+                    if (blackboard == null) continue;
+
+                    // Only repopulate if m_Variables is empty
+                    if (blackboard.Variables.Count == 0)
+                    {
+                        var sourceBB = source.GetType().GetProperty("Blackboard",
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                            ?.GetValue(source) as Unity.Behavior.Blackboard;
+                        if (sourceBB != null && sourceBB.Variables.Count > 0)
+                        {
+                            generateMethod.Invoke(blackboard, new object[] { sourceBB, source });
+                        }
+                    }
+                }
+            }
+            catch {}
         }
 
         protected virtual void Update()
