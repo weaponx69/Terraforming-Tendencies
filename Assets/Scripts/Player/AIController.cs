@@ -205,6 +205,7 @@ namespace GameDevTV.RTS.Units
             {
                 assignedTargets[worker] = supply;
                 Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} initial assignment: {supply.name}");
+                worker.GetComponent<WorkerBrainController>()?.SetHomeBase(node.CommandPost?.transform);
                 worker.Gather(supply);
             }
             else
@@ -384,8 +385,13 @@ namespace GameDevTV.RTS.Units
 
                         Debug.Log($"[AI Debug] Drone #{drone.UnitID} path stats: pathPending={na.pathPending}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, remainingDistance={na.remainingDistance}, stoppingDistance={na.stoppingDistance}");
 
-                        // Stuck detection: position unchanged between Ticks but distance remaining
-                        if (droneCmd != UnitCommands.Stop && !na.pathPending)
+                        // Stuck detection: position unchanged between Ticks but agent has a path to travel.
+                        // Skip if the BrainController is intentionally stationary (Gathering) or returning home.
+                        bool brainIsStationary = drone.TryGetComponent(out WorkerBrainController wbc) &&
+                            (wbc.CurrentState == WorkerBrainController.State.Gathering ||
+                             wbc.CurrentState == WorkerBrainController.State.MovingToBase);
+
+                        if (!brainIsStationary && droneCmd != UnitCommands.Stop && !na.pathPending)
                         {
                             if (lastDronePositions.TryGetValue(drone, out Vector3 lastPos))
                             {
@@ -455,9 +461,10 @@ namespace GameDevTV.RTS.Units
                     if (supply != null)
                     {
                         assignedTargets[drone] = supply;
-                        lastCommandTime[drone] = Time.time;
+                        drone.GetComponent<WorkerBrainController>()?.SetHomeBase(node.CommandPost?.transform);
                         drone.Gather(supply);
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} NEW ASSIGNMENT: {supply.name}");
+                        lastCommandTime[drone] = Time.time;
+                        Debug.Log($"[AI] Reassigned drone #{drone.UnitID} -> {supply.name}");
                     }
                 }
             }

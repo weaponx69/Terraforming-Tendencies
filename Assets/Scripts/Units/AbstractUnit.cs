@@ -191,11 +191,31 @@ namespace GameDevTV.RTS.Units
                     statusColor = Color.cyan; // Idle/Healthy
                     reason = "IDLE";
                 }
+                else if (this is Worker w && w.IsActivelyWorking)
+                {
+                    // Map BrainController state to indicator colour
+                    switch (w.BrainState)
+                    {
+                        case WorkerBrainController.State.Gathering:
+                            statusColor = Color.yellow;
+                            reason = "GATHERING";
+                            break;
+                        case WorkerBrainController.State.MovingToBase:
+                            statusColor = Color.green;
+                            reason = "RETURNING";
+                            break;
+                        default: // MovingToSupply
+                            statusColor = Color.green;
+                            reason = "ACTIVE";
+                            break;
+                    }
+                }
                 else if (Agent.pathPending || (Agent.hasPath && (Agent.pathStatus == NavMeshPathStatus.PathComplete || Agent.pathStatus == NavMeshPathStatus.PathPartial)))
                 {
                     statusColor = Color.green; // Active/Go
                     reason = "ACTIVE";
                 }
+
             }
 
             if (statusColor == Color.red)

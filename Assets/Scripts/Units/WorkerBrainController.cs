@@ -23,6 +23,7 @@ namespace GameDevTV.RTS.Units
         private NavMeshAgent agent;
         private Worker worker;
         private GatherSuppliesEventChannel eventChannel;
+        private Transform homeBase;
 
         private GatherableSupply targetSupply;
         private Coroutine runningCoroutine;
@@ -37,6 +38,12 @@ namespace GameDevTV.RTS.Units
         public void SetEventChannel(GatherSuppliesEventChannel channel)
         {
             eventChannel = channel;
+        }
+
+        /// <summary>Called by AIController when it assigns this drone to a node.</summary>
+        public void SetHomeBase(Transform commandPostTransform)
+        {
+            homeBase = commandPostTransform;
         }
 
         // --- Public commands ---
@@ -118,6 +125,15 @@ namespace GameDevTV.RTS.Units
                 if (eventChannel != null && gathered > 0)
                 {
                     eventChannel.SendEventMessage(gameObject, gathered, targetSupply?.Supply);
+                }
+
+                // ── State: Return to base (visual only — resources credited above) ──
+                if (homeBase != null && agent.isOnNavMesh)
+                {
+                    CurrentState = State.MovingToBase;
+                    agent.SetDestination(homeBase.position);
+                    yield return WaitUntilNear(homeBase, 3f, timeout: 30f);
+                    if (agent.isOnNavMesh) agent.ResetPath();
                 }
 
                 // One frame so the event processes before we loop
