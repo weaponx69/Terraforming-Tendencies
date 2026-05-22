@@ -147,52 +147,29 @@ namespace GameDevTV.RTS.Units
         {
             try
             {
-                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Inspecting BehaviorGraphAgent...");
+                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Inspecting variables...");
                 if (graphAgent == null) return;
-
-                object blackboardObj = GetBlackboardObject();
-                if (blackboardObj == null)
+                
+                string[] vars = { "Command", "Self", "Unit", "Supply", "TargetGameObject", "TargetLocation" };
+                foreach (var vName in vars)
                 {
-                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Blackboard Object not found.");
-                    return;
-                }
-
-                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Blackboard Type: {blackboardObj.GetType().Name}");
-
-                // Get variables list safely
-                System.Collections.IEnumerable variables = null;
-                var prop = blackboardObj.GetType().GetProperty("Variables");
-                if (prop != null) variables = prop.GetValue(blackboardObj) as System.Collections.IEnumerable;
-
-                if (variables != null)
-                {
-                    foreach (var variable in variables)
-                    {
-                        if (variable == null) continue;
-                        try
+                    // Use reflection-less API as much as possible for stability
+                    try {
+                        if (graphAgent.GetVariable(vName, out Unity.Behavior.BlackboardVariable bbVar))
                         {
-                            var vType = variable.GetType();
-                            var nProp = vType.GetProperty("Name");
-                            var vProp = vType.GetProperty("Value");
-                            
-                            string n = nProp?.GetValue(variable)?.ToString() ?? "Unknown";
-                            object v = vProp?.GetValue(variable);
-                            string vt = v?.GetType().Name ?? "null";
-                            string vs = v?.ToString() ?? "null";
-                            
-                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Variable: {n} | Type: {vt} | Value: {vs}");
+                            object val = bbVar?.ObjectValue;
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {val?.GetType().Name ?? "null"})");
                         }
-                        catch {}
-                    }
-                }
-                else
-                {
-                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | 'Variables' property not found on Blackboard.");
+                        else
+                        {
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND");
+                        }
+                    } catch {}
                 }
             }
             catch (System.Exception ex)
             {
-                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Diagnostic Failed: {ex.Message}");
+                Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
             }
         }
 
@@ -201,26 +178,30 @@ namespace GameDevTV.RTS.Units
             if (graphAgent == null) return null;
             
             // Try BlackboardReference first (Standard for Unity 6 Behavior)
-            var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference");
-            if (bbRefProp != null)
-            {
-                object bbRef = bbRefProp.GetValue(graphAgent);
-                if (bbRef != null)
+            try {
+                var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (bbRefProp != null)
                 {
-                    var bbProp = bbRef.GetType().GetProperty("Blackboard");
-                    if (bbProp != null) return bbProp.GetValue(bbRef);
+                    object bbRef = bbRefProp.GetValue(graphAgent);
+                    if (bbRef != null)
+                    {
+                        var bbProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        if (bbProp != null) return bbProp.GetValue(bbRef);
+                    }
                 }
-            }
+            } catch {}
 
             // Fallbacks for older versions or internal fields
             var props = new[] { "Blackboard", "m_Blackboard", "RuntimeBlackboard" };
             foreach (var p in props)
             {
-                var prop = graphAgent.GetType().GetProperty(p, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (prop != null) return prop.GetValue(graphAgent);
+                try {
+                    var prop = graphAgent.GetType().GetProperty(p, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (prop != null) return prop.GetValue(graphAgent);
 
-                var field = graphAgent.GetType().GetField(p, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field != null) return field.GetValue(graphAgent);
+                    var field = graphAgent.GetType().GetField(p, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (field != null) return field.GetValue(graphAgent);
+                } catch {}
             }
             return null;
         }
@@ -230,7 +211,7 @@ namespace GameDevTV.RTS.Units
             cmd = UnitCommands.Stop;
             if (graphAgent == null) return false;
 
-            // 1. Try standard GetVariable (fast path)
+            // Primary: typed generic GetVariable — fires correctly after m_IsInitialised = true
             try
             {
                 if (graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
@@ -240,12 +221,12 @@ namespace GameDevTV.RTS.Units
                 }
             } catch {}
 
-            // 2. Try the integer variant (some BTs use int for enums)
+            // Fallback: non-generic, converts via ObjectValue
             try
             {
-                if (graphAgent.GetVariable("Command", out BlackboardVariable<int> cmdInt))
+                if (graphAgent.GetVariable("Command", out BlackboardVariable bbVar) && bbVar?.ObjectValue != null)
                 {
-                    cmd = (UnitCommands)cmdInt.Value;
+                    cmd = (UnitCommands)System.Convert.ToInt32(bbVar.ObjectValue);
                     return true;
                 }
             } catch {}
@@ -266,17 +247,20 @@ namespace GameDevTV.RTS.Units
         {
             if (graphAgent == null) return;
 
-            // Direct set using the standard API - Unity 6 should handle routing to the runtime instance
+            // Primary: typed SetVariableValue — sets BlackboardVariable<UnitCommands>.Value and
+            // fires OnValueChanged, which the BT SwitchComposite listens to for branch re-evaluation.
+            if (graphAgent.SetVariableValue("Command", cmd))
+                return;
+
+            // Fallback: set ObjectValue directly on the raw variable.
+            // This skips OnValueChanged, so the BT may not react immediately,
+            // but is a safety net if the typed path fails.
             try
             {
-                graphAgent.SetVariableValue("Command", cmd);
-                // Also set the integer version as insurance for the BT transitions
-                graphAgent.SetVariableValue("Command", (int)cmd);
+                if (graphAgent.GetVariable("Command", out BlackboardVariable bbVar) && bbVar != null)
+                    bbVar.ObjectValue = cmd;
             }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[Blackboard] Failed to set Command on {name}: {ex.Message}");
-            }
+            catch {}
         }
 
         private GameObject statusIndicator;

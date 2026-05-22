@@ -413,51 +413,51 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        private Dictionary<Worker, float> lastCommandTime = new Dictionary<Worker, float>();
+
         private void DispatchIdleDronesInNode(AINode node)
         {
             foreach (Worker drone in node.Drones.ToList())
             {
                 if (drone == null) continue;
 
-                // 1. Check if the drone already has a sticky assignment
                 if (assignedTargets.TryGetValue(drone, out var currentTarget))
                 {
-                    // If target is gone or depleted, clear the assignment
                     if (currentTarget == null || currentTarget.Amount <= 0)
                     {
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} sticky target is null or depleted. Clearing target.");
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} target depleted. Clearing.");
                         assignedTargets.Remove(drone);
+                        lastCommandTime.Remove(drone);
                     }
                     else
                     {
-                        // Check if the drone is actually working or if it's waiting for the BT to start
                         UnitCommands cmd = drone.GetCurrentCommand();
-                        if (cmd == UnitCommands.Stop || cmd == UnitCommands.Move)
+                        // Only re-send if drone is Stop/Move AND we haven't sent it in the last 2 seconds
+                        bool needsCommand = cmd == UnitCommands.Stop || cmd == UnitCommands.Move;
+                        bool cooldownOver = !lastCommandTime.ContainsKey(drone) || (Time.time - lastCommandTime[drone] > 2f);
+
+                        if (needsCommand && cooldownOver)
                         {
-                             Debug.Log($"[AI Debug] Drone #{drone.UnitID} currently {cmd}, re-sending sticky target: {currentTarget.name}");
+                             Debug.Log($"[AI Debug] Drone #{drone.UnitID} is {cmd}, re-sending Gather command to {currentTarget.name}");
                              drone.Gather(currentTarget);
+                             lastCommandTime[drone] = Time.time;
                         }
-                        // If it's already "Gathering", don't spam the command
                         continue; 
                     }
                 }
                 
-                // 2. If it still doesn't have an assignment and is eligible, find it a unique one
                 if (!assignedTargets.ContainsKey(drone) && IsDroneEligibleForAssignment(drone))
                 {
-                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} is eligible for assignment. Searching for nearest supply in node...");
-                    // Filter resources to find one that isn't globally assigned to ANY drone
                     HashSet<GatherableSupply> globallyTargeted = new HashSet<GatherableSupply>(assignedTargets.Values);
-                    
-                    // For Air Units, we sample the NavMesh at their flight height
                     Vector3 queryPos = drone.transform.position;
                     GatherableSupply supply = FindNearestAvailableSupplyInNode(queryPos, node, globallyTargeted, drone.Agent.agentTypeID);
                     
                     if (supply != null)
                     {
                         assignedTargets[drone] = supply;
+                        lastCommandTime[drone] = Time.time;
                         drone.Gather(supply);
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} sticky dispatch: {drone.name} -> {supply.name} at {supply.transform.position}.");
+                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} NEW ASSIGNMENT: {supply.name}");
                     }
                 }
             }

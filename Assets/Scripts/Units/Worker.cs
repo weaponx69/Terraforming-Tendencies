@@ -32,33 +32,29 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
             
-            // Fix: Ensure the Behavior Tree knows which unit it is on (Variable name is 'Self' in the BT)
+            // Fix: Set every possible name the BT might use for the local unit
             if (graphAgent != null)
             {
                 graphAgent.SetVariableValue("Self", gameObject);
+                graphAgent.SetVariableValue("Unit", gameObject);
+                graphAgent.SetVariableValue("Agent", gameObject);
+                
+                // Ensure event channels are loaded into the blackboard
+                LoadEventChannels();
             }
+        }
 
-            if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> eventChannelVariable))
+        private void LoadEventChannels()
+        {
+            if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> gatherEvt))
             {
-                if (eventChannelVariable.Value == null)
-                {
-                    eventChannelVariable.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
-                    if (eventChannelVariable.Value == null)
-                    {
-                        // Fallback search if not in Resources
-                        string[] guids = UnityEngine.AI.NavMesh.GetSettingsCount() > 0 ? new string[0] : null; // Dummy to use namespace
-                        Debug.LogWarning($"[Worker] GatherSuppliesEventChannel is null on {name}. Ensure it is assigned in the Behavior Tree blackboard or exists in Resources/Events/");
-                    }
-                }
-
-                if (eventChannelVariable.Value != null)
-                {
-                    eventChannelVariable.Value.Event += HandleGatherSupplies;
-                }
+                if (gatherEvt.Value == null) gatherEvt.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
+                if (gatherEvt.Value != null) gatherEvt.Value.Event += HandleGatherSupplies;
             }
-            if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildingEventChannelVariable))
+            if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
             {
-                buildingEventChannelVariable.Value.Event += HandleBuildingEvent;
+                if (buildEvt.Value == null) buildEvt.Value = Resources.Load<BuildingEventChannel>("Events/BuildingEventChannel");
+                if (buildEvt.Value != null) buildEvt.Value.Event += HandleBuildingEvent;
             }
         }
 
