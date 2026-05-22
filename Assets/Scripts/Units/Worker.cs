@@ -6,6 +6,7 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using Unity.Behavior;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace GameDevTV.RTS.Units
 {
@@ -28,17 +29,24 @@ namespace GameDevTV.RTS.Units
         public int TransportCapacityUsage => unitSO.TransportConfig.GetTransportCapacityUsage();
         [SerializeField] private BaseCommand CancelBuildingCommand;
 
+        private GatherSuppliesEventChannel gatherEventChannel;
+        private WorkerBrainController brain;
+
         protected override void Start()
         {
             base.Start();
-            
+
+            brain = GetComponent<WorkerBrainController>();
+            if (brain == null)
+                brain = gameObject.AddComponent<WorkerBrainController>();
+
             // Fix: Set every possible name the BT might use for the local unit
             if (graphAgent != null)
             {
                 graphAgent.SetVariableValue("Self", gameObject);
                 graphAgent.SetVariableValue("Unit", gameObject);
                 graphAgent.SetVariableValue("Agent", gameObject);
-                
+
                 // Ensure event channels are loaded into the blackboard
                 LoadEventChannels();
             }
@@ -49,7 +57,12 @@ namespace GameDevTV.RTS.Units
             if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> gatherEvt))
             {
                 if (gatherEvt.Value == null) gatherEvt.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
-                if (gatherEvt.Value != null) gatherEvt.Value.Event += HandleGatherSupplies;
+                if (gatherEvt.Value != null)
+                {
+                    gatherEventChannel = gatherEvt.Value;
+                    gatherEvt.Value.Event += HandleGatherSupplies;
+                    brain?.SetEventChannel(gatherEventChannel);
+                }
             }
             if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
             {
@@ -66,29 +79,39 @@ namespace GameDevTV.RTS.Units
 
         public void Gather(GatherableSupply supply)
         {
+            if (supply == null) return;
+
             if (Agent != null)
             {
-                // For air units, account for the vertical gap (height ~4.0)
                 float verticalGap = Mathf.Abs(transform.position.y - supply.transform.position.y);
                 Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
             }
-            Debug.Log($"[Worker] {name} (ID: {UnitID}) Gather called for {supply?.name ?? "null"}");
+
             graphAgent.SetVariableValue("Supply", supply);
-            graphAgent.SetVariableValue("TargetGameObject", supply?.gameObject);
+            graphAgent.SetVariableValue("TargetGameObject", supply.gameObject);
             SetCurrentCommand(UnitCommands.Gather);
+
+            brain.StartGather(supply);
         }
 
         public void ReturnSupplies(GameObject commandPost)
         {
             if (Agent != null)
             {
-                // For air units, account for the vertical gap (height ~4.0)
                 float verticalGap = Mathf.Abs(transform.position.y - commandPost.transform.position.y);
                 Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 2.5f : 2.5f;
             }
-            Debug.Log($"[Worker] {name} (ID: {UnitID}) ReturnSupplies called for {commandPost?.name ?? "null"}");
             graphAgent.SetVariableValue("CommandPost", commandPost);
             SetCurrentCommand(UnitCommands.ReturnSupplies);
+
+            if (Agent != null && Agent.isOnNavMesh)
+                Agent.SetDestination(commandPost.transform.position);
+        }
+
+        public override void Stop()
+        {
+            brain?.Halt();
+            base.Stop();
         }
 
         public GameObject Build(BuildingSO building, Vector3 targetLocation)

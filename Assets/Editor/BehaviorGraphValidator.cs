@@ -1,43 +1,97 @@
+using System.Collections.Generic;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-using System.Collections.Generic;
 
+/// <summary>
+/// Runs once per editor session to rebuild all BehaviorAuthoringGraph runtime data.
+/// The Unity Behavior package only rebuilds compiled runtime graph modules (SwitchComposite
+/// children, node trees, etc.) when assets are saved through the visual graph editor.
+/// This validator replicates that process via reflection so that stale compiled modules
+/// are corrected automatically on domain reload without needing to open the editor.
+/// </summary>
 [InitializeOnLoad]
 public class BehaviorGraphValidator
 {
+    private const string k_SessionKey = "BehaviorGraphsRebuilt_V1";
+
     static BehaviorGraphValidator()
     {
-        EditorApplication.delayCall += ValidateGraphs;
+        EditorApplication.delayCall += RebuildAllGraphs;
     }
 
-    private static void ValidateGraphs()
+    [MenuItem("Tools/Behavior/Force Rebuild All Behavior Graphs")]
+    public static void ForceRebuildAll()
     {
-        // Block execution if we are in play mode, transitioning, or if the editor is busy
-        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isUpdating)
+        SessionState.EraseBool(k_SessionKey);
+        RebuildAllGraphs();
+    }
+
+    private static void RebuildAllGraphs()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling)
+            return;
+
+        if (SessionState.GetBool(k_SessionKey, false))
+            return;
+
+        // Locate BehaviorAuthoringGraph type and its internal rebuild method via reflection.
+        System.Type authoringType = null;
+        foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
         {
-            return; 
+            authoringType = asm.GetType("Unity.Behavior.BehaviorAuthoringGraph");
+            if (authoringType != null) break;
         }
 
-        if (SessionState.GetBool("BehaviorGraphsValidated_V3", false))
+        if (authoringType == null)
         {
-            return; // Only run once per editor session
+            Debug.LogWarning("[BehaviorGraphValidator] BehaviorAuthoringGraph type not found — skipping rebuild.");
+            return;
         }
 
-        string[] guids = AssetDatabase.FindAssets("t:Unity.Behavior.BehaviorGraph");
-        List<string> paths = new List<string>();
+        MethodInfo rebuildMethod = authoringType.GetMethod(
+            "RebuildGraphAndBlackboardRuntimeData",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 
-        foreach (string guid in guids)
+        if (rebuildMethod == null)
+        {
+            Debug.LogWarning("[BehaviorGraphValidator] RebuildGraphAndBlackboardRuntimeData not found — skipping rebuild.");
+            return;
+        }
+
+        // Find every .asset that is a BehaviorAuthoringGraph (main asset type check).
+        string[] allAssetGuids = AssetDatabase.FindAssets("t:ScriptableObject");
+        var toRebuild = new List<Object>();
+
+        foreach (string guid in allAssetGuids)
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
-            paths.Add(path);
+            if (!path.EndsWith(".asset")) continue;
+
+            System.Type mainType = AssetDatabase.GetMainAssetTypeAtPath(path);
+            if (mainType == authoringType)
+            {
+                Object graph = AssetDatabase.LoadAssetAtPath(path, authoringType);
+                if (graph != null)
+                    toRebuild.Add(graph);
+            }
         }
 
-        if (paths.Count > 0)
+        if (toRebuild.Count == 0)
         {
-            Debug.Log($"[BehaviorGraphValidator] Force reserializing {paths.Count} Behavior Graphs to fix assembly references...");
-            AssetDatabase.ForceReserializeAssets(paths, ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata);
-            SessionState.SetBool("BehaviorGraphsValidated_V3", true);
-            Debug.Log("[BehaviorGraphValidator] Successfully validated Behavior Graphs!");
+            SessionState.SetBool(k_SessionKey, true);
+            return;
         }
+
+        Debug.Log($"[BehaviorGraphValidator] Rebuilding runtime data for {toRebuild.Count} Behavior Graph(s)...");
+
+        foreach (Object graph in toRebuild)
+        {
+            rebuildMethod.Invoke(graph, null);
+        }
+
+        AssetDatabase.SaveAssets();
+        SessionState.SetBool(k_SessionKey, true);
+        Debug.Log("[BehaviorGraphValidator] Behavior Graph runtime data rebuild complete.");
     }
 }
