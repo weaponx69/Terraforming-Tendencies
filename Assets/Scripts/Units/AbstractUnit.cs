@@ -100,19 +100,22 @@ namespace GameDevTV.RTS.Units
                 var modules = graphsField.GetValue(graph) as System.Collections.IList;
                 if (modules == null) return;
 
-                // For each module, repopulate its BlackboardReference.m_Blackboard from m_Source
-                var bbRefField = typeof(Unity.Behavior.BehaviorGraphModule).GetField("BlackboardReference",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                // BlackboardReference, Blackboard are public — look them up once
                 var mSourceField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Source", bf);
                 var mBlackboardField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Blackboard", bf);
                 var generateMethod = typeof(Unity.Behavior.Blackboard).GetMethod("GenerateInstanceData", bf);
 
-                if (bbRefField == null || mSourceField == null || mBlackboardField == null || generateMethod == null) return;
+                if (mSourceField == null || mBlackboardField == null || generateMethod == null) return;
 
                 for (int i = 0; i < modules.Count; i++)
                 {
                     var module = modules[i];
                     if (module == null) continue;
+
+                    // BehaviorGraphModule is internal — get its type from the instance
+                    var bbRefField = module.GetType().GetField("BlackboardReference",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    if (bbRefField == null) continue;
 
                     var bbRef = bbRefField.GetValue(module);
                     if (bbRef == null) continue;
