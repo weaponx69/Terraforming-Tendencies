@@ -148,7 +148,6 @@ namespace GameDevTV.RTS.Environment
                 {
                     NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
                     bool isAirAgent = settings.agentTypeID != 0; // Assuming 0 is Humanoid
-                    if (isAirAgent) continue;
 
                     // Find where this surface should live
                     GameObject targetObj = isAirAgent ? flyZone.gameObject : gameObject;
@@ -156,8 +155,9 @@ namespace GameDevTV.RTS.Environment
                     NavMeshSurface surface = targetObj.AddComponent<NavMeshSurface>();
                     surface.agentTypeID = settings.agentTypeID;
 
-                    // Use All for everything to ensure ghosts and expansion features are caught
-                    surface.collectObjects = CollectObjects.All;
+                    // Use Children for Air Units to only bake the FlyZone elevated mesh
+                    // Use All for ground units to catch ghosts and expansion features
+                    surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
                     surface.useGeometry = NavMeshCollectGeometry.RenderMeshes; 
                 
                     int mask = ~0;

@@ -186,7 +186,11 @@ namespace GameDevTV.RTS.Units
             if (worker == null) yield break;
 
             AINode node = activeNodes.FirstOrDefault(n => n.Drones.Contains(worker));
-            if (node == null) yield break;
+            if (node == null)
+            {
+                Debug.LogWarning($"[AI] {aiOwner} worker {worker.UnitID} spawned but no node found to assign it to.");
+                yield break;
+            }
 
             // Try to find a resource that isn't globally assigned yet
             HashSet<GatherableSupply> excluded = new HashSet<GatherableSupply>(assignedTargets.Values);
@@ -200,7 +204,12 @@ namespace GameDevTV.RTS.Units
             if (supply != null)
             {
                 assignedTargets[worker] = supply;
+                Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} initial assignment: {supply.name}");
                 worker.Gather(supply);
+            }
+            else
+            {
+                Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} could not find initial resource in range.");
             }
         }
 
@@ -352,7 +361,10 @@ namespace GameDevTV.RTS.Units
                         na.enabled = true;
                     }
 
-                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Pos: {drone.transform.position} | Command: {droneCmd} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
+                    string graphName = "None";
+                    if (drone.TryGetComponent(out BehaviorGraphAgent bga) && bga.Graph != null) graphName = bga.Graph.name;
+
+                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Graph: {graphName} | Pos: {drone.transform.position} | Command: {droneCmd} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
 
                     if (!na.isOnNavMesh && na.isActiveAndEnabled)
                     {
@@ -416,10 +428,17 @@ namespace GameDevTV.RTS.Units
                         Debug.Log($"[AI Debug] Drone #{drone.UnitID} sticky target is null or depleted. Clearing target.");
                         assignedTargets.Remove(drone);
                     }
-                    else if (IsDroneEligibleForAssignment(drone))
+                    else
                     {
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} returning to current sticky target: {currentTarget.name} at {currentTarget.transform.position}.");
-                        drone.Gather(currentTarget);
+                        // Check if the drone is actually working or if it's waiting for the BT to start
+                        UnitCommands cmd = drone.GetCurrentCommand();
+                        if (cmd == UnitCommands.Stop || cmd == UnitCommands.Move)
+                        {
+                             Debug.Log($"[AI Debug] Drone #{drone.UnitID} currently {cmd}, re-sending sticky target: {currentTarget.name}");
+                             drone.Gather(currentTarget);
+                        }
+                        // If it's already "Gathering", don't spam the command
+                        continue; 
                     }
                 }
                 
@@ -429,11 +448,9 @@ namespace GameDevTV.RTS.Units
                     Debug.Log($"[AI Debug] Drone #{drone.UnitID} is eligible for assignment. Searching for nearest supply in node...");
                     // Filter resources to find one that isn't globally assigned to ANY drone
                     HashSet<GatherableSupply> globallyTargeted = new HashSet<GatherableSupply>(assignedTargets.Values);
+                    
+                    // For Air Units, we sample the NavMesh at their flight height
                     Vector3 queryPos = drone.transform.position;
-                    if (drone.Agent != null)
-                    {
-                        queryPos.y -= drone.Agent.baseOffset;
-                    }
                     GatherableSupply supply = FindNearestAvailableSupplyInNode(queryPos, node, globallyTargeted, drone.Agent.agentTypeID);
                     
                     if (supply != null)
@@ -441,10 +458,6 @@ namespace GameDevTV.RTS.Units
                         assignedTargets[drone] = supply;
                         drone.Gather(supply);
                         Debug.Log($"[AI Debug] Drone #{drone.UnitID} sticky dispatch: {drone.name} -> {supply.name} at {supply.transform.position}.");
-                    }
-                    else
-                    {
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} found no reachable supply in range. Node resources count: {node.ResourcesInRange.Count}");
                     }
                 }
             }
@@ -482,8 +495,12 @@ namespace GameDevTV.RTS.Units
                     }
                     else if (path.status == NavMeshPathStatus.PathPartial && path.corners.Length > 0)
                     {
-                        float distToEnd = Vector3.Distance(path.corners[path.corners.Length - 1], targetPos);
-                        if (distToEnd <= 5f)
+                        // Check 2D distance for air units to ignore vertical gap
+                        Vector3 lastCorner = path.corners[path.corners.Length - 1];
+                        Vector2 corner2D = new Vector2(lastCorner.x, lastCorner.z);
+                        Vector2 target2D = new Vector2(targetPos.x, targetPos.z);
+                        
+                        if (Vector2.Distance(corner2D, target2D) <= 5f)
                         {
                             return item.Supply;
                         }
@@ -529,7 +546,7 @@ namespace GameDevTV.RTS.Units
             NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = 0, areaMask = NavMesh.AllAreas };
             if (NavMesh.SamplePosition(position, out NavMeshHit hit, 20f, filter)) position = hit.position;
             
-            Debug.Log($"[AI] Spawning expansion Command Post at {position}");
+            Debug.Log($"[AI] {aiOwner} spawning Command Post at {position}");
             GameObject inst = Instantiate(commandPostPrefab, position, Quaternion.identity);
 
             if (inst.TryGetComponent(out BaseBuilding building))
@@ -537,6 +554,11 @@ namespace GameDevTV.RTS.Units
                 building.enabled = true;
                 building.Owner = aiOwner;
                 building.CompleteConstruction();
+                Debug.Log($"[AI] {aiOwner} Command Post instantiated and construction completed.");
+            }
+            else
+            {
+                Debug.LogError($"[AI] {aiOwner} spawned prefab {commandPostPrefab.name} is missing BaseBuilding component!");
             }
             
             StartCoroutine(RebakeAndUnlockSpawning());

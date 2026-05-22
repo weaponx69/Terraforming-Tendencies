@@ -101,7 +101,7 @@ namespace GameDevTV.RTS.Units
 
         private void UpdateStatusIndicator()
         {
-            Color statusColor = Color.red; // Default to "No-Go"
+            Color statusColor = Color.red; 
             string reason = "STUCK / NO PATH";
 
             if (Agent == null)
@@ -140,70 +140,98 @@ namespace GameDevTV.RTS.Units
 
             if (statusColor == Color.red)
             {
-                Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason}");
-                if (reason == "NO COMMAND" && unitSO != null && (unitSO.Name == "Mining Drone" || unitSO.Name == "Worker"))
+                Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason} | NameSO: {unitSO?.Name ?? "null"}");
+                
+                // Print extensive diagnostics for drones/workers when RED
+                if (unitSO != null && (unitSO.Name.Contains("Drone") || unitSO.Name.Contains("Worker")))
                 {
-                    try
-                    {
-                        object blackboardObj = null;
-                        
-                        // 1. Try Blackboard property
-                        var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
-                        
-                        // 2. Try BlackboardReference property
-                        if (blackboardObj == null)
-                        {
-                            var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            object bbRef = bbRefProp != null ? bbRefProp.GetValue(graphAgent) : null;
-                            if (bbRef != null)
-                            {
-                                var innerBBProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                                blackboardObj = innerBBProp != null ? innerBBProp.GetValue(bbRef) : null;
-                            }
-                        }
-
-                        // 3. Try private m_Blackboard field
-                        if (blackboardObj == null)
-                        {
-                            var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                            blackboardObj = blackboardField != null ? blackboardField.GetValue(graphAgent) : null;
-                        }
-
-                        if (blackboardObj != null)
-                        {
-                            var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
-                            if (variablesList != null)
-                            {
-                                foreach (var variable in variablesList)
-                                {
-                                    var nameProp = variable.GetType().GetProperty("Name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                                    var valueProp = variable.GetType().GetProperty("Value", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                                    string varName = nameProp != null ? nameProp.GetValue(variable)?.ToString() : "Unknown";
-                                    string varType = valueProp != null ? valueProp.PropertyType.ToString() : "UnknownType";
-                                    string varValue = valueProp != null ? valueProp.GetValue(variable)?.ToString() : "null";
-                                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Name: {varName} | Type: {varType} | Value: {varValue}");
-                                }
-                            }
-                            else
-                            {
-                                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Variables list is null");
-                            }
-                        }
-                        else
-                        {
-                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Blackboard is null");
-                        }
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Exception: {ex.Message}");
-                    }
+                    LogDetailedBlackboardStatus();
                 }
             }
 
             SetStatusColor(statusColor, reason);
+        }
+
+        private void LogDetailedBlackboardStatus()
+        {
+            try
+            {
+                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Inspecting BehaviorGraphAgent...");
+                if (graphAgent == null) return;
+
+                object blackboardObj = GetBlackboardObject();
+                if (blackboardObj == null)
+                {
+                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Blackboard Object not found.");
+                    return;
+                }
+
+                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Blackboard Type: {blackboardObj.GetType().Name}");
+
+                // Get variables list safely
+                System.Collections.IEnumerable variables = null;
+                var prop = blackboardObj.GetType().GetProperty("Variables");
+                if (prop != null) variables = prop.GetValue(blackboardObj) as System.Collections.IEnumerable;
+
+                if (variables != null)
+                {
+                    foreach (var variable in variables)
+                    {
+                        if (variable == null) continue;
+                        try
+                        {
+                            var vType = variable.GetType();
+                            var nProp = vType.GetProperty("Name");
+                            var vProp = vType.GetProperty("Value");
+                            
+                            string n = nProp?.GetValue(variable)?.ToString() ?? "Unknown";
+                            object v = vProp?.GetValue(variable);
+                            string vt = v?.GetType().Name ?? "null";
+                            string vs = v?.ToString() ?? "null";
+                            
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Variable: {n} | Type: {vt} | Value: {vs}");
+                        }
+                        catch {}
+                    }
+                }
+                else
+                {
+                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | 'Variables' property not found on Blackboard.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Diagnostic Failed: {ex.Message}");
+            }
+        }
+
+        private object GetBlackboardObject()
+        {
+            if (graphAgent == null) return null;
+            
+            // Try BlackboardReference first (Standard for Unity 6 Behavior)
+            var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference");
+            if (bbRefProp != null)
+            {
+                object bbRef = bbRefProp.GetValue(graphAgent);
+                if (bbRef != null)
+                {
+                    var bbProp = bbRef.GetType().GetProperty("Blackboard");
+                    if (bbProp != null) return bbProp.GetValue(bbRef);
+                }
+            }
+
+            // Fallbacks for older versions or internal fields
+            var props = new[] { "Blackboard", "m_Blackboard", "RuntimeBlackboard" };
+            foreach (var p in props)
+            {
+                var prop = graphAgent.GetType().GetProperty(p, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (prop != null) return prop.GetValue(graphAgent);
+
+                var field = graphAgent.GetType().GetField(p, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (field != null) return field.GetValue(graphAgent);
+            }
+            return null;
         }
 
         public bool TryGetCurrentCommand(out UnitCommands cmd)
@@ -211,90 +239,25 @@ namespace GameDevTV.RTS.Units
             cmd = UnitCommands.Stop;
             if (graphAgent == null) return false;
 
-            // 1. Try standard GetVariable with UnitCommands
-            if (graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
-            {
-                cmd = cmdVar.Value;
-                return true;
-            }
-
-            // 2. Try GetVariable with int
-            if (graphAgent.GetVariable("Command", out BlackboardVariable<int> cmdInt))
-            {
-                cmd = (UnitCommands)cmdInt.Value;
-                return true;
-            }
-
-            // 3. Fallback: Use reflection to get the value
+            // 1. Try standard GetVariable (fast path)
             try
             {
-                object blackboardObj = null;
-                var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
-                if (blackboardObj == null)
+                if (graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
                 {
-                    var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    object bbRef = bbRefProp != null ? bbRefProp.GetValue(graphAgent) : null;
-                    if (bbRef != null)
-                    {
-                        var innerBBProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        blackboardObj = innerBBProp != null ? innerBBProp.GetValue(bbRef) : null;
-                    }
+                    cmd = cmdVar.Value;
+                    return true;
                 }
-                if (blackboardObj == null)
-                {
-                    var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    blackboardObj = blackboardField != null ? blackboardField.GetValue(graphAgent) : null;
-                }
+            } catch {}
 
-                if (blackboardObj != null)
-{
-                    var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
-                    if (variablesList != null)
-                    {
-                        foreach (var variable in variablesList)
-                        {
-                            var nameProp = variable.GetType().GetProperty("Name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            string varName = nameProp != null ? nameProp.GetValue(variable)?.ToString() : null;
-                            if (varName == "Command")
-                            {
-                                var valueProp = variable.GetType().GetProperty("Value", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                                if (valueProp != null)
-                                {
-                                    object val = valueProp.GetValue(variable);
-                                    if (val != null)
-                                    {
-                                        if (val is UnitCommands ucmd)
-                                        {
-                                            cmd = ucmd;
-                                            return true;
-                                        }
-                                        if (val is int valInt)
-                                        {
-                                            cmd = (UnitCommands)valInt;
-                                            return true;
-                                        }
-                                        if (val.GetType().IsEnum)
-                                        {
-                                            cmd = (UnitCommands)System.Convert.ToInt32(val);
-                                            return true;
-                                        }
-                                        
-                                        string valStr = val.ToString();
-                                        if (System.Enum.TryParse(valStr, out UnitCommands parsedCmd))
-                                        {
-                                            cmd = parsedCmd;
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            // 2. Try the integer variant (some BTs use int for enums)
+            try
+            {
+                if (graphAgent.GetVariable("Command", out BlackboardVariable<int> cmdInt))
+                {
+                    cmd = (UnitCommands)cmdInt.Value;
+                    return true;
                 }
-            }
-            catch {}
+            } catch {}
 
             return false;
         }
@@ -312,80 +275,17 @@ namespace GameDevTV.RTS.Units
         {
             if (graphAgent == null) return;
 
-            // 1. Try standard SetVariableValue
+            // Direct set using the standard API - Unity 6 should handle routing to the runtime instance
             try
             {
                 graphAgent.SetVariableValue("Command", cmd);
-                return;
-            }
-            catch {}
-
-            // 2. Try SetVariableValue with int
-            try
-            {
+                // Also set the integer version as insurance for the BT transitions
                 graphAgent.SetVariableValue("Command", (int)cmd);
-                return;
             }
-            catch {}
-
-            // 3. Fallback: Use reflection to set the value
-            try
+            catch (System.Exception ex)
             {
-                object blackboardObj = null;
-                var blackboardProp = graphAgent.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                blackboardObj = blackboardProp != null ? blackboardProp.GetValue(graphAgent) : null;
-                if (blackboardObj == null)
-                {
-                    var bbRefProp = graphAgent.GetType().GetProperty("BlackboardReference", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    object bbRef = bbRefProp != null ? bbRefProp.GetValue(graphAgent) : null;
-                    if (bbRef != null)
-                    {
-                        var innerBBProp = bbRef.GetType().GetProperty("Blackboard", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        blackboardObj = innerBBProp != null ? innerBBProp.GetValue(bbRef) : null;
-                    }
-                }
-                if (blackboardObj == null)
-                {
-                    var blackboardField = graphAgent.GetType().GetField("m_Blackboard", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    blackboardObj = blackboardField != null ? blackboardField.GetValue(graphAgent) : null;
-                }
-
-                if (blackboardObj != null)
-{
-                    var variablesProp = blackboardObj.GetType().GetProperty("Variables", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    var variablesList = variablesProp != null ? variablesProp.GetValue(blackboardObj) as System.Collections.IEnumerable : null;
-                    if (variablesList != null)
-                    {
-                        foreach (var variable in variablesList)
-                        {
-                            var nameProp = variable.GetType().GetProperty("Name", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            string varName = nameProp != null ? nameProp.GetValue(variable)?.ToString() : null;
-                            if (varName == "Command")
-                            {
-                                var valueProp = variable.GetType().GetProperty("Value", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                                if (valueProp != null)
-                                {
-                                    System.Type targetType = valueProp.PropertyType;
-                                    if (targetType == typeof(UnitCommands))
-                                    {
-                                        valueProp.SetValue(variable, cmd);
-                                    }
-                                    else if (targetType == typeof(int))
-                                    {
-                                        valueProp.SetValue(variable, (int)cmd);
-                                    }
-                                    else if (targetType.IsEnum)
-                                    {
-                                        object enumVal = System.Enum.ToObject(targetType, (int)cmd);
-                                        valueProp.SetValue(variable, enumVal);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                Debug.LogError($"[Blackboard] Failed to set Command on {name}: {ex.Message}");
             }
-            catch {}
         }
 
         private GameObject statusIndicator;

@@ -72,11 +72,13 @@ namespace GameDevTV.RTS.Units
         {
             if (Agent != null)
             {
-                // Set stopping distance for resources (radius 0.2 + agent radius 1.0 + buffer)
-                Agent.stoppingDistance = 1.5f;
+                // For air units, account for the vertical gap (height ~4.0)
+                float verticalGap = Mathf.Abs(transform.position.y - supply.transform.position.y);
+                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
             }
+            Debug.Log($"[Worker] {name} (ID: {UnitID}) Gather called for {supply?.name ?? "null"}");
             graphAgent.SetVariableValue("Supply", supply);
-            graphAgent.SetVariableValue("TargetGameObject", supply.gameObject);
+            graphAgent.SetVariableValue("TargetGameObject", supply?.gameObject);
             SetCurrentCommand(UnitCommands.Gather);
         }
 
@@ -84,9 +86,11 @@ namespace GameDevTV.RTS.Units
         {
             if (Agent != null)
             {
-                // Set stopping distance for buildings (radius 2.0 + hole 2.75 + agent radius 1.0 + buffer)
-                Agent.stoppingDistance = 2.5f;
+                // For air units, account for the vertical gap (height ~4.0)
+                float verticalGap = Mathf.Abs(transform.position.y - commandPost.transform.position.y);
+                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 2.5f : 2.5f;
             }
+            Debug.Log($"[Worker] {name} (ID: {UnitID}) ReturnSupplies called for {commandPost?.name ?? "null"}");
             graphAgent.SetVariableValue("CommandPost", commandPost);
             SetCurrentCommand(UnitCommands.ReturnSupplies);
         }
