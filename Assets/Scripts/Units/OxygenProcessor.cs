@@ -13,12 +13,11 @@ namespace GameDevTV.RTS.Units
 
         private float tickTimer = 0f;
 
-        protected override void Update()
+        private void Update()
         {
-            base.Update();
             
             // Only generate oxygen if the building is fully constructed and alive
-            if (Owner != Owner.None && Progress.State == BuildingProgress.BuildingState.Completed)
+            if (Owner != Owner.Invalid && Progress.State == BuildingProgress.BuildingState.Completed)
             {
                 tickTimer += Time.deltaTime;
                 if (tickTimer >= tickRate)
