@@ -293,7 +293,7 @@ namespace GameDevTV.RTS.Units
 
             if (activeNodes.Count == 0)
             {
-                if (!isSpawning) SpawnCommandPost();
+                if (aiOwner != Owner.Player1 && !isSpawning) SpawnCommandPost();
                 return;
             }
 
