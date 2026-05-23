@@ -75,11 +75,7 @@ namespace GameDevTV.RTS.UI
 
         private void Start()
         {
-            actionsUI.Disable();
-            buildingSelectedUI.Disable();
-            unitIconUI.Disable();
-            singleUnitSelectedUI.Disable();
-            unitTransportUI.Disable();
+            RefreshUI();
         }
 
         private void InitializeUI()
