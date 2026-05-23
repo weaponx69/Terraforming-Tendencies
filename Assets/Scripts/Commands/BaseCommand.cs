@@ -32,7 +32,7 @@ namespace GameDevTV.RTS.Commands
         /// <returns></returns>
         public virtual bool IsAvailable(CommandContext context) => true;
 
-        public bool AllRestrictionsPass(Vector3 point) =>
+        public virtual bool AllRestrictionsPass(Vector3 point) =>
             Restrictions.Length == 0 || Restrictions.All(restriction => restriction.CanPlace(point));
 
         public bool IsHitColliderVisible(CommandContext context) => context.Hit.collider != null

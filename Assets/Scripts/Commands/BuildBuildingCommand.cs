@@ -35,7 +35,14 @@ namespace GameDevTV.RTS.Commands
                 if (commandPostCount >= 2) return false;
             }
 
-            return HasEnoughSupplies(context) && AllRestrictionsPass(context.Hit.point);
+            Vector3 targetPos = context.Hit.point;
+            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+            if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+            {
+                targetPos = navHit.position;
+            }
+
+            return HasEnoughSupplies(context) && AllRestrictionsPass(targetPos);
         }
 
         public override void Handle(CommandContext context)
@@ -81,6 +88,22 @@ namespace GameDevTV.RTS.Commands
                     newBuilding.CompleteConstruction();
                 }
 
+                // Crush any rocks/supplies underneath the orbital drop!
+                Collider ghostHitbox = Building.Prefab.GetComponent<Collider>();
+                if (ghostHitbox != null)
+                {
+                    Collider[] crushed = Physics.OverlapBox(
+                        targetPos + ghostHitbox.bounds.center - Building.Prefab.transform.position,
+                        ghostHitbox.bounds.extents,
+                        Quaternion.identity,
+                        LayerMask.GetMask("Supplies")
+                    );
+                    foreach (var rock in crushed)
+                    {
+                        Destroy(rock.gameObject);
+                    }
+                }
+
                 Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Minerals, Building.Cost.MineralsSO));
                 Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Gas, Building.Cost.GasSO));
                 return;
@@ -94,6 +117,63 @@ namespace GameDevTV.RTS.Commands
             {
                 builder.Build(Building, targetPos);
             }
+        }
+
+        public override bool AllRestrictionsPass(Vector3 point)
+        {
+            // First check base restrictions
+            bool passes = base.AllRestrictionsPass(point);
+            if (passes) return true;
+
+            // If it failed, check if it's due to overlapping rocks during an Orbital Drop
+            Worker[] workers = FindObjectsByType<Worker>(FindObjectsSortMode.None);
+            bool hasWorker = false;
+            foreach (var w in workers)
+            {
+                if (w.Owner == Owner.Player1 || w.Owner == Owner.Player2)
+                {
+                    hasWorker = true;
+                    break;
+                }
+            }
+
+            if (!hasWorker)
+            {
+                // It's an orbital drop! We want to ignore overlaps with rocks ("Supplies" layer).
+                // Re-evaluate restrictions but ignore hits on the Supplies layer.
+                foreach (BuildingRestrictionSO restriction in Restrictions)
+                {
+                    int hits = restriction.HitDetectionStyle switch
+                    {
+                        BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
+                        BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
+                        _ => 0
+                    };
+
+                    if (hits > 0) return false;
+
+                    if (restriction.MustBeFullyOnNavmesh)
+                    {
+                        UnityEngine.AI.NavMeshQueryFilter queryFilter = new()
+                        {
+                            areaMask = UnityEngine.AI.NavMesh.AllAreas,
+                            agentTypeID = restriction.NavMeshAgentTypeId
+                        };
+
+                        bool isOnNavMesh = UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(restriction.Extents.x, 0, restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter)
+                                        && UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(restriction.Extents.x, 0, -restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter)
+                                        && UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(-restriction.Extents.x, 0, -restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter)
+                                        && UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(-restriction.Extents.x, 0, restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter);
+
+                        if (!isOnNavMesh) return false;
+                    }
+                }
+                // If we get here, the ONLY reason it failed originally was because it hit the Supplies layer.
+                // Since this is an orbital drop, we allow it!
+                return true;
+            }
+
+            return false;
         }
 
         public override bool IsLocked(CommandContext context) =>
