@@ -316,7 +316,7 @@ namespace GameDevTV.RTS.Units
                 if (droneCount < targetCount)
                 {
                     allNodesMaxed = false;
-                    if (node.CommandPost.QueueSize < 5 && CanAfford(miningDroneUnitSO) && !IsInQueue(node.CommandPost, miningDroneUnitSO))
+                    if (aiOwner != Owner.Player1 && node.CommandPost.QueueSize < 5 && CanAfford(miningDroneUnitSO) && !IsInQueue(node.CommandPost, miningDroneUnitSO))
                     {
                         node.CommandPost.BuildUnlockable(miningDroneUnitSO);
                     }
@@ -326,11 +326,14 @@ namespace GameDevTV.RTS.Units
                 DispatchIdleDronesInNode(node);
             }
 
-            TryExpand();
-
-            if (allNodesMaxed && activeNodes.Count < 20 && !isSpawning) 
+            if (aiOwner != Owner.Player1)
             {
                 TryExpand();
+
+                if (allNodesMaxed && activeNodes.Count < 20 && !isSpawning) 
+                {
+                    TryExpand();
+                }
             }
         }
 
