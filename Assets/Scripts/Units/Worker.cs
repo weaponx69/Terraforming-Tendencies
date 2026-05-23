@@ -119,12 +119,20 @@ namespace GameDevTV.RTS.Units
 
         public GameObject Build(BuildingSO building, Vector3 targetLocation)
         {
+            brain?.Halt();
             GameObject instance = Instantiate(building.Prefab, targetLocation, Quaternion.identity);
             if (!instance.TryGetComponent(out BaseBuilding baseBuilding))
             {
                 Debug.LogError($"Missing BaseBuilding on Prefab for BuildingSO \"{building.name}\"! Cannot build!");
                 return null;
             }
+
+            // Ensure the building starts in a Paused state so it doesn't immediately function!
+            baseBuilding.Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
+            baseBuilding.CurrentHealth = 1;
+            
+            // Set the placement material so it looks like a transparent ghost until the worker starts building
+            baseBuilding.MainRenderer.material = building.PlacementMaterial;
 
             graphAgent.SetVariableValue("BuildingSO", building);
             graphAgent.SetVariableValue("TargetLocation", targetLocation);
@@ -140,6 +148,7 @@ namespace GameDevTV.RTS.Units
 
         public void ResumeBuilding(BaseBuilding building)
         {
+            brain?.Halt();
             graphAgent.SetVariableValue("TargetLocation", building.transform.position);
             graphAgent.SetVariableValue("BuildingUnderConstruction", building);
             graphAgent.SetVariableValue("BuildingSO", building.BuildingSO);
@@ -149,6 +158,7 @@ namespace GameDevTV.RTS.Units
 
         public void CancelBuilding()
         {
+            brain?.Halt();
             if (graphAgent.GetVariable("Ghost", out BlackboardVariable<GameObject> ghostVariable)
                 && ghostVariable.Value != null)
             {

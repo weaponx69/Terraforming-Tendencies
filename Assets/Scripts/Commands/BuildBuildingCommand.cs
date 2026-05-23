@@ -79,6 +79,12 @@ namespace GameDevTV.RTS.Commands
 
             if (builder == null)
             {
+                if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
+                {
+                    Debug.LogWarning("Only Command Centers can be orbital dropped! You must build a worker first.");
+                    return;
+                }
+
                 // Instant-build fallback from orbit when player has NO workers at all
                 GameObject instance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                 if (instance.TryGetComponent(out BaseBuilding newBuilding))
@@ -139,6 +145,12 @@ namespace GameDevTV.RTS.Commands
 
             if (!hasWorker)
             {
+                // Only allow Orbital Drop overrides for the Command Center!
+                if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
+                {
+                    return false;
+                }
+
                 // It's an orbital drop! We want to ignore overlaps with rocks ("Supplies" layer).
                 // Re-evaluate restrictions but ignore hits on the Supplies layer.
                 foreach (BuildingRestrictionSO restriction in Restrictions)
