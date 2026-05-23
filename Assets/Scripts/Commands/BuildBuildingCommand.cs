@@ -130,7 +130,7 @@ namespace GameDevTV.RTS.Commands
             bool hasWorker = false;
             foreach (var w in workers)
             {
-                if (w.Owner == Owner.Player1 || w.Owner == Owner.Player2)
+                if (w.Owner == Owner.Player1)
                 {
                     hasWorker = true;
                     break;
