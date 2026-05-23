@@ -105,9 +105,7 @@ namespace GameDevTV.RTS.Environment
                 Material terrainMat = GetComponent<MeshRenderer>().sharedMaterial;
 
                 if (!bakeMeshObj.TryGetComponent<MeshFilter>(out var ff)) ff = bakeMeshObj.AddComponent<MeshFilter>();
-                if (!bakeMeshObj.TryGetComponent<MeshCollider>(out var fc)) fc = bakeMeshObj.AddComponent<MeshCollider>();
                 ff.sharedMesh = terrainMesh;
-                fc.sharedMesh = terrainMesh;
 
                 if (!bakeMeshObj.TryGetComponent<MeshRenderer>(out var mr)) mr = bakeMeshObj.AddComponent<MeshRenderer>();
                 mr.sharedMaterial = terrainMat;
@@ -130,9 +128,7 @@ namespace GameDevTV.RTS.Environment
                         ghost.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
                     
                         var gff = ghost.AddComponent<MeshFilter>();
-                        var gfc = ghost.AddComponent<MeshCollider>();
                         gff.sharedMesh = terrainMesh;
-                        gfc.sharedMesh = terrainMesh;
 
                         var gmr = ghost.AddComponent<MeshRenderer>();
                         gmr.sharedMaterial = terrainMat;

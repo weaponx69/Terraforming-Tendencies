@@ -72,8 +72,6 @@ namespace GameDevTV.RTS.Commands
 
             if (builder == null)
             {
-                Debug.Log($"[Diagnostic] Instant Build: Raycast Y = {context.Hit.point.y} | NavMesh Snap Y = {targetPos.y} | Hit Collider = {(context.Hit.collider != null ? context.Hit.collider.name : "None")}");
-
                 // Instant-build fallback from orbit when player has NO workers at all
                 GameObject instance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                 if (instance.TryGetComponent(out BaseBuilding newBuilding))

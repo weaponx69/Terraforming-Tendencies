@@ -205,12 +205,6 @@ HandleZooming();
                     hitPos = navHit.position;
                 }
 
-                // [Diagnostic] Print ghost positioning info once every 30 frames to avoid spam
-                if (Time.frameCount % 30 == 0)
-                {
-                    Debug.Log($"[Diagnostic] Ghost Update: Raycast Hit Y = {(Physics.Raycast(cameraRay, out RaycastHit dHit) ? dHit.point.y.ToString() : "None")} | Hit Collider = {(dHit.collider != null ? dHit.collider.name : "None")} | Final Snap Y = {hitPos.Value.y}");
-                }
-
                 ghostInstance.transform.position = hitPos.Value;
 
                 bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hitPos.Value);
