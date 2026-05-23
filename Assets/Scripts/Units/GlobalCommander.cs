@@ -8,7 +8,7 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
             // The global commander is always owned by Player 1
-            Owner = GameDevTV.RTS.Player.Owner.Player1;
+            Owner = Owner.Player1;
         }
     }
 }
