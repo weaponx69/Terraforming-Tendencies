@@ -66,7 +66,7 @@ namespace GameDevTV.RTS.UI.Containers
                 ? selectedUnits.ElementAt(0).AvailableCommands 
                 : Array.Empty<BaseCommand>();
 
-            availableCommands = availableCommands.Where(action => action.IsAvailable(
+            availableCommands = availableCommands.Where(action => action != null && action.IsAvailable(
                 new CommandContext(
                     Owner.Player1,
                     selectedUnits.FirstOrDefault(),

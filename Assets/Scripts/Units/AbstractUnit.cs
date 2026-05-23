@@ -273,7 +273,7 @@ namespace GameDevTV.RTS.Units
                     } catch {}
                 }
             }
-            catch (System.Exception ex)
+            catch (System.Exception)
             {
                 // // // Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
             }

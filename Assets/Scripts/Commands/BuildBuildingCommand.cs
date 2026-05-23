@@ -46,7 +46,7 @@ namespace GameDevTV.RTS.Commands
             if (builder == null)
             {
                 float closestDist = float.MaxValue;
-                Worker[] workers = FindObjectsOfType<Worker>();
+                Worker[] workers = FindObjectsByType<Worker>(FindObjectsSortMode.None);
                 
                 foreach (var w in workers)
                 {
@@ -89,10 +89,11 @@ namespace GameDevTV.RTS.Commands
         }
 
         public override bool IsLocked(CommandContext context) =>
-            !HasEnoughSupplies(context) || !Building.TechTree.IsUnlocked(context.Owner, Building);
+            !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
 
         public UnlockableSO[] GetUnmetDependencies(Owner owner)
         {
+            if (Building.TechTree == null) return new UnlockableSO[0];
             return Building.TechTree.GetUnmetDependencies(owner, Building);
         }
 
