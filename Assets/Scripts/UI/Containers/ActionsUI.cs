@@ -89,7 +89,6 @@ namespace GameDevTV.RTS.UI.Containers
 
                 if (actionForSlot != null)
                 {
-                    Debug.Log($"[Diagnostic] ActionsUI: Assigning {actionForSlot.Name} to Slot {i}");
                     actionButtons[i].EnableFor(actionForSlot, selectedUnits, HandleClick(actionForSlot));
                 }
                 else
