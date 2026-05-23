@@ -195,6 +195,13 @@ HandleZooming();
                     allRestrictionsPass ? availableToPlaceFresnelColor : errorFresnelColor
                 );
             }
+            // Fallback: if floorLayers is missing or misconfigured, try hitting ANYTHING
+            else if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
+            {
+                ghostInstance.transform.position = hit.point;
+                ghostRenderer.material.SetColor(TINT, errorTintColor); // Mark as red since it's not the floor
+                ghostRenderer.material.SetColor(FRESNEL, errorFresnelColor);
+            }
         }
 
         private void HandleDragSelect()
@@ -350,10 +357,17 @@ HandleZooming();
                 selectable.Select();
             }
             else if (activeCommand != null
-                && !EventSystem.current.IsPointerOverGameObject()
-                && Physics.Raycast(cameraRay, out hit, float.MaxValue, interactableLayers | floorLayers))
+                && !EventSystem.current.IsPointerOverGameObject())
             {
-                ActivateAction(hit);
+                if (Physics.Raycast(cameraRay, out hit, float.MaxValue, interactableLayers | floorLayers))
+                {
+                    ActivateAction(hit);
+                }
+                // Fallback: If the user forgot to set their floorLayers mask, try to place it on literally anything
+                else if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
+                {
+                    ActivateAction(hit);
+                }
             }
         }
 
