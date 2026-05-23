@@ -62,10 +62,18 @@ namespace GameDevTV.RTS.Commands
                 }
             }
 
+            // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
+            Vector3 targetPos = context.Hit.point;
+            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+            if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+            {
+                targetPos = navHit.position;
+            }
+
             if (builder == null)
             {
                 // Instant-build fallback from orbit when player has NO workers at all
-                GameObject instance = Instantiate(Building.Prefab, context.Hit.point, Quaternion.identity);
+                GameObject instance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                 if (instance.TryGetComponent(out BaseBuilding newBuilding))
                 {
                     newBuilding.enabled = true;
@@ -82,9 +90,9 @@ namespace GameDevTV.RTS.Commands
             {
                 builder.ResumeBuilding(building);
             }
-            else if (HasEnoughSupplies(context) && AllRestrictionsPass(context.Hit.point))
+            else if (HasEnoughSupplies(context) && AllRestrictionsPass(targetPos))
             {
-                builder.Build(Building, context.Hit.point);
+                builder.Build(Building, targetPos);
             }
         }
 

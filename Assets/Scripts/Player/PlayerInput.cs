@@ -184,23 +184,35 @@ HandleZooming();
             }
 
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            Vector3? hitPos = null;
+
             if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, floorLayers))
             {
-                ghostInstance.transform.position = hit.point;
+                hitPos = hit.point;
+            }
+            // Fallback: if floorLayers is missing or misconfigured, try hitting ANYTHING
+            else if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
+            {
+                hitPos = hit.point;
+            }
 
-                bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hit.point);
+            if (hitPos.HasValue)
+            {
+                // Snap to NavMesh to ensure the ghost isn't floating on top of large rock colliders
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+                {
+                    hitPos = navHit.position;
+                }
+
+                ghostInstance.transform.position = hitPos.Value;
+
+                bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hitPos.Value);
 
                 ghostRenderer.material.SetColor(TINT, allRestrictionsPass ? availableToPlaceTintColor : errorTintColor);
                 ghostRenderer.material.SetColor(FRESNEL,
                     allRestrictionsPass ? availableToPlaceFresnelColor : errorFresnelColor
                 );
-            }
-            // Fallback: if floorLayers is missing or misconfigured, try hitting ANYTHING
-            else if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
-            {
-                ghostInstance.transform.position = hit.point;
-                ghostRenderer.material.SetColor(TINT, errorTintColor); // Mark as red since it's not the floor
-                ghostRenderer.material.SetColor(FRESNEL, errorFresnelColor);
             }
         }
 
