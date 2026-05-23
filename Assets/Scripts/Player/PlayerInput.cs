@@ -370,6 +370,16 @@ HandleZooming();
                                 .Cast<AbstractCommandable>()
                                 .ToList();
 
+            // Fallback for Global Commands: If no units are selected, the command is coming from the GlobalCommander
+            if (abstractCommandables.Count == 0)
+            {
+                GlobalCommander globalCommander = FindAnyObjectByType<GlobalCommander>();
+                if (globalCommander != null)
+                {
+                    abstractCommandables.Add(globalCommander);
+                }
+            }
+
             for (int i = 0; i < abstractCommandables.Count; i++)
             {
                 CommandContext context = new(abstractCommandables[i], hit, i);

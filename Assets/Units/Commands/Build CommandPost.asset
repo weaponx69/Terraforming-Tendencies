@@ -21,5 +21,4 @@ MonoBehaviour:
   <Restrictions>k__BackingField:
   - {fileID: 11400000, guid: 56b38c40a3360594cb05105a71758f47, type: 2}
   - {fileID: 11400000, guid: 25286824198b0cc4694b8a4549081e63, type: 2}
-  techTree: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <Building>k__BackingField: {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
