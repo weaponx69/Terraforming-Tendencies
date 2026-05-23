@@ -95,8 +95,8 @@ namespace GameDevTV.RTS.Units
             GrantStartingBiomass();
             // // // Debug.Log($"[AI] {aiOwner} biomass granted. startingBiomass={startingAIBiomass}");
             
-            // Only spawn if nothing exists
-            if (GetBuildingsInScene().Count == 0)
+            // Only spawn if nothing exists and we aren't the player (player builds their own)
+            if (aiOwner != Owner.Player1 && GetBuildingsInScene().Count == 0)
             {
                 // // // Debug.Log($"[AI] No buildings found, spawning initial Command Post.");
                 SpawnCommandPost();
@@ -108,11 +108,13 @@ namespace GameDevTV.RTS.Units
 
         private void GrantStartingBiomass()
         {
-            if (startingAIBiomass <= 0) return;
             if (Player.Supplies.Biomass == null) return;
 
+            int amountToGrant = aiOwner == Owner.Player1 ? 1000 : startingAIBiomass;
+            if (amountToGrant <= 0) return;
+
             int current = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
-            int total   = current + startingAIBiomass;
+            int total   = current + amountToGrant;
             Player.Supplies.Biomass[aiOwner] = total;
             Player.Supplies.RaiseBiomassChanged(aiOwner, total);
         }

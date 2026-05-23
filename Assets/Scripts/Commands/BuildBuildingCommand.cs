@@ -3,6 +3,9 @@ using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
+using System.Linq;
+using GameDevTV.RTS.EventBus;
+using GameDevTV.RTS.Events;
 
 namespace GameDevTV.RTS.Commands
 {
@@ -23,6 +26,13 @@ namespace GameDevTV.RTS.Commands
                        && (building.Progress.State == BuildingProgress.BuildingState.Paused
                            || building.Progress.State == BuildingProgress.BuildingState.Destroyed
                        );
+            }
+
+            // Enforce a maximum of 2 Command Centers per player
+            if (Building.name.Contains("Command Post") || Building.name.Contains("Command Center"))
+            {
+                int commandPostCount = BaseBuilding.ActiveBuildings.Count(b => b.Owner == context.Owner && b.UnitSO == Building);
+                if (commandPostCount >= 2) return false;
             }
 
             return HasEnoughSupplies(context) && AllRestrictionsPass(context.Hit.point);
@@ -54,7 +64,17 @@ namespace GameDevTV.RTS.Commands
 
             if (builder == null)
             {
-                // // Debug.LogWarning("No available drones to construct the building!");
+                // Instant-build fallback from orbit when player has NO workers at all
+                GameObject instance = Instantiate(Building.Prefab, context.Hit.point, Quaternion.identity);
+                if (instance.TryGetComponent(out BaseBuilding newBuilding))
+                {
+                    newBuilding.enabled = true;
+                    newBuilding.Owner = context.Owner;
+                    newBuilding.CompleteConstruction();
+                }
+
+                Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Minerals, Building.Cost.MineralsSO));
+                Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Gas, Building.Cost.GasSO));
                 return;
             }
 

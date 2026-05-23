@@ -28,6 +28,8 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private UnitTransportUI unitTransportUI;
         [SerializeField] private Image iconImage;
 
+        [SerializeField] private AbstractCommandable globalCommander;
+
         private HashSet<AbstractCommandable> selectedUnits = new(12);
         private Owner displayedOwner = Owner.Player1;
 
@@ -214,6 +216,12 @@ namespace GameDevTV.RTS.UI
             else
             {
                 DisableAllContainers();
+                
+                if (globalCommander != null)
+                {
+                    actionsUI.EnableFor(new HashSet<AbstractCommandable> { globalCommander });
+                    actionsUI.gameObject.SetActive(true);
+                }
             }
         }
 
