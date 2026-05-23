@@ -41,7 +41,7 @@ namespace GameDevTV.RTS.Commands
 
         private void HandleQueueUpdated(Owner owner, BaseBuilding building, UnlockableSO[] unitsInQueue)
         {
-            Debug.Log($"Handle Queue Updated in {Name}");
+            // // Debug.Log($"Handle Queue Updated in {Name}");
             if (!unitsInQueue.Contains(Upgrade))
             {
                 building.OnQueueUpdated -= updateQueue[owner];

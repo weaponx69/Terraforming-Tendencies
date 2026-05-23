@@ -35,7 +35,7 @@ namespace GameDevTV.RTS.Behavior
                 // In Unity Behavior, the Action has access to the agent's GameObject
                 // but we must be careful how we retrieve it. 
                 // We'll try to get it from the blackboard or fallback to logging.
-                Debug.LogWarning("[GatherSuppliesAction] Unit variable was null in blackboard. Cannot identify miner.");
+                // // Debug.LogWarning("[GatherSuppliesAction] Unit variable was null in blackboard. Cannot identify miner.");
                 return Status.Failure;
             }
 
@@ -93,7 +93,7 @@ namespace GameDevTV.RTS.Behavior
                     if (Unit.Value.TryGetComponent(out IDamageable damageable))
                     {
                         damageable.TakeDamage(10);
-                        Debug.Log($"<color=red>[Poison]</color> {Unit.Value.name} took 10 damage from mining {GatherableSupplies.Value.name}.");
+                        // // Debug.Log($"<color=red>[Poison]</color> {Unit.Value.name} took 10 damage from mining {GatherableSupplies.Value.name}.");
                     }
                     
                     if (Unit.Value.TryGetComponent(out BehaviorGraphAgent bgAgent))
@@ -109,7 +109,7 @@ namespace GameDevTV.RTS.Behavior
                     }
                 }
 
-                Debug.Log($"<color=green>[Gathering]</color> {Unit.Value.name} gathered exactly <b>{gathered}</b> {(SupplySO.Value != null ? SupplySO.Value.name : "NULL")} from {GatherableSupplies.Value.name}");
+                // // Debug.Log($"<color=green>[Gathering]</color> {Unit.Value.name} gathered exactly <b>{gathered}</b> {(SupplySO.Value != null ? SupplySO.Value.name : "NULL")} from {GatherableSupplies.Value.name}");
 
                 if (EventChannel != null && EventChannel.Value != null)
                 {

@@ -72,7 +72,7 @@ namespace GameDevTV.RTS.Units
 
                 if (miningDroneUnitSO == null)
                 {
-                    Debug.LogWarning("[AIController] Could not load MiningDrone or Air Transport from Resources! AI will attempt to auto-discover unit type from spawned Workers.");
+                    // // // Debug.LogWarning("[AIController] Could not load MiningDrone or Air Transport from Resources! AI will attempt to auto-discover unit type from spawned Workers.");
                 }
             }
         }
@@ -90,19 +90,19 @@ namespace GameDevTV.RTS.Units
         // ── Boot ──────────────────────────────────────────────────────────────
         private IEnumerator DelayedStart()
         {
-            Debug.Log($"[AI] {aiOwner} starting DelayedStart. delay={startDelay}");
+            // // // Debug.Log($"[AI] {aiOwner} starting DelayedStart. delay={startDelay}");
             yield return new WaitForSeconds(startDelay);
             GrantStartingBiomass();
-            Debug.Log($"[AI] {aiOwner} biomass granted. startingBiomass={startingAIBiomass}");
+            // // // Debug.Log($"[AI] {aiOwner} biomass granted. startingBiomass={startingAIBiomass}");
             
             // Only spawn if nothing exists
             if (GetBuildingsInScene().Count == 0)
             {
-                Debug.Log($"[AI] No buildings found, spawning initial Command Post.");
+                // // // Debug.Log($"[AI] No buildings found, spawning initial Command Post.");
                 SpawnCommandPost();
             }
             
-            Debug.Log($"[AI] Starting Tick repetition every {tickRate}s.");
+            // // // Debug.Log($"[AI] Starting Tick repetition every {tickRate}s.");
             InvokeRepeating(nameof(Tick), tickRate, tickRate);
         }
 
@@ -126,7 +126,7 @@ namespace GameDevTV.RTS.Units
             if (miningDroneUnitSO == null && evt.Unit is Worker workerDiscover)
             {
                 miningDroneUnitSO = evt.Unit.UnitSO;
-                Debug.Log($"[AI] Auto-discovered drone unit type: {miningDroneUnitSO.Name}");
+                // // // Debug.Log($"[AI] Auto-discovered drone unit type: {miningDroneUnitSO.Name}");
             }
 
             if (miningDroneUnitSO == null || evt.Unit.UnitSO?.Name != miningDroneUnitSO.Name) return;
@@ -188,7 +188,7 @@ namespace GameDevTV.RTS.Units
             AINode node = activeNodes.FirstOrDefault(n => n.Drones.Contains(worker));
             if (node == null)
             {
-                Debug.LogWarning($"[AI] {aiOwner} worker {worker.UnitID} spawned but no node found to assign it to.");
+                // // // Debug.LogWarning($"[AI] {aiOwner} worker {worker.UnitID} spawned but no node found to assign it to.");
                 yield break;
             }
 
@@ -204,13 +204,13 @@ namespace GameDevTV.RTS.Units
             if (supply != null)
             {
                 assignedTargets[worker] = supply;
-                Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} initial assignment: {supply.name}");
+                // // // Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} initial assignment: {supply.name}");
                 worker.GetComponent<WorkerBrainController>()?.SetHomeBase(node.CommandPost?.transform);
                 worker.Gather(supply);
             }
             else
             {
-                Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} could not find initial resource in range.");
+                // // // Debug.Log($"[AI] {aiOwner} worker {worker.UnitID} could not find initial resource in range.");
             }
         }
 
@@ -240,7 +240,7 @@ namespace GameDevTV.RTS.Units
                 AINode node = new AINode { CommandPost = evt.Building };
                 RefreshNodeResources(node);
                 activeNodes.Add(node);
-                Debug.Log($"[AI] {aiOwner} Node created around: {evt.Building.name} with {node.ResourcesInRange.Count} resources.");
+                // // // Debug.Log($"[AI] {aiOwner} Node created around: {evt.Building.name} with {node.ResourcesInRange.Count} resources.");
             }
         }
 
@@ -275,7 +275,7 @@ namespace GameDevTV.RTS.Units
             
             // Remove nodes whose buildings are gone
             int removed = activeNodes.RemoveAll(n => n.CommandPost == null || !sceneBuildings.Contains(n.CommandPost));
-            if (removed > 0) Debug.Log($"[AI] {aiOwner} removed {removed} nodes. Remaining: {activeNodes.Count}");
+            // if (removed > 0) // // Debug.Log($"[AI] {aiOwner} removed {removed} nodes. Remaining: {activeNodes.Count}");
 
             // Add nodes for buildings that aren't tracked yet
             foreach (var b in sceneBuildings)
@@ -285,7 +285,7 @@ namespace GameDevTV.RTS.Units
                     AINode node = new AINode { CommandPost = b };
                     RefreshNodeResources(node);
                     activeNodes.Add(node);
-                    Debug.Log($"[AI] {aiOwner} discovered existing building, added node: {b.name}");
+                    // // // Debug.Log($"[AI] {aiOwner} discovered existing building, added node: {b.name}");
                 }
             }
 
@@ -336,7 +336,7 @@ namespace GameDevTV.RTS.Units
         {
             if (node.Drones.Count > 0)
             {
-                Debug.Log($"[AI Debug] Node at {node.CommandPost.transform.position} processing {node.Drones.Count} drones.");
+                // // // Debug.Log($"[AI Debug] Node at {node.CommandPost.transform.position} processing {node.Drones.Count} drones.");
             }
 
             foreach (Worker drone in node.Drones.ToList())
@@ -358,7 +358,7 @@ namespace GameDevTV.RTS.Units
                     string graphName = "None";
                     if (drone.TryGetComponent(out BehaviorGraphAgent bga) && bga.Graph != null) graphName = bga.Graph.name;
 
-                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Graph: {graphName} | Pos: {drone.transform.position} | Command: {droneCmd} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
+                    // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} | Graph: {graphName} | Pos: {drone.transform.position} | Command: {droneCmd} | HasSupplies: {drone.HasSupplies} | IsIdle: {drone.IsIdle} | AgentEnabled: {na.enabled} | OnNavMesh: {na.isOnNavMesh}");
 
                     if (!na.isOnNavMesh && na.isActiveAndEnabled)
                     {
@@ -366,7 +366,7 @@ namespace GameDevTV.RTS.Units
                         NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = na.agentTypeID, areaMask = NavMesh.AllAreas };
                         if (NavMesh.SamplePosition(drone.transform.position, out NavMeshHit hit, 10f, filter))
                         {
-                            Debug.Log($"[AI Debug] Drone #{drone.UnitID} is not on NavMesh. Warping to {hit.position}.");
+                            // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} is not on NavMesh. Warping to {hit.position}.");
                             na.Warp(hit.position);
                         }
                     }
@@ -376,7 +376,7 @@ namespace GameDevTV.RTS.Units
                         if (droneCmd == UnitCommands.ReturnSupplies) na.stoppingDistance = 2.5f;
                         else if (droneCmd == UnitCommands.Gather) na.stoppingDistance = 1.5f;
 
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} path stats: pathPending={na.pathPending}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, remainingDistance={na.remainingDistance}, stoppingDistance={na.stoppingDistance}");
+                        // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} path stats: pathPending={na.pathPending}, hasPath={na.hasPath}, pathStatus={na.pathStatus}, remainingDistance={na.remainingDistance}, stoppingDistance={na.stoppingDistance}");
 
                         // Stuck detection: position unchanged between Ticks but agent has a path to travel.
                         // Skip if the BrainController is intentionally stationary (Gathering) or returning home.
@@ -391,7 +391,7 @@ namespace GameDevTV.RTS.Units
                                 float movementDist = Vector3.Distance(drone.transform.position, lastPos);
                                 if (movementDist < 0.2f && na.remainingDistance > na.stoppingDistance + 0.5f)
                                 {
-                                    Debug.Log($"[AI Debug] Drone #{drone.UnitID} stuck detected! (moved {movementDist}m, remaining {na.remainingDistance}m). Stopping drone.");
+                                    // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} stuck detected! (moved {movementDist}m, remaining {na.remainingDistance}m). Stopping drone.");
                                     drone.Stop();
                                 }
                             }
@@ -404,7 +404,7 @@ namespace GameDevTV.RTS.Units
 
                         if (droneCmd == UnitCommands.ReturnSupplies && !drone.HasSupplies)
                         {
-                            Debug.Log($"[AI Debug] Drone #{drone.UnitID} finished returning supplies. Stopping drone.");
+                            // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} finished returning supplies. Stopping drone.");
                             drone.Stop();
                         }
                     }
@@ -424,7 +424,7 @@ namespace GameDevTV.RTS.Units
                 {
                     if (currentTarget == null || currentTarget.Amount <= 0)
                     {
-                        Debug.Log($"[AI Debug] Drone #{drone.UnitID} target depleted. Clearing.");
+                        // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} target depleted. Clearing.");
                         assignedTargets.Remove(drone);
                         lastCommandTime.Remove(drone);
                     }
@@ -437,7 +437,7 @@ namespace GameDevTV.RTS.Units
 
                         if (needsCommand && cooldownOver)
                         {
-                             Debug.Log($"[AI Debug] Drone #{drone.UnitID} is {cmd}, re-sending Gather command to {currentTarget.name}");
+                             // // // Debug.Log($"[AI Debug] Drone #{drone.UnitID} is {cmd}, re-sending Gather command to {currentTarget.name}");
                              drone.Gather(currentTarget);
                              lastCommandTime[drone] = Time.time;
                         }
@@ -457,7 +457,7 @@ namespace GameDevTV.RTS.Units
                         drone.GetComponent<WorkerBrainController>()?.SetHomeBase(node.CommandPost?.transform);
                         drone.Gather(supply);
                         lastCommandTime[drone] = Time.time;
-                        Debug.Log($"[AI] Reassigned drone #{drone.UnitID} -> {supply.name}");
+                        // // // Debug.Log($"[AI] Reassigned drone #{drone.UnitID} -> {supply.name}");
                     }
                 }
             }
@@ -485,7 +485,7 @@ namespace GameDevTV.RTS.Units
 
                 NavMeshPath path = new NavMeshPath();
                 bool pathCalculated = NavMesh.CalculatePath(position, targetPos, filter, path);
-                Debug.Log($"[AI Debug] Checking path to {item.Supply.name} at {targetPos}. Calculated: {pathCalculated}, Status: {path.status}");
+                // // // Debug.Log($"[AI Debug] Checking path to {item.Supply.name} at {targetPos}. Calculated: {pathCalculated}, Status: {path.status}");
                 
                 if (pathCalculated)
                 {
@@ -546,7 +546,7 @@ namespace GameDevTV.RTS.Units
             NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = 0, areaMask = NavMesh.AllAreas };
             if (NavMesh.SamplePosition(position, out NavMeshHit hit, 20f, filter)) position = hit.position;
             
-            Debug.Log($"[AI] {aiOwner} spawning Command Post at {position}");
+            // // // Debug.Log($"[AI] {aiOwner} spawning Command Post at {position}");
             GameObject inst = Instantiate(commandPostPrefab, position, Quaternion.identity);
 
             if (inst.TryGetComponent(out BaseBuilding building))
@@ -554,11 +554,11 @@ namespace GameDevTV.RTS.Units
                 building.enabled = true;
                 building.Owner = aiOwner;
                 building.CompleteConstruction();
-                Debug.Log($"[AI] {aiOwner} Command Post instantiated and construction completed.");
+                // // // Debug.Log($"[AI] {aiOwner} Command Post instantiated and construction completed.");
             }
             else
             {
-                Debug.LogError($"[AI] {aiOwner} spawned prefab {commandPostPrefab.name} is missing BaseBuilding component!");
+                // Debug.LogError($"[AI] {aiOwner} spawned prefab {commandPostPrefab.name} is missing BaseBuilding component!");
             }
             
             StartCoroutine(RebakeAndUnlockSpawning());
@@ -579,7 +579,7 @@ namespace GameDevTV.RTS.Units
                     }
                     else
                     {
-                        Debug.LogWarning($"[AI] NavMeshSurface on {s.gameObject.name} has no NavMeshData asset! Synchronous bake skipped to prevent hang.");
+                        // // // Debug.LogWarning($"[AI] NavMeshSurface on {s.gameObject.name} has no NavMeshData asset! Synchronous bake skipped to prevent hang.");
                     }
                 }
                 foreach (var op in ops)

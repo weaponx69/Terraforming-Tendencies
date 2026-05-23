@@ -11,15 +11,15 @@ namespace GameDevTV.RTS.TechTree
 
         public override void Apply(AbstractUnitSO unit)
         {
-            Debug.Log($"{Name} is applying {Amount} to {PropertyPath}.");
+            // // Debug.Log($"{Name} is applying {Amount} to {PropertyPath}.");
 
             try
             {
                 int currentValue = GetPropertyValue<int>(unit, out object target, out PropertyInfo attributeField);
-                Debug.Log($"Adding {Amount} to {PropertyPath}'s current value of {currentValue}");
+                // // Debug.Log($"Adding {Amount} to {PropertyPath}'s current value of {currentValue}");
                 currentValue += Amount;
                 attributeField.SetValue(target, currentValue);
-                Debug.Log($"Updated value to: {attributeField.GetValue(target)}");
+                // // Debug.Log($"Updated value to: {attributeField.GetValue(target)}");
             }
             catch(InvalidPathSpecifiedException) {}
         }

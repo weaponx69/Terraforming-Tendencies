@@ -18,24 +18,24 @@ namespace GameDevTV.RTS.Behavior
         {
             if (Agent.Value == null)
             {
-                Debug.LogWarning($"[SetAgentAvoidanceAction] Agent.Value is null!");
+                // // Debug.LogWarning($"[SetAgentAvoidanceAction] Agent.Value is null!");
                 return Status.Failure;
             }
 
             if (!Agent.Value.TryGetComponent(out NavMeshAgent agent))
             {
-                Debug.LogWarning($"[SetAgentAvoidanceAction] {Agent.Value.name} has no NavMeshAgent!");
+                // // Debug.LogWarning($"[SetAgentAvoidanceAction] {Agent.Value.name} has no NavMeshAgent!");
                 return Status.Failure;
             }
 
             if (AvoidanceQuality.Value > 4 || AvoidanceQuality.Value < 0)
             {
-                Debug.LogWarning($"[SetAgentAvoidanceAction] {Agent.Value.name} AvoidanceQuality {AvoidanceQuality.Value} out of bounds!");
+                // // Debug.LogWarning($"[SetAgentAvoidanceAction] {Agent.Value.name} AvoidanceQuality {AvoidanceQuality.Value} out of bounds!");
                 return Status.Failure;
             }
 
             agent.obstacleAvoidanceType = (ObstacleAvoidanceType)AvoidanceQuality.Value;
-            Debug.Log($"[SetAgentAvoidanceAction] {agent.name} set avoidance quality to {AvoidanceQuality.Value}");
+            // // Debug.Log($"[SetAgentAvoidanceAction] {agent.name} set avoidance quality to {AvoidanceQuality.Value}");
 
             return Status.Success;
         }

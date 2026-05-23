@@ -13,7 +13,8 @@ namespace GameDevTV.RTS.Commands
 
         public override bool CanHandle(CommandContext context)
         {
-            if (context.Commandable is not IBuildingBuilder buildingBuilder || buildingBuilder.IsBuilding) return false;
+            // If the commandable itself is a builder and is already building, abort
+            if (context.Commandable is IBuildingBuilder b && b.IsBuilding) return false;
 
             if (context.Hit.collider != null && context.Button == MouseButton.Right)
             {
@@ -29,7 +30,33 @@ namespace GameDevTV.RTS.Commands
 
         public override void Handle(CommandContext context)
         {
-            IBuildingBuilder builder = (IBuildingBuilder)context.Commandable;
+            IBuildingBuilder builder = context.Commandable as IBuildingBuilder;
+
+            // If the unit issuing the command isn't a builder (e.g. Command Center), find the nearest idle drone
+            if (builder == null)
+            {
+                float closestDist = float.MaxValue;
+                Worker[] workers = FindObjectsOfType<Worker>();
+                
+                foreach (var w in workers)
+                {
+                    if (w.Owner == context.Owner && !w.IsBuilding)
+                    {
+                        float dist = Vector3.Distance(w.transform.position, context.Hit.point);
+                        if (dist < closestDist)
+                        {
+                            closestDist = dist;
+                            builder = w;
+                        }
+                    }
+                }
+            }
+
+            if (builder == null)
+            {
+                // // Debug.LogWarning("No available drones to construct the building!");
+                return;
+            }
 
             if (context.Hit.collider != null && context.Hit.collider.TryGetComponent(out BaseBuilding building))
             {

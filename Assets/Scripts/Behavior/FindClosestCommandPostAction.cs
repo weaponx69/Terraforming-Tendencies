@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.Behavior
             {
                 unitOwner = commandableUnit.Owner;
             }
-            Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} starting search. UnitOwner={unitOwner}, SearchRadius={SearchRadius.Value}");
+            // // Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} starting search. UnitOwner={unitOwner}, SearchRadius={SearchRadius.Value}");
 
             int layerMask = LayerMask.GetMask("Buildings", "Units");
             Collider[] colliders = Physics.OverlapSphere(
@@ -66,21 +66,21 @@ namespace GameDevTV.RTS.Behavior
                     else
                     {
                         // Log why it didn't match
-                        Debug.Log($"[FindClosestCommandPostAction] Scene Candidate {building.name}: SOMatch={soMatch} (Building: {building.UnitSO?.Name} vs Filter: {CommandPostBuilding.Value?.Name}), OwnerMatch={ownerMatch} (Building: {building.Owner} vs Unit: {unitOwner}), StateMatch={stateMatch} (State: {building.Progress.State})");
+                        // // Debug.Log($"[FindClosestCommandPostAction] Scene Candidate {building.name}: SOMatch={soMatch} (Building: {building.UnitSO?.Name} vs Filter: {CommandPostBuilding.Value?.Name}), OwnerMatch={ownerMatch} (Building: {building.Owner} vs Unit: {unitOwner}), StateMatch={stateMatch} (State: {building.Progress.State})");
                     }
                 }
             }
 
             if (nearbyCommandPosts.Count == 0)
             {
-                Debug.LogWarning($"[FindClosestCommandPostAction] {Unit.Value.name} failed to find any completed Command Post. " +
-                                 $"UnitOwner={unitOwner}, FilterSO={(CommandPostBuilding.Value != null ? CommandPostBuilding.Value.Name : "None")}");
+                // // Debug.LogWarning($"[FindClosestCommandPostAction] {Unit.Value.name} failed to find any completed Command Post. " +
+                //                 $"UnitOwner={unitOwner}, FilterSO={(CommandPostBuilding.Value != null ? CommandPostBuilding.Value.Name : "None")}");
                 return Status.Failure;
             }
 
             nearbyCommandPosts.Sort(new ClosestCommandPostComparer(Unit.Value.transform.position));
             CommandPost.Value = nearbyCommandPosts[0].gameObject;
-            Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} SUCCESS! Found {CommandPost.Value.name} at {CommandPost.Value.transform.position}.");
+            // // Debug.Log($"[FindClosestCommandPostAction] {Unit.Value.name} SUCCESS! Found {CommandPost.Value.name} at {CommandPost.Value.transform.position}.");
 
             return Status.Success;
         }

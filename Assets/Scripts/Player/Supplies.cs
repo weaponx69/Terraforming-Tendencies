@@ -42,7 +42,7 @@ namespace GameDevTV.RTS.Player
         {
             if (Instance != null && Instance != this)
             {
-                Debug.LogWarning($"[Supplies] Multiple instances detected. Destroying duplicate on {gameObject.name}");
+                // // Debug.LogWarning($"[Supplies] Multiple instances detected. Destroying duplicate on {gameObject.name}");
                 Destroy(this);
                 return;
             }
@@ -106,7 +106,7 @@ namespace GameDevTV.RTS.Player
             if (evt.Supply == null) 
             {
                 Biomass[evt.Owner] += evt.Amount;
-                Debug.Log($"[Supplies] {evt.Owner} received direct grant of {evt.Amount} Biomass. Total: {Biomass[evt.Owner]}");
+                // // Debug.Log($"[Supplies] {evt.Owner} received direct grant of {evt.Amount} Biomass. Total: {Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]);
                 return;
             }
@@ -120,7 +120,7 @@ namespace GameDevTV.RTS.Player
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * mineralsToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
-                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} minerals -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
+                // // Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} minerals -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
                 return;
             }
@@ -128,7 +128,7 @@ namespace GameDevTV.RTS.Player
             {
                 int biomassAmount = Mathf.FloorToInt(evt.Amount * gasToBiomassRate);
                 Biomass[evt.Owner] += biomassAmount;
-                Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} gas -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
+                // // Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} gas -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
                 RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
                 return;
             }

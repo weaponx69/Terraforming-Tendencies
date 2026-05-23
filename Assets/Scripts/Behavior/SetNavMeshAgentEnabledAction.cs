@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Behavior
 
             if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
             {
-                Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
+                // // Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
                 return Status.Failure;
             }
 
@@ -39,7 +39,7 @@ namespace GameDevTV.RTS.Behavior
 
             if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
             {
-                Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
+                // // Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
                 return Status.Failure;
             }
 

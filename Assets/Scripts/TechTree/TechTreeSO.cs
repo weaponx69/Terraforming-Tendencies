@@ -45,7 +45,7 @@ namespace GameDevTV.RTS.TechTree
 
         private void HandleUpgradeResearched(UpgradeResearchedEvent evt)
         {
-            Debug.Log($"Researched {evt.Upgrade.Name} for {evt.Owner}!");
+            // // Debug.Log($"Researched {evt.Upgrade.Name} for {evt.Owner}!");
             unlockedDependencies[evt.Owner].Add(evt.Upgrade);
 
             foreach(KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])

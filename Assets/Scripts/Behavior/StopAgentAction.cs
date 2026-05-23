@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Behavior
         {
             if (Agent.Value == null)
             {
-                Debug.LogWarning($"[StopAgentAction] Agent.Value is null!");
+                // // Debug.LogWarning($"[StopAgentAction] Agent.Value is null!");
                 return Status.Failure;
             }
 
@@ -32,16 +32,16 @@ namespace GameDevTV.RTS.Behavior
                 if (agent.isActiveAndEnabled && agent.isOnNavMesh)
                 {
                     agent.ResetPath();
-                    Debug.Log($"[StopAgentAction] {agent.name} stopped and reset path.");
+                    // // Debug.Log($"[StopAgentAction] {agent.name} stopped and reset path.");
                 }
                 else
                 {
-                    Debug.LogWarning($"[StopAgentAction] {agent.name} is not on NavMesh or inactive. Cannot reset path.");
+                    // // Debug.LogWarning($"[StopAgentAction] {agent.name} is not on NavMesh or inactive. Cannot reset path.");
                 }
                 return Status.Success;
             }
 
-            Debug.LogWarning($"[StopAgentAction] {Agent.Value.name} has no NavMeshAgent!");
+            // // Debug.LogWarning($"[StopAgentAction] {Agent.Value.name} has no NavMeshAgent!");
             return Status.Failure;
         }
     }

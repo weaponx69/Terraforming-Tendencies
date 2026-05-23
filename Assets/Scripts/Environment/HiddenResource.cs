@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Environment
             if (IsDiscovered) return;
             
             IsDiscovered = true;
-            Debug.Log($"Rock surface charted at {transform.position}!");
+            // // Debug.Log($"Rock surface charted at {transform.position}!");
         }
     }
 }

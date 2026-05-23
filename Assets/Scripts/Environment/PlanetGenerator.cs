@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.Environment
         {
             if (Instance != null && Instance != this)
             {
-                Debug.LogWarning($"[PlanetGenerator] Multiple instances detected. Destroying duplicate on {gameObject.name}");
+                // // Debug.LogWarning($"[PlanetGenerator] Multiple instances detected. Destroying duplicate on {gameObject.name}");
                 Destroy(this);
                 return;
             }
@@ -44,7 +44,7 @@ namespace GameDevTV.RTS.Environment
             
             if (MineralsSupplySO == null || GasSupplySO == null)
             {
-                Debug.LogWarning("[PlanetGenerator] Could not load SupplySOs from Resources! Ensure they exist in Assets/Resources/Gatherable Supplies/");
+                // // Debug.LogWarning("[PlanetGenerator] Could not load SupplySOs from Resources! Ensure they exist in Assets/Resources/Gatherable Supplies/");
             }
             
             FixPreplacedGatherables();

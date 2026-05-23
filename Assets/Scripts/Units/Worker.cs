@@ -203,17 +203,17 @@ namespace GameDevTV.RTS.Units
         {
             if (self != gameObject) 
             {
-                // Debug.Log($"[Worker] {name} ignoring event for {self?.name ?? "null"}");
+                // // // Debug.Log($"[Worker] {name} ignoring event for {self?.name ?? "null"}");
                 return; 
             }
             
             if (supply == null)
             {
-                Debug.LogWarning($"HandleGatherSupplies called with null supply. Owner={Owner}, Self={(self != null ? self.name : "null")}, Amount={amount}");
+                // // Debug.LogWarning($"HandleGatherSupplies called with null supply. Owner={Owner}, Self={(self != null ? self.name : "null")}, Amount={amount}");
                 return;
             }
 
-            Debug.Log($"[Worker] {name} received gather event: amount={amount}, biomassDictExists={GameDevTV.RTS.Player.Supplies.Biomass != null}");
+            // // // Debug.Log($"[Worker] {name} received gather event: amount={amount}, biomassDictExists={GameDevTV.RTS.Player.Supplies.Biomass != null}");
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, amount, supply));
         }
 

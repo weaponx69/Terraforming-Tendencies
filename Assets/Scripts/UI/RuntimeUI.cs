@@ -115,17 +115,17 @@ namespace GameDevTV.RTS.UI
         {
             if (owner != displayedOwner) 
             {
-                // Debug.Log($"[RuntimeUI] Biomass changed for {owner} to {newValue}, but HUD is showing {displayedOwner}. Ignoring.");
+                // // // Debug.Log($"[RuntimeUI] Biomass changed for {owner} to {newValue}, but HUD is showing {displayedOwner}. Ignoring.");
                 return;
             }
 
             if (biomassValueText == null) 
             {
-                Debug.LogWarning("[RuntimeUI] HandleBiomassChanged: biomassValueText is NULL!");
+                // // Debug.LogWarning("[RuntimeUI] HandleBiomassChanged: biomassValueText is NULL!");
                 return;
             }
 
-            // Debug.Log($"[RuntimeUI] Updating HUD biomass text to {newValue}");
+            // // // Debug.Log($"[RuntimeUI] Updating HUD biomass text to {newValue}");
             biomassValueText.SetText(newValue.ToString());
         }
 

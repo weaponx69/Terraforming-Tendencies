@@ -32,7 +32,7 @@ namespace GameDevTV.RTS.Player
             CurrentLevelIndex++;
             if (CurrentLevelIndex >= levelConfigs.Length)
             {
-                Debug.Log("Campaign Completed!");
+                // // Debug.Log("Campaign Completed!");
             }
             else
             {
