@@ -220,7 +220,7 @@ namespace GameDevTV.RTS.Units
 
             if (statusColor == Color.red)
             {
-                // // // Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason} | NameSO: {unitSO?.Name ?? "null"}");
+                // Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason} | NameSO: {unitSO?.Name ?? "null"}");
                 
                 // Print extensive diagnostics for drones/workers when RED
                 if (unitSO != null && (unitSO.Name.Contains("Drone") || unitSO.Name.Contains("Worker")))
@@ -238,7 +238,7 @@ namespace GameDevTV.RTS.Units
             {
                 if (graphAgent == null)
                 {
-                    // // // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | graphAgent IS NULL");
+                    // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | graphAgent IS NULL");
                     return;
                 }
 
@@ -264,18 +264,18 @@ namespace GameDevTV.RTS.Units
                         if (graphAgent.GetVariable(vName, out Unity.Behavior.BlackboardVariable bbVar))
                         {
                             object val = bbVar?.ObjectValue;
-                            // // // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {val?.GetType().Name ?? "null"})");
+                            // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {val?.GetType().Name ?? "null"})");
                         }
                         else
                         {
-                            // // // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
+                            // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
                         }
                     } catch {}
                 }
             }
             catch (System.Exception)
             {
-                // // // Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
+                // Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
             }
         }
 

@@ -213,8 +213,22 @@ namespace GameDevTV.RTS.UI
             {
                 DisableAllContainers();
                 
+                Debug.Log($"[Diagnostic] RefreshUI: selectedUnits=0. globalCommander is null? {globalCommander == null}");
+                
                 if (globalCommander != null)
                 {
+                    Debug.Log($"[Diagnostic] globalCommander is activeInHierarchy? {globalCommander.gameObject.activeInHierarchy}");
+                    Debug.Log($"[Diagnostic] AvailableCommands count: {globalCommander.AvailableCommands?.Length.ToString() ?? "NULL"}");
+                    
+                    if (globalCommander.AvailableCommands != null && globalCommander.AvailableCommands.Length > 0)
+                    {
+                        for (int i = 0; i < globalCommander.AvailableCommands.Length; i++)
+                        {
+                            var cmd = globalCommander.AvailableCommands[i];
+                            Debug.Log($"[Diagnostic] Command {i}: {(cmd == null ? "NULL" : cmd.Name)} (Slot: {(cmd == null ? "N/A" : cmd.Slot.ToString())})");
+                        }
+                    }
+
                     actionsUI.EnableFor(new HashSet<AbstractCommandable> { globalCommander });
                     actionsUI.gameObject.SetActive(true);
                 }
