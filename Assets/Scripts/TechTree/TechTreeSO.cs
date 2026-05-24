@@ -41,6 +41,8 @@ namespace GameDevTV.RTS.TechTree
             Bus<BuildingSpawnEvent>.RegisterForAll(HandleBuildingSpawn);
             Bus<UpgradeResearchedEvent>.RegisterForAll(HandleUpgradeResearched);
             Bus<BuildingDeathEvent>.RegisterForAll(HandleBuildingDeath);
+            Bus<UnitSpawnEvent>.RegisterForAll(HandleUnitSpawn);
+            Bus<UnitDeathEvent>.RegisterForAll(HandleUnitDeath);
         }
 
         private void HandleUpgradeResearched(UpgradeResearchedEvent evt)
@@ -60,6 +62,8 @@ namespace GameDevTV.RTS.TechTree
             Bus<BuildingSpawnEvent>.UnregisterForAll(HandleBuildingSpawn);
             Bus<UpgradeResearchedEvent>.UnregisterForAll(HandleUpgradeResearched);
             Bus<BuildingDeathEvent>.UnregisterForAll(HandleBuildingDeath);
+            Bus<UnitSpawnEvent>.UnregisterForAll(HandleUnitSpawn);
+            Bus<UnitDeathEvent>.UnregisterForAll(HandleUnitDeath);
         }
 
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
@@ -75,6 +79,22 @@ namespace GameDevTV.RTS.TechTree
             foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
             {
                 keyValuePair.Value.LoseDependency(evt.Building.BuildingSO);
+            }
+        }
+
+        private void HandleUnitSpawn(UnitSpawnEvent evt)
+        {
+            foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
+            {
+                keyValuePair.Value.UnlockDependency(evt.Unit.UnitSO);
+            }
+        }
+
+        private void HandleUnitDeath(UnitDeathEvent evt)
+        {
+            foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
+            {
+                keyValuePair.Value.LoseDependency(evt.Unit.UnitSO);
             }
         }
 
