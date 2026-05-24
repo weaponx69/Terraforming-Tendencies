@@ -130,8 +130,20 @@ namespace GameDevTV.RTS.Units
             // Ensure the building starts in a Paused state so it doesn't immediately function!
             baseBuilding.InitializeAsGhost(building.PlacementMaterial);
 
+            // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)
+            // This prevents airborne drones from rejecting ground-level pathfinding destinations!
+            Vector3 navDestination = targetLocation;
+            if (TryGetComponent(out UnityEngine.AI.NavMeshAgent agent))
+            {
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                if (UnityEngine.AI.NavMesh.SamplePosition(targetLocation, out UnityEngine.AI.NavMeshHit hit, 15f, filter))
+                {
+                    navDestination = hit.position;
+                }
+            }
+
             graphAgent.SetVariableValue("BuildingSO", building);
-            graphAgent.SetVariableValue("TargetLocation", targetLocation);
+            graphAgent.SetVariableValue("TargetLocation", navDestination);
             graphAgent.SetVariableValue("Ghost", instance);
             SetCurrentCommand(UnitCommands.BuildBuilding);
 
@@ -145,7 +157,19 @@ namespace GameDevTV.RTS.Units
         public void ResumeBuilding(BaseBuilding building)
         {
             brain?.Halt();
-            graphAgent.SetVariableValue("TargetLocation", building.transform.position);
+
+            // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)
+            Vector3 navDestination = building.transform.position;
+            if (TryGetComponent(out UnityEngine.AI.NavMeshAgent agent))
+            {
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                if (UnityEngine.AI.NavMesh.SamplePosition(building.transform.position, out UnityEngine.AI.NavMeshHit hit, 15f, filter))
+                {
+                    navDestination = hit.position;
+                }
+            }
+
+            graphAgent.SetVariableValue("TargetLocation", navDestination);
             graphAgent.SetVariableValue("BuildingUnderConstruction", building);
             graphAgent.SetVariableValue("BuildingSO", building.BuildingSO);
             graphAgent.SetVariableValue<GameObject>("Ghost", null);

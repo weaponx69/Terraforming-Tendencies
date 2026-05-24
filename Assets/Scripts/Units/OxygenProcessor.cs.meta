@@ -1,2 +1,19 @@
 fileFormatVersion: 2
 guid: f482ed22270e671aa9e352d65ac6818c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - <UnitSO>k__BackingField: {instanceID: 0}
+  - decalProjector: {instanceID: 0}
+  - VisionTransform: {instanceID: 0}
+  - <SOBeingBuilt>k__BackingField: {instanceID: 0}
+  - <MainRenderer>k__BackingField: {fileID: -7511558181221131132, guid: 76455e7bca4c655a98e73625251ad953, type: 3}
+  - <BuildingSO>k__BackingField: {instanceID: 0}
+  - primaryMaterial: {instanceID: 0}
+  - navMeshObstacle: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

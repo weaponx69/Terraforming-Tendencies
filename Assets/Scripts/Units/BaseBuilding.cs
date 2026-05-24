@@ -171,7 +171,10 @@ namespace GameDevTV.RTS.Units
             Awake();
             unitBuildingThis = buildingBuilder;
             Owner = unitBuildingThis.Owner;
-            MainRenderer.material = BuildingSO.PlacementMaterial;
+            if (MainRenderer != null)
+            {
+                MainRenderer.material = BuildingSO.PlacementMaterial;
+            }
 
             Progress = new BuildingProgress(
                 BuildingProgress.BuildingState.Building,
@@ -337,7 +340,7 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
         {
             base.OnLoseVisibility();
 
-            if (culledVisuals == null)
+            if (culledVisuals == null && MainRenderer != null)
             {
                 Transform originalRendererTransform = MainRenderer.transform;
                 GameObject culledGO = new ($"Culled {BuildingSO.Name} Visuals")
