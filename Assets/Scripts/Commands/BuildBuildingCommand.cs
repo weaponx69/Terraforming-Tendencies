@@ -127,65 +127,39 @@ namespace GameDevTV.RTS.Commands
 
         public override bool AllRestrictionsPass(Vector3 point)
         {
-            // First check base restrictions
-            bool passes = base.AllRestrictionsPass(point);
-            if (passes) return true;
-
-            // If it failed, check if it's due to overlapping rocks during an Orbital Drop
-            Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
-            bool hasWorker = false;
-            foreach (var w in workers)
+            // Evaluate restrictions directly to ignore Supplies (rocks) and NavMesh holes!
+            // The ground is covered in rocks which have NavMeshObstacles. This creates holes in the NavMesh.
+            // If we strictly check IsFullyOnNavMesh, players can never place buildings!
+            foreach (BuildingRestrictionSO restriction in Restrictions)
             {
-                if (w.Owner == Owner.Player1)
+                int hits = restriction.HitDetectionStyle switch
                 {
-                    hasWorker = true;
-                    break;
-                }
+                    BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
+                    BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
+                    _ => 0
+                };
+
+                if (hits > 0) return false;
             }
 
-            if (!hasWorker)
+            // Enforce worker requirement for standard buildings
+            if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
             {
-                // Only allow Orbital Drop overrides for the Command Center!
-                if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
+                Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+                bool hasWorker = false;
+                foreach (var w in workers)
                 {
-                    return false;
-                }
-
-                // It's an orbital drop! We want to ignore overlaps with rocks ("Supplies" layer).
-                // Re-evaluate restrictions but ignore hits on the Supplies layer.
-                foreach (BuildingRestrictionSO restriction in Restrictions)
-                {
-                    int hits = restriction.HitDetectionStyle switch
+                    if (w.Owner == Owner.Player1)
                     {
-                        BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
-                        BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
-                        _ => 0
-                    };
-
-                    if (hits > 0) return false;
-
-                    if (restriction.MustBeFullyOnNavmesh)
-                    {
-                        UnityEngine.AI.NavMeshQueryFilter queryFilter = new()
-                        {
-                            areaMask = UnityEngine.AI.NavMesh.AllAreas,
-                            agentTypeID = restriction.NavMeshAgentTypeId
-                        };
-
-                        bool isOnNavMesh = UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(restriction.Extents.x, 0, restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter)
-                                        && UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(restriction.Extents.x, 0, -restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter)
-                                        && UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(-restriction.Extents.x, 0, -restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter)
-                                        && UnityEngine.AI.NavMesh.SamplePosition(point + new Vector3(-restriction.Extents.x, 0, restriction.Extents.z), out _, restriction.NavMeshTolerance, queryFilter);
-
-                        if (!isOnNavMesh) return false;
+                        hasWorker = true;
+                        break;
                     }
                 }
-                // If we get here, the ONLY reason it failed originally was because it hit the Supplies layer.
-                // Since this is an orbital drop, we allow it!
-                return true;
+
+                if (!hasWorker) return false;
             }
 
-            return false;
+            return true;
         }
 
         public override bool IsLocked(CommandContext context) =>
