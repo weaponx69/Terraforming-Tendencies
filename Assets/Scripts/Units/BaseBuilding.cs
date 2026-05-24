@@ -145,6 +145,27 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        public void InitializeAsGhost(Material ghostMaterial)
+        {
+            Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
+            CurrentHealth = 1;
+            if (MainRenderer != null && ghostMaterial != null)
+            {
+                MainRenderer.material = ghostMaterial;
+            }
+
+            if (navMeshObstacle != null)
+            {
+                navMeshObstacle.enabled = false;
+            }
+
+            Collider[] colliders = GetComponentsInChildren<Collider>();
+            foreach (Collider c in colliders)
+            {
+                c.enabled = false;
+            }
+        }
+
         public void StartBuilding(IBuildingBuilder buildingBuilder)
         {
             Awake();
@@ -157,6 +178,17 @@ namespace GameDevTV.RTS.Units
                 Time.time - BuildingSO.BuildTime * Progress.Completion,
                 Progress.Completion
             );
+
+            if (navMeshObstacle != null)
+            {
+                navMeshObstacle.enabled = true;
+            }
+
+            Collider[] colliders = GetComponentsInChildren<Collider>();
+            foreach (Collider c in colliders)
+            {
+                c.enabled = true;
+            }
 
             if (Progress.Completion == 0)
             {

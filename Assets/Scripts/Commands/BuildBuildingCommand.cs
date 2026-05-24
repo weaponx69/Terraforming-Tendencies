@@ -53,7 +53,7 @@ namespace GameDevTV.RTS.Commands
             if (builder == null)
             {
                 float closestDist = float.MaxValue;
-                Worker[] workers = FindObjectsByType<Worker>(FindObjectsSortMode.None);
+                Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
                 
                 foreach (var w in workers)
                 {
@@ -132,7 +132,7 @@ namespace GameDevTV.RTS.Commands
             if (passes) return true;
 
             // If it failed, check if it's due to overlapping rocks during an Orbital Drop
-            Worker[] workers = FindObjectsByType<Worker>(FindObjectsSortMode.None);
+            Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
             bool hasWorker = false;
             foreach (var w in workers)
             {

@@ -128,11 +128,7 @@ namespace GameDevTV.RTS.Units
             }
 
             // Ensure the building starts in a Paused state so it doesn't immediately function!
-            baseBuilding.Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
-            baseBuilding.CurrentHealth = 1;
-            
-            // Set the placement material so it looks like a transparent ghost until the worker starts building
-            baseBuilding.MainRenderer.material = building.PlacementMaterial;
+            baseBuilding.InitializeAsGhost(building.PlacementMaterial);
 
             graphAgent.SetVariableValue("BuildingSO", building);
             graphAgent.SetVariableValue("TargetLocation", targetLocation);
