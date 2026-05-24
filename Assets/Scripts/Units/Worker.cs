@@ -145,6 +145,7 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("BuildingSO", building);
             graphAgent.SetVariableValue("TargetLocation", navDestination);
             graphAgent.SetVariableValue("Ghost", instance);
+            graphAgent.SetVariableValue("BuildingUnderConstruction", baseBuilding);
             SetCurrentCommand(UnitCommands.BuildBuilding);
 
             SetCommandOverrides(new BaseCommand[] { CancelBuildingCommand });

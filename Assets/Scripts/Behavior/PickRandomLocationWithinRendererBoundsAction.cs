@@ -16,17 +16,28 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
-            if (BuildingUnderConstruction.Value == null
-                || BuildingUnderConstruction.Value.MainRenderer == null) return Status.Failure;
+            if (BuildingUnderConstruction.Value == null) return Status.Failure;
 
             Renderer renderer = BuildingUnderConstruction.Value.MainRenderer;
-            Bounds bounds = renderer.bounds;
-
-            TargetLocation.Value = new Vector3(
-                UnityEngine.Random.Range(bounds.min.x, bounds.max.x),
-                TargetLocation.Value.y,
-                UnityEngine.Random.Range(bounds.min.z, bounds.max.z)
-            );
+            
+            if (renderer != null)
+            {
+                Bounds bounds = renderer.bounds;
+                TargetLocation.Value = new Vector3(
+                    UnityEngine.Random.Range(bounds.min.x, bounds.max.x),
+                    TargetLocation.Value.y,
+                    UnityEngine.Random.Range(bounds.min.z, bounds.max.z)
+                );
+            }
+            else
+            {
+                // Fallback to exactly the building's origin point if there is no renderer
+                TargetLocation.Value = new Vector3(
+                    BuildingUnderConstruction.Value.transform.position.x,
+                    TargetLocation.Value.y,
+                    BuildingUnderConstruction.Value.transform.position.z
+                );
+            }
 
             return Status.Success;
         }

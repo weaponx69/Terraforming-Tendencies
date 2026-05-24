@@ -17,7 +17,7 @@ namespace GameDevTV.RTS.Units
         public UnlockableSO[] Queue => buildingQueue.ToArray();
         [field: SerializeField] public float CurrentQueueStartTime { get; private set; }
         [field: SerializeField] public UnlockableSO SOBeingBuilt { get; private set; }
-        [field: SerializeField] public MeshRenderer MainRenderer { get; private set; }
+        [field: SerializeField] public MeshRenderer MainRenderer { get; protected set; }
         [field: SerializeField]
         public BuildingProgress Progress { get; private set; } = new(
             BuildingProgress.BuildingState.Completed, 0, 1
@@ -42,6 +42,11 @@ namespace GameDevTV.RTS.Units
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO.Health;
             // Current health is set as the building is being built via Heal()
+            
+            if (MainRenderer == null)
+            {
+                MainRenderer = GetComponentInChildren<MeshRenderer>();
+            }
         }
 
         private void OnEnable()

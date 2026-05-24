@@ -29,9 +29,8 @@ namespace GameDevTV.RTS.Behavior
 
             if (BuildingUnderConstruction.Value == null)
             {
-                GameObject building = GameObject.Instantiate(BuildingSO.Value.Prefab, TargetLocation, Quaternion.identity);
-                if (!building.TryGetComponent(out completedBuilding)
-                    || completedBuilding.MainRenderer == null) return Status.Failure;
+                GameObject building = GameObject.Instantiate(BuildingSO.Value.Prefab, TargetLocation.Value, Quaternion.identity);
+                if (!building.TryGetComponent(out completedBuilding)) return Status.Failure;
             }
             else
             {
@@ -45,9 +44,12 @@ namespace GameDevTV.RTS.Behavior
 
             BuildingUnderConstruction.Value = completedBuilding;
 
-            startPosition = TargetLocation.Value - Vector3.up * buildingRenderer.bounds.size.y;
-            endPosition = TargetLocation.Value;
-            buildingRenderer.transform.position = startPosition;
+            if (buildingRenderer != null)
+            {
+                startPosition = TargetLocation.Value - Vector3.up * buildingRenderer.bounds.size.y;
+                endPosition = TargetLocation.Value;
+                buildingRenderer.transform.position = startPosition;
+            }
 
             return OnUpdate();
         }
@@ -64,7 +66,10 @@ namespace GameDevTV.RTS.Behavior
                 targetHealth -= healAmount;
             }
 
-            buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalizedTime);
+            if (buildingRenderer != null)
+            {
+                buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalizedTime);
+            }
 
             return normalizedTime >= 1 ? Status.Success : Status.Running;
         }
