@@ -42,12 +42,10 @@ namespace GameDevTV.RTS.Behavior
 
             buildingRenderer = completedBuilding.MainRenderer;
 
-            BuildingUnderConstruction.Value = completedBuilding;
-
             if (buildingRenderer != null)
             {
-                startPosition = TargetLocation.Value - Vector3.up * buildingRenderer.bounds.size.y;
-                endPosition = TargetLocation.Value;
+                endPosition = completedBuilding.transform.position;
+                startPosition = endPosition - Vector3.up * buildingRenderer.bounds.size.y;
                 buildingRenderer.transform.position = startPosition;
             }
 

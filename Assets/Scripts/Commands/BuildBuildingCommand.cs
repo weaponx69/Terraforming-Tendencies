@@ -127,15 +127,15 @@ namespace GameDevTV.RTS.Commands
 
         public override bool AllRestrictionsPass(Vector3 point)
         {
-            // Evaluate restrictions directly to ignore Supplies (rocks) and NavMesh holes!
+            // Evaluate restrictions directly to ignore NavMesh holes!
             // The ground is covered in rocks which have NavMeshObstacles. This creates holes in the NavMesh.
             // If we strictly check IsFullyOnNavMesh, players can never place buildings!
             foreach (BuildingRestrictionSO restriction in Restrictions)
             {
                 int hits = restriction.HitDetectionStyle switch
                 {
-                    BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
-                    BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask & ~LayerMask.GetMask("Supplies")).Length,
+                    BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask).Length,
+                    BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask).Length,
                     _ => 0
                 };
 
