@@ -25,7 +25,13 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
-            if (!HasValidInputs()) return Status.Failure;
+            if (!HasValidInputs()) 
+            {
+                Debug.Log($"[BuildBuildingAction] Aborting OnStart because HasValidInputs() returned false!");
+                return Status.Failure;
+            }
+
+            Debug.Log($"[BuildBuildingAction] Started building {BuildingSO.Value.name} at {TargetLocation.Value}");
 
             if (BuildingUnderConstruction.Value == null)
             {

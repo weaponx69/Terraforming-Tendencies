@@ -119,9 +119,14 @@ namespace GameDevTV.RTS.Commands
             {
                 builder.ResumeBuilding(building);
             }
-            else if (HasEnoughSupplies(context) && AllRestrictionsPass(targetPos))
+            else if (HasEnoughSupplies(context))
             {
-                builder.Build(Building, targetPos);
+                bool pass = AllRestrictionsPass(targetPos);
+                Debug.Log($"[BuildBuildingCommand] Checking restrictions at {targetPos}. Result: {pass}");
+                if (pass)
+                {
+                    builder.Build(Building, targetPos);
+                }
             }
         }
 

@@ -120,6 +120,7 @@ namespace GameDevTV.RTS.Units
         public GameObject Build(BuildingSO building, Vector3 targetLocation)
         {
             brain?.Halt();
+            Debug.Log($"[Worker] Build called for {building.name} at {targetLocation}");
             GameObject instance = Instantiate(building.Prefab, targetLocation, Quaternion.identity);
             if (!instance.TryGetComponent(out BaseBuilding baseBuilding))
             {
@@ -183,7 +184,12 @@ namespace GameDevTV.RTS.Units
             if (graphAgent.GetVariable("Ghost", out BlackboardVariable<GameObject> ghostVariable)
                 && ghostVariable.Value != null)
             {
+                Debug.Log($"[Worker] CancelBuilding called! Destroying ghost instance {ghostVariable.Value.name}");
                 Destroy(ghostVariable.Value);
+            }
+            else
+            {
+                Debug.Log($"[Worker] CancelBuilding called, but no ghost was found in the blackboard to destroy.");
             }
             if (graphAgent.GetVariable("BuildingUnderConstruction", out BlackboardVariable<BaseBuilding> buildingVariable)
                 && buildingVariable.Value != null)
