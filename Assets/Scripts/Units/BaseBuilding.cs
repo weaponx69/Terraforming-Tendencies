@@ -47,6 +47,12 @@ namespace GameDevTV.RTS.Units
             {
                 MainRenderer = GetComponentInChildren<MeshRenderer>();
             }
+
+            if (MainRenderer != null && primaryMaterial == null)
+            {
+                // Auto-save the mesh's original material so it doesn't disappear if primaryMaterial wasn't set in the Inspector
+                primaryMaterial = MainRenderer.material;
+            }
         }
 
         private void OnEnable()
@@ -63,15 +69,20 @@ namespace GameDevTV.RTS.Units
         protected override void Start()
         {
             base.Start();
-            if (MainRenderer != null)
+
+            // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
+            if (Progress.State != BuildingProgress.BuildingState.Paused)
             {
-                MainRenderer.material = primaryMaterial;
-            }
-            
-            // If the building is already completed (e.g. spawned by AI), ensure it has health and completed progress
-            if (unitBuildingThis == null)
-            {
-                CompleteConstruction();
+                if (MainRenderer != null && primaryMaterial != null)
+                {
+                    MainRenderer.material = primaryMaterial;
+                }
+                
+                // If the building is already completed (e.g. spawned by AI), ensure it has health and completed progress
+                if (unitBuildingThis == null)
+                {
+                    CompleteConstruction();
+                }
             }
 
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
@@ -94,6 +105,11 @@ namespace GameDevTV.RTS.Units
             }
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
+
+            if (MainRenderer != null && primaryMaterial != null)
+            {
+                MainRenderer.material = primaryMaterial;
+            }
         }
 
 
