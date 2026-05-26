@@ -395,7 +395,6 @@ MonoBehaviour:
         m_Parent:
           rid: 3824763901155213520
         m_Children:
-        - rid: 3824763901155213525
         - rid: 3824763901155213523
         m_RegisteredObservers: []
     - rid: 3824763901155213523
