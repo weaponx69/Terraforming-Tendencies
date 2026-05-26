@@ -191,6 +191,11 @@ namespace GameDevTV.RTS.Units
                     statusColor = Color.cyan; // Idle/Healthy
                     reason = "IDLE";
                 }
+                else if (cmd == UnitCommands.BuildBuilding)
+                {
+                    statusColor = Color.green; // Building
+                    reason = "BUILDING";
+                }
                 else if (this is Worker w && w.IsActivelyWorking)
                 {
                     // Map BrainController state to indicator colour

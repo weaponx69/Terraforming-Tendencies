@@ -55,6 +55,11 @@ namespace GameDevTV.RTS.Units
                 // Auto-save the mesh's original material so it doesn't disappear if primaryMaterial wasn't set in the Inspector
                 primaryMaterial = MainRenderer.material;
             }
+
+            if (navMeshObstacle == null)
+            {
+                navMeshObstacle = GetComponentInChildren<UnityEngine.AI.NavMeshObstacle>();
+            }
         }
 
         private void OnEnable()
@@ -188,7 +193,8 @@ namespace GameDevTV.RTS.Units
         {
             Owner = owner;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
-            CurrentHealth = 1;
+            CurrentHealth = 0;
+            Heal(1);
             if (MainRenderer != null && ghostMaterial != null)
             {
                 MainRenderer.material = ghostMaterial;
