@@ -34,8 +34,9 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Failure;
             }
 
-            agent.obstacleAvoidanceType = (ObstacleAvoidanceType)AvoidanceQuality.Value;
-            // // Debug.Log($"[SetAgentAvoidanceAction] {agent.name} set avoidance quality to {AvoidanceQuality.Value}");
+            // Force NoObstacleAvoidance to allow moving units to pass through each other and prevent jamming
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.NoObstacleAvoidance;
+            // // Debug.Log($"[SetAgentAvoidanceAction] {agent.name} forced avoidance quality to NoObstacleAvoidance");
 
             return Status.Success;
         }

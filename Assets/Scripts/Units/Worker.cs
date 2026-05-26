@@ -87,7 +87,7 @@ namespace GameDevTV.RTS.Units
             if (Agent != null)
             {
                 float verticalGap = Mathf.Abs(transform.position.y - supply.transform.position.y);
-                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
+                Agent.stoppingDistance = verticalGap + 1.5f;
             }
 
             graphAgent.SetVariableValue("Supply", supply);
@@ -102,7 +102,7 @@ namespace GameDevTV.RTS.Units
             if (Agent != null)
             {
                 float verticalGap = Mathf.Abs(transform.position.y - commandPost.transform.position.y);
-                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 2.5f : 2.5f;
+                Agent.stoppingDistance = verticalGap + 2.5f;
             }
             graphAgent.SetVariableValue("CommandPost", commandPost);
             SetCurrentCommand(UnitCommands.ReturnSupplies);
@@ -144,7 +144,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 float verticalGap = Mathf.Abs(transform.position.y - navDestination.y);
-                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
+                Agent.stoppingDistance = verticalGap + 1.5f;
             }
 
             graphAgent.SetVariableValue("BuildingSO", building);
@@ -175,7 +175,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 float verticalGap = Mathf.Abs(transform.position.y - navDestination.y);
-                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
+                Agent.stoppingDistance = verticalGap + 1.5f;
             }
 
             graphAgent.SetVariableValue("TargetLocation", navDestination);
