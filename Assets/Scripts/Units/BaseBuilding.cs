@@ -34,6 +34,7 @@ namespace GameDevTV.RTS.Units
         private List<UnlockableSO> buildingQueue = new(MAX_QUEUE_SIZE);
         private const int MAX_QUEUE_SIZE = 5;
         private int spawnCount = 0; // Tracks how many units have been spawned, for angle distribution
+        private bool hasRaisedSpawnEvent = false;
 
         protected override void Awake()
         {
@@ -69,6 +70,16 @@ namespace GameDevTV.RTS.Units
             ActiveBuildings.Remove(this);
         }
 
+        private void RaiseSpawnEvent()
+        {
+            if (!hasRaisedSpawnEvent)
+            {
+                hasRaisedSpawnEvent = true;
+                Debug.Log($"[BaseBuilding Debug] Raising BuildingSpawnEvent for {gameObject.name} (ID: {GetInstanceID()})");
+                Bus<BuildingSpawnEvent>.Raise(Owner, new BuildingSpawnEvent(Owner, this));
+            }
+        }
+
         protected override void Start()
         {
             Debug.Log($"[BaseBuilding Debug] Start called on {gameObject.name} (ID: {GetInstanceID()}). Progress State: {Progress.State}, Owner: {Owner}");
@@ -87,10 +98,11 @@ namespace GameDevTV.RTS.Units
                 {
                     CompleteConstruction();
                 }
+                
+                RaiseSpawnEvent();
             }
 
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
-            Bus<BuildingSpawnEvent>.Raise(Owner, new BuildingSpawnEvent(Owner, this));
 
             foreach (UpgradeSO upgrade in BuildingSO.Upgrades)
             {
@@ -114,6 +126,8 @@ namespace GameDevTV.RTS.Units
             {
                 MainRenderer.material = primaryMaterial;
             }
+
+            RaiseSpawnEvent();
         }
 
 
@@ -351,7 +365,10 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
             Debug.Log($"[BaseBuilding Debug] OnDestroy called on {gameObject.name} (ID: {GetInstanceID()})! StackTrace:\n{System.Environment.StackTrace}");
             base.OnDestroy();
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
-            Bus<BuildingDeathEvent>.Raise(Owner, new BuildingDeathEvent(Owner, this));
+            if (hasRaisedSpawnEvent)
+            {
+                Bus<BuildingDeathEvent>.Raise(Owner, new BuildingDeathEvent(Owner, this));
+            }
         }
 
         protected override void OnGainVisibility()
