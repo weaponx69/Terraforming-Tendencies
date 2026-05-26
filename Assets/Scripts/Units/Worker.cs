@@ -135,13 +135,16 @@ namespace GameDevTV.RTS.Units
             // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)
             // This prevents airborne drones from rejecting ground-level pathfinding destinations!
             Vector3 navDestination = targetLocation;
-            if (TryGetComponent(out UnityEngine.AI.NavMeshAgent agent))
+            if (Agent != null)
             {
-                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = UnityEngine.AI.NavMesh.AllAreas };
                 if (UnityEngine.AI.NavMesh.SamplePosition(targetLocation, out UnityEngine.AI.NavMeshHit hit, 15f, filter))
                 {
                     navDestination = hit.position;
                 }
+
+                float verticalGap = Mathf.Abs(transform.position.y - navDestination.y);
+                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
             }
 
             graphAgent.SetVariableValue("BuildingSO", building);
@@ -163,13 +166,16 @@ namespace GameDevTV.RTS.Units
 
             // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)
             Vector3 navDestination = building.transform.position;
-            if (TryGetComponent(out UnityEngine.AI.NavMeshAgent agent))
+            if (Agent != null)
             {
-                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = agent.agentTypeID, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = UnityEngine.AI.NavMesh.AllAreas };
                 if (UnityEngine.AI.NavMesh.SamplePosition(building.transform.position, out UnityEngine.AI.NavMeshHit hit, 15f, filter))
                 {
                     navDestination = hit.position;
                 }
+
+                float verticalGap = Mathf.Abs(transform.position.y - navDestination.y);
+                Agent.stoppingDistance = (Agent.agentTypeID != 0) ? verticalGap + 1.5f : 1.5f;
             }
 
             graphAgent.SetVariableValue("TargetLocation", navDestination);
