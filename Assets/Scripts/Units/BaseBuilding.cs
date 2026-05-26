@@ -38,6 +38,7 @@ namespace GameDevTV.RTS.Units
         protected override void Awake()
         {
             base.Awake();
+            Debug.Log($"[BaseBuilding Debug] Awake called on {gameObject.name} (ID: {GetInstanceID()})");
 
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO.Health;
@@ -57,17 +58,20 @@ namespace GameDevTV.RTS.Units
 
         private void OnEnable()
         {
+            Debug.Log($"[BaseBuilding Debug] OnEnable called on {gameObject.name} (ID: {GetInstanceID()})");
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
         }
 
         private void OnDisable()
         {
+            Debug.Log($"[BaseBuilding Debug] OnDisable called on {gameObject.name} (ID: {GetInstanceID()})");
             ActiveBuildings.Remove(this);
         }
 
         protected override void Start()
         {
+            Debug.Log($"[BaseBuilding Debug] Start called on {gameObject.name} (ID: {GetInstanceID()}). Progress State: {Progress.State}, Owner: {Owner}");
             base.Start();
 
             // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
@@ -344,6 +348,7 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
 
         protected override void OnDestroy()
         {
+            Debug.Log($"[BaseBuilding Debug] OnDestroy called on {gameObject.name} (ID: {GetInstanceID()})! StackTrace:\n{System.Environment.StackTrace}");
             base.OnDestroy();
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
             Bus<BuildingDeathEvent>.Raise(Owner, new BuildingDeathEvent(Owner, this));
