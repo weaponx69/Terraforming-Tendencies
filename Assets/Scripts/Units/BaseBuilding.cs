@@ -166,8 +166,9 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        public void InitializeAsGhost(Material ghostMaterial)
+        public void InitializeAsGhost(Material ghostMaterial, Owner owner)
         {
+            Owner = owner;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 1;
             if (MainRenderer != null && ghostMaterial != null)

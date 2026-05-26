@@ -164,7 +164,7 @@ MonoBehaviour:
     <Completion>k__BackingField: 1
     <State>k__BackingField: 2
   <BuildingSO>k__BackingField: {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}
-  primaryMaterial: {fileID: 0}
+  primaryMaterial: {fileID: 2100000, guid: 69987b2c316d1154ea5e1d61e87a9136, type: 2}
   navMeshObstacle: {fileID: 0}
   oxygenPerTick: 0.001
   tickRate: 1

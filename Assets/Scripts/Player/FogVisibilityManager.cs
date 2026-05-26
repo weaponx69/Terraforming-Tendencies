@@ -53,11 +53,9 @@ namespace GameDevTV.RTS.Player
 
         private void LateUpdate()
         {
-            ReadPixelsToVisionTexture();
-
             foreach(IHideable hideable in hideables)
             {
-                SetUnitVisibilityStatus(hideable);
+                hideable.SetVisible(true);
             }
         }
 
@@ -72,9 +70,7 @@ namespace GameDevTV.RTS.Player
 
         private void SetUnitVisibilityStatus(IHideable hideable)
         {
-            Vector3 screenPoint = fogOfWarCamera.WorldToScreenPoint(hideable.Transform.position);
-            Color visibilityColor = visionTexture.GetPixel((int)screenPoint.x, (int)screenPoint.y);
-            hideable.SetVisible(visibilityColor.r > 0.9f);
+            hideable.SetVisible(true);
         }
 
         private void HandleUnitSpawn(UnitSpawnEvent evt)
