@@ -126,6 +126,10 @@ namespace GameDevTV.RTS.Units
                     var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
                     if (blackboard == null) continue;
 
+                    // Only repair the main blackboard of the agent, do not touch subgraphs!
+                    var mainBB = GetBlackboardObject() as Unity.Behavior.Blackboard;
+                    if (blackboard != mainBB) continue;
+
                     // Only repopulate if m_Variables is empty
                     if (blackboard.Variables.Count == 0)
                     {
