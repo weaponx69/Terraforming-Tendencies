@@ -142,7 +142,19 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            // Activate any procedural visual effects (e.g. SmokestackVisuals).
+            GetComponent<SmokestackVisuals>()?.ActivateSmoke();
+
             RaiseSpawnEvent();
+        }
+
+        /// <summary>
+        /// Allows procedural visual components (e.g. SmokestackVisuals) to override
+        /// which renderer receives placement/ghost materials during construction.
+        /// </summary>
+        public void SetMainRenderer(MeshRenderer renderer)
+        {
+            MainRenderer = renderer;
         }
 
 
