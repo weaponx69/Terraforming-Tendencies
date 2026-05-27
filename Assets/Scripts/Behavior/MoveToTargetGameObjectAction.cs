@@ -30,6 +30,11 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Failure;
             }
 
+            if (!agent.enabled)
+            {
+                agent.enabled = true;
+            }
+
             Agent.Value.TryGetComponent(out animator);
 
             // Calculate random offset once to prevent jitter. Keep it small to avoid circling.

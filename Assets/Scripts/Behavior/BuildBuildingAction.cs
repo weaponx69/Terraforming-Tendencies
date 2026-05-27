@@ -80,6 +80,7 @@ namespace GameDevTV.RTS.Behavior
 
         protected override void OnEnd()
         {
+            Debug.Log($"[BuildBuildingAction] OnEnd with Status={CurrentStatus}");
             if (CurrentStatus == Status.Success)
             {
                 completedBuilding.enabled = true;

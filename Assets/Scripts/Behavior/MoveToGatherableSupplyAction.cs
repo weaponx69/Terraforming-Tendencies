@@ -141,6 +141,11 @@ namespace GameDevTV.RTS.Behavior
                 return false;
             }
 
+            if (!agent.enabled)
+            {
+                agent.enabled = true;
+            }
+
             if (Supply.Value != null)
             {
                 supplySO = Supply.Value.Supply;

@@ -26,6 +26,11 @@ namespace GameDevTV.RTS.Behavior
                 return Status.Failure;
             }
 
+            if (!agent.enabled)
+            {
+                agent.enabled = true;
+            }
+
             Agent.Value.TryGetComponent(out animator);
 
             Vector3 targetPosition = TargetLocation.Value;
@@ -35,18 +40,23 @@ namespace GameDevTV.RTS.Behavior
                 targetPosition = hit.position;
             }
 
+            Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetInstanceID()}) OnStart targetPosition={targetPosition}, stoppingDistance={agent.stoppingDistance}");
+
             if (Vector3.Distance(agent.transform.position, targetPosition) <= agent.stoppingDistance)
             {
+                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetInstanceID()}) OnStart ALREADY AT DESTINATION (distance={Vector3.Distance(agent.transform.position, targetPosition)} <= stoppingDistance={agent.stoppingDistance})");
                 return Status.Success;
             }
 
             if (agent.isOnNavMesh)
             {
                 destinationSet = agent.SetDestination(targetPosition);
+                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetInstanceID()}) SetDestination returned {destinationSet} for {targetPosition}");
             }
             else
             {
                 destinationSet = false;
+                Debug.LogWarning($"[Navigation] {agent.name} (ID: {agent.gameObject.GetInstanceID()}) cannot SetDestination because agent is not on NavMesh!");
             }
 
             return Status.Running;
@@ -73,6 +83,7 @@ namespace GameDevTV.RTS.Behavior
                     targetPosition = hit.position;
                 }
                 destinationSet = agent.SetDestination(targetPosition);
+                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetInstanceID()}) OnUpdate retry SetDestination returned {destinationSet} for {targetPosition}");
                 if (!destinationSet) return Status.Running;
             }
 
@@ -83,6 +94,7 @@ namespace GameDevTV.RTS.Behavior
 
             if (agent.remainingDistance <= agent.stoppingDistance)
             {
+                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetInstanceID()}) OnUpdate REACHED DESTINATION (remainingDistance={agent.remainingDistance} <= stoppingDistance={agent.stoppingDistance})");
                 return Status.Success;
             }
 

@@ -24,6 +24,8 @@ namespace GameDevTV.RTS.Units
         private static int nextUnitId = 1;
         public int UnitID { get; private set; }
 
+        private float lastDiagnosticTime = 0f;
+
         protected override void Awake()
         {
             base.Awake();
@@ -160,6 +162,17 @@ namespace GameDevTV.RTS.Units
             if (this is Worker)
             {
                 UpdateStatusIndicator();
+
+                // Periodically log blackboard status if a command is in progress
+                if (Time.time - lastDiagnosticTime >= 3.0f)
+                {
+                    lastDiagnosticTime = Time.time;
+                    if (TryGetCurrentCommand(out UnitCommands currentCmd) && currentCmd != UnitCommands.Stop)
+                    {
+                        Debug.Log($"[Periodic Diagnostic] {name} (ID: {UnitID}) command is {currentCmd}");
+                        LogDetailedBlackboardStatus();
+                    }
+                }
             }
         }
 
@@ -229,7 +242,7 @@ namespace GameDevTV.RTS.Units
 
             if (statusColor == Color.red)
             {
-                // Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason} | NameSO: {unitSO?.Name ?? "null"}");
+                Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason} | NameSO: {unitSO?.Name ?? "null"}");
                 
                 // Print extensive diagnostics for drones/workers when RED
                 if (unitSO != null && (unitSO.Name.Contains("Drone") || unitSO.Name.Contains("Worker")))
@@ -247,7 +260,7 @@ namespace GameDevTV.RTS.Units
             {
                 if (graphAgent == null)
                 {
-                    // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | graphAgent IS NULL");
+                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | graphAgent IS NULL");
                     return;
                 }
 
@@ -263,7 +276,7 @@ namespace GameDevTV.RTS.Units
                 }
                 catch {}
 
-                // // // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | m_IsInitialised={isInit} | m_IsStarted={isStarted}");
+                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | m_IsInitialised={isInit} | m_IsStarted={isStarted}");
                 if (!isInit) return;
 
                 string[] vars = { "Command", "Self", "Unit", "Supply", "TargetGameObject", "TargetLocation" };
@@ -273,18 +286,18 @@ namespace GameDevTV.RTS.Units
                         if (graphAgent.GetVariable(vName, out Unity.Behavior.BlackboardVariable bbVar))
                         {
                             object val = bbVar?.ObjectValue;
-                            // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {val?.GetType().Name ?? "null"})");
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {val?.GetType().Name ?? "null"})");
                         }
                         else
                         {
-                            // Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
                         }
                     } catch {}
                 }
             }
-            catch (System.Exception)
+            catch (System.Exception ex)
             {
-                // Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
+                Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
             }
         }
 
@@ -361,6 +374,8 @@ namespace GameDevTV.RTS.Units
         public void SetCurrentCommand(UnitCommands cmd)
         {
             if (graphAgent == null) return;
+            Debug.Log($"[Command Queue] {name} (ID: {UnitID}) SetCurrentCommand: {cmd}");
+            LogDetailedBlackboardStatus();
 
             // Primary: typed SetVariableValue — sets BlackboardVariable<UnitCommands>.Value and
             // fires OnValueChanged, which the BT SwitchComposite listens to for branch re-evaluation.
