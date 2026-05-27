@@ -21,7 +21,7 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
-            if (!Agent.Value.TryGetComponent(out agent))
+            if (Agent.Value == null || !Agent.Value.TryGetComponent(out agent))
             {
                 return Status.Failure;
             }

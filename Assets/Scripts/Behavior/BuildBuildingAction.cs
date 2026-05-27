@@ -60,6 +60,12 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnUpdate()
         {
+            if (completedBuilding == null)
+            {
+                Debug.LogWarning("[BuildBuildingAction] completedBuilding is null in OnUpdate!");
+                return Status.Failure;
+            }
+
             float normalizedTime = (Time.time - startBuildTime) / BuildingSO.Value.BuildTime;
 
             targetHealth += Time.deltaTime * (BuildingSO.Value.Health / BuildingSO.Value.BuildTime);
@@ -81,7 +87,7 @@ namespace GameDevTV.RTS.Behavior
         protected override void OnEnd()
         {
             Debug.Log($"[BuildBuildingAction] OnEnd with Status={CurrentStatus}");
-            if (CurrentStatus == Status.Success)
+            if (CurrentStatus == Status.Success && completedBuilding != null)
             {
                 completedBuilding.enabled = true;
             }

@@ -285,14 +285,25 @@ namespace GameDevTV.RTS.Units
                     try {
                         if (graphAgent.GetVariable(vName, out Unity.Behavior.BlackboardVariable bbVar))
                         {
-                            object val = bbVar?.ObjectValue;
-                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {val?.GetType().Name ?? "null"})");
+                            object val = null;
+                            try {
+                                val = bbVar?.ObjectValue;
+                            } catch (System.Exception valEx) {
+                                val = $"<Exception reading ObjectValue: {valEx.Message}>";
+                            }
+                            string typeName = "null";
+                            try {
+                                typeName = val?.GetType().Name ?? "null";
+                            } catch {}
+                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {typeName})");
                         }
                         else
                         {
                             Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
                         }
-                    } catch {}
+                    } catch (System.Exception ex) {
+                        Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Exception processing variable '{vName}': {ex.Message}");
+                    }
                 }
             }
             catch (System.Exception ex)
@@ -375,22 +386,38 @@ namespace GameDevTV.RTS.Units
         {
             if (graphAgent == null) return;
             Debug.Log($"[Command Queue] {name} (ID: {UnitID}) SetCurrentCommand: {cmd}");
-            LogDetailedBlackboardStatus();
 
-            // Primary: typed SetVariableValue — sets BlackboardVariable<UnitCommands>.Value and
-            // fires OnValueChanged, which the BT SwitchComposite listens to for branch re-evaluation.
-            if (graphAgent.SetVariableValue("Command", cmd))
-                return;
+            // Primary: typed SetVariableValue
+            bool setSuccess = graphAgent.SetVariableValue("Command", cmd);
 
-            // Fallback: set ObjectValue directly on the raw variable.
-            // This skips OnValueChanged, so the BT may not react immediately,
-            // but is a safety net if the typed path fails.
-            try
+            if (!setSuccess)
             {
-                if (graphAgent.GetVariable("Command", out BlackboardVariable bbVar) && bbVar != null)
-                    bbVar.ObjectValue = cmd;
+                // Fallback: set ObjectValue directly on the raw variable.
+                try
+                {
+                    if (graphAgent.GetVariable("Command", out BlackboardVariable bbVar) && bbVar != null)
+                    {
+                        bbVar.ObjectValue = cmd;
+                        setSuccess = true;
+                    }
+                }
+                catch {}
             }
-            catch {}
+
+            if (setSuccess)
+            {
+                try
+                {
+                    graphAgent.Restart();
+                    Debug.Log($"[Command Queue] {name} (ID: {UnitID}) restarted behavior graph for command: {cmd}");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[Command Queue] Failed to restart behavior graph: {ex.Message}");
+                }
+            }
+
+            LogDetailedBlackboardStatus();
         }
 
         private GameObject statusIndicator;
