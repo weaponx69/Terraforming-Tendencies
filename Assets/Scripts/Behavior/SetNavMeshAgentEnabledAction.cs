@@ -16,16 +16,11 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnStart()
         {
-            // Self is set by Worker.Start() which may run after BehaviorGraphAgent.Start().
-            // Return Running so the BT retries next tick rather than failing the whole sequence.
-            if (Self.Value == null)
-                return Status.Running;
+            NavMeshAgent agent = GetAgent();
 
-            if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
-            {
-                // // Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
-                return Status.Failure;
-            }
+            // If no agent found at all, skip gracefully — this is a best-effort action.
+            if (agent == null)
+                return Status.Success;
 
             agent.enabled = Active.Value;
             return Status.Success;
@@ -33,18 +28,23 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnUpdate()
         {
-            // Keep waiting until Self is populated.
-            if (Self.Value == null)
-                return Status.Running;
-
-            if (!Self.Value.TryGetComponent(out NavMeshAgent agent))
-            {
-                // // Debug.LogWarning($"[SetNavMeshAgentEnabledAction] {Self.Value.name} has no NavMeshAgent!");
-                return Status.Failure;
-            }
-
-            agent.enabled = Active.Value;
+            // OnUpdate should not be reached since OnStart always returns Success or Success.
+            // Safety fallback: succeed immediately.
             return Status.Success;
+        }
+
+        private NavMeshAgent GetAgent()
+        {
+            // Primary: use the linked Self blackboard variable.
+            if (Self?.Value != null && Self.Value.TryGetComponent(out NavMeshAgent linkedAgent))
+                return linkedAgent;
+
+            // Fallback: search the behavior owner's GameObject hierarchy.
+            // This handles cases where the Self field is not linked in the BT asset.
+            if (GameObject != null && GameObject.TryGetComponent(out NavMeshAgent ownerAgent))
+                return ownerAgent;
+
+            return null;
         }
     }
 }

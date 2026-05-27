@@ -147,6 +147,7 @@ namespace GameDevTV.RTS.Units
                 Agent.stoppingDistance = verticalGap + 1.5f;
             }
 
+            // Keep blackboard variables updated for diagnostic logging
             graphAgent.SetVariableValue("BuildingSO", building);
             graphAgent.SetVariableValue("TargetLocation", navDestination);
             graphAgent.SetVariableValue("Ghost", instance);
@@ -157,8 +158,13 @@ namespace GameDevTV.RTS.Units
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -building.Cost.Minerals, building.Cost.MineralsSO));
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -building.Cost.Gas, building.Cost.GasSO));
 
+            // Drive navigation and construction via the C# brain coroutine.
+            // The behavior tree cannot handle Mining Drones (no Animator), so we bypass it entirely.
+            brain.StartBuild(baseBuilding, building, navDestination);
+
             return instance;
         }
+
 
         public void ResumeBuilding(BaseBuilding building)
         {

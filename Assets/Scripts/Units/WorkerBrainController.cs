@@ -10,13 +10,13 @@ namespace GameDevTV.RTS.Units
 {
     /// <summary>
     /// Self-contained finite state machine for Worker drone behaviour.
-    /// Manages the Gather → (optional Return) loop directly via NavMeshAgent,
-    /// independent of the BehaviorGraphAgent which handles animation state only.
+    /// Manages the Gather → Return loop and Build loop directly via NavMeshAgent
+    /// coroutines, independent of the BehaviorGraphAgent.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent), typeof(Worker))]
     public class WorkerBrainController : MonoBehaviour
     {
-        public enum State { Idle, MovingToSupply, Gathering, MovingToBase }
+        public enum State { Idle, MovingToSupply, Gathering, MovingToBase, MovingToBuild, Building }
 
         public State CurrentState { get; private set; } = State.Idle;
 
@@ -52,6 +52,17 @@ namespace GameDevTV.RTS.Units
         {
             targetSupply = supply;
             Restart(GatherLoop());
+        }
+
+        /// <summary>
+        /// Navigate to <paramref name="targetLocation"/>, then incrementally construct
+        /// <paramref name="building"/> over <paramref name="buildingSO"/>.BuildTime seconds.
+        /// Runs entirely in C# coroutines, bypassing the behavior-tree which cannot
+        /// handle Mining Drones (no Animator component).
+        /// </summary>
+        public void StartBuild(BaseBuilding building, BuildingSO buildingSO, Vector3 targetLocation)
+        {
+            Restart(BuildLoop(building, buildingSO, targetLocation));
         }
 
         public void Halt()
@@ -91,9 +102,7 @@ namespace GameDevTV.RTS.Units
                 CurrentState = State.MovingToSupply;
 
                 if (agent.isOnNavMesh)
-                {
                     agent.SetDestination(targetSupply.transform.position);
-                }
 
                 yield return WaitUntilNear(targetSupply.transform, agent.stoppingDistance + 0.5f, timeout: 30f);
 
@@ -106,28 +115,21 @@ namespace GameDevTV.RTS.Units
 
                 if (!targetSupply.BeginGather())
                 {
-                    // Another drone beat us to it — wait then retry navigation
                     yield return new WaitForSeconds(1.5f);
                     continue;
                 }
 
-                float gatherTime = targetSupply.Supply != null
-                    ? targetSupply.Supply.BaseGatherTime
-                    : 1.5f;
-
+                float gatherTime = targetSupply.Supply != null ? targetSupply.Supply.BaseGatherTime : 1.5f;
                 yield return new WaitForSeconds(gatherTime);
 
                 if (targetSupply == null) break;
 
                 int gathered = targetSupply.EndGather();
 
-                // Credit resources to the player immediately (same as BT GatherSuppliesAction does)
                 if (eventChannel != null && gathered > 0)
-                {
                     eventChannel.SendEventMessage(gameObject, gathered, targetSupply?.Supply);
-                }
 
-                // ── State: Return to base (visual only — resources credited above) ──
+                // ── State: Return to base ──────────────────────────────
                 if (homeBase != null && agent.isOnNavMesh)
                 {
                     CurrentState = State.MovingToBase;
@@ -136,31 +138,104 @@ namespace GameDevTV.RTS.Units
                     if (agent.isOnNavMesh) agent.ResetPath();
                 }
 
-                // One frame so the event processes before we loop
                 yield return null;
             }
 
-            // Supply exhausted — go idle so AIController reassigns on next Tick
             CurrentState = State.Idle;
             runningCoroutine = null;
             worker.Stop();
         }
 
-        /// <summary>
-        /// Yields until the XZ distance to <paramref name="target"/> is within
-        /// <paramref name="stopDist"/>, or <paramref name="timeout"/> seconds elapse.
-        /// </summary>
+        private IEnumerator BuildLoop(BaseBuilding building, BuildingSO buildingSO, Vector3 targetLocation)
+        {
+            // ── Navigate to build site ────────────────────────────────
+            CurrentState = State.MovingToBuild;
+
+            if (agent.isOnNavMesh)
+                agent.SetDestination(targetLocation);
+
+            yield return WaitUntilNear(targetLocation, agent.stoppingDistance + 0.5f, timeout: 60f);
+
+            if (building == null)
+            {
+                CurrentState = State.Idle;
+                runningCoroutine = null;
+                worker.Stop();
+                yield break;
+            }
+
+            agent.ResetPath();
+
+            // ── Start construction ────────────────────────────────────
+            CurrentState = State.Building;
+            building.StartBuilding(worker);
+
+            // Rise-from-ground animation
+            Renderer buildingRenderer = building.MainRenderer;
+            Vector3 endPosition = building.transform.position;
+            Vector3 startPosition = endPosition;
+            if (buildingRenderer != null)
+            {
+                startPosition = endPosition - Vector3.up * buildingRenderer.bounds.size.y;
+                buildingRenderer.transform.position = startPosition;
+            }
+
+            float startTime = building.Progress.StartTime;
+            float targetHealth = 0f;
+
+            while (building != null)
+            {
+                float normalizedTime = (Time.time - startTime) / buildingSO.BuildTime;
+
+                targetHealth += Time.deltaTime * (buildingSO.Health / buildingSO.BuildTime);
+                if (targetHealth >= 1)
+                {
+                    int healAmount = Mathf.FloorToInt(targetHealth);
+                    building.Heal(healAmount);
+                    targetHealth -= healAmount;
+                }
+
+                if (buildingRenderer != null)
+                    buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalizedTime);
+
+                if (normalizedTime >= 1f) break;
+                yield return null;
+            }
+
+            // ── Complete construction ─────────────────────────────────
+            if (building != null)
+            {
+                building.enabled = true;
+                building.CompleteConstruction();
+            }
+
+            CurrentState = State.Idle;
+            runningCoroutine = null;
+            worker.Stop();
+        }
+
         private IEnumerator WaitUntilNear(Transform target, float stopDist, float timeout)
         {
             float elapsed = 0f;
             while (elapsed < timeout)
             {
                 if (target == null) yield break;
-
                 float dx = transform.position.x - target.position.x;
                 float dz = transform.position.z - target.position.z;
                 if (dx * dx + dz * dz <= stopDist * stopDist) yield break;
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
 
+        private IEnumerator WaitUntilNear(Vector3 targetPos, float stopDist, float timeout)
+        {
+            float elapsed = 0f;
+            while (elapsed < timeout)
+            {
+                float dx = transform.position.x - targetPos.x;
+                float dz = transform.position.z - targetPos.z;
+                if (dx * dx + dz * dz <= stopDist * stopDist) yield break;
                 elapsed += Time.deltaTime;
                 yield return null;
             }

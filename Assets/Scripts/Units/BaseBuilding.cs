@@ -132,8 +132,19 @@ namespace GameDevTV.RTS.Units
                 MainRenderer.material = primaryMaterial;
             }
 
+            // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
+            if (BuildingSO != null && BuildingSO.IsLifeSupport)
+            {
+                if (!TryGetComponent<LifeSupportNode>(out _))
+                {
+                    var node = gameObject.AddComponent<LifeSupportNode>();
+                    node.Radius = BuildingSO.LifeSupportRadius;
+                }
+            }
+
             RaiseSpawnEvent();
         }
+
 
 
         public void BuildUnlockable(UnlockableSO unlockable)

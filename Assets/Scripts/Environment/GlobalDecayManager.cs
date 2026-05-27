@@ -55,7 +55,7 @@ namespace GameDevTV.RTS.Environment
             {
                 yield return new WaitForSeconds(decayTickRate);
 
-                // Re-fetch in case new ones were built
+                // All LifeSupportNode components in the scene (including those dynamically added to buildings).
                 LifeSupportNode[] lifeSupportNodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
 
                 for (int i = activeBuildings.Count - 1; i >= 0; i--)
@@ -67,8 +67,10 @@ namespace GameDevTV.RTS.Environment
                         continue;
                     }
 
-                    // For the MVP, main Command Post itself might not have LifeSupportNode if it decays too. 
-                    // But if it has a LifeSupportNode, it protects itself and others.
+                    // A building that IS a LifeSupportNode protects itself — skip decay entirely.
+                    if (building.TryGetComponent<LifeSupportNode>(out _))
+                        continue;
+
                     bool isSupported = false;
                     foreach (var node in lifeSupportNodes)
                     {
@@ -84,21 +86,14 @@ namespace GameDevTV.RTS.Environment
                         int damage = Mathf.RoundToInt(baseDecayRate * decayTickRate);
                         if (damage > 0)
                         {
-                            // Try to cast to IDamageable to take damage
                             if (building is IDamageable damageable)
                             {
                                 damageable.TakeDamage(damage);
                             }
-                            else 
+                            else
                             {
-                                // BaseBuilding doesn't explicitly implement IDamageable in the interface, 
-                                // but it might be IDamageable if it inherits from AbstractCommandable which implements it.
-                                // Let's check AbstractCommandable.
                                 var d = building.GetComponent<IDamageable>();
-                                if (d != null)
-                                {
-                                    d.TakeDamage(damage);
-                                }
+                                if (d != null) d.TakeDamage(damage);
                             }
                         }
                     }
