@@ -39,7 +39,7 @@ namespace GameDevTV.RTS.Units
         protected override void Awake()
         {
             base.Awake();
-            Debug.Log($"[BaseBuilding Debug] Awake called on {gameObject.name} (ID: {GetInstanceID()})");
+            Debug.Log($"[BaseBuilding Debug] Awake called on {gameObject.name} (ID: {GetHashCode()})");
 
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO.Health;
@@ -64,14 +64,14 @@ namespace GameDevTV.RTS.Units
 
         private void OnEnable()
         {
-            Debug.Log($"[BaseBuilding Debug] OnEnable called on {gameObject.name} (ID: {GetInstanceID()})");
+            Debug.Log($"[BaseBuilding Debug] OnEnable called on {gameObject.name} (ID: {GetHashCode()})");
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
         }
 
         private void OnDisable()
         {
-            Debug.Log($"[BaseBuilding Debug] OnDisable called on {gameObject.name} (ID: {GetInstanceID()})");
+            Debug.Log($"[BaseBuilding Debug] OnDisable called on {gameObject.name} (ID: {GetHashCode()})");
             ActiveBuildings.Remove(this);
         }
 
@@ -80,14 +80,14 @@ namespace GameDevTV.RTS.Units
             if (!hasRaisedSpawnEvent)
             {
                 hasRaisedSpawnEvent = true;
-                Debug.Log($"[BaseBuilding Debug] Raising BuildingSpawnEvent for {gameObject.name} (ID: {GetInstanceID()})");
+                Debug.Log($"[BaseBuilding Debug] Raising BuildingSpawnEvent for {gameObject.name} (ID: {GetHashCode()})");
                 Bus<BuildingSpawnEvent>.Raise(Owner, new BuildingSpawnEvent(Owner, this));
             }
         }
 
         protected override void Start()
         {
-            Debug.Log($"[BaseBuilding Debug] Start called on {gameObject.name} (ID: {GetInstanceID()}). Progress State: {Progress.State}, Owner: {Owner}");
+            Debug.Log($"[BaseBuilding Debug] Start called on {gameObject.name} (ID: {GetHashCode()}). Progress State: {Progress.State}, Owner: {Owner}");
             base.Start();
 
             // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
@@ -133,12 +133,13 @@ namespace GameDevTV.RTS.Units
             }
 
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
-            if (BuildingSO != null && BuildingSO.IsLifeSupport)
+            bool isCommandPost = BuildingSO != null && (BuildingSO.name.Contains("Command Post") || BuildingSO.name.Contains("Command Center"));
+            if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isCommandPost)
             {
                 if (!TryGetComponent<LifeSupportNode>(out _))
                 {
                     var node = gameObject.AddComponent<LifeSupportNode>();
-                    node.Radius = BuildingSO.LifeSupportRadius;
+                    node.Radius = isCommandPost ? Mathf.Max(BuildingSO.LifeSupportRadius, 30f) : BuildingSO.LifeSupportRadius;
                 }
             }
 
@@ -218,9 +219,14 @@ namespace GameDevTV.RTS.Units
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 0;
             Heal(1);
-            if (MainRenderer != null && ghostMaterial != null)
+            // Let SmokestackVisuals (or any future visual override) supply its own ghost material.
+            Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
+                ? sv.GhostMaterial
+                : ghostMaterial;
+
+            if (MainRenderer != null && effectiveMat != null)
             {
-                MainRenderer.material = ghostMaterial;
+                MainRenderer.material = effectiveMat;
             }
 
             if (navMeshObstacle != null)
@@ -242,7 +248,11 @@ namespace GameDevTV.RTS.Units
             Owner = unitBuildingThis.Owner;
             if (MainRenderer != null)
             {
-                MainRenderer.material = BuildingSO.PlacementMaterial;
+                // Use the visual override material if present (e.g. dull grey for smokestack).
+                Material buildMat = TryGetComponent<SmokestackVisuals>(out var sv2)
+                    ? sv2.GhostMaterial
+                    : BuildingSO.PlacementMaterial;
+                MainRenderer.material = buildMat;
             }
 
             Progress = new BuildingProgress(
@@ -391,7 +401,7 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
 
         protected override void OnDestroy()
         {
-            Debug.Log($"[BaseBuilding Debug] OnDestroy called on {gameObject.name} (ID: {GetInstanceID()})! StackTrace:\n{System.Environment.StackTrace}");
+            Debug.Log($"[BaseBuilding Debug] OnDestroy called on {gameObject.name} (ID: {GetHashCode()})! StackTrace:\n{System.Environment.StackTrace}");
             base.OnDestroy();
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
             if (hasRaisedSpawnEvent)

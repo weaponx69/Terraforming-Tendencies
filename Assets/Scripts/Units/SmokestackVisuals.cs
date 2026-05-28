@@ -11,18 +11,22 @@ namespace GameDevTV.RTS.Units
     [RequireComponent(typeof(BaseBuilding))]
     public class SmokestackVisuals : MonoBehaviour
     {
-        [Header("Stack Dimensions")]
-        [SerializeField] private float stackHeight = 5f;
-        [SerializeField] private float stackRadius = 0.3f;
-        [SerializeField] private float baseHeight = 0.5f;
-        [SerializeField] private float baseRadius = 0.7f;
+        [Header("Monolith Dimensions")]
+        [SerializeField] private float width = 1.5f;
+        [SerializeField] private float height = 6f;
+        [SerializeField] private float depth = 1.5f;
 
         [Header("Appearance")]
-        [SerializeField] private Color metalColor = new Color(0.50f, 0.52f, 0.54f);
+        [SerializeField] private Color ghostColor = new Color(0.45f, 0.47f, 0.50f, 0.75f);  // dull grey, slightly transparent
+        [SerializeField] private Color finalColor = new Color(0.38f, 0.40f, 0.42f);           // dark industrial monolith
 
         [Header("Smoke")]
         [SerializeField] private float smokeEmissionRate = 6f;
         [SerializeField] private float smokeSpeed = 0.6f;
+
+        // Exposed so BaseBuilding can query it during InitializeAsGhost and StartBuilding.
+        public Material GhostMaterial  { get; private set; }
+        public Material FinalMaterial  { get; private set; }
 
         private BaseBuilding building;
         private ParticleSystem smokePS;
@@ -32,9 +36,22 @@ namespace GameDevTV.RTS.Units
         {
             building = GetComponent<BaseBuilding>();
 
-            // Hide any existing renderer that shipped with the prefab so it doesn't compete.
+            // Create materials first — BaseBuilding.InitializeAsGhost may query GhostMaterial
+            // immediately after Awake() via Worker.Build().
+            GhostMaterial  = MakeMetal(ghostColor, metallic: 0.65f, smoothness: 0.15f, transparent: true);
+            FinalMaterial  = MakeMetal(finalColor, metallic: 0.85f, smoothness: 0.20f, transparent: false);
+
+            // Destroy any existing renderer/filter that shipped with the prefab so it doesn't compete.
             foreach (var r in GetComponentsInChildren<MeshRenderer>())
-                r.enabled = false;
+            {
+                if (r.gameObject != gameObject) Destroy(r.gameObject);
+                else
+                {
+                    Destroy(r);
+                    var mf = GetComponent<MeshFilter>();
+                    if (mf != null) Destroy(mf);
+                }
+            }
 
             BuildGeometry();
             BuildSmokeEffect();
@@ -50,45 +67,41 @@ namespace GameDevTV.RTS.Units
         {
             visualRoot = new GameObject("SmokestackRoot").transform;
             visualRoot.SetParent(transform, false);
+            visualRoot.localPosition = Vector3.zero;
 
-            Material metalMat = MakeMetal(metalColor);
+            Material metalMat = GhostMaterial;
 
-            // Wide base at ground level
-            MakeCylinder("Base", visualRoot,
-                new Vector3(0, baseHeight * 0.5f, 0),
-                new Vector3(baseRadius * 2f, baseHeight * 0.5f, baseRadius * 2f),
-                metalMat);
-
-            // Main tall stack
-            MakeCylinder("Stack", visualRoot,
-                new Vector3(0, baseHeight + stackHeight * 0.5f, 0),
-                new Vector3(stackRadius * 2f, stackHeight * 0.5f, stackRadius * 2f),
-                metalMat);
-
-            // Flared lip at the very top
-            MakeCylinder("Lip", visualRoot,
-                new Vector3(0, baseHeight + stackHeight + 0.06f, 0),
-                new Vector3(stackRadius * 3f, 0.06f, stackRadius * 3f),
-                metalMat);
+            // Single Monolith Cube
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Monolith";
+            go.transform.SetParent(visualRoot, false);
+            // Center of the cube needs to be half-height so it sits on the ground
+            go.transform.localPosition = new Vector3(0, height * 0.5f, 0);
+            go.transform.localScale = new Vector3(width, height, depth);
+            
+            Destroy(go.GetComponent<BoxCollider>()); // colliders handled by BaseBuilding
+            go.GetComponent<MeshRenderer>().material = metalMat;
         }
 
-        private static void MakeCylinder(string objName, Transform parent, Vector3 localPos, Vector3 localScale, Material mat)
+        private static Material MakeMetal(Color color, float metallic = 0.80f, float smoothness = 0.25f, bool transparent = false)
         {
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            go.name = objName;
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = localPos;
-            go.transform.localScale = localScale;
-            Destroy(go.GetComponent<CapsuleCollider>()); // colliders handled by BaseBuilding
-            go.GetComponent<MeshRenderer>().material = mat;
-        }
-
-        private static Material MakeMetal(Color color)
-        {
-            var mat = new Material(Shader.Find("Standard"));
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var mat = new Material(shader);
+            if (transparent)
+            {
+                // Fade rendering mode for semi-transparent ghost
+                mat.SetFloat("_Mode", 2); // Fade
+                mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                mat.SetInt("_ZWrite", 0);
+                mat.DisableKeyword("_ALPHATEST_ON");
+                mat.EnableKeyword("_ALPHABLEND_ON");
+                mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                mat.renderQueue = 3000;
+            }
             mat.color = color;
-            mat.SetFloat("_Metallic", 0.80f);
-            mat.SetFloat("_Glossiness", 0.25f);
+            mat.SetFloat("_Metallic", metallic);
+            mat.SetFloat("_Glossiness", smoothness);
             return mat;
         }
 
@@ -98,7 +111,8 @@ namespace GameDevTV.RTS.Units
         {
             GameObject smokeGO = new GameObject("SmokeEffect");
             smokeGO.transform.SetParent(transform, false);
-            smokeGO.transform.localPosition = new Vector3(0f, baseHeight + stackHeight + 0.15f, 0f);
+            // Place smoke exactly at the top of the monolith
+            smokeGO.transform.localPosition = new Vector3(0f, height + 0.1f, 0f);
 
             smokePS = smokeGO.AddComponent<ParticleSystem>();
 
@@ -122,7 +136,7 @@ namespace GameDevTV.RTS.Units
             shape.enabled   = true;
             shape.shapeType = ParticleSystemShapeType.Cone;
             shape.angle     = 8f;
-            shape.radius    = stackRadius * 0.5f;
+            shape.radius    = Mathf.Min(width, depth) * 0.4f;
 
             // Fade out & expand over lifetime
             var col = smokePS.colorOverLifetime;
@@ -141,8 +155,9 @@ namespace GameDevTV.RTS.Units
             var vel = smokePS.velocityOverLifetime;
             vel.enabled = true;
             vel.space   = ParticleSystemSimulationSpace.Local;
-            vel.x = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
-            vel.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
+            // Use simple constant velocity to avoid mixed-mode errors
+            vel.x = new ParticleSystem.MinMaxCurve(0.1f);
+            vel.z = new ParticleSystem.MinMaxCurve(0.1f);
 
             // Soft particle material
             var psr = smokeGO.GetComponent<ParticleSystemRenderer>();
@@ -163,6 +178,13 @@ namespace GameDevTV.RTS.Units
         // Called by BaseBuilding.CompleteConstruction()
         public void ActivateSmoke()
         {
+            // Swap every smokestack renderer to the final dark-metal material.
+            if (visualRoot != null)
+            {
+                foreach (var r in visualRoot.GetComponentsInChildren<MeshRenderer>())
+                    r.material = FinalMaterial;
+            }
+
             if (smokePS != null && !smokePS.isPlaying)
                 smokePS.Play();
         }

@@ -144,10 +144,27 @@ namespace GameDevTV.RTS.Player
             {
                 ActivateAction(new RaycastHit());
             }
-            else if (activeCommand.GhostPrefab != null)
+            else 
             {
-                ghostInstance = Instantiate(activeCommand.GhostPrefab);
-                ghostRenderer = ghostInstance.GetComponentInChildren<MeshRenderer>();
+                GameObject prefabToInstantiate = activeCommand.GhostPrefab;
+                
+                // If this is a building command, completely ignore the assigned GhostPrefab and just use 
+                // the actual building prefab. This guarantees the preview shape matches the final shape!
+                if (activeCommand is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Prefab != null)
+                {
+                    prefabToInstantiate = bbc.Building.Prefab;
+                }
+
+                if (prefabToInstantiate != null)
+                {
+                    ghostInstance = Instantiate(prefabToInstantiate);
+                    ghostRenderer = ghostInstance.GetComponentInChildren<Renderer>();
+                    
+                    // We only want the visuals for the ghost, so strip any colliders/navmesh obstacles
+                    // to prevent it from interfering with the game while dragging!
+                    foreach (var col in ghostInstance.GetComponentsInChildren<Collider>()) Destroy(col);
+                    foreach (var nav in ghostInstance.GetComponentsInChildren<UnityEngine.AI.NavMeshObstacle>()) Destroy(nav);
+                }
             }
         }
 

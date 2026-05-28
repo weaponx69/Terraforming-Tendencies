@@ -20,4 +20,4 @@ MonoBehaviour:
   <GhostPrefab>k__BackingField: {fileID: 6863950657232117088, guid: c60b206b950e2df33a7a6da0d9039fa9, type: 3}
   <Restrictions>k__BackingField:
   - {fileID: 11400000, guid: ce5f6d260e8d6d54fbb96a434adb7bc2, type: 2}
-  <Building>k__BackingField: {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}
+  <Building>k__BackingField: {fileID: 0}

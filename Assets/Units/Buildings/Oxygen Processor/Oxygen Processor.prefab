@@ -73,6 +73,7 @@ GameObject:
   - component: {fileID: 2422821575361291847}
   - component: {fileID: 7460994627033053413}
   - component: {fileID: 8857424984771829256}
+  - component: {fileID: 6048315779731679173}
   m_Layer: 7
   m_Name: Oxygen Processor
   m_TagString: Untagged
@@ -168,6 +169,25 @@ MonoBehaviour:
   navMeshObstacle: {fileID: 0}
   oxygenPerTick: 0.001
   tickRate: 1
+--- !u!114 &6048315779731679173
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6964012305514025925}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad48e05667fc989f8b03f308a83109c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.SmokestackVisuals
+  stackHeight: 5
+  stackRadius: 0.3
+  baseHeight: 0.5
+  baseRadius: 0.7
+  metalColor: {r: 0.5, g: 0.52, b: 0.54, a: 1}
+  smokeEmissionRate: 6
+  smokeSpeed: 0.6
 --- !u!1001 &4498428509526723367
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -41,13 +41,23 @@ namespace GameDevTV.RTS.Units
             // The BehaviorGraphAgent handles its own initialization.
             
             SetCurrentCommand(UnitCommands.Stop);
-            if (graphAgent != null && unitSO != null && unitSO.AttackConfig != null)
+            ReapplyCoreBlackboardVariables();
+        }
+
+        protected virtual void ReapplyCoreBlackboardVariables()
+        {
+            if (graphAgent != null)
             {
                 try
                 {
-                    graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
+                    graphAgent.SetVariableValue("Self", gameObject);
+                    graphAgent.SetVariableValue("Unit", this);
+                    if (unitSO != null && unitSO.AttackConfig != null)
+                    {
+                        graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
+                    }
                 }
-                catch {}
+                catch { }
             }
         }
 
@@ -409,6 +419,7 @@ namespace GameDevTV.RTS.Units
                 try
                 {
                     graphAgent.Restart();
+                    ReapplyCoreBlackboardVariables();
                     Debug.Log($"[Command Queue] {name} (ID: {UnitID}) restarted behavior graph for command: {cmd}");
                 }
                 catch (System.Exception ex)

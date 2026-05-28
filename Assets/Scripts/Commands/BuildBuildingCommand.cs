@@ -178,6 +178,8 @@ namespace GameDevTV.RTS.Commands
 
         private bool HasEnoughSupplies(CommandContext context)
         {
+            if (Building == null || Building.Cost == null) return true;
+
             // Biomass replaces minerals/gas. Compute biomass-equivalent cost.
             int biomassCost = Mathf.FloorToInt(Building.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
                 + Building.Cost.Gas * Supplies.GasToBiomassRateStatic);
