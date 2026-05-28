@@ -158,7 +158,7 @@ namespace GameDevTV.RTS.Player
                 if (prefabToInstantiate != null)
                 {
                     ghostInstance = Instantiate(prefabToInstantiate);
-                    ghostRenderer = ghostInstance.GetComponentInChildren<Renderer>();
+                    ghostRenderer = ghostInstance.GetComponentInChildren<MeshRenderer>();
                     
                     // We only want the visuals for the ghost, so strip any colliders/navmesh obstacles
                     // to prevent it from interfering with the game while dragging!
