@@ -87,7 +87,6 @@ namespace GameDevTV.RTS.Units
 
         protected override void Start()
         {
-            Debug.Log($"[BaseBuilding Debug] Start called on {gameObject.name} (ID: {GetHashCode()}). Progress State: {Progress.State}, Owner: {Owner}");
             base.Start();
 
             // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
@@ -401,7 +400,6 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
 
         protected override void OnDestroy()
         {
-            Debug.Log($"[BaseBuilding Debug] OnDestroy called on {gameObject.name} (ID: {GetHashCode()})! StackTrace:\n{System.Environment.StackTrace}");
             base.OnDestroy();
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
             if (hasRaisedSpawnEvent)

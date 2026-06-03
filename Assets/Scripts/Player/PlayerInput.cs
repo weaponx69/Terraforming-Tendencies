@@ -436,7 +436,6 @@ HandleZooming();
                 CommandContext context = new(abstractCommandables[i], hit, i);
                 if (activeCommand.CanHandle(context))
                 {
-                    Debug.Log($"[PlayerInput] Placing command {activeCommand.Name} at {hit.point}");
                     activeCommand.Handle(context);
                     if (activeCommand.IsSingleUnitCommand)
                     {

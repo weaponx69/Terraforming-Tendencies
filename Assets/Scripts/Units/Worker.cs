@@ -198,12 +198,7 @@ namespace GameDevTV.RTS.Units
             if (graphAgent.GetVariable("Ghost", out BlackboardVariable<GameObject> ghostVariable)
                 && ghostVariable.Value != null)
             {
-                Debug.Log($"[Worker] CancelBuilding called! Destroying ghost instance {ghostVariable.Value.name}");
                 Destroy(ghostVariable.Value);
-            }
-            else
-            {
-                Debug.Log($"[Worker] CancelBuilding called, but no ghost was found in the blackboard to destroy.");
             }
             if (graphAgent.GetVariable("BuildingUnderConstruction", out BlackboardVariable<BaseBuilding> buildingVariable)
                 && buildingVariable.Value != null)

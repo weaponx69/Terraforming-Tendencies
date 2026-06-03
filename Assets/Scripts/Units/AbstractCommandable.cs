@@ -119,7 +119,6 @@ namespace GameDevTV.RTS.Units
 
         public void Die()
         {
-            Debug.Log($"[AbstractCommandable] {name} is dying! StackTrace: {System.Environment.StackTrace}");
             Destroy(gameObject);
         }
 

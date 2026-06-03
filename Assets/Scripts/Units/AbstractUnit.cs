@@ -26,7 +26,6 @@ namespace GameDevTV.RTS.Units
         private static int nextUnitId = 1;
         public int UnitID { get; private set; }
 
-        private float lastDiagnosticTime = 0f;
         private float lastStatusUpdateTime = 0f;
         private const float STATUS_UPDATE_INTERVAL = 0.2f;
 
@@ -187,17 +186,6 @@ namespace GameDevTV.RTS.Units
                     lastStatusUpdateTime = Time.time;
                     UpdateStatusIndicator();
                 }
-
-                // Periodically log blackboard status if a command is in progress
-                if (Time.time - lastDiagnosticTime >= 3.0f)
-                {
-                    lastDiagnosticTime = Time.time;
-                    if (TryGetCurrentCommand(out UnitCommands currentCmd) && currentCmd != UnitCommands.Stop)
-                    {
-                        Debug.Log($"[Periodic Diagnostic] {name} (ID: {UnitID}) command is {currentCmd}");
-                        LogDetailedBlackboardStatus();
-                    }
-                }
             }
         }
 
@@ -265,83 +253,7 @@ namespace GameDevTV.RTS.Units
 
             }
 
-            if (statusColor == Color.red)
-            {
-                Debug.Log($"[Status] {name} (ID: {UnitID}) is RED. Reason: {reason} | NameSO: {unitSO?.Name ?? "null"}");
-                
-                // Print extensive diagnostics for drones/workers when RED
-                if (unitSO != null && (unitSO.Name.Contains("Drone") || unitSO.Name.Contains("Worker")))
-                {
-                    LogDetailedBlackboardStatus();
-                }
-            }
-
             SetStatusColor(statusColor, reason);
-        }
-
-        private void LogDetailedBlackboardStatus()
-        {
-            try
-            {
-                if (graphAgent == null)
-                {
-                    Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | graphAgent IS NULL");
-                    return;
-                }
-
-                // Check initialization state — root cause suspect for all NOT FOUND
-                bool isInit = false, isStarted = false;
-                try
-                {
-                    var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-                    var f1 = graphAgent.GetType().GetField("m_IsInitialised", bf);
-                    var f2 = graphAgent.GetType().GetField("m_IsStarted", bf);
-                    if (f1 != null) isInit = (bool)f1.GetValue(graphAgent);
-                    if (f2 != null) isStarted = (bool)f2.GetValue(graphAgent);
-                }
-                catch {}
-
-                Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | m_IsInitialised={isInit} | m_IsStarted={isStarted}");
-                if (!isInit) return;
-
-                string[] vars = { 
-                    BlackboardConstants.COMMAND, 
-                    BlackboardConstants.SELF, 
-                    BlackboardConstants.UNIT, 
-                    BlackboardConstants.SUPPLY, 
-                    BlackboardConstants.TARGET_GAME_OBJECT, 
-                    BlackboardConstants.TARGET_LOCATION 
-                };
-                foreach (var vName in vars)
-                {
-                    try {
-                        if (graphAgent.GetVariable(vName, out Unity.Behavior.BlackboardVariable bbVar))
-                        {
-                            object val = null;
-                            try {
-                                val = bbVar?.ObjectValue;
-                            } catch (System.Exception valEx) {
-                                val = $"<Exception reading ObjectValue: {valEx.Message}>";
-                            }
-                            string typeName = "null";
-                            try {
-                                typeName = val?.GetType().Name ?? "null";
-                            } catch {}
-                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' = {val ?? "null"} (Type: {typeName})");
-                        }
-                        else
-                        {
-                            Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | '{vName}' NOT FOUND (initialized=true)");
-                        }
-                    } catch (System.Exception ex) {
-                        Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | Exception processing variable '{vName}': {ex.Message}");
-                    }
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.Log($"[Blackboard Diagnostic] Crash: {ex.Message}");
-            }
         }
 
         private object GetBlackboardObject()
@@ -417,7 +329,6 @@ namespace GameDevTV.RTS.Units
         public void SetCurrentCommand(UnitCommands cmd)
         {
             if (graphAgent == null) return;
-            Debug.Log($"[Command Queue] {name} (ID: {UnitID}) SetCurrentCommand: {cmd}");
 
             // Primary: typed SetVariableValue
             bool setSuccess = graphAgent.SetVariableValue(BlackboardConstants.COMMAND, cmd);
@@ -442,15 +353,12 @@ namespace GameDevTV.RTS.Units
                 {
                     graphAgent.Restart();
                     ReapplyCoreBlackboardVariables();
-                    Debug.Log($"[Command Queue] {name} (ID: {UnitID}) restarted behavior graph for command: {cmd}");
                 }
                 catch (System.Exception ex)
                 {
                     Debug.LogError($"[Command Queue] Failed to restart behavior graph: {ex.Message}");
                 }
             }
-
-            LogDetailedBlackboardStatus();
         }
 
         private GameObject statusIndicator;
