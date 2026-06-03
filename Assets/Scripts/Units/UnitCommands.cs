@@ -11,6 +11,7 @@ namespace GameDevTV.RTS.Units
         ReturnSupplies,
         BuildBuilding,
         Attack,
-        LoadUnits
+        LoadUnits,
+        Repair
     }
 }

@@ -11,13 +11,31 @@ using UnityEngine.AI;
 
 namespace GameDevTV.RTS.Units
 {
-    public class Worker : AbstractUnit, IBuildingBuilder, ITransportable
+    public class Worker : AbstractUnit, IBuildingBuilder, ITransportable, IRepairer
     {
         public bool IsBuilding => GetCurrentCommand() == UnitCommands.BuildBuilding;
+        public bool IsRepairing => GetCurrentCommand() == UnitCommands.Repair;
         public bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
         public bool IsGathering => brain != null && brain.CurrentState == WorkerBrainController.State.Gathering;
         public bool IsActivelyWorking => brain != null && brain.CurrentState != WorkerBrainController.State.Idle;
         public WorkerBrainController.State BrainState => brain != null ? brain.CurrentState : WorkerBrainController.State.Idle;
+
+        public void Repair(AbstractCommandable target)
+        {
+            if (target == null) return;
+            brain?.Halt();
+
+            if (Agent != null)
+            {
+                float verticalGap = Mathf.Abs(transform.position.y - target.transform.position.y);
+                Agent.stoppingDistance = verticalGap + 2.5f;
+            }
+
+            graphAgent.SetVariableValue("TargetGameObject", target.gameObject);
+            SetCurrentCommand(UnitCommands.Repair);
+
+            brain?.StartRepair(target);
+        }
         public bool HasSupplies
         {
             get

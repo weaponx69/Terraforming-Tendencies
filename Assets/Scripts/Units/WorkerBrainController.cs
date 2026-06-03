@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.Units
     [RequireComponent(typeof(NavMeshAgent), typeof(Worker))]
     public class WorkerBrainController : MonoBehaviour
     {
-        public enum State { Idle, MovingToSupply, Gathering, MovingToBase, MovingToBuild, Building }
+        public enum State { Idle, MovingToSupply, Gathering, MovingToBase, MovingToBuild, Building, MovingToRepair, Repairing }
 
         public State CurrentState { get; private set; } = State.Idle;
 
@@ -63,6 +63,11 @@ namespace GameDevTV.RTS.Units
         public void StartBuild(BaseBuilding building, BuildingSO buildingSO, Vector3 targetLocation)
         {
             Restart(BuildLoop(building, buildingSO, targetLocation));
+        }
+
+        public void StartRepair(AbstractCommandable target)
+        {
+            Restart(RepairLoop(target));
         }
 
         public void Halt()
@@ -139,6 +144,45 @@ namespace GameDevTV.RTS.Units
                 }
 
                 yield return null;
+            }
+
+            CurrentState = State.Idle;
+            runningCoroutine = null;
+            worker.Stop();
+        }
+
+        private IEnumerator RepairLoop(AbstractCommandable target)
+        {
+            while (target != null && target.CurrentHealth < target.MaxHealth)
+            {
+                CurrentState = State.MovingToRepair;
+                if (agent.isOnNavMesh)
+                    agent.SetDestination(target.transform.position);
+
+                yield return WaitUntilNear(target.transform, agent.stoppingDistance + 1.2f, timeout: 30f);
+
+                if (target == null || target.CurrentHealth >= target.MaxHealth) break;
+
+                CurrentState = State.Repairing;
+                if (agent.isOnNavMesh) agent.ResetPath();
+
+                float repairTimer = 0f;
+                while (target != null && target.CurrentHealth < target.MaxHealth)
+                {
+                    repairTimer += Time.deltaTime;
+                    if (repairTimer >= 0.5f) // Repair tick rate
+                    {
+                        target.Heal(2); // Heal per tick
+                        repairTimer = 0f;
+                    }
+                    
+                    if (Vector3.Distance(transform.position, target.transform.position) > agent.stoppingDistance + 2f)
+                    {
+                        break; 
+                    }
+
+                    yield return null;
+                }
             }
 
             CurrentState = State.Idle;

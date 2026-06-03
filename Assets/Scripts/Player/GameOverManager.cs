@@ -73,7 +73,7 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
-            InvokeRepeating(nameof(CheckNoRecovery), checkInterval, checkInterval);
+            InvokeRepeating(nameof(CheckNoRecovery), 10f, checkInterval); // Wait 10s for initial spawn
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────────
@@ -81,6 +81,11 @@ namespace GameDevTV.RTS.Player
         private void HandleIntegrityDepleted()
         {
             if (gameOverTriggered) return;
+            
+            // Check if we actually have units before failing. 
+            // If integrity is 0 because of no units, don't fail immediately at start.
+            if (Time.timeSinceLevelLoad < 5f) return;
+            
             TriggerGameOver();
         }
 
