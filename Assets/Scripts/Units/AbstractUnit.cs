@@ -55,6 +55,16 @@ namespace GameDevTV.RTS.Units
                 {
                     graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
                     graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
+
+                    if (graphAgent != null)
+                    {
+                        Animator animator = GetComponentInChildren<Animator>();
+                        if (animator != null)
+                        {
+                            graphAgent.SetVariableValue("Animator", animator);
+                        }
+                    }
+
                     if (unitSO != null && unitSO.AttackConfig != null)
                     {
                         graphAgent.SetVariableValue(BlackboardConstants.ATTACK_CONFIG, unitSO.AttackConfig);
@@ -75,6 +85,7 @@ namespace GameDevTV.RTS.Units
             // m_Blackboard.m_Variables empty — variables are in m_Source (RuntimeBlackboardAsset).
             // We call GenerateInstanceData via reflection to populate the live blackboard.
             RepairBlackboards();
+            ReapplyCoreBlackboardVariables();
 
             if (DamageableSensor != null)
             {
@@ -106,59 +117,92 @@ namespace GameDevTV.RTS.Units
                 var graph = graphField.GetValue(graphAgent) as Unity.Behavior.BehaviorGraph;
                 if (graph == null) return;
 
-                // Access BehaviorGraph.Graphs (internal List<BehaviorGraphModule>)
-                var graphsField = graph.GetType().GetField("Graphs",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.Public);
-                if (graphsField == null) return;
+                RepairGraphRecursive(graph, bf);
+            }
+            catch {}
+        }
 
-                var modules = graphsField.GetValue(graph) as System.Collections.IList;
-                if (modules == null) return;
+        private void RepairGraphRecursive(BehaviorGraph graph, System.Reflection.BindingFlags bf)
+        {
+            if (graph == null) return;
 
-                // BlackboardReference, Blackboard are public — look them up once
-                var mSourceField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Source", bf);
-                var mBlackboardField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Blackboard", bf);
-                var generateMethod = typeof(Unity.Behavior.Blackboard).GetMethod("GenerateInstanceData", bf);
+            // Access BehaviorGraph.Graphs (internal List<BehaviorGraphModule>)
+            var graphsField = graph.GetType().GetField("Graphs",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public);
+            if (graphsField == null) return;
 
-                if (mSourceField == null || mBlackboardField == null || generateMethod == null) return;
+            var modules = graphsField.GetValue(graph) as System.Collections.IList;
+            if (modules == null) return;
 
-                for (int i = 0; i < modules.Count; i++)
+            // BlackboardReference, Blackboard are public — look them up once
+            var mSourceField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Source", bf);
+            var mBlackboardField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Blackboard", bf);
+            var generateMethod = typeof(Unity.Behavior.Blackboard).GetMethod("GenerateInstanceData", bf);
+
+            if (mSourceField == null || mBlackboardField == null || generateMethod == null) return;
+
+            for (int i = 0; i < modules.Count; i++)
+            {
+                var module = modules[i];
+                if (module == null) continue;
+
+                // 1. Recurse into subgraphs if this module has its own graph
+                var subGraphField = module.GetType().GetField("Graph", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (subGraphField != null)
                 {
-                    var module = modules[i];
-                    if (module == null) continue;
-
-                    // BehaviorGraphModule is internal — get its type from the instance
-                    var bbRefField = module.GetType().GetField("BlackboardReference",
-                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    if (bbRefField == null) continue;
-
-                    var bbRef = bbRefField.GetValue(module);
-                    if (bbRef == null) continue;
-
-                    var source = mSourceField.GetValue(bbRef);
-                    if (source == null) continue;
-
-                    var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
-                    if (blackboard == null) continue;
-
-                    // Only repair the main blackboard of the agent, do not touch subgraphs!
-                    var mainBB = GetBlackboardObject() as Unity.Behavior.Blackboard;
-                    if (blackboard != mainBB) continue;
-
-                    // Only repopulate if m_Variables is empty
-                    if (blackboard.Variables.Count == 0)
+                    var subGraph = subGraphField.GetValue(module) as BehaviorGraph;
+                    if (subGraph != null && subGraph != graph)
                     {
-                        var sourceBB = source.GetType().GetProperty("Blackboard",
-                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                            ?.GetValue(source) as Unity.Behavior.Blackboard;
-                        if (sourceBB != null && sourceBB.Variables.Count > 0)
-                        {
-                            generateMethod.Invoke(blackboard, new object[] { sourceBB, source });
-                        }
+                        RepairGraphRecursive(subGraph, bf);
+                    }
+                }
+
+                // 2. Repair this module's blackboard
+                var bbRefField = module.GetType().GetField("BlackboardReference",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (bbRefField == null) continue;
+
+                var bbRef = bbRefField.GetValue(module);
+                if (bbRef == null) continue;
+
+                var source = mSourceField.GetValue(bbRef);
+                if (source == null) continue;
+
+                var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
+                if (blackboard == null) continue;
+
+                // Only repopulate if m_Variables is empty
+                if (blackboard.Variables.Count == 0)
+                {
+                    var sourceBB = source.GetType().GetProperty("Blackboard",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                        ?.GetValue(source) as Unity.Behavior.Blackboard;
+                    if (sourceBB != null && sourceBB.Variables.Count > 0)
+                    {
+                        generateMethod.Invoke(blackboard, new object[] { sourceBB, source });
+                    }
+                }
+
+                // Force core variables into every blackboard that has them defined.
+                // This ensures subgraphs and GameObjectToComponent variables resolve correctly.
+                Animator animator = GetComponentInChildren<Animator>();
+                foreach (var variable in blackboard.Variables)
+                {
+                    if (variable.Name == BlackboardConstants.SELF || variable.Name == "Agent")
+                    {
+                        variable.ObjectValue = gameObject;
+                    }
+                    else if (variable.Name == BlackboardConstants.UNIT)
+                    {
+                        variable.ObjectValue = this;
+                    }
+                    else if (variable.Name == "Animator" && animator != null)
+                    {
+                        variable.ObjectValue = animator;
                     }
                 }
             }
-            catch {}
         }
 
         private float lastNavMeshSampleTime = 0f;
@@ -352,6 +396,7 @@ namespace GameDevTV.RTS.Units
                 try
                 {
                     graphAgent.Restart();
+                    RepairBlackboards();
                     ReapplyCoreBlackboardVariables();
                 }
                 catch (System.Exception ex)

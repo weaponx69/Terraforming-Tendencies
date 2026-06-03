@@ -157,8 +157,8 @@ namespace GameDevTV.RTS.Units
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -building.Cost.Minerals, building.Cost.MineralsSO));
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -building.Cost.Gas, building.Cost.GasSO));
 
-            // Drive navigation and construction via the C# brain coroutine.
-            // The behavior tree cannot handle Mining Drones (no Animator), so we bypass it entirely.
+            // Drive navigation and construction via the C# brain coroutine for better control over the procedural rise-from-ground animation.
+            // Note: The behavior tree is still running but remains in a waiting state.
             brain.StartBuild(baseBuilding, building, navDestination);
 
             return instance;
