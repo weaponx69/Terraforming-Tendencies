@@ -8,12 +8,20 @@ namespace GameDevTV.RTS.UI
     public class PauseMenuUI : MonoBehaviour
     {
         public GameObject menuPanel;
+        public GameObject slotPanel; // New: Panel to select slots
         public Button resumeButton;
         public Button saveButton;
         public Button loadButton;
         public Button quitButton;
 
+        // Slot buttons
+        public Button slot1Button;
+        public Button slot2Button;
+        public Button slot3Button;
+        public Button backButton;
+
         private bool isPaused = false;
+        private bool isSaving = false; // Track if we are saving or loading
 
         private void Awake()
         {
@@ -33,6 +41,7 @@ namespace GameDevTV.RTS.UI
         private void Start()
         {
             if (menuPanel != null) menuPanel.SetActive(false);
+            if (slotPanel != null) slotPanel.SetActive(false);
 
             if (resumeButton != null)
             {
@@ -41,19 +50,25 @@ namespace GameDevTV.RTS.UI
             }
             if (saveButton != null)
             {
-                saveButton.onClick.RemoveListener(SaveGame);
-                saveButton.onClick.AddListener(SaveGame);
+                saveButton.onClick.RemoveListener(OnSaveClicked);
+                saveButton.onClick.AddListener(OnSaveClicked);
             }
             if (loadButton != null)
             {
-                loadButton.onClick.RemoveListener(LoadGame);
-                loadButton.onClick.AddListener(LoadGame);
+                loadButton.onClick.RemoveListener(OnLoadClicked);
+                loadButton.onClick.AddListener(OnLoadClicked);
             }
             if (quitButton != null)
             {
                 quitButton.onClick.RemoveListener(QuitGame);
                 quitButton.onClick.AddListener(QuitGame);
             }
+
+            // Slot button setup
+            if (slot1Button != null) slot1Button.onClick.AddListener(() => SelectSlot(1));
+            if (slot2Button != null) slot2Button.onClick.AddListener(() => SelectSlot(2));
+            if (slot3Button != null) slot3Button.onClick.AddListener(() => SelectSlot(3));
+            if (backButton != null) backButton.onClick.AddListener(CloseSlotPanel);
         }
 
         private void Update()
@@ -71,21 +86,46 @@ namespace GameDevTV.RTS.UI
             if (menuPanel != null)
                 menuPanel.SetActive(isPaused);
 
+            if (!isPaused && slotPanel != null)
+                slotPanel.SetActive(false);
+
             Time.timeScale = isPaused ? 0f : 1f;
-            
-            // Log for debugging
-            // Debug.Log($"[PauseMenuUI] TogglePause: isPaused={isPaused}, panelActive={menuPanel?.activeSelf}");
         }
 
-        private void SaveGame()
+        private void OnSaveClicked()
         {
-            SaveSystem.SaveGame();
-            TogglePause();
+            isSaving = true;
+            ShowSlotPanel();
         }
 
-        private void LoadGame()
+        private void OnLoadClicked()
         {
-            SaveSystem.LoadGame();
+            isSaving = false;
+            ShowSlotPanel();
+        }
+
+        private void ShowSlotPanel()
+        {
+            if (menuPanel != null) menuPanel.SetActive(false);
+            if (slotPanel != null) slotPanel.SetActive(true);
+        }
+
+        private void CloseSlotPanel()
+        {
+            if (slotPanel != null) slotPanel.SetActive(false);
+            if (menuPanel != null) menuPanel.SetActive(true);
+        }
+
+        private void SelectSlot(int slot)
+        {
+            if (isSaving)
+            {
+                SaveSystem.SaveGame(slot);
+            }
+            else
+            {
+                SaveSystem.LoadGame(slot);
+            }
             TogglePause();
         }
 

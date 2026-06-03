@@ -84,3 +84,7 @@ crashlytics-build.properties
 # Unity Hub
 UserSettings/Layouts/default-6000.dwlt
 
+# Game Saves
+/[Ss]aves/
+*.json
+

@@ -1,53 +1,75 @@
 using UnityEngine;
 using GameDevTV.RTS.Units;
 using System.Collections.Generic;
+using System.IO;
 
 namespace GameDevTV.RTS.Player
 {
+    [System.Serializable]
+    public class SaveData
+    {
+        public int biomass;
+        public float oxygen;
+    }
+
     public static class SaveSystem
     {
-        private const string BIOMASS_KEY = "Save_Biomass";
-        private const string OXYGEN_KEY = "Save_Oxygen";
-        private const string HAS_SAVE_KEY = "Save_Exists";
+        private static string SavePath => Path.Combine(Application.persistentDataPath, "Saves");
 
-        public static void SaveGame()
+        public static void SaveGame(int slot)
         {
+            if (!Directory.Exists(SavePath))
+            {
+                Directory.CreateDirectory(SavePath);
+            }
+
+            SaveData data = new SaveData();
+
             if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int biomass))
             {
-                PlayerPrefs.SetInt(BIOMASS_KEY, biomass);
+                data.biomass = biomass;
             }
 
             if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float oxygen))
             {
-                PlayerPrefs.SetFloat(OXYGEN_KEY, oxygen);
+                data.oxygen = oxygen;
             }
 
-            PlayerPrefs.SetInt(HAS_SAVE_KEY, 1);
-            PlayerPrefs.Save();
+            string json = JsonUtility.ToJson(data, true);
+            string filePath = GetFilePath(slot);
+            File.WriteAllText(filePath, json);
+            Debug.Log($"Game Saved to Slot {slot} at {filePath}");
         }
 
-        public static bool HasSave()
+        public static bool HasSave(int slot)
         {
-            return PlayerPrefs.GetInt(HAS_SAVE_KEY, 0) == 1;
+            return File.Exists(GetFilePath(slot));
         }
 
-        public static void LoadGame()
+        public static void LoadGame(int slot)
         {
-            if (!HasSave()) return;
+            if (!HasSave(slot)) return;
 
-            int biomass = PlayerPrefs.GetInt(BIOMASS_KEY);
-            float oxygen = PlayerPrefs.GetFloat(OXYGEN_KEY);
+            string filePath = GetFilePath(slot);
+            string json = File.ReadAllText(filePath);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
 
             if (Supplies.Instance != null)
             {
                 if (Supplies.Biomass.ContainsKey(Owner.Player1))
-                    Supplies.Biomass[Owner.Player1] = biomass;
+                    Supplies.Biomass[Owner.Player1] = data.biomass;
                 
-                Supplies.UpdateOxygen(Owner.Player1, oxygen);
+                Supplies.UpdateOxygen(Owner.Player1, data.oxygen);
                 
                 // Refresh UI
-                Supplies.RaiseBiomassChanged(Owner.Player1, biomass);
+                Supplies.RaiseBiomassChanged(Owner.Player1, data.biomass);
             }
+            Debug.Log($"Game Loaded from Slot {slot}");
+        }
+
+        private static string GetFilePath(int slot)
+        {
+            return Path.Combine(SavePath, $"save_slot_{slot}.json");
         }
     }
 }
