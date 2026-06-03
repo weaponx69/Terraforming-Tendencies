@@ -16,7 +16,9 @@ namespace GameDevTV.RTS.Player
 
         [SerializeField] private SupplySO oxygenSO;
         public static Dictionary<Owner, float> Oxygen { get; private set; }
+        public static Dictionary<Owner, float> Integrity { get; private set; }
         public static event Action<Owner, float> OnOxygenChanged;
+        public static event Action<Owner, float> OnIntegrityChanged;
 
         public static float MineralsToBiomassRateStatic { get; private set; } = 1f;
         public static float GasToBiomassRateStatic { get; private set; } = 1f;
@@ -30,6 +32,7 @@ namespace GameDevTV.RTS.Player
 
         public static event System.Action<Owner, int> OnBiomassChanged;
         public static event System.Action OnVictory;
+        public static event System.Action OnIntegrityDepleted;
 
         public static void RaiseBiomassChanged(Owner owner, int value)
         {
@@ -53,6 +56,7 @@ namespace GameDevTV.RTS.Player
             Population = new Dictionary<Owner, int>();
             PopulationLimit = new Dictionary<Owner, int>();
             Oxygen = new Dictionary<Owner, float>();
+            Integrity = new Dictionary<Owner, float>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
@@ -60,12 +64,14 @@ namespace GameDevTV.RTS.Player
                 if (!Population.ContainsKey(owner)) Population.Add(owner, 0);
                 if (!PopulationLimit.ContainsKey(owner)) PopulationLimit.Add(owner, 0);
                 if (!Oxygen.ContainsKey(owner)) Oxygen.Add(owner, 0f);
+                if (!Integrity.ContainsKey(owner)) Integrity.Add(owner, 100f); // Default 100% integrity
             }
 
             MineralsToBiomassRateStatic = mineralsToBiomassRate;
             GasToBiomassRateStatic = gasToBiomassRate;
 
             OnOxygenChanged += HandleOxygenChanged;
+            OnIntegrityChanged += HandleIntegrityChanged;
 
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent); 
             Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
@@ -78,6 +84,7 @@ namespace GameDevTV.RTS.Player
         {
             if (Instance == this) Instance = null;
             OnOxygenChanged -= HandleOxygenChanged;
+            OnIntegrityChanged -= HandleIntegrityChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
         }
 
@@ -92,6 +99,14 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        private void HandleIntegrityChanged(Owner owner, float value)
+        {
+            if (owner == Owner.Player1 && value <= 0)
+            {
+                OnIntegrityDepleted?.Invoke();
+            }
+        }
+
         public static void UpdateOxygen(Owner owner, float value)
         {
             if (Oxygen != null && Oxygen.ContainsKey(owner))
@@ -99,6 +114,36 @@ namespace GameDevTV.RTS.Player
                 Oxygen[owner] = value;
                 OnOxygenChanged?.Invoke(owner, value);
             }
+        }
+
+        public static void UpdateIntegrity(Owner owner, float value)
+        {
+            if (Integrity != null && Integrity.ContainsKey(owner))
+            {
+                Integrity[owner] = Mathf.Max(0, value);
+                OnIntegrityChanged?.Invoke(owner, Integrity[owner]);
+            }
+        }
+
+        public static float CalculateIntegrity(Owner owner)
+        {
+            var commandables = FindObjectsByType<AbstractCommandable>(FindObjectsInactive.Exclude);
+            long totalMaxHP = 0;
+            long totalCurrentHP = 0;
+            bool foundAny = false;
+
+            foreach (var c in commandables)
+            {
+                if (c.Owner == owner)
+                {
+                    totalMaxHP += c.MaxHealth;
+                    totalCurrentHP += c.CurrentHealth;
+                    foundAny = true;
+                }
+            }
+
+            if (!foundAny) return 0f;
+            return ((float)totalCurrentHP / totalMaxHP) * 100f;
         }
 
         private void HandleSupplyEvent(SupplyEvent evt)

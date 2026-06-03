@@ -185,7 +185,6 @@ namespace GameDevTV.RTS.Units
                 }
 
                 // Force core variables into every blackboard that has them defined.
-                // This ensures subgraphs and GameObjectToComponent variables resolve correctly.
                 Animator animator = GetComponentInChildren<Animator>();
                 foreach (var variable in blackboard.Variables)
                 {
@@ -197,9 +196,55 @@ namespace GameDevTV.RTS.Units
                     {
                         variable.ObjectValue = this;
                     }
-                    else if (variable.Name == "Animator" && animator != null)
+                    else if ((variable.Name == "Animator" || (string.IsNullOrEmpty(variable.Name) && variable.Type == typeof(Animator))) && animator != null)
                     {
                         variable.ObjectValue = animator;
+                    }
+                }
+
+                // Scan all nodes in the module and inject animator directly into any animation fields.
+                // This catches "Local" values that aren't part of the named blackboard variables list.
+                var nodesField = module.GetType().GetField("m_Nodes", bf);
+                if (nodesField != null)
+                {
+                    var nodes = nodesField.GetValue(module) as System.Collections.IList;
+                    if (nodes != null)
+                    {
+                        foreach (var node in nodes)
+                        {
+                            if (node == null) continue;
+                            InjectAnimatorIntoNode(node, animator, bf);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void InjectAnimatorIntoNode(object node, Animator animator, System.Reflection.BindingFlags bf)
+        {
+            if (animator == null || node == null) return;
+
+            // Check all fields for BlackboardVariable<Animator> or Animator
+            foreach (var field in node.GetType().GetFields(bf))
+            {
+                if (field.FieldType == typeof(Animator))
+                {
+                    field.SetValue(node, animator);
+                }
+                else if (field.FieldType.IsGenericType && field.FieldType.GetGenericTypeDefinition() == typeof(BlackboardVariable<>))
+                {
+                    if (field.FieldType.GetGenericArguments()[0] == typeof(Animator))
+                    {
+                        var bbVar = field.GetValue(node);
+                        if (bbVar != null)
+                        {
+                            // Set the ObjectValue property which handles internal data updates
+                            var objValProp = bbVar.GetType().GetProperty("ObjectValue", bf);
+                            if (objValProp != null)
+                            {
+                                objValProp.SetValue(bbVar, animator);
+                            }
+                        }
                     }
                 }
             }

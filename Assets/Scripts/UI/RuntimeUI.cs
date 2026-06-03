@@ -19,6 +19,8 @@ namespace GameDevTV.RTS.UI
         // Oxygen UI
         [SerializeField] private TextMeshProUGUI oxygenLabelText;
         [SerializeField] private TextMeshProUGUI oxygenValueText;
+        [SerializeField] private TextMeshProUGUI integrityLabelText;
+        [SerializeField] private TextMeshProUGUI integrityValueText;
         [SerializeField] private TextMeshProUGUI populationText;
 
         [SerializeField] private ActionsUI actionsUI;
@@ -49,6 +51,7 @@ namespace GameDevTV.RTS.UI
 
             Supplies.OnOxygenChanged += HandleOxygenChanged;
             Supplies.OnBiomassChanged += HandleBiomassChanged;
+            Supplies.OnIntegrityChanged += HandleIntegrityChanged;
 
             InitializeUI();
         }
@@ -67,10 +70,38 @@ namespace GameDevTV.RTS.UI
 
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
         }
 
         private void Awake()
         {
+            // Auto-hookup missing UI references by searching the hierarchy
+            FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
+            FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
+            FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
+            
+            // Special case for the duplicate population text if it exists
+            if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
+        }
+
+        private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, string headerName)
+        {
+            GameObject container = GameObject.Find(containerName);
+            if (container == null) return;
+
+            if (valueField == null)
+            {
+                // Look for Resource Label anywhere in children
+                valueField = container.GetComponentsInChildren<TextMeshProUGUI>(true)
+                    .FirstOrDefault(t => t.gameObject.name == "Resource Label");
+            }
+
+            if (labelField == null)
+            {
+                // Look for header anywhere in children
+                labelField = container.GetComponentsInChildren<TextMeshProUGUI>(true)
+                    .FirstOrDefault(t => t.gameObject.name == headerName);
+            }
         }
 
         private void Start()
@@ -92,12 +123,19 @@ namespace GameDevTV.RTS.UI
                 oxygenValueText.SetText(oxyInitial.ToString("F3"));
                 if (populationText != null) populationText.SetText($"{oxyInitial:F3}%");
             }
+
+            if (integrityLabelText != null) integrityLabelText.SetText("Integrity");
+            if (integrityValueText != null && Supplies.Integrity != null && Supplies.Integrity.TryGetValue(displayedOwner, out float integrityInitial))
+            {
+                integrityValueText.SetText(integrityInitial.ToString("F1"));
+            }
         }
 
         private void OnDestroy()
         {
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
         }
 
         private void HandleOxygenChanged(Owner owner, float newValue)
@@ -107,6 +145,13 @@ namespace GameDevTV.RTS.UI
                 oxygenValueText.SetText(newValue.ToString("F3"));
             if (populationText != null)
                 populationText.SetText($"{newValue:F3}%");
+        }
+
+        private void HandleIntegrityChanged(Owner owner, float newValue)
+        {
+            if (owner != displayedOwner) return;
+            if (integrityValueText != null)
+                integrityValueText.SetText(newValue.ToString("F1"));
         }
 
         private void HandleBiomassChanged(Owner owner, int newValue)

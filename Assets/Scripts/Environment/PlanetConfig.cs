@@ -15,6 +15,8 @@ namespace GameDevTV.RTS.Environment
         public int ResourceCount = 10;
         public float BaseDecayRate = 2f;
         public float ToxicityLevel = 0f;
+        public float BiomassDrainRate = 1f; // Biomass lost per second
+        public float IntegrityDrainRate = 0.5f; // Integrity lost per second
 
         [Header("Procedural Scatter")]
         public int EnvironmentDensity = 50;

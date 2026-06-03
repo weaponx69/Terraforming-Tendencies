@@ -59,6 +59,7 @@ namespace GameDevTV.RTS.Player
         {
             Supplies.OnBiomassChanged += HandleBiomassChanged;
             Supplies.OnVictory += HandleVictory;
+            Supplies.OnIntegrityDepleted += HandleIntegrityDepleted;
             Bus<SupplyDepletedEvent>.RegisterForAll(HandleSupplyDepleted);
         }
 
@@ -66,6 +67,7 @@ namespace GameDevTV.RTS.Player
         {
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
             Supplies.OnVictory -= HandleVictory;
+            Supplies.OnIntegrityDepleted -= HandleIntegrityDepleted;
             Bus<SupplyDepletedEvent>.UnregisterForAll(HandleSupplyDepleted);
         }
 
@@ -75,6 +77,12 @@ namespace GameDevTV.RTS.Player
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────────
+
+        private void HandleIntegrityDepleted()
+        {
+            if (gameOverTriggered) return;
+            TriggerGameOver();
+        }
 
         private void HandleVictory()
         {

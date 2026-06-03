@@ -19,6 +19,8 @@ MonoBehaviour:
   ResourceCount: 80
   BaseDecayRate: 2
   ToxicityLevel: 0
+  BiomassDrainRate: 1
+  IntegrityDrainRate: 0.5
   EnvironmentDensity: 400
   EnvironmentPrefabs: []
   SurfaceFeatureDensity: 100
