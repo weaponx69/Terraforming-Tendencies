@@ -4,6 +4,7 @@ using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Utilities;
 using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
@@ -46,8 +47,8 @@ namespace GameDevTV.RTS.Units
             // Fix: Set every possible name the BT might use for the local unit
             if (graphAgent != null)
             {
-                graphAgent.SetVariableValue("Self", gameObject);
-                graphAgent.SetVariableValue("Unit", gameObject);
+                graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
+                graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
                 graphAgent.SetVariableValue("Agent", gameObject);
 
                 // Ensure event channels are loaded into the blackboard

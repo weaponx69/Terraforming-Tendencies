@@ -9,6 +9,7 @@ namespace GameDevTV.RTS.Environment
     public class PlanetGenerator : MonoBehaviour
     {
         public static PlanetGenerator Instance { get; private set; }
+        public static event System.Action OnPlanetGenerated;
 
         public PlanetConfig Config;
         public float CellSize = 1f;
@@ -328,6 +329,7 @@ namespace GameDevTV.RTS.Environment
                 ScatterResources();
 
                 BakeAllNavMeshes();
+                OnPlanetGenerated?.Invoke();
                 }
 
                 private void SetLayerRecursive(GameObject obj, int layer)

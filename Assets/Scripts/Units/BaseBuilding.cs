@@ -428,14 +428,13 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
                 Transform originalRendererTransform = MainRenderer.transform;
                 GameObject culledGO = new ($"Culled {BuildingSO.Name} Visuals")
                 {
-                    layer = LayerMask.GetMask("TransparentFX"),
-                    transform =
-                    {
-                        position = originalRendererTransform.position,
-                        rotation = originalRendererTransform.rotation,
-                        localScale = originalRendererTransform.localScale
-                    }
+                    layer = LayerMask.NameToLayer("TransparentFX"),
                 };
+                culledGO.transform.SetParent(transform);
+                culledGO.transform.position = originalRendererTransform.position;
+                culledGO.transform.rotation = originalRendererTransform.rotation;
+                culledGO.transform.localScale = originalRendererTransform.localScale;
+
                 culledVisuals = culledGO.AddComponent<Placeholder>();
                 culledVisuals.Owner = Owner;
                 culledVisuals.ParentObject = gameObject;

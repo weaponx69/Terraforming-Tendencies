@@ -28,13 +28,8 @@ namespace GameDevTV.RTS.Commands
                        );
             }
 
-            // Enforce a maximum of 2 Command Centers per player
-            if (Building.name.Contains("Command Post") || Building.name.Contains("Command Center"))
-            {
-                int commandPostCount = BaseBuilding.ActiveBuildings.Count(b => b.Owner == context.Owner && b.UnitSO == Building);
-                if (commandPostCount >= 2) return false;
-            }
-
+            // Removed maximum Command Center limit to allow building multiple bases.
+            
             Vector3 targetPos = context.Hit.point;
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
@@ -110,8 +105,11 @@ namespace GameDevTV.RTS.Commands
                     }
                 }
 
-                Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Minerals, Building.Cost.MineralsSO));
-                Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Gas, Building.Cost.GasSO));
+                if (Building.Cost != null)
+                {
+                    Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Minerals, Building.Cost.MineralsSO));
+                    Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Gas, Building.Cost.GasSO));
+                }
                 return;
             }
 
@@ -167,8 +165,11 @@ namespace GameDevTV.RTS.Commands
             return true;
         }
 
-        public override bool IsLocked(CommandContext context) =>
-            !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
+        public override bool IsLocked(CommandContext context)
+        {
+            if (Building == null) return false;
+            return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
+        }
 
         public UnlockableSO[] GetUnmetDependencies(Owner owner)
         {

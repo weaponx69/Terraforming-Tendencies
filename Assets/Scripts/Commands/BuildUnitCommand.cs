@@ -33,6 +33,8 @@ namespace GameDevTV.RTS.Commands
 
         private bool HasEnoughSupplies(CommandContext context)
         {
+            if (Unit == null || Unit.Cost == null) return true;
+
             int biomassCost = Mathf.FloorToInt(Unit.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
                 + Unit.Cost.Gas * Supplies.GasToBiomassRateStatic);
             return biomassCost <= Supplies.Biomass[context.Owner];

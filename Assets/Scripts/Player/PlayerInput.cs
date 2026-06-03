@@ -35,7 +35,7 @@ namespace GameDevTV.RTS.Player
 
         private BaseCommand activeCommand;
         private GameObject ghostInstance;
-        private MeshRenderer ghostRenderer;
+        private Renderer ghostRenderer;
         private bool wasMouseDownOnUI;
         private CinemachineFollow cinemachineFollow;
         private float zoomStartTime;
@@ -69,7 +69,7 @@ namespace GameDevTV.RTS.Player
             hasMouseMoved = false;
 
             if (!cinemachineCamera.TryGetComponent(out cinemachineFollow))
-{
+            {
                 Debug.LogError("Cinemachine Camera did not have CinemachineFollow. Zoom functionality will not work!");
             }
             else
@@ -84,6 +84,8 @@ namespace GameDevTV.RTS.Player
             Bus<UnitSpawnEvent>.OnEvent[Owner.Player1] += HandleUnitSpawn;
             Bus<CommandSelectedEvent>.OnEvent[Owner.Player1] += HandleActionSelected;
             Bus<UnitDeathEvent>.OnEvent[Owner.Player1] += HandleUnitDeath;
+            
+            GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated += CenterCameraOnMap;
         }
 
         private void Start()
@@ -106,11 +108,6 @@ namespace GameDevTV.RTS.Player
                 pos.z = mapHeight / 2f;
                 cameraTarget.position = pos;
             }
-            else
-            {
-                // Retry in the next frame if not ready
-                Invoke(nameof(CenterCameraOnMap), 0.1f);
-            }
         }
 
         private void OnDestroy()
@@ -120,6 +117,8 @@ namespace GameDevTV.RTS.Player
             Bus<UnitSpawnEvent>.OnEvent[Owner.Player1] -= HandleUnitSpawn;
             Bus<CommandSelectedEvent>.OnEvent[Owner.Player1] -= HandleActionSelected;
             Bus<UnitDeathEvent>.OnEvent[Owner.Player1] -= HandleUnitDeath;
+            
+            GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated -= CenterCameraOnMap;
         }
 
         private void HandleUnitSelected(UnitSelectedEvent evt)
@@ -158,7 +157,13 @@ namespace GameDevTV.RTS.Player
                 if (prefabToInstantiate != null)
                 {
                     ghostInstance = Instantiate(prefabToInstantiate);
-                    ghostRenderer = ghostInstance.GetComponentInChildren<MeshRenderer>();
+
+                    if (ghostInstance.TryGetComponent(out BaseBuilding bb))
+                    {
+                        bb.InitializeAsGhost(null, Owner.Player1);
+                    }
+
+                    ghostRenderer = ghostInstance.GetComponentInChildren<Renderer>();
                     
                     // We only want the visuals for the ghost, so strip any colliders/navmesh obstacles
                     // to prevent it from interfering with the game while dragging!
@@ -190,7 +195,7 @@ HandleZooming();
 
         private void HandleGhost()
         {
-            if (ghostInstance == null) return;
+            if (ghostInstance == null || ghostRenderer == null) return;
 
             if (Keyboard.current.escapeKey.wasReleasedThisFrame)
             {
@@ -226,10 +231,13 @@ HandleZooming();
 
                 bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hitPos.Value);
 
-                ghostRenderer.material.SetColor(TINT, allRestrictionsPass ? availableToPlaceTintColor : errorTintColor);
-                ghostRenderer.material.SetColor(FRESNEL,
-                    allRestrictionsPass ? availableToPlaceFresnelColor : errorFresnelColor
-                );
+                if (ghostRenderer != null && ghostRenderer.material != null)
+                {
+                    ghostRenderer.material.SetColor(TINT, allRestrictionsPass ? availableToPlaceTintColor : errorTintColor);
+                    ghostRenderer.material.SetColor(FRESNEL,
+                        allRestrictionsPass ? availableToPlaceFresnelColor : errorFresnelColor
+                    );
+                }
             }
         }
 

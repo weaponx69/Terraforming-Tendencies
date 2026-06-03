@@ -154,16 +154,15 @@ namespace GameDevTV.RTS.Environment
                 if (mainRenderer == null) return; // Cannot create culled visuals without a MeshRenderer
                 
                 Transform originalRendererTransform = mainRenderer.transform;
-GameObject culledGO = new ($"Culled {name} Visuals")
+                GameObject culledGO = new ($"Culled {name} Visuals")
                 {
-                    layer = LayerMask.GetMask("TransparentFX"),
-                    transform =
-                    {
-                        position = originalRendererTransform.position,
-                        rotation = originalRendererTransform.rotation,
-                        localScale = originalRendererTransform.localScale
-                    }
+                    layer = LayerMask.NameToLayer("TransparentFX"),
                 };
+                culledGO.transform.SetParent(transform);
+                culledGO.transform.position = originalRendererTransform.position;
+                culledGO.transform.rotation = originalRendererTransform.rotation;
+                culledGO.transform.localScale = originalRendererTransform.localScale;
+
                 culledVisuals = culledGO.AddComponent<Placeholder>();
                 culledVisuals.ParentObject = gameObject;
                 culledVisuals.Owner = Owner.Unowned;

@@ -16,6 +16,8 @@ namespace GameDevTV.RTS.Units
         public float AgentRadius => Agent.radius;
         [field: SerializeField] public ParticleSystem AttackingParticleSystem { get; private set; }
         [SerializeField] private DamageableSensor DamageableSensor;
+        [SerializeField] private Shader statusShader;
+
         public NavMeshAgent Agent { get; private set; }
         public Sprite Icon => UnitSO.Icon;
         protected BehaviorGraphAgent graphAgent;
@@ -25,6 +27,8 @@ namespace GameDevTV.RTS.Units
         public int UnitID { get; private set; }
 
         private float lastDiagnosticTime = 0f;
+        private float lastStatusUpdateTime = 0f;
+        private const float STATUS_UPDATE_INTERVAL = 0.2f;
 
         protected override void Awake()
         {
@@ -50,11 +54,11 @@ namespace GameDevTV.RTS.Units
             {
                 try
                 {
-                    graphAgent.SetVariableValue("Self", gameObject);
-                    graphAgent.SetVariableValue("Unit", this);
+                    graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
+                    graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
                     if (unitSO != null && unitSO.AttackConfig != null)
                     {
-                        graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
+                        graphAgent.SetVariableValue(BlackboardConstants.ATTACK_CONFIG, unitSO.AttackConfig);
                     }
                 }
                 catch { }
@@ -158,20 +162,31 @@ namespace GameDevTV.RTS.Units
             catch {}
         }
 
+        private float lastNavMeshSampleTime = 0f;
+        private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
+
         protected virtual void Update()
         {
             if (Agent != null && Agent.isActiveAndEnabled && !Agent.isOnNavMesh)
             {
-                NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas };
-                if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 15f, filter))
+                if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
                 {
-                    Agent.Warp(hit.position);
+                    lastNavMeshSampleTime = Time.time;
+                    NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas };
+                    if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 15f, filter))
+                    {
+                        Agent.Warp(hit.position);
+                    }
                 }
             }
 
             if (this is Worker)
             {
-                UpdateStatusIndicator();
+                if (Time.time - lastStatusUpdateTime >= STATUS_UPDATE_INTERVAL)
+                {
+                    lastStatusUpdateTime = Time.time;
+                    UpdateStatusIndicator();
+                }
 
                 // Periodically log blackboard status if a command is in progress
                 if (Time.time - lastDiagnosticTime >= 3.0f)
@@ -289,7 +304,14 @@ namespace GameDevTV.RTS.Units
                 Debug.Log($"[Blackboard Diagnostic] Drone #{UnitID} | m_IsInitialised={isInit} | m_IsStarted={isStarted}");
                 if (!isInit) return;
 
-                string[] vars = { "Command", "Self", "Unit", "Supply", "TargetGameObject", "TargetLocation" };
+                string[] vars = { 
+                    BlackboardConstants.COMMAND, 
+                    BlackboardConstants.SELF, 
+                    BlackboardConstants.UNIT, 
+                    BlackboardConstants.SUPPLY, 
+                    BlackboardConstants.TARGET_GAME_OBJECT, 
+                    BlackboardConstants.TARGET_LOCATION 
+                };
                 foreach (var vName in vars)
                 {
                     try {
@@ -363,7 +385,7 @@ namespace GameDevTV.RTS.Units
             // Primary: typed generic GetVariable — fires correctly after m_IsInitialised = true
             try
             {
-                if (graphAgent.GetVariable("Command", out BlackboardVariable<UnitCommands> cmdVar))
+                if (graphAgent.GetVariable(BlackboardConstants.COMMAND, out BlackboardVariable<UnitCommands> cmdVar))
                 {
                     cmd = cmdVar.Value;
                     return true;
@@ -373,7 +395,7 @@ namespace GameDevTV.RTS.Units
             // Fallback: non-generic, converts via ObjectValue
             try
             {
-                if (graphAgent.GetVariable("Command", out BlackboardVariable bbVar) && bbVar?.ObjectValue != null)
+                if (graphAgent.GetVariable(BlackboardConstants.COMMAND, out BlackboardVariable bbVar) && bbVar?.ObjectValue != null)
                 {
                     cmd = (UnitCommands)System.Convert.ToInt32(bbVar.ObjectValue);
                     return true;
@@ -398,14 +420,14 @@ namespace GameDevTV.RTS.Units
             Debug.Log($"[Command Queue] {name} (ID: {UnitID}) SetCurrentCommand: {cmd}");
 
             // Primary: typed SetVariableValue
-            bool setSuccess = graphAgent.SetVariableValue("Command", cmd);
+            bool setSuccess = graphAgent.SetVariableValue(BlackboardConstants.COMMAND, cmd);
 
             if (!setSuccess)
             {
                 // Fallback: set ObjectValue directly on the raw variable.
                 try
                 {
-                    if (graphAgent.GetVariable("Command", out BlackboardVariable bbVar) && bbVar != null)
+                    if (graphAgent.GetVariable(BlackboardConstants.COMMAND, out BlackboardVariable bbVar) && bbVar != null)
                     {
                         bbVar.ObjectValue = cmd;
                         setSuccess = true;
@@ -433,6 +455,7 @@ namespace GameDevTV.RTS.Units
 
         private GameObject statusIndicator;
         private Material indicatorMaterial;
+        private Color lastIndicatorColor;
 
         public void SetStatusColor(Color color, string reason = "")
         {
@@ -455,7 +478,8 @@ namespace GameDevTV.RTS.Units
 
                 Renderer r = statusIndicator.GetComponent<Renderer>();
 
-                Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+                Shader shader = statusShader;
+                if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
                 if (shader == null) shader = Shader.Find("Unlit/Color");
                 if (shader == null) shader = Shader.Find("Sprites/Default");
 
@@ -464,8 +488,9 @@ namespace GameDevTV.RTS.Units
                 r.sharedMaterial = indicatorMaterial;
             }
 
-            if (indicatorMaterial != null)
+            if (indicatorMaterial != null && color != lastIndicatorColor)
             {
+                lastIndicatorColor = color;
                 Color displayColor = color;
                 if (color == Color.red)    displayColor = new Color(1f,   0.1f, 0.1f, 1f);
                 else if (color == Color.green)  displayColor = new Color(0.1f, 1f,   0.1f, 1f);
@@ -481,14 +506,14 @@ namespace GameDevTV.RTS.Units
 
         public void MoveTo(Vector3 position)
         {
-            graphAgent.SetVariableValue("TargetLocation", position);
-            graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
+            graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, position);
+            graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
             SetCurrentCommand(UnitCommands.Move);
         }
 
         public void MoveTo(Transform transform)
         {
-            graphAgent.SetVariableValue("TargetGameObject", transform.gameObject);
+            graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, transform.gameObject);
             SetCurrentCommand(UnitCommands.Move);
         }
 
@@ -500,14 +525,14 @@ namespace GameDevTV.RTS.Units
 
         public void Attack(IDamageable damageable)
         {
-            graphAgent.SetVariableValue("TargetGameObject", damageable.Transform.gameObject);
+            graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, damageable.Transform.gameObject);
             SetCurrentCommand(UnitCommands.Attack);
         }
 
         public void Attack(Vector3 location)
         {
-            graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
-            graphAgent.SetVariableValue("TargetLocation", location);
+            graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
+            graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, location);
             SetCurrentCommand(UnitCommands.Attack);
         }
 
@@ -515,10 +540,10 @@ namespace GameDevTV.RTS.Units
         {
             List<GameObject> nearbyEnemies = SetNearbyEnemiesOnBlackboard();
 
-            if (graphAgent.GetVariable("TargetGameObject", out BlackboardVariable<GameObject> targetVariable)
+            if (graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVariable)
                 && targetVariable.Value == null && nearbyEnemies.Count > 0)
             {
-                graphAgent.SetVariableValue("TargetGameObject", nearbyEnemies[0]);
+                graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, nearbyEnemies[0]);
             }
         }
 
@@ -526,17 +551,17 @@ namespace GameDevTV.RTS.Units
         {
             List<GameObject> nearbyEnemies = SetNearbyEnemiesOnBlackboard();
 
-            if (!graphAgent.GetVariable("TargetGameObject", out BlackboardVariable<GameObject> targetVariable)
+            if (!graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVariable)
                 || damageable.Transform.gameObject != targetVariable.Value) return;
 
             if (nearbyEnemies.Count > 0)
             {
-                graphAgent.SetVariableValue("TargetGameObject", nearbyEnemies[0]);
+                graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, nearbyEnemies[0]);
             }
             else
             {
-                graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
-                graphAgent.SetVariableValue("TargetLocation", damageable.Transform.position);
+                graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
+                graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, damageable.Transform.position);
             }
         }
 
@@ -546,7 +571,7 @@ namespace GameDevTV.RTS.Units
                             .ConvertAll(damageable => damageable.Transform.gameObject);
             nearbyEnemies.Sort(new ClosestGameObjectComparer(transform.position));
 
-            graphAgent.SetVariableValue("NearbyEnemies", nearbyEnemies);
+            graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, nearbyEnemies);
 
             return nearbyEnemies;
         }

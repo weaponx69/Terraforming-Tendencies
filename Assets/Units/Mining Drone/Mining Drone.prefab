@@ -171,12 +171,17 @@ MonoBehaviour:
   <MaxHealth>k__BackingField: 100
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
-  <AvailableCommands>k__BackingField: []
+  <AvailableCommands>k__BackingField:
+  - {fileID: 11400000, guid: 84c8d4cd8863b1244994c4ca7b8d09a6, type: 2}
+  - {fileID: 11400000, guid: 5b88f1c2df63cea41a0b8cd466334886, type: 2}
+  - {fileID: 11400000, guid: 5711e626ee3260d4388aaac5e505ab47, type: 2}
+  - {fileID: 11400000, guid: cc4c6cbe12074ef4381e6e573f4503b5, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: f6b38bef630bb884195c6d3f702eefb9, type: 2}
   decalProjector: {fileID: 0}
   VisionTransform: {fileID: 4999257484100946669}
   <AttackingParticleSystem>k__BackingField: {fileID: 0}
   DamageableSensor: {fileID: 0}
+  statusShader: {fileID: 0}
   CancelBuildingCommand: {fileID: 11400000, guid: 166415456c8d4cd4282c9686f36a509b, type: 2}
 --- !u!1 &8767989424686635610
 GameObject:

@@ -44,12 +44,11 @@ namespace GameDevTV.RTS.Units
             // Destroy any existing renderer/filter that shipped with the prefab so it doesn't compete.
             foreach (var r in GetComponentsInChildren<MeshRenderer>())
             {
-                if (r.gameObject != gameObject) Destroy(r.gameObject);
+                if (r.gameObject != gameObject) DestroyImmediate(r.gameObject);
                 else
                 {
-                    Destroy(r);
-                    var mf = GetComponent<MeshFilter>();
-                    if (mf != null) Destroy(mf);
+                    DestroyImmediate(r);
+                    if (TryGetComponent<MeshFilter>(out var mf)) DestroyImmediate(mf);
                 }
             }
 
