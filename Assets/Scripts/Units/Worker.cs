@@ -121,9 +121,7 @@ namespace GameDevTV.RTS.Units
         public GameObject Build(BuildingSO building, Vector3 targetLocation)
         {
             brain?.Halt();
-            Debug.Log($"[Worker] Build called for {building.name} at {targetLocation}");
             GameObject instance = Instantiate(building.Prefab, targetLocation, Quaternion.identity);
-            Debug.Log($"[Worker] Instantiated building prefab {building.name} (Instance ID: {instance.GetHashCode()})");
             if (!instance.TryGetComponent(out BaseBuilding baseBuilding))
             {
                 Debug.LogError($"Missing BaseBuilding on Prefab for BuildingSO \"{building.name}\"! Cannot build!");

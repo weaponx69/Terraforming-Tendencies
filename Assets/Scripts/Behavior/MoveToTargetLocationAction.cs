@@ -40,23 +40,23 @@ namespace GameDevTV.RTS.Behavior
                 targetPosition = hit.position;
             }
 
-            Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnStart targetPosition={targetPosition}, stoppingDistance={agent.stoppingDistance}");
+            // // Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnStart targetPosition={targetPosition}, stoppingDistance={agent.stoppingDistance}");
 
             if (Vector3.Distance(agent.transform.position, targetPosition) <= agent.stoppingDistance)
             {
-                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnStart ALREADY AT DESTINATION (distance={Vector3.Distance(agent.transform.position, targetPosition)} <= stoppingDistance={agent.stoppingDistance})");
+                // // Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnStart ALREADY AT DESTINATION (distance={Vector3.Distance(agent.transform.position, targetPosition)} <= stoppingDistance={agent.stoppingDistance})");
                 return Status.Success;
             }
 
             if (agent.isOnNavMesh)
             {
                 destinationSet = agent.SetDestination(targetPosition);
-                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) SetDestination returned {destinationSet} for {targetPosition}");
+                // // Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) SetDestination returned {destinationSet} for {targetPosition}");
             }
             else
             {
                 destinationSet = false;
-                Debug.LogWarning($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) cannot SetDestination because agent is not on NavMesh!");
+                // // Debug.LogWarning($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) cannot SetDestination because agent is not on NavMesh!");
             }
 
             return Status.Running;
@@ -83,7 +83,7 @@ namespace GameDevTV.RTS.Behavior
                     targetPosition = hit.position;
                 }
                 destinationSet = agent.SetDestination(targetPosition);
-                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnUpdate retry SetDestination returned {destinationSet} for {targetPosition}");
+                // // Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnUpdate retry SetDestination returned {destinationSet} for {targetPosition}");
                 if (!destinationSet) return Status.Running;
             }
 
@@ -94,7 +94,7 @@ namespace GameDevTV.RTS.Behavior
 
             if (agent.remainingDistance <= agent.stoppingDistance)
             {
-                Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnUpdate REACHED DESTINATION (remainingDistance={agent.remainingDistance} <= stoppingDistance={agent.stoppingDistance})");
+                // // Debug.Log($"[Navigation] {agent.name} (ID: {agent.gameObject.GetHashCode()}) OnUpdate REACHED DESTINATION (remainingDistance={agent.remainingDistance} <= stoppingDistance={agent.stoppingDistance})");
                 return Status.Success;
             }
 

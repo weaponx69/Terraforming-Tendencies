@@ -76,7 +76,7 @@ namespace GameDevTV.RTS.Commands
             {
                 if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
                 {
-                    Debug.LogWarning("Only Command Centers can be orbital dropped! You must build a worker first.");
+                    // // Debug.LogWarning("Only Command Centers can be orbital dropped! You must build a worker first.");
                     return;
                 }
 
@@ -120,7 +120,6 @@ namespace GameDevTV.RTS.Commands
             else if (HasEnoughSupplies(context))
             {
                 bool pass = AllRestrictionsPass(targetPos);
-                Debug.Log($"[BuildBuildingCommand] Checking restrictions at {targetPos}. Result: {pass}");
                 if (pass)
                 {
                     builder.Build(Building, targetPos);

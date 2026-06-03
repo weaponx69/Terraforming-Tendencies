@@ -39,7 +39,6 @@ namespace GameDevTV.RTS.Units
         protected override void Awake()
         {
             base.Awake();
-            Debug.Log($"[BaseBuilding Debug] Awake called on {gameObject.name} (ID: {GetHashCode()})");
 
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO.Health;
@@ -64,14 +63,12 @@ namespace GameDevTV.RTS.Units
 
         private void OnEnable()
         {
-            Debug.Log($"[BaseBuilding Debug] OnEnable called on {gameObject.name} (ID: {GetHashCode()})");
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
         }
 
         private void OnDisable()
         {
-            Debug.Log($"[BaseBuilding Debug] OnDisable called on {gameObject.name} (ID: {GetHashCode()})");
             ActiveBuildings.Remove(this);
         }
 
@@ -80,7 +77,6 @@ namespace GameDevTV.RTS.Units
             if (!hasRaisedSpawnEvent)
             {
                 hasRaisedSpawnEvent = true;
-                Debug.Log($"[BaseBuilding Debug] Raising BuildingSpawnEvent for {gameObject.name} (ID: {GetHashCode()})");
                 Bus<BuildingSpawnEvent>.Raise(Owner, new BuildingSpawnEvent(Owner, this));
             }
         }

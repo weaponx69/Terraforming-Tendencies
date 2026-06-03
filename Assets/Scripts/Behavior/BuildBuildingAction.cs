@@ -27,11 +27,11 @@ namespace GameDevTV.RTS.Behavior
         {
             if (!HasValidInputs()) 
             {
-                Debug.Log($"[BuildBuildingAction] Aborting OnStart because HasValidInputs() returned false!");
+                // // Debug.Log($"[BuildBuildingAction] Aborting OnStart because HasValidInputs() returned false!");
                 return Status.Failure;
             }
 
-            Debug.Log($"[BuildBuildingAction] Started building {BuildingSO.Value.name} at {TargetLocation.Value}");
+            // // Debug.Log($"[BuildBuildingAction] Started building {BuildingSO.Value.name} at {TargetLocation.Value}");
 
             if (BuildingUnderConstruction.Value == null)
             {
@@ -62,7 +62,7 @@ namespace GameDevTV.RTS.Behavior
         {
             if (completedBuilding == null)
             {
-                Debug.LogWarning("[BuildBuildingAction] completedBuilding is null in OnUpdate!");
+                // // Debug.LogWarning("[BuildBuildingAction] completedBuilding is null in OnUpdate!");
                 return Status.Failure;
             }
 
@@ -86,7 +86,7 @@ namespace GameDevTV.RTS.Behavior
 
         protected override void OnEnd()
         {
-            Debug.Log($"[BuildBuildingAction] OnEnd with Status={CurrentStatus}");
+            // // Debug.Log($"[BuildBuildingAction] OnEnd with Status={CurrentStatus}");
             if (CurrentStatus == Status.Success && completedBuilding != null)
             {
                 completedBuilding.enabled = true;
