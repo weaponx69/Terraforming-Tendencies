@@ -172,7 +172,10 @@ namespace GameDevTV.RTS.Units
                 }
 
                 // Assign to closest node
-                AINode node = activeNodes.OrderBy(n => Vector3.Distance(worker.transform.position, n.CommandPost.transform.position)).FirstOrDefault();
+                AINode node = activeNodes
+                    .Where(n => n.CommandPost != null)
+                    .OrderBy(n => Vector3.Distance(worker.transform.position, n.CommandPost.transform.position))
+                    .FirstOrDefault();
                 if (node != null)
                 {
                     node.Drones.Add(worker);
@@ -302,6 +305,12 @@ namespace GameDevTV.RTS.Units
 
             foreach (var node in activeNodes.ToList())
             {
+                if (node.CommandPost == null)
+                {
+                    activeNodes.Remove(node);
+                    continue;
+                }
+
                 node.ResourcesInRange.RemoveWhere(s => s == null || s.Amount <= 0);
 
                 // Re-fill resources if the cell's pocket has more available within its radius

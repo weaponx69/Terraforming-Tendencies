@@ -40,11 +40,20 @@ namespace GameDevTV.RTS.Units
 
             unitSO = UnitSO as UnitSO;
 
-            // IMPORTANT: Removed manual graphAgent.Init() to prevent "Clone(Clone)" issues in Unity 6.
-            // The BehaviorGraphAgent handles its own initialization.
-            
             SetCurrentCommand(UnitCommands.Stop);
             ReapplyCoreBlackboardVariables();
+            
+            // Run an extra repair in the next few frames to catch late-initialized graphs
+            StartCoroutine(DelayedRepair());
+        }
+
+        private System.Collections.IEnumerator DelayedRepair()
+        {
+            yield return null;
+            RepairBlackboards();
+            ReapplyCoreBlackboardVariables();
+            yield return new WaitForSeconds(0.5f);
+            RepairBlackboards();
         }
 
         protected virtual void ReapplyCoreBlackboardVariables()
@@ -76,16 +85,17 @@ namespace GameDevTV.RTS.Units
 
         protected override void Start()
         {
-            base.Start();
             CurrentHealth = UnitSO.Health;
             MaxHealth = UnitSO.Health;
-            Bus<UnitSpawnEvent>.Raise(Owner, new UnitSpawnEvent(this));
 
             // The BehaviorGraphAgent.Init() clones the graph but leaves each module's
             // m_Blackboard.m_Variables empty — variables are in m_Source (RuntimeBlackboardAsset).
             // We call GenerateInstanceData via reflection to populate the live blackboard.
             RepairBlackboards();
             ReapplyCoreBlackboardVariables();
+
+            base.Start();
+            Bus<UnitSpawnEvent>.Raise(Owner, new UnitSpawnEvent(this));
 
             if (DamageableSensor != null)
             {
@@ -231,19 +241,24 @@ namespace GameDevTV.RTS.Units
                 {
                     field.SetValue(node, animator);
                 }
-                else if (field.FieldType.IsGenericType && field.FieldType.GetGenericTypeDefinition() == typeof(BlackboardVariable<>))
+                else 
                 {
-                    if (field.FieldType.GetGenericArguments()[0] == typeof(Animator))
+                    var fieldValue = field.GetValue(node);
+                    if (fieldValue == null) continue;
+                    
+                    // Most Behavior Graph variables (named or anonymous) have an ObjectValue property.
+                    var objValProp = fieldValue.GetType().GetProperty("ObjectValue", bf);
+                    if (objValProp != null)
                     {
-                        var bbVar = field.GetValue(node);
-                        if (bbVar != null)
+                        objValProp.SetValue(fieldValue, animator);
+                    }
+                    else
+                    {
+                        // Direct field access as fallback
+                        var valField = fieldValue.GetType().GetField("m_Value", bf);
+                        if (valField != null && valField.FieldType == typeof(Animator))
                         {
-                            // Set the ObjectValue property which handles internal data updates
-                            var objValProp = bbVar.GetType().GetProperty("ObjectValue", bf);
-                            if (objValProp != null)
-                            {
-                                objValProp.SetValue(bbVar, animator);
-                            }
+                            valField.SetValue(fieldValue, animator);
                         }
                     }
                 }
