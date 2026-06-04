@@ -10,6 +10,7 @@ using TMPro;
 
 namespace GameDevTV.RTS.Units
 {
+    [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(NavMeshAgent), typeof(BehaviorGraphAgent))]
     public abstract class AbstractUnit : AbstractCommandable, IMoveable, IAttacker
     {
@@ -289,9 +290,19 @@ protected UnitSO unitSO;
 
         private float lastNavMeshSampleTime = 0f;
         private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
+        private bool hasFirstFrameRepair = false;
 
         protected virtual void Update()
         {
+            // One-shot: re-inject Animator into the behavior graph on the first Update,
+            // after BehaviorGraphAgent has fully initialized its graph (which happens in its own Start).
+            if (!hasFirstFrameRepair)
+            {
+                hasFirstFrameRepair = true;
+                RepairBlackboards();
+                ReapplyCoreBlackboardVariables();
+            }
+
             if (Agent != null && Agent.isActiveAndEnabled && !Agent.isOnNavMesh)
             {
                 if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
