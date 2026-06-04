@@ -16,14 +16,14 @@ namespace GameDevTV.RTS.Units
         public bool IsBuilding => GetCurrentCommand() == UnitCommands.BuildBuilding;
         public bool IsRepairing => GetCurrentCommand() == UnitCommands.Repair;
         public bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
-        public bool IsGathering => brain != null && brain.CurrentState == WorkerBrainController.State.Gathering;
-        public bool IsActivelyWorking => brain != null && brain.CurrentState != WorkerBrainController.State.Idle;
-        public WorkerBrainController.State BrainState => brain != null ? brain.CurrentState : WorkerBrainController.State.Idle;
+        public bool IsGathering => Brain.CurrentState == WorkerBrainController.State.Gathering;
+        public bool IsActivelyWorking => Brain.CurrentState != WorkerBrainController.State.Idle;
+        public WorkerBrainController.State BrainState => Brain.CurrentState;
 
         public void Repair(AbstractCommandable target)
         {
             if (target == null) return;
-            brain?.Halt();
+            Brain.Halt();
 
             if (Agent != null)
             {
@@ -34,7 +34,7 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("TargetGameObject", target.gameObject);
             SetCurrentCommand(UnitCommands.Repair);
 
-            brain?.StartRepair(target);
+            Brain.StartRepair(target);
         }
         public bool HasSupplies
         {
@@ -53,14 +53,23 @@ namespace GameDevTV.RTS.Units
 
         private GatherSuppliesEventChannel gatherEventChannel;
         private WorkerBrainController brain;
+        private WorkerBrainController Brain
+        {
+            get
+            {
+                if (brain == null)
+                {
+                    brain = GetComponent<WorkerBrainController>();
+                    if (brain == null)
+                        brain = gameObject.AddComponent<WorkerBrainController>();
+                }
+                return brain;
+            }
+        }
 
         protected override void Start()
         {
             base.Start();
-
-            brain = GetComponent<WorkerBrainController>();
-            if (brain == null)
-                brain = gameObject.AddComponent<WorkerBrainController>();
 
             // Fix: Set every possible name the BT might use for the local unit
             if (graphAgent != null)
@@ -83,7 +92,7 @@ namespace GameDevTV.RTS.Units
                 {
                     gatherEventChannel = gatherEvt.Value;
                     gatherEvt.Value.Event += HandleGatherSupplies;
-                    brain?.SetEventChannel(gatherEventChannel);
+                    Brain.SetEventChannel(gatherEventChannel);
                 }
             }
             if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
@@ -113,7 +122,7 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("TargetGameObject", supply.gameObject);
             SetCurrentCommand(UnitCommands.Gather);
 
-            brain.StartGather(supply);
+            Brain.StartGather(supply);
         }
 
         public void ReturnSupplies(GameObject commandPost)
@@ -132,13 +141,13 @@ namespace GameDevTV.RTS.Units
 
         public override void Stop()
         {
-            brain?.Halt();
+            Brain.Halt();
             base.Stop();
         }
 
         public GameObject Build(BuildingSO building, Vector3 targetLocation)
         {
-            brain?.Halt();
+            Brain.Halt();
             GameObject instance = Instantiate(building.Prefab, targetLocation, Quaternion.identity);
             if (!instance.TryGetComponent(out BaseBuilding baseBuilding))
             {
@@ -177,7 +186,7 @@ namespace GameDevTV.RTS.Units
 
             // Drive navigation and construction via the C# brain coroutine for better control over the procedural rise-from-ground animation.
             // Note: The behavior tree is still running but remains in a waiting state.
-            brain.StartBuild(baseBuilding, building, navDestination);
+            Brain.StartBuild(baseBuilding, building, navDestination);
 
             return instance;
         }
@@ -185,7 +194,7 @@ namespace GameDevTV.RTS.Units
 
         public void ResumeBuilding(BaseBuilding building)
         {
-            brain?.Halt();
+            Brain.Halt();
 
             // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)
             Vector3 navDestination = building.transform.position;
@@ -210,7 +219,7 @@ namespace GameDevTV.RTS.Units
 
         public void CancelBuilding()
         {
-            brain?.Halt();
+            Brain.Halt();
             if (graphAgent.GetVariable("Ghost", out BlackboardVariable<GameObject> ghostVariable)
                 && ghostVariable.Value != null)
             {
