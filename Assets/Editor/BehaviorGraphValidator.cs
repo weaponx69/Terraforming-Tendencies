@@ -87,8 +87,16 @@ public class BehaviorGraphValidator
 
         foreach (Object graph in toRebuild)
         {
-            rebuildMethod.Invoke(graph, null);
-        }
+            try
+            {
+                rebuildMethod.Invoke(graph, null);
+            }
+            catch (System.Exception ex)
+            {
+                var realEx = ex is System.Reflection.TargetInvocationException ? ex.InnerException : ex;
+                Debug.LogError($"[BehaviorGraphValidator] Failed to rebuild graph at {AssetDatabase.GetAssetPath(graph)}: {realEx?.Message}\n{realEx?.StackTrace}");
+            }
+}
 
         AssetDatabase.SaveAssets();
         SessionState.SetBool(k_SessionKey, true);

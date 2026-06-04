@@ -49,6 +49,7 @@ namespace GameDevTV.RTS.Player
 
         private bool hasMouseMoved;
         private Vector2 lastMousePosition;
+        private int currentBaseIndex = -1;
 
         private static readonly int TINT = Shader.PropertyToID("_Tint");
         private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
@@ -175,22 +176,65 @@ namespace GameDevTV.RTS.Player
 
         private void Update()
         {
-            if (Application.isFocused)
+            // Stop everything if focus is lost. This prevents the camera from scrolling
+            // forever if the user alt-tabs or clicks away while moving.
+            if (!Application.isFocused) 
             {
-                Vector2 currentMousePos = Mouse.current.position.ReadValue();
-                if (!hasMouseMoved && (currentMousePos - lastMousePosition).sqrMagnitude > 100f)
-                {
-                    hasMouseMoved = true;
-                }
-                lastMousePosition = currentMousePos;
+                // Optional: hasMouseMoved = false; // Could reset this if desired
+                return;
             }
 
+            Vector2 currentMousePos = Mouse.current.position.ReadValue();
+            if (!hasMouseMoved && (currentMousePos - lastMousePosition).sqrMagnitude > 100f)
+            {
+                hasMouseMoved = true;
+            }
+            lastMousePosition = currentMousePos;
+
             HandlePanning();
-HandleZooming();
+            HandleZooming();
             HandleRotation();
             HandleGhost();
             HandleRightClick();
             HandleDragSelect();
+            HandleBasePaging();
+        }
+
+        private void HandleBasePaging()
+        {
+            if (Keyboard.current.qKey.wasPressedThisFrame)
+            {
+                PageBases(-1);
+            }
+            else if (Keyboard.current.eKey.wasPressedThisFrame)
+            {
+                PageBases(1);
+            }
+        }
+
+        private void PageBases(int direction)
+        {
+            var bases = BaseBuilding.ActiveBuildings
+                .Where(b => b != null && b.Owner == Owner.Player1 &&
+                       (b.name.Contains("Command") || (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command"))) &&
+                       b.Progress.State == BuildingProgress.BuildingState.Completed)
+                .OrderBy(b => b.transform.position.x)
+                .ThenBy(b => b.transform.position.z)
+                .ToList();
+
+            if (bases.Count == 0) return;
+
+            currentBaseIndex += direction;
+            if (currentBaseIndex < 0) currentBaseIndex = bases.Count - 1;
+            if (currentBaseIndex >= bases.Count) currentBaseIndex = 0;
+
+            BaseBuilding targetBase = bases[currentBaseIndex];
+            if (targetBase != null && cameraTarget != null)
+            {
+                Vector3 pos = targetBase.transform.position;
+                pos.y = cameraTarget.position.y; // Keep current camera height
+                cameraTarget.position = pos;
+            }
         }
 
         private void HandleGhost()
@@ -552,14 +596,17 @@ HandleZooming();
         {
             Vector2 moveAmount = Vector2.zero;
 
+            // Stop scrolling immediately if the application is not focused or the mouse hasn't moved yet
             if (!cameraConfig.EnableEdgePan || !Application.isFocused || !hasMouseMoved) { return moveAmount; }
 
             Vector2 mousePosition = Mouse.current.position.ReadValue();
             int screenWidth = Screen.width;
             int screenHeight = Screen.height;
 
-            // Ignore edge pan if the mouse is outside the window bounds
-            if (mousePosition.x < 0 || mousePosition.x > screenWidth || mousePosition.y < 0 || mousePosition.y > screenHeight)
+            // Stop scrolling immediately if the mouse is outside the window bounds.
+            // We use a small epsilon to catch the mouse as it hits or crosses the border.
+            if (mousePosition.x < 1f || mousePosition.x >= screenWidth - 1f || 
+                mousePosition.y < 1f || mousePosition.y >= screenHeight - 1f)
             {
                 return moveAmount;
             }
@@ -588,6 +635,10 @@ HandleZooming();
         private Vector2 GetKeyboardMoveAmount()
         {
             Vector2 moveAmount = Vector2.zero;
+            
+            // Explicitly check focus for keyboard input to prevent "stuck" keys from scrolling
+            // the camera when the user alt-tabs or moves the mouse out of the window.
+            if (!Application.isFocused) return moveAmount;
 
             if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed)
             {

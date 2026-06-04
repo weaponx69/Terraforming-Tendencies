@@ -73,6 +73,7 @@ GameObject:
   - component: {fileID: 8954186936418030536}
   - component: {fileID: 1422532545010619854}
   - component: {fileID: 4408794320720015172}
+  - component: {fileID: 1374989911307791933}
   m_Layer: 7
   m_Name: Command Post
   m_TagString: Home
@@ -170,6 +171,19 @@ NavMeshObstacle:
   m_CarveOnlyStationary: 1
   m_Center: {x: 0, y: 1, z: 0}
   m_TimeToStationary: 0.5
+--- !u!114 &1374989911307791933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1589499662120937400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad3ddfdb52f261db88882e179d4aa80b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
+  Radius: 35
 --- !u!1001 &4830853549830045949
 PrefabInstance:
   m_ObjectHideFlags: 0

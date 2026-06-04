@@ -4,32 +4,77 @@ namespace GameDevTV.RTS.Environment
 {
     public class GrowingVegetation : MonoBehaviour
     {
-        [SerializeField] private float growthDuration = 300f; // 5 minutes to full size
+        [SerializeField] private float growthDuration = 30f; // Default to 30 seconds for better feedback
         [SerializeField] private Vector3 targetScale = Vector3.one;
         
+        public float GrowthProgress { get => growthProgress; set => growthProgress = value; }
         private float growthProgress = 0f;
         private Vector3 initialScale;
 
+        public void SetDuration(float duration)
+        {
+            growthDuration = duration;
+        }
+
+        public void SetTargetScale(Vector3 scale)
+        {
+            targetScale = scale;
+        }
+
+        public void ApplyColorTint(Color color)
+        {
+            foreach (var r in GetComponentsInChildren<MeshRenderer>(true))
+            {
+                Material mat = r.material; // Instance
+                if (mat.HasProperty("_EmissionColor"))
+                {
+                    mat.EnableKeyword("_EMISSION");
+                    mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    // Multiply color to ensure it glows and drowns out the texture's yellow
+                    mat.SetColor("_EmissionColor", color * 1.5f);
+                }
+            }
+        }
+
         private void Start()
         {
-            // Randomize duration and target scale slightly
+            // Randomize duration slightly for variety
             growthDuration *= Random.Range(0.8f, 1.2f);
-            targetScale *= Random.Range(0.7f, 1.3f);
             
-            transform.localScale = Vector3.zero;
+            // Apply a subtle scale variety (±20%) instead of the massive multipliers
+            targetScale *= Random.Range(0.8f, 1.2f);
+            
+            // If we haven't set progress yet, start at zero
+            if (growthProgress <= 0)
+                transform.localScale = Vector3.zero;
+            else
+                transform.localScale = Vector3.Lerp(Vector3.zero, targetScale, growthProgress);
         }
 
         private void Update()
         {
+            float multiplier = 1f;
+            var vm = Object.FindAnyObjectByType<VegetationManager>();
+            
+            if (vm != null && vm.useManualGrowthControl)
+            {
+                growthProgress = vm.manualGrowthProgress;
+                transform.localScale = Vector3.Lerp(Vector3.zero, targetScale, growthProgress);
+                return;
+            }
+
             if (growthProgress < 1f)
             {
-                growthProgress += Time.deltaTime / growthDuration;
+                if (vm != null) multiplier = vm.globalGrowthMultiplier;
+
+                growthProgress += (Time.deltaTime * multiplier) / growthDuration;
                 transform.localScale = Vector3.Lerp(Vector3.zero, targetScale, growthProgress);
             }
             else
             {
-                // Once grown, we can disable this script
-                enabled = false;
+                // If not manual control, we can eventually disable, but keep it active if we might switch to manual
+                if (vm == null || !vm.useManualGrowthControl)
+                    enabled = false;
             }
         }
     }

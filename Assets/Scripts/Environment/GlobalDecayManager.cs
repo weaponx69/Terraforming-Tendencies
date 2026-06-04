@@ -54,8 +54,12 @@ namespace GameDevTV.RTS.Environment
 
                     if (!isSupported)
                     {
+                        // Skip decay for ghost buildings (paused state) or buildings under construction
+                        if (target is BaseBuilding building && (building.Progress.State == BuildingProgress.BuildingState.Paused || building.Progress.State == BuildingProgress.BuildingState.Building))
+                            continue;
+
                         // Use baseDecayRate for buildings and integrityDamageRate for units?
-                        // Or just combine them. User wants Integrity to reflect HP.
+// Or just combine them. User wants Integrity to reflect HP.
                         float damageRate = (target is BaseBuilding) ? baseDecayRate : integrityDamageRate;
                         int damage = Mathf.RoundToInt(damageRate * decayTickRate);
                         

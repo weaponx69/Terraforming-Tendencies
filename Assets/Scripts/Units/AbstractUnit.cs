@@ -20,8 +20,9 @@ namespace GameDevTV.RTS.Units
 
         public NavMeshAgent Agent { get; private set; }
         public Sprite Icon => UnitSO.Icon;
+        public bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
         protected BehaviorGraphAgent graphAgent;
-        protected UnitSO unitSO;
+protected UnitSO unitSO;
 
         private static int nextUnitId = 1;
         public int UnitID { get; private set; }
@@ -41,6 +42,9 @@ namespace GameDevTV.RTS.Units
             unitSO = UnitSO as UnitSO;
 
             SetCurrentCommand(UnitCommands.Stop);
+            
+            // Repair the blackboard immediately so variables can be set
+            RepairBlackboards();
             ReapplyCoreBlackboardVariables();
             
             // Run an extra repair in the next few frames to catch late-initialized graphs
@@ -65,22 +69,30 @@ namespace GameDevTV.RTS.Units
                     graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
                     graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
 
-                    if (graphAgent != null)
-                    {
-                        Animator animator = GetComponentInChildren<Animator>();
-                        if (animator != null)
-                        {
-                            graphAgent.SetVariableValue("Animator", animator);
-                        }
-                    }
+                    // Ensure the Animator variable is set on the blackboard.
+                    // Even if null, we set it to avoid 'uninitialized variable' warnings 
+                    // from Behavior Graph actions that expect it.
+                    Animator animator = GetComponentInChildren<Animator>();
+                    graphAgent.SetVariableValue("Animator", animator);
 
                     if (unitSO != null && unitSO.AttackConfig != null)
                     {
                         graphAgent.SetVariableValue(BlackboardConstants.ATTACK_CONFIG, unitSO.AttackConfig);
                     }
                 }
-                catch { }
+                catch (System.Exception e) 
+                {
+                    // Debug.LogWarning($"[AbstractUnit] Failed to set blackboard variables: {e.Message}");
+                }
             }
+        }
+
+        protected virtual void OnEnable()
+        {
+            // Re-ensure blackboard variables are set whenever the unit is enabled.
+            // This catches race conditions during spawning.
+            RepairBlackboards();
+            ReapplyCoreBlackboardVariables();
         }
 
         protected override void Start()
@@ -120,7 +132,8 @@ namespace GameDevTV.RTS.Units
 
             try
             {
-                var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                // Include Public for package-defined fields
+                var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public;
                 var graphField = graphAgent.GetType().GetField("m_Graph", bf);
                 if (graphField == null) return;
 
@@ -195,7 +208,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 // Force core variables into every blackboard that has them defined.
-                Animator animator = GetComponentInChildren<Animator>();
+                Animator animator = GetComponentInChildren<Animator>(true);
                 foreach (var variable in blackboard.Variables)
                 {
                     if (variable.Name == BlackboardConstants.SELF || variable.Name == "Agent")
@@ -206,8 +219,10 @@ namespace GameDevTV.RTS.Units
                     {
                         variable.ObjectValue = this;
                     }
-                    else if ((variable.Name == "Animator" || (string.IsNullOrEmpty(variable.Name) && variable.Type == typeof(Animator))) && animator != null)
+                    else if (variable.Name == "Animator" || (string.IsNullOrEmpty(variable.Name) && variable.Type == typeof(Animator)))
                     {
+                        // ALWAYS set the value, even if animator is null, to ensure the 
+                        // behavior node sees an initialized (albeit null) variable.
                         variable.ObjectValue = animator;
                     }
                 }

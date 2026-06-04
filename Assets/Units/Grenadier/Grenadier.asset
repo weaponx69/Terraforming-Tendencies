@@ -20,7 +20,7 @@ MonoBehaviour:
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField:
   - {fileID: 11400000, guid: 0997c20444ad8e64990f524ed591c91f, type: 2}
-  <Health>k__BackingField: 60
+  <Health>k__BackingField: 100
   <Prefab>k__BackingField: {fileID: 1813055781741166138, guid: d606f67b2169916478d3b1364e1b4428, type: 3}
   <Upgrades>k__BackingField:
   - {fileID: 11400000, guid: 1a539722dcaa7bf4bbf2af09917a710d, type: 2}

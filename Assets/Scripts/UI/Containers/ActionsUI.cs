@@ -66,13 +66,13 @@ namespace GameDevTV.RTS.UI.Containers
                 ? selectedUnits.ElementAt(0).AvailableCommands 
                 : Array.Empty<BaseCommand>();
 
-            availableCommands = availableCommands.Where(action => action != null && action.IsAvailable(
+            availableCommands = availableCommands?.Where(action => action != null && action.IsAvailable(
                 new CommandContext(
                     Owner.Player1,
                     selectedUnits.FirstOrDefault(),
                     new RaycastHit()
                 )
-            ));
+            )) ?? Enumerable.Empty<BaseCommand>();
 
             for(int i = 1; i<selectedUnits.Count; i++)
             {

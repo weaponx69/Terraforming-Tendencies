@@ -16,14 +16,7 @@ namespace GameDevTV.RTS.Environment
 
         private void Start()
         {
-            if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
-            {
-                float mapWidth = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
-                float mapHeight = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
-
-                Vector3 targetPos = new Vector3(Random.Range(0, mapWidth), 0, Random.Range(0, mapHeight));
-                unit.MoveTo(targetPos);
-            }
+            // Movement is handled by the ProbeMovement component
         }
 
         private void Update()

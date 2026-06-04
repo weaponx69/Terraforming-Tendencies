@@ -315,14 +315,18 @@ namespace GameDevTV.RTS.Environment
                         GameObject ghost = new GameObject($"Terrain Ghost ({x},{z})");
                         ghost.transform.parent = transform;
                         ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
-                        SetLayerRecursive(ghost, transparentLayer);
+                        // Use Default layer for terrain ghosts so raycasts hit them
+                        ghost.layer = 0; 
                         
                         MeshFilter mf = ghost.AddComponent<MeshFilter>();
                         mf.sharedMesh = mesh;
                         
                         MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
                         mr.sharedMaterial = renderer.sharedMaterial;
-                    }
+
+                        MeshCollider mc = ghost.AddComponent<MeshCollider>();
+                        mc.sharedMesh = mesh;
+}
                 }
 
                 ScatterSurfaceFeatures();

@@ -213,9 +213,9 @@ namespace GameDevTV.RTS.Units
             Owner = owner;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 0;
-            Heal(1);
+            Heal(300);
             // Let SmokestackVisuals (or any future visual override) supply its own ghost material.
-            Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
+Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                 ? sv.GhostMaterial
                 : ghostMaterial;
 
@@ -269,7 +269,7 @@ namespace GameDevTV.RTS.Units
 
             if (Progress.Completion == 0)
             {
-                Heal(1);
+                Heal(300);
             }
 
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
