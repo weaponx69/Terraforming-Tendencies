@@ -175,7 +175,6 @@ public int spawnAttemptsPerInterval = 40;
 
         private void ExecuteFillNow()
         {
-            float oxygen = 100f; 
             LifeSupportNode[] nodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
             foreach (var node in nodes)
             {

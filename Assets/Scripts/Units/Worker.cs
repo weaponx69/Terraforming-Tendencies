@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Units
     {
         public bool IsBuilding => GetCurrentCommand() == UnitCommands.BuildBuilding;
         public bool IsRepairing => GetCurrentCommand() == UnitCommands.Repair;
-        public bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
+        public new bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
         public bool IsGathering => Brain.CurrentState == WorkerBrainController.State.Gathering;
         public bool IsActivelyWorking => Brain.CurrentState != WorkerBrainController.State.Idle;
         public WorkerBrainController.State BrainState => Brain.CurrentState;

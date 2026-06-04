@@ -88,7 +88,7 @@ protected UnitSO unitSO;
                         graphAgent.SetVariableValue(BlackboardConstants.ATTACK_CONFIG, unitSO.AttackConfig);
                     }
                 }
-                catch (System.Exception e) 
+                catch (System.Exception)
                 {
                     // Debug.LogWarning($"[AbstractUnit] Failed to set blackboard variables: {e.Message}");
                 }
