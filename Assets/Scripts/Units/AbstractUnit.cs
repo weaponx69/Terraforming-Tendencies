@@ -42,6 +42,13 @@ protected UnitSO unitSO;
             unitSO = UnitSO as UnitSO;
 
             SetCurrentCommand(UnitCommands.Stop);
+
+            // Ensure every unit has an Animator component (even if dummy)
+            // to prevent Unity Behavior's SetAnimatorBoolAction from spamming "No Animator set" warnings.
+            if (GetComponentInChildren<Animator>(true) == null)
+            {
+                gameObject.AddComponent<Animator>();
+            }
             
             // Repair the blackboard immediately so variables can be set
             RepairBlackboards();
