@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.Units;
 using UnityEngine;
@@ -16,9 +17,11 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private TextMeshProUGUI biomassLabelText;
         [SerializeField] private TextMeshProUGUI biomassValueText;
 
-        // Oxygen UI
+        // Oxygen & Sector UI
         [SerializeField] private TextMeshProUGUI oxygenLabelText;
         [SerializeField] private TextMeshProUGUI oxygenValueText;
+        [SerializeField] private TextMeshProUGUI sectorsLabelText;
+        [SerializeField] private TextMeshProUGUI sectorsValueText;
         [SerializeField] private TextMeshProUGUI integrityLabelText;
         [SerializeField] private TextMeshProUGUI integrityValueText;
         [SerializeField] private TextMeshProUGUI populationText;
@@ -109,6 +112,24 @@ namespace GameDevTV.RTS.UI
             RefreshUI();
         }
 
+        private void Update()
+        {
+            UpdateSectorsUI();
+        }
+
+        private void UpdateSectorsUI()
+        {
+            if (SectorManager.Instance == null || sectorsValueText == null) return;
+
+            int occupied = SectorManager.Instance.Sectors.Count(s => s.IsOccupied);
+            int total = SectorManager.Instance.Sectors.Count;
+
+            if (total > 0)
+            {
+                sectorsValueText.SetText($"{occupied}/{total}");
+            }
+        }
+
         private void InitializeUI()
         {
             displayedOwner = GameOverManager.MonitoredOwner;
@@ -120,9 +141,11 @@ namespace GameDevTV.RTS.UI
             if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
             if (oxygenValueText != null && Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(displayedOwner, out float oxyInitial))
             {
-                oxygenValueText.SetText(oxyInitial.ToString("F3"));
-                if (populationText != null) populationText.SetText($"{oxyInitial:F3}%");
+                oxygenValueText.SetText($"{oxyInitial:F1}%");
             }
+
+            if (sectorsLabelText != null) sectorsLabelText.SetText("Sectors");
+            UpdateSectorsUI();
 
             if (integrityLabelText != null) integrityLabelText.SetText("Integrity");
             if (integrityValueText != null && Supplies.Integrity != null && Supplies.Integrity.TryGetValue(displayedOwner, out float integrityInitial))
@@ -142,9 +165,9 @@ namespace GameDevTV.RTS.UI
         {
             if (owner != displayedOwner) return;
             if (oxygenValueText != null)
-                oxygenValueText.SetText(newValue.ToString("F3"));
+                oxygenValueText.SetText($"{newValue:F1}%");
             if (populationText != null)
-                populationText.SetText($"{newValue:F3}%");
+                populationText.SetText($"{newValue:F1}%");
         }
 
         private void HandleIntegrityChanged(Owner owner, float newValue)

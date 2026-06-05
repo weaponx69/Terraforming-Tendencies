@@ -50,6 +50,7 @@ namespace GameDevTV.RTS.Player
         private bool hasMouseMoved;
         private Vector2 lastMousePosition;
         private int currentBaseIndex = -1;
+        private GlobalCommander globalCommander;
 
         private static readonly int TINT = Shader.PropertyToID("_Tint");
         private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
@@ -92,6 +93,16 @@ namespace GameDevTV.RTS.Player
         private void Start()
         {
             CenterCameraOnMap();
+            globalCommander = FindAnyObjectByType<GlobalCommander>();
+        }
+
+        private GlobalCommander GetGlobalCommander()
+        {
+            if (globalCommander == null)
+            {
+                globalCommander = FindAnyObjectByType<GlobalCommander>();
+            }
+            return globalCommander;
         }
 
         private void CenterCameraOnMap()
@@ -221,10 +232,10 @@ namespace GameDevTV.RTS.Player
                 .Cast<AbstractCommandable>()
                 .ToList();
 
-            var globalCommander = FindAnyObjectByType<GlobalCommander>();
-            if (globalCommander != null)
+            GlobalCommander commander = GetGlobalCommander();
+            if (commander != null)
             {
-                commandPosts.Add(globalCommander);
+                commandPosts.Add(commander);
             }
 
             commandPosts = commandPosts.OrderBy(b => b.transform.position.x)
@@ -329,6 +340,17 @@ namespace GameDevTV.RTS.Player
                 unit.Select();
             }
             selectionBox.gameObject.SetActive(false);
+
+            // If the click landed on empty space (nothing got selected and it wasn't a UI
+            // interaction or an active command placement), fall back to selecting the Global Commander.
+            if (!wasMouseDownOnUI && activeCommand == null && selectedUnits.Count == 0)
+            {
+                GlobalCommander commander = GetGlobalCommander();
+                if (commander != null)
+                {
+                    commander.Select();
+                }
+            }
         }
 
         private void HandleMouseDrag()
@@ -481,10 +503,10 @@ namespace GameDevTV.RTS.Player
             // Fallback for Global Commands: If no units are selected, the command is coming from the GlobalCommander
             if (abstractCommandables.Count == 0)
             {
-                GlobalCommander globalCommander = FindAnyObjectByType<GlobalCommander>();
-                if (globalCommander != null)
+                GlobalCommander commander = GetGlobalCommander();
+                if (commander != null)
                 {
-                    abstractCommandables.Add(globalCommander);
+                    abstractCommandables.Add(commander);
                 }
             }
 

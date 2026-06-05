@@ -16,14 +16,17 @@ MonoBehaviour:
   MapHeight: 100
   NoiseScale: 75
   HeightMultiplier: 12
-  ResourceCount: 80
+  ResourceCount: 40
   BaseDecayRate: 2
   ToxicityLevel: 0
   BiomassDrainRate: 1
   IntegrityDrainRate: 0.5
-  EnvironmentDensity: 400
+  SectorsX: 3
+  SectorsY: 3
+  SectorOccupationRadius: 20
+  EnvironmentDensity: 100
   EnvironmentPrefabs: []
-  SurfaceFeatureDensity: 100
+  SurfaceFeatureDensity: 50
   SurfaceFeaturePrefabs:
   - {fileID: 8123850839380615009, guid: 4153fabb29649133abb064ffcb6582ea, type: 3}
   - {fileID: 5614667252087818490, guid: d12c260b02305a879a72f64423ea0e2e, type: 3}

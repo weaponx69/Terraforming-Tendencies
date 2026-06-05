@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GameDevTV.RTS.Units;
 using TMPro;
 using UnityEngine;
@@ -16,10 +17,18 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private TextMeshProUGUI resourceCountText; // reused as the live total
         [SerializeField] private Button selectButton;
 
+        // Whether a drone is currently available to build worker-built items (e.g. Oxygen Processor).
+        private bool buildersAvailable;
+        // Per-row re-evaluators for builder-gated items, re-run when availability changes.
+        private readonly List<System.Action> gatedRows = new List<System.Action>();
+
         public void Setup(ExpansionProposal proposal, System.Action onSelect)
         {
+            gatedRows.Clear();
+            buildersAvailable = GreedyAIController.Instance != null && GreedyAIController.Instance.HasAvailableBuilder();
+
             // Header
-            if (siteNameText != null)
+if (siteNameText != null)
             {
                 string header = proposal.SiteName;
                 if (proposal.IsExpansion && proposal.ResourceCount > 0)

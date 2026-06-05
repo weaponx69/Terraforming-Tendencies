@@ -70,11 +70,8 @@ namespace GameDevTV.RTS.Player
             MineralsToBiomassRateStatic = mineralsToBiomassRate;
             GasToBiomassRateStatic = gasToBiomassRate;
 
-            OnOxygenChanged += HandleOxygenChanged;
-            OnIntegrityChanged += HandleIntegrityChanged;
-
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent); 
-            Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
+Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
             
             Owner displayOwner = GameOverManager.MonitoredOwner;
             RaiseBiomassChanged(displayOwner, Biomass[displayOwner]);
@@ -83,32 +80,11 @@ namespace GameDevTV.RTS.Player
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
-            OnOxygenChanged -= HandleOxygenChanged;
-            OnIntegrityChanged -= HandleIntegrityChanged;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
         }
 
-        private void HandleOxygenChanged(Owner owner, float value)
-        {
-            if (owner == Owner.AI1 || owner == Owner.Player1)
-            {
-                if (value >= 100)
-                {
-                    OnVictory?.Invoke();
-                }
-            }
-        }
-
-        private void HandleIntegrityChanged(Owner owner, float value)
-        {
-            if (owner == Owner.Player1 && value <= 0)
-            {
-                OnIntegrityDepleted?.Invoke();
-            }
-        }
-
         public static void UpdateOxygen(Owner owner, float value)
-        {
+{
             if (Oxygen != null && Oxygen.ContainsKey(owner))
             {
                 Oxygen[owner] = value;
@@ -127,13 +103,14 @@ namespace GameDevTV.RTS.Player
 
         public static float CalculateIntegrity(Owner owner)
         {
-            var commandables = FindObjectsByType<AbstractCommandable>(FindObjectsInactive.Exclude);
+            var commandables = AbstractCommandable.ActiveCommandables;
             long totalMaxHP = 0;
             long totalCurrentHP = 0;
             bool foundAny = false;
 
             foreach (var c in commandables)
             {
+                if (c == null) continue;
                 if (c.Owner == owner)
                 {
                     totalMaxHP += c.MaxHealth;

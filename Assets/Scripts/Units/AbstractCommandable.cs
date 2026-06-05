@@ -11,8 +11,20 @@ namespace GameDevTV.RTS.Units
 {
     public abstract class AbstractCommandable : MonoBehaviour, ISelectable, IDamageable, IHideable
     {
+        public static readonly System.Collections.Generic.List<AbstractCommandable> ActiveCommandables = new();
+
+        protected virtual void OnEnable()
+        {
+            if (!ActiveCommandables.Contains(this)) ActiveCommandables.Add(this);
+        }
+
+        protected virtual void OnDisable()
+        {
+            ActiveCommandables.Remove(this);
+        }
+
         [field: SerializeField] public bool IsSelected { get; protected set; }
-        [field: SerializeField] public int CurrentHealth { get; protected set; }
+[field: SerializeField] public int CurrentHealth { get; protected set; }
         [field: SerializeField] public int MaxHealth { get; protected set; }
         [field: SerializeField] public Owner Owner { get; set; }
         [field: SerializeField] public bool IsVisible { get; private set; } = true;

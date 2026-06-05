@@ -198,9 +198,24 @@ namespace GameDevTV.RTS.Units
             if (agent.isOnNavMesh)
                 agent.SetDestination(targetLocation);
 
-            yield return WaitUntilNear(targetLocation, agent.stoppingDistance + 0.5f, timeout: 60f);
+            float arrivalDistance = agent.stoppingDistance + 0.5f;
+            yield return WaitUntilNear(targetLocation, arrivalDistance, timeout: 60f);
 
             if (building == null)
+            {
+                CurrentState = State.Idle;
+                runningCoroutine = null;
+                worker.Stop();
+                yield break;
+            }
+
+            // Only construct if the drone actually reached the site. If it could not
+            // path there within the timeout, leave the ghost in its Paused state so it
+            // can be resumed later — never auto-complete a building without a drone present.
+            float adx = transform.position.x - targetLocation.x;
+            float adz = transform.position.z - targetLocation.z;
+            bool arrived = (adx * adx + adz * adz) <= arrivalDistance * arrivalDistance;
+            if (!arrived)
             {
                 CurrentState = State.Idle;
                 runningCoroutine = null;

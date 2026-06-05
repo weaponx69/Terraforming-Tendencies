@@ -39,8 +39,17 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private float gracePeriod = 5f;
 
         // ── Public event ───────────────────────────────────────────────────────────
+        /// <summary>Why the run ended in failure, so the UI can show an appropriate message.</summary>
+        public enum GameOverReason
+        {
+            /// <summary>Colony life support collapsed (integrity depleted to 0).</summary>
+            LifeSupport,
+            /// <summary>No biomass left and no way to gather more.</summary>
+            Resources
+        }
+
         /// <summary>Raised once when the game-over condition is confirmed.</summary>
-        public static event System.Action OnGameOver;
+        public static event System.Action<GameOverReason> OnGameOver;
         public static event System.Action OnVictory;
 
         public static Owner MonitoredOwner { get; private set; } = Owner.Player1;
@@ -60,6 +69,10 @@ namespace GameDevTV.RTS.Player
             Supplies.OnBiomassChanged += HandleBiomassChanged;
             Supplies.OnVictory += HandleVictory;
             Supplies.OnIntegrityDepleted += HandleIntegrityDepleted;
+            // Subscribe directly to the change events as the authoritative win/loss detection.
+            // (Supplies' own internal relays are unreliable, so we evaluate thresholds here.)
+            Supplies.OnIntegrityChanged += HandleIntegrityChanged;
+            Supplies.OnOxygenChanged += HandleOxygenChanged;
             Bus<SupplyDepletedEvent>.RegisterForAll(HandleSupplyDepleted);
         }
 
@@ -68,12 +81,103 @@ namespace GameDevTV.RTS.Player
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
             Supplies.OnVictory -= HandleVictory;
             Supplies.OnIntegrityDepleted -= HandleIntegrityDepleted;
+            Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
+            Supplies.OnOxygenChanged -= HandleOxygenChanged;
             Bus<SupplyDepletedEvent>.UnregisterForAll(HandleSupplyDepleted);
+        }
+
+        /// <summary>
+        /// Authoritative loss check: colony integrity (life support) depleted to 0.
+        /// Fires immediately (past the brief startup guard), alongside the biomass loss.
+        /// </summary>
+        private void HandleIntegrityChanged(Owner owner, float value)
+        {
+            if (gameOverTriggered) return;
+            if (owner != monitoredOwner) return;
+            if (value > 0f) return;
+            // Avoid an instant loss at startup before the colony has spawned in.
+            if (Time.timeSinceLevelLoad < 5f) return;
+
+            TriggerGameOver(GameOverReason.LifeSupport);
+        }
+
+        /// <summary>Authoritative win check: oxygen sustainability reached 100%.</summary>
+        private void HandleOxygenChanged(Owner owner, float value)
+        {
+            if (gameOverTriggered) return;
+            if (owner != monitoredOwner) return;
+            if (value >= 100f)
+            {
+                TriggerVictory();
+            }
         }
 
         private void Start()
         {
             InvokeRepeating(nameof(CheckNoRecovery), 10f, checkInterval); // Wait 10s for initial spawn
+        }
+
+        /// <summary>
+        /// Authoritative win/loss polling. Reads the shared Supplies state directly each frame
+        /// (rather than relying on event delivery) so the conditions are robust and immediate:
+        ///   WIN  — oxygen sustainability reaches 100%.
+        ///   LOSS — colony integrity (life support) depletes to 0.
+        /// The biomass/no-recovery loss continues to work alongside this via CheckNoRecovery.
+        /// </summary>
+        private void Update()
+        {
+            if (gameOverTriggered) return;
+
+            // Win: oxygen sustainability at 100% AND all sectors occupied.
+            bool oxygenComplete = Supplies.Oxygen != null
+                && Supplies.Oxygen.TryGetValue(monitoredOwner, out float oxygen)
+                && oxygen >= 100f;
+
+            bool sectorsComplete = SectorManager.Instance != null && SectorManager.Instance.AreAllSectorsOccupied();
+
+            if (oxygenComplete && sectorsComplete)
+            {
+                TriggerVictory();
+                return;
+            }
+
+            // Loss Condition 1: Colony life support coverage collapsed.
+// If there are no active LifeSupportNodes, the colony cannot survive.
+            // Brief startup guard avoids an instant loss before the starting base is completed.
+            if (Time.timeSinceLevelLoad >= 5f)
+            {
+                if (!AnyLifeSupportNodesRemain(monitoredOwner))
+                {
+                    TriggerGameOver(GameOverReason.LifeSupport);
+                    return;
+                }
+
+                // Loss Condition 2: Colony integrity (total HP) depleted to 0.
+                if (Supplies.Integrity != null
+                    && Supplies.Integrity.TryGetValue(monitoredOwner, out float integrity)
+                    && integrity <= 0f)
+                {
+                    TriggerGameOver(GameOverReason.LifeSupport);
+                }
+            }
+        }
+
+        private bool AnyLifeSupportNodesRemain(Owner owner)
+        {
+            var nodes = Object.FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
+            foreach (var node in nodes)
+            {
+                if (node.TryGetComponent<BaseBuilding>(out var b) && b.Owner == owner)
+                {
+                    // Only count completed buildings; ghosts/under-construction buildings 
+                    // haven't activated their life support yet.
+                    if (b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────────
@@ -86,7 +190,8 @@ namespace GameDevTV.RTS.Player
             // If integrity is 0 because of no units, don't fail immediately at start.
             if (Time.timeSinceLevelLoad < 5f) return;
             
-            TriggerGameOver();
+            // Integrity hitting 0 means colony life support has collapsed. Fire immediately.
+            TriggerGameOver(GameOverReason.LifeSupport);
         }
 
         private void HandleVictory()
@@ -133,7 +238,7 @@ namespace GameDevTV.RTS.Player
 
             if (!supplyNodesExist && !miningUnitsExist)
             {
-                TriggerGameOver();
+                TriggerGameOver(GameOverReason.Resources);
             }
         }
 
@@ -180,7 +285,7 @@ namespace GameDevTV.RTS.Player
             return false;
         }
 
-        private void TriggerGameOver()
+        private void TriggerGameOver(GameOverReason reason)
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
@@ -188,7 +293,7 @@ namespace GameDevTV.RTS.Player
             CancelInvoke(nameof(CheckNoRecovery));
             StopAllCoroutines();
 
-            OnGameOver?.Invoke();
+            OnGameOver?.Invoke(reason);
         }
 
         private void TriggerVictory()

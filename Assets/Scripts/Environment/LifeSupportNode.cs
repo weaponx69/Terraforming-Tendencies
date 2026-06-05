@@ -1,11 +1,24 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace GameDevTV.RTS.Environment
 {
     public class LifeSupportNode : MonoBehaviour
-    {
+{
+        public static readonly List<LifeSupportNode> ActiveNodes = new List<LifeSupportNode>();
+
+        private void OnEnable()
+        {
+            if (!ActiveNodes.Contains(this)) ActiveNodes.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            ActiveNodes.Remove(this);
+        }
+
         [Tooltip("Radius within which buildings are protected from decay.")]
-        public float Radius = 15f;
+public float Radius = 15f;
 
         private void OnDrawGizmosSelected()
         {

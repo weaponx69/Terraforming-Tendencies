@@ -20,13 +20,13 @@ namespace GameDevTV.RTS.Environment
         public Color grassColor = new Color(0.2f, 0.8f, 0.1f);
 
         [Header("Optimization")]
-        public int itemsPerChunk = 100;
-        public float cullingDistance = 60f;
-        public int maxSpawnsPerFrame = 50;
+        public int itemsPerChunk = 500; // Increased since they are now batches
+        public float cullingDistance = 80f;
+        public int maxSpawnsPerFrame = 100;
 
         [Header("Growth Loop")]
         public float spawnInterval = 1.5f;
-public int spawnAttemptsPerInterval = 40;
+        public int spawnAttemptsPerInterval = 40;
         public LayerMask groundLayer;
 
         [Header("Growth Control")]
@@ -39,19 +39,150 @@ public int spawnAttemptsPerInterval = 40;
         public float manualGrowthProgress = 0f;
 
         private Dictionary<LifeSupportNode, List<GameObject>> zonePlants = new Dictionary<LifeSupportNode, List<GameObject>>();
-        private Dictionary<LifeSupportNode, List<GameObject>> zoneGrass = new Dictionary<LifeSupportNode, List<GameObject>>();
-        private Dictionary<LifeSupportNode, List<VegetationChunk>> zoneChunks = new Dictionary<LifeSupportNode, List<VegetationChunk>>();
+        private Dictionary<LifeSupportNode, GrassBatch> zoneGrassBatches = new Dictionary<LifeSupportNode, GrassBatch>();
+        
+        private List<LifeSupportNode> cachedNodes = new List<LifeSupportNode>();
+        private float nodeCacheTimer = 0f;
+
+        private class GrassInstance
+        {
+            public Vector3 Position;
+            public Quaternion Rotation;
+            public Vector3 TargetScale;
+            public float GrowthProgress;
+            public float GrowthDuration;
+            public int PrefabIndex;
+        }
+
+        private class GrassBatch
+        {
+            public List<GrassInstance> Instances = new List<GrassInstance>();
+            public Dictionary<int, List<Matrix4x4[]>> MatrixGroups = new Dictionary<int, List<Matrix4x4[]>>();
+            public bool AnyGrowing = true;
+            public bool NeedsUpdate = true;
+        }
 
         private void Start()
         {
+            if (Instance == null) Instance = this;
+            
             if ((plantPrefabs == null || plantPrefabs.Length == 0) && (grassPrefabs == null || grassPrefabs.Length == 0))
             {
                 Debug.LogWarning("[VegetationManager] No plant or grass prefabs assigned.");
                 return;
             }
 
+            UpdateNodeCache();
             StartCoroutine(GrowthLoop());
         }
+
+        public static VegetationManager Instance { get; private set; }
+
+        private void UpdateNodeCache()
+        {
+            cachedNodes.Clear();
+            cachedNodes.AddRange(LifeSupportNode.ActiveNodes);
+        }
+
+        private void Update()
+        {
+            nodeCacheTimer += Time.deltaTime;
+            if (nodeCacheTimer >= 5f)
+            {
+                nodeCacheTimer = 0f;
+                UpdateNodeCache();
+            }
+
+            RenderGrassBatches();
+        }
+
+        private void RenderGrassBatches()
+        {
+            if (grassPrefabs == null || grassPrefabs.Length == 0) return;
+
+            float dt = Time.deltaTime;
+            float multiplier = globalGrowthMultiplier;
+
+            foreach (var kvp in zoneGrassBatches)
+            {
+                LifeSupportNode node = kvp.Key;
+                if (node == null) continue;
+
+                GrassBatch batch = kvp.Value;
+
+                if (batch.AnyGrowing)
+                {
+                    bool stillGrowing = false;
+                    foreach (var inst in batch.Instances)
+                    {
+                        if (inst.GrowthProgress < 1f)
+                        {
+                            inst.GrowthProgress += (dt * multiplier) / inst.GrowthDuration;
+                            if (inst.GrowthProgress >= 1f) inst.GrowthProgress = 1f;
+                            else stillGrowing = true;
+                            batch.NeedsUpdate = true;
+                        }
+                    }
+                    batch.AnyGrowing = stillGrowing;
+                }
+
+                if (batch.NeedsUpdate)
+                {
+                    UpdateBatchMatrices(batch);
+                    batch.NeedsUpdate = false;
+                }
+
+                for (int p = 0; p < grassPrefabs.Length; p++)
+                {
+                    Mesh mesh = GetMesh(grassPrefabs[p]);
+                    Material mat = GetMaterial(grassPrefabs[p]);
+                    if (mesh == null || mat == null) continue;
+
+                    if (batch.MatrixGroups.TryGetValue(p, out var groups))
+                    {
+                        foreach (var group in groups)
+                        {
+                            if (group.Length > 0)
+                                Graphics.DrawMeshInstanced(mesh, 0, mat, group, group.Length);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void UpdateBatchMatrices(GrassBatch batch)
+        {
+            batch.MatrixGroups.Clear();
+            Dictionary<int, List<Matrix4x4>> matricesByPrefab = new Dictionary<int, List<Matrix4x4>>();
+
+            foreach (var inst in batch.Instances)
+            {
+                if (!matricesByPrefab.ContainsKey(inst.PrefabIndex))
+                    matricesByPrefab[inst.PrefabIndex] = new List<Matrix4x4>();
+
+                Vector3 scale = Vector3.Lerp(Vector3.zero, inst.TargetScale, inst.GrowthProgress);
+                matricesByPrefab[inst.PrefabIndex].Add(Matrix4x4.TRS(inst.Position, inst.Rotation, scale));
+            }
+
+            foreach (var kvp in matricesByPrefab)
+            {
+                int prefabIdx = kvp.Key;
+                List<Matrix4x4> matrices = kvp.Value;
+                List<Matrix4x4[]> groups = new List<Matrix4x4[]>();
+
+                for (int i = 0; i < matrices.Count; i += 1023)
+                {
+                    int count = Mathf.Min(1023, matrices.Count - i);
+                    Matrix4x4[] group = new Matrix4x4[count];
+                    matrices.CopyTo(i, group, 0, count);
+                    groups.Add(group);
+                }
+                batch.MatrixGroups[prefabIdx] = groups;
+            }
+        }
+
+        private Mesh GetMesh(GameObject prefab) => prefab.GetComponentInChildren<MeshFilter>()?.sharedMesh;
+        private Material GetMaterial(GameObject prefab) => prefab.GetComponentInChildren<MeshRenderer>()?.sharedMaterial;
 
         private IEnumerator GrowthLoop()
         {
@@ -73,25 +204,22 @@ public int spawnAttemptsPerInterval = 40;
                 float currentInterval = spawnInterval / Mathf.Clamp(oxygen, 0.1f, 10f);
                 yield return new WaitForSeconds(Mathf.Clamp(currentInterval, 0.5f, spawnInterval));
 
-                LifeSupportNode[] nodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
-                foreach (var node in nodes)
+                foreach (var node in cachedNodes)
                 {
-                    // Clean and ensure dictionaries
+                    if (node == null) continue;
                     EnsureNodeData(node);
 
-                    // Scale max counts by oxygen
                     float oxFactor = Mathf.Clamp01(oxygen / 100f);
                     int currentMaxPlants = Mathf.RoundToInt(maxPlantsPerZone * oxFactor);
                     int currentMaxGrass = Mathf.RoundToInt(maxGrassPerZone * oxFactor);
 
-                    // Multiple attempts per interval
                     for (int i = 0; i < spawnAttemptsPerInterval; i++)
                     {
                         if (zonePlants[node].Count < currentMaxPlants)
                             TrySpawnItem(node, plantPrefabs, plantMinSpacing, zonePlants[node]);
                         
-                        if (zoneGrass[node].Count < currentMaxGrass)
-                            TrySpawnItem(node, grassPrefabs, grassMinSpacing, zoneGrass[node]);
+                        if (zoneGrassBatches[node].Instances.Count < currentMaxGrass)
+                            TrySpawnGrassInstance(node);
                     }
                 }
             }
@@ -100,101 +228,90 @@ public int spawnAttemptsPerInterval = 40;
         private void EnsureNodeData(LifeSupportNode node)
         {
             if (!zonePlants.ContainsKey(node)) zonePlants[node] = new List<GameObject>();
-            if (!zoneGrass.ContainsKey(node)) zoneGrass[node] = new List<GameObject>();
-            if (!zoneChunks.ContainsKey(node)) zoneChunks[node] = new List<VegetationChunk>();
+            if (!zoneGrassBatches.ContainsKey(node)) zoneGrassBatches[node] = new GrassBatch();
             
             zonePlants[node].RemoveAll(p => p == null);
-            zoneGrass[node].RemoveAll(p => p == null);
-            zoneChunks[node].RemoveAll(c => c == null);
+        }
+
+        private void TrySpawnGrassInstance(LifeSupportNode node)
+        {
+            if (grassPrefabs == null || grassPrefabs.Length == 0) return;
+
+            Vector2 randomCircle = Random.insideUnitCircle * node.Radius;
+            Vector3 spawnPos = node.transform.position + new Vector3(randomCircle.x, 50f, randomCircle.y);
+
+            int mask = groundLayer.value | (1 << LayerMask.NameToLayer("TransparentFX"));
+            if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 100f, mask))
+            {
+                int prefabIdx = Random.Range(0, grassPrefabs.Length);
+                var inst = new GrassInstance
+                {
+                    Position = hit.point,
+                    Rotation = Quaternion.Euler(0, Random.Range(0, 360), 0),
+                    TargetScale = new Vector3(0.04f, 0.03f, 0.04f),
+                    GrowthProgress = 0f,
+                    GrowthDuration = 20f * Random.Range(0.8f, 1.2f),
+                    PrefabIndex = prefabIdx
+                };
+                zoneGrassBatches[node].Instances.Add(inst);
+                zoneGrassBatches[node].NeedsUpdate = true;
+            }
         }
 
         [ContextMenu("Fill All Zones (Zero Growth)")]
         public void FillAllZonesNow()
         {
-            if (Application.isPlaying)
-            {
-                StartCoroutine(FillAllZonesRoutine());
-            }
-            else
-            {
-                ExecuteFillNow();
-            }
+            if (Application.isPlaying) StartCoroutine(FillAllZonesRoutine());
+            else ExecuteFillNow();
         }
 
         private IEnumerator FillAllZonesRoutine()
         {
+            UpdateNodeCache();
             float oxygen = 100f; 
             Owner owner = GameOverManager.MonitoredOwner;
-            if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(owner, out float val))
-            {
-                oxygen = val;
-            }
+            if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(owner, out float val)) oxygen = val;
 
-            LifeSupportNode[] nodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
             int spawnCountThisFrame = 0;
-
-            foreach (var node in nodes)
+            foreach (var node in cachedNodes)
             {
+                if (node == null) continue;
                 EnsureNodeData(node);
                 
-                int targetPlants = maxPlantsPerZone;
-                int targetGrass = maxGrassPerZone;
-
-                // Plants
-                for (int i = 0; i < targetPlants * 2; i++)
+                // Plants (GameObjects)
+                for (int i = 0; i < maxPlantsPerZone; i++)
                 {
-                    if (zonePlants[node].Count >= targetPlants) break;
+                    if (zonePlants[node].Count >= maxPlantsPerZone) break;
                     if (TrySpawnItem(node, plantPrefabs, plantMinSpacing, zonePlants[node]) != null)
                     {
                         spawnCountThisFrame++;
-                        if (spawnCountThisFrame >= maxSpawnsPerFrame)
-                        {
-                            spawnCountThisFrame = 0;
-                            yield return null;
-                        }
+                        if (spawnCountThisFrame >= maxSpawnsPerFrame) { spawnCountThisFrame = 0; yield return null; }
                     }
                 }
 
-                // Grass
-                for (int i = 0; i < targetGrass * 5; i++)
+                // Grass (Instances)
+                for (int i = 0; i < maxGrassPerZone; i++)
                 {
-                    if (zoneGrass[node].Count >= targetGrass) break;
-                    if (TrySpawnItem(node, grassPrefabs, grassMinSpacing, zoneGrass[node]) != null)
-                    {
-                        spawnCountThisFrame++;
-                        if (spawnCountThisFrame >= maxSpawnsPerFrame)
-                        {
-                            spawnCountThisFrame = 0;
-                            yield return null;
-                        }
-                    }
+                    if (zoneGrassBatches[node].Instances.Count >= maxGrassPerZone) break;
+                    TrySpawnGrassInstance(node);
+                    spawnCountThisFrame++;
+                    if (spawnCountThisFrame >= maxSpawnsPerFrame) { spawnCountThisFrame = 0; yield return null; }
                 }
             }
-            Debug.Log($"[VegetationManager] Finished filling zones staggered.");
         }
 
         private void ExecuteFillNow()
         {
-            LifeSupportNode[] nodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
-            foreach (var node in nodes)
+            UpdateNodeCache();
+            foreach (var node in cachedNodes)
             {
+                if (node == null) continue;
                 EnsureNodeData(node);
-                int targetPlants = maxPlantsPerZone;
-                int targetGrass = maxGrassPerZone;
-
-                for (int i = 0; i < targetPlants * 2; i++)
-                {
-                    if (zonePlants[node].Count >= targetPlants) break;
+                for (int i = 0; i < maxPlantsPerZone; i++)
                     TrySpawnItem(node, plantPrefabs, plantMinSpacing, zonePlants[node]);
-                }
-
-                for (int i = 0; i < targetGrass * 5; i++)
-                {
-                    if (zoneGrass[node].Count >= targetGrass) break;
-                    TrySpawnItem(node, grassPrefabs, grassMinSpacing, zoneGrass[node]);
-                }
+                for (int i = 0; i < maxGrassPerZone; i++)
+                    TrySpawnGrassInstance(node);
             }
-            Debug.Log($"[VegetationManager] Filled zones immediately (Editor).");
         }
 
         [ContextMenu("Clear All Vegetation")]
@@ -207,24 +324,9 @@ public int spawnAttemptsPerInterval = 40;
                 else DestroyImmediate(p.gameObject);
             }
             
-            // Also destroy chunks
-            var chunks = GetComponentsInChildren<VegetationChunk>();
-            foreach (var c in chunks)
-            {
-                if (Application.isPlaying) Destroy(c.gameObject);
-                else DestroyImmediate(c.gameObject);
-            }
-
             zonePlants.Clear();
-            zoneGrass.Clear();
-            zoneChunks.Clear();
+            zoneGrassBatches.Clear();
             Debug.Log("[VegetationManager] Cleared all vegetation.");
-        }
-
-        public void SimulateTurns(int turns)
-        {
-            // Simplified simulation
-            for (int i = 0; i < turns; i++) FillAllZonesNow();
         }
 
         private GameObject TrySpawnItem(LifeSupportNode node, GameObject[] prefabs, float spacing, List<GameObject> collection)
@@ -237,78 +339,33 @@ public int spawnAttemptsPerInterval = 40;
             int mask = groundLayer.value | (1 << LayerMask.NameToLayer("TransparentFX"));
             if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 100f, mask))
             {
+                // Simple distance check for plant spacing
                 bool tooClose = false;
-                if (spacing > 0.01f)
+                int checkCount = Mathf.Min(collection.Count, 10);
+                for (int i = collection.Count - 1; i >= collection.Count - checkCount; i--)
                 {
-                    int checkCount = Mathf.Min(collection.Count, 10);
-                    for (int i = collection.Count - 1; i >= collection.Count - checkCount; i--)
+                    if (collection[i] != null && Vector3.Distance(hit.point, collection[i].transform.position) < spacing)
                     {
-                        if (collection[i] != null && Vector3.Distance(hit.point, collection[i].transform.position) < spacing)
-                        {
-                            tooClose = true;
-                            break;
-                        }
+                        tooClose = true; break;
                     }
                 }
 
                 if (!tooClose)
                 {
-                    // Get or create chunk
-                    VegetationChunk chunk = GetAvailableChunk(node, hit.point);
-
                     GameObject prefab = prefabs[Random.Range(0, prefabs.Length)];
                     GameObject item = Instantiate(prefab, hit.point, Quaternion.Euler(0, Random.Range(0, 360), 0));
-                    item.transform.SetParent(chunk.transform);
-                    item.layer = 2; // Ignore Raycast
+                    item.transform.SetParent(transform);
+                    item.layer = 2; 
                     
                     var gv = item.AddComponent<GrowingVegetation>();
-                    
-                    // If this is grass (based on spacing/collection), tint it green
-                    if (spacing < 0.5f)
-                    {
-                        gv.SetDuration(20f); // Grass grows very fast
-                        // Use much smaller scale for grass (prefabs are huge)
-                        gv.SetTargetScale(new Vector3(0.04f, 0.03f, 0.04f)); 
-                        gv.ApplyColorTint(grassColor);
-                    }
-                    else
-                    {
-                        gv.SetDuration(45f); // Plants grow at medium speed
-                        // Use smaller scale for plants to look like bushes
-                        gv.SetTargetScale(new Vector3(0.15f, 0.15f, 0.15f));
-                        gv.ApplyColorTint(new Color(0.1f, 0.6f, 0.2f)); 
-                    }
-
-                    chunk.AddItem(item);
+                    gv.SetDuration(45f);
+                    gv.SetTargetScale(new Vector3(0.15f, 0.15f, 0.15f));
+                    gv.ApplyColorTint(new Color(0.1f, 0.6f, 0.2f)); 
                     collection.Add(item);
                     return item;
                 }
             }
             return null;
-        }
-
-        private VegetationChunk GetAvailableChunk(LifeSupportNode node, Vector3 position)
-        {
-            List<VegetationChunk> chunks = zoneChunks[node];
-            
-            // Find nearby chunk with space
-            foreach (var c in chunks)
-            {
-                if (c.transform.childCount < itemsPerChunk && Vector3.Distance(c.transform.position, position) < 10f)
-                {
-                    return c;
-                }
-            }
-
-            // Create new chunk
-            GameObject chunkGO = new GameObject("VegetationChunk_" + node.name + "_" + chunks.Count);
-            chunkGO.transform.SetParent(transform);
-            chunkGO.transform.position = position;
-            
-            VegetationChunk chunk = chunkGO.AddComponent<VegetationChunk>();
-            chunk.SetVisibleDistance(cullingDistance);
-            chunks.Add(chunk);
-            return chunk;
         }
     }
 }

@@ -128,7 +128,7 @@ namespace GameDevTV.RTS.Units
             }
 
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
-            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command Post") || BuildingSO.Name.Contains("Command Center"));
+            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
             if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isCommandPost)
             {
                 if (!TryGetComponent<LifeSupportNode>(out _))
@@ -158,7 +158,7 @@ namespace GameDevTV.RTS.Units
 
             foreach (var b in ActiveBuildings)
             {
-                if (b == this) continue;
+                if (b == null || b == this) continue;
                 if (b.Owner == Owner && b.name.StartsWith(prefix))
                 {
                     string numPart = b.name.Substring(prefix.Length);
@@ -169,7 +169,9 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            gameObject.name = $"{prefix}{maxNum + 1}";
+            string newName = $"{prefix}{maxNum + 1}";
+            gameObject.name = newName;
+            // // Debug.Log($"[BaseBuilding] Renamed {BuildingSO.Name} to {newName} for owner {Owner}");
         }
 
         /// <summary>

@@ -51,10 +51,20 @@ namespace GameDevTV.RTS.Environment
                 transform.localScale = Vector3.Lerp(Vector3.zero, targetScale, growthProgress);
         }
 
+        private static VegetationManager _managerInstance;
+        private static VegetationManager Manager
+        {
+            get
+            {
+                if (_managerInstance == null) _managerInstance = Object.FindAnyObjectByType<VegetationManager>();
+                return _managerInstance;
+            }
+        }
+
         private void Update()
         {
             float multiplier = 1f;
-            var vm = Object.FindAnyObjectByType<VegetationManager>();
+            var vm = Manager;
             
             if (vm != null && vm.useManualGrowthControl)
             {
@@ -72,7 +82,7 @@ namespace GameDevTV.RTS.Environment
             }
             else
             {
-                // If not manual control, we can eventually disable, but keep it active if we might switch to manual
+                // If not manual control, we can disable the script to save CPU
                 if (vm == null || !vm.useManualGrowthControl)
                     enabled = false;
             }

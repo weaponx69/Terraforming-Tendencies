@@ -77,10 +77,10 @@ namespace GameDevTV.RTS.Units
 
         [Header("Growth Package (player-approved batch)")]
         [Tooltip("How many Workers are included in each approved package.")]
-        [SerializeField] private int packageWorkers = 2;
+        [SerializeField] private int packageWorkers = 1;
         [Tooltip("How many Probes are included in each approved package.")]
         [SerializeField] private int packageProbes = 1;
-        [Tooltip("How many Oxygen Processors are included in each approved package.")]
+[Tooltip("How many Oxygen Processors are included in each approved package.")]
         [SerializeField] private int packageOxygen = 1;
         [Tooltip("Seconds to wait before offering a new package after the player decides.")]
         [SerializeField] private float offerCooldown = 20f;
@@ -225,13 +225,12 @@ namespace GameDevTV.RTS.Units
             // One decision per command center. A new command center opens a fresh decision.
             // Bootstrap exception: the first time expansion becomes possible within an era
             // (probes have scouted a site), allow that single expansion decision.
-            // NOTE: the gate is advanced only when the player ACCEPTS (see ProposalSequence),
-            // so declining simply re-offers later instead of stranding the colony.
-            bool allow = newEra || (expansionAvailable && !offeredExpansionThisEra);
+            // ADDITION: Always allow "Grow Colony" offers if enough time has passed.
+            bool allow = newEra || (expansionAvailable && !offeredExpansionThisEra) || !expansionAvailable;
             if (!allow) return;
 
             Debug.Log("[GreedyAI] Offering " + packages.Count + " growth package(s) for player approval. (era CC=" + ccCount + ")");
-            StartCoroutine(ProposalSequence(packages));
+StartCoroutine(ProposalSequence(packages));
         }
 
         // ── Build the set of player-approvable packages ─────────────────────────
@@ -248,9 +247,39 @@ namespace GameDevTV.RTS.Units
 
             int biomass = CurrentBiomass();
 
-            // Candidate expansion directions (discovered resource clusters away from bases).
+            // Candidate expansion directions
             var sites = new List<ExpansionProposal>();
-            int siteIndex = 1;
+
+            // 1. Sector centers (priority for winning condition)
+if (SectorManager.Instance != null)
+            {
+                int sectorIndex = 1;
+                float occupationRadius = SectorManager.Instance != null && PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null 
+                    ? PlanetGenerator.Instance.Config.SectorOccupationRadius + 5f 
+                    : minExpansionDistance;
+
+                foreach (var sector in SectorManager.Instance.Sectors)
+                {
+                    if (!sector.IsOccupied)
+                    {
+                        // Check if we are already proposing this site or if a base is already nearby (using occupation radius + buffer)
+                        if (!CommandPostExistsNear(sector.Center, occupationRadius))
+                        {
+                            sites.Add(new ExpansionProposal
+                            {
+                                Position = sector.Center,
+                                ResourceCount = 100, // High weight to ensure they are offered
+                                SiteName = "Sector " + sectorIndex,
+                                IsExpansion = true,
+                                Items = MakeItems(true)
+                            });
+                        }
+                    }
+                    sectorIndex++;
+                }
+}
+
+            // 2. Candidate expansion directions (discovered resource clusters away from bases).
             foreach (var res in discoveredResources.ToList())
             {
                 if (res == null) { discoveredResources.Remove(res); continue; }
@@ -262,23 +291,32 @@ namespace GameDevTV.RTS.Units
                 int count = discoveredResources.Count(r => r != null && Vector3.Distance(r.transform.position, pos) <= expansionRadius);
                 if (count >= minResourcesForExpansion)
                 {
-                    sites.Add(new ExpansionProposal { Position = pos, ResourceCount = count, SiteName = "Site " + siteIndex++ });
+                    sites.Add(new ExpansionProposal { Position = pos, ResourceCount = count, SiteName = "Resource Site" });
                 }
             }
-            sites = sites.OrderByDescending(s => s.ResourceCount).Take(3).ToList();
+            
+            // Limit to a few best options to avoid UI clutter
+            var expansionSites = sites.OrderByDescending(s => s.ResourceCount).Take(3).ToList();
 
-            if (sites.Count > 0)
+            foreach (var s in expansionSites)
             {
-                foreach (var s in sites)
+                // Items already assigned for sector sites; ensure they are set for resource sites.
+                if (s.Items == null)
                 {
                     s.IsExpansion = true;
                     s.Items = MakeItems(true);
+                }
+                
+                // Only add if affordable
+                if (s.Items.Sum(i => i.Cost) <= biomass)
+                {
                     packages.Add(s);
                 }
             }
-            else
+
+            // If no affordable expansion is available, offer a "Grow Colony" package at an existing base
+            if (packages.Count == 0 && activeCommandPosts.Count > 0)
             {
-                // No expansion target scouted yet — offer a bootstrap grow package.
                 var grow = new ExpansionProposal
                 {
                     Position = activeCommandPosts[0].transform.position,
@@ -287,15 +325,12 @@ namespace GameDevTV.RTS.Units
                     IsExpansion = false,
                     Items = MakeItems(false)
                 };
-                packages.Add(grow);
-            }
 
-            // Only offer a package once the player can afford the FULL bundle. This keeps
-            // decisions infrequent (fewer popups); per-item veto then lets the player
-            // choose to spend less than the full amount on any given offer.
-            packages = packages
-                .Where(p => p.Items.Count > 0 && p.Items.Sum(i => i.Cost) <= biomass)
-                .ToList();
+                if (grow.Items.Sum(i => i.Cost) <= biomass)
+                {
+                    packages.Add(grow);
+                }
+            }
 
             return packages;
         }
@@ -632,8 +667,8 @@ namespace GameDevTV.RTS.Units
                 // Prefer an unclaimed, non-busy supply so drones spread out.
                 GatherableSupply supply = GatherableSupply.ActiveSupplies
                     .Where(s => s != null && s.Amount > 0 && !s.IsBusy
-                                && s.GetComponent<GhostRock>() == null
-                                && !claimed.Contains(s))
+                                && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null)
+&& !claimed.Contains(s))
                     .OrderBy(s => (s.transform.position - drone.transform.position).sqrMagnitude)
                     .FirstOrDefault();
 
@@ -642,8 +677,8 @@ namespace GameDevTV.RTS.Units
                 if (supply == null)
                 {
                     supply = GatherableSupply.ActiveSupplies
-                        .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null)
-                        .OrderBy(s => (s.transform.position - drone.transform.position).sqrMagnitude)
+                        .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null))
+.OrderBy(s => (s.transform.position - drone.transform.position).sqrMagnitude)
                         .FirstOrDefault();
                 }
 
@@ -817,6 +852,27 @@ namespace GameDevTV.RTS.Units
                 .Where(w => !w.IsBuilding)
                 .OrderBy(w => Vector3.Distance(w.transform.position, transform.position))
                 .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// True if at least one drone could be dispatched to build a structure right now —
+        /// either a genuinely idle drone, or a mining drone that can be pulled off its job
+        /// (not a probe, not carrying supplies, not already building). Mirrors the selection
+        /// in <see cref="FindWorkerForExpansion"/> so UI purchase-gating matches execution.
+        /// </summary>
+        public bool HasAvailableBuilder()
+        {
+            var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+            foreach (var w in workers)
+            {
+                if (w == null) continue;
+                if (w.Owner != aiOwner) continue;
+                if (w.GetComponent<ProbeMovement>() != null) continue; // never a probe
+                if (w.HasSupplies) continue;                           // busy hauling
+                if (w.IsBuilding) continue;                            // already building
+                return true;                                           // idle OR mining (reassignable)
+            }
+            return false;
         }
 
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)

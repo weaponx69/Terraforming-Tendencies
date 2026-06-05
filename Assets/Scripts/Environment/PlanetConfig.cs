@@ -18,6 +18,11 @@ namespace GameDevTV.RTS.Environment
         public float BiomassDrainRate = 1f; // Biomass lost per second
         public float IntegrityDrainRate = 0.5f; // Integrity lost per second
 
+        [Header("Sectors")]
+        public int SectorsX = 3;
+        public int SectorsY = 3;
+        public float SectorOccupationRadius = 10f;
+
         [Header("Procedural Scatter")]
         public int EnvironmentDensity = 50;
         public GameObject[] EnvironmentPrefabs;

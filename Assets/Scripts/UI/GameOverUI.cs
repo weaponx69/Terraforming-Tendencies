@@ -65,18 +65,29 @@ namespace GameDevTV.RTS.UI
                 headlineText.SetText("MISSION SUCCESSFUL");
 
             if (reasonText != null)
-                reasonText.SetText("The planet is now human habitable.\nTerraforming complete.");
+                reasonText.SetText("The planet is now human habitable.\nSectors occupied and terraforming complete.");
 
             ShowGameOverUI();
         }
 
-        private void HandleGameOver()
+        private void HandleGameOver(GameOverManager.GameOverReason reason)
         {
             if (headlineText != null)
                 headlineText.SetText("MISSION FAILED");
 
             if (reasonText != null)
-                reasonText.SetText("The planet's resources are gone.\nTerraforming has ceased.");
+            {
+                switch (reason)
+                {
+                    case GameOverManager.GameOverReason.LifeSupport:
+                        reasonText.SetText("Life support has collapsed.\nThe colony can no longer sustain itself.");
+                        break;
+                    case GameOverManager.GameOverReason.Resources:
+                    default:
+                        reasonText.SetText("The planet's resources are gone.\nTerraforming has ceased.");
+                        break;
+                }
+            }
 
             ShowGameOverUI();
         }

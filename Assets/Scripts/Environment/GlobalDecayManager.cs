@@ -30,10 +30,10 @@ namespace GameDevTV.RTS.Environment
             {
                 yield return new WaitForSeconds(decayTickRate);
 
-                LifeSupportNode[] lifeSupportNodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
-                AbstractCommandable[] allCommandables = FindObjectsByType<AbstractCommandable>(FindObjectsInactive.Exclude);
+                var lifeSupportNodes = LifeSupportNode.ActiveNodes;
+                var allCommandables = AbstractCommandable.ActiveCommandables;
 
-                for (int i = 0; i < allCommandables.Length; i++)
+                for (int i = allCommandables.Count - 1; i >= 0; i--)
                 {
                     AbstractCommandable target = allCommandables[i];
                     if (target == null) continue;
@@ -45,6 +45,7 @@ namespace GameDevTV.RTS.Environment
                     bool isSupported = false;
                     foreach (var node in lifeSupportNodes)
                     {
+                        if (node == null) continue;
                         if (Vector3.Distance(target.transform.position, node.transform.position) <= node.Radius)
                         {
                             isSupported = true;
@@ -59,7 +60,6 @@ namespace GameDevTV.RTS.Environment
                             continue;
 
                         // Use baseDecayRate for buildings and integrityDamageRate for units?
-// Or just combine them. User wants Integrity to reflect HP.
                         float damageRate = (target is BaseBuilding) ? baseDecayRate : integrityDamageRate;
                         int damage = Mathf.RoundToInt(damageRate * decayTickRate);
                         

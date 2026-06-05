@@ -259,8 +259,8 @@ namespace GameDevTV.RTS.Units
             node.ResourcesInRange.Clear();
             Vector3 pos = node.CommandPost.transform.position;
             var supplies = GatherableSupply.ActiveSupplies
-                .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null)
-                .Where(s => Vector3.Distance(s.transform.position, pos) <= nodeRadius)
+                .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null))
+.Where(s => Vector3.Distance(s.transform.position, pos) <= nodeRadius)
                 .OrderBy(s => Vector3.Distance(s.transform.position, pos));
 
             foreach (var s in supplies) node.ResourcesInRange.Add(s);
@@ -527,7 +527,7 @@ namespace GameDevTV.RTS.Units
         private void TryExpand()
         {
             var allSupplies = GatherableSupply.ActiveSupplies
-                .Where(s => s != null && s.Amount > 0 && s.GetComponent<GhostRock>() == null).ToList();
+                .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null)).ToList();
 
             Vector3 bestPos = Vector3.zero;
             int maxNearby = 0;

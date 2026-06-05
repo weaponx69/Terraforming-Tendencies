@@ -11,7 +11,21 @@ namespace GameDevTV.RTS.UI.Containers
         public void EnableFor(AbstractCommandable item)
         {
             gameObject.SetActive(true);
-            unitName.SetText(item.UnitSO.Name);
+            unitName.SetText(ResolveDisplayName(item));
+        }
+
+        // Buildings such as Command Posts are renamed with a unique suffix (e.g. "Command Post #2")
+        // when they complete construction. Prefer that unique GameObject name so the player can tell
+        // multiple identical buildings apart. Fall back to the UnitSO name, and finally to the
+        // GameObject name (e.g. the Universal Command Center / GlobalCommander has no UnitSO).
+        private string ResolveDisplayName(AbstractCommandable item)
+        {
+            if (item.name.Contains("#"))
+            {
+                return item.name;
+            }
+
+            return item.UnitSO != null ? item.UnitSO.Name : item.name;
         }
 
         public void Disable()

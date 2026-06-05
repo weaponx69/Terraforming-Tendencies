@@ -170,7 +170,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 float verticalGap = Mathf.Abs(transform.position.y - navDestination.y);
-                Agent.stoppingDistance = verticalGap + 1.5f;
+                Agent.stoppingDistance = GetStoppingDistance(instance, navDestination);
             }
 
             // Keep blackboard variables updated for diagnostic logging
@@ -207,7 +207,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 float verticalGap = Mathf.Abs(transform.position.y - navDestination.y);
-                Agent.stoppingDistance = verticalGap + 1.5f;
+                Agent.stoppingDistance = GetStoppingDistance(building.gameObject, navDestination);
             }
 
             graphAgent.SetVariableValue("TargetLocation", navDestination);
@@ -252,6 +252,31 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("SupplyAmountHeld", 0);
             graphAgent.SetVariableValue<GameObject>("Supply", null);
             graphAgent.SetVariableValue<GameObject>("TargetGameObject", null);
+        }
+
+        private float GetStoppingDistance(GameObject target, Vector3 targetLocation)
+        {
+            float verticalGap = Mathf.Abs(transform.position.y - targetLocation.y);
+            if (target == null) return verticalGap + 1.5f;
+
+            float radius = 1.0f;
+            if (target.TryGetComponent(out UnityEngine.AI.NavMeshObstacle obstacle))
+            {
+                if (obstacle.shape == UnityEngine.AI.NavMeshObstacleShape.Box)
+                {
+                    radius = Mathf.Max(obstacle.size.x, obstacle.size.z) * 0.5f;
+                }
+                else
+                {
+                    radius = obstacle.radius;
+                }
+            }
+            else if (target.TryGetComponent(out Collider collider))
+            {
+                radius = Mathf.Max(collider.bounds.extents.x, collider.bounds.extents.z);
+            }
+
+            return verticalGap + radius + 1.0f;
         }
 
         public override void Deselect()

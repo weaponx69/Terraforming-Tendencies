@@ -447,19 +447,28 @@ namespace GameDevTV.RTS.Environment
 
                 float mapWidthWorld = width * CellSize;
                 float mapHeightWorld = height * CellSize;
+                float margin = 20f;
+
                 for (int gx = -1; gx <= 1; gx++)
                 {
                     for (int gz = -1; gz <= 1; gz++)
                     {
                         if (gx == 0 && gz == 0) continue; 
+
+                        // Only spawn ghost if original is close enough to the opposite edge to be seen when wrapping
+                        bool xNeeded = (gx == 0) || (gx == -1 && spawnPos.x > mapWidthWorld - margin) || (gx == 1 && spawnPos.x < margin);
+                        bool zNeeded = (gz == 0) || (gz == -1 && spawnPos.z > mapHeightWorld - margin) || (gz == 1 && spawnPos.z < margin);
+                        
+                        if (!xNeeded || !zNeeded) continue;
                         
                         Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
-                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
-                        ghost.transform.localScale = instance.transform.localScale;
+                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
+                        ghost.name = "Ghost";
+                        ghost.transform.localScale = Vector3.one;
                         SetLayerRecursive(ghost, transparentLayer);
                         
                         Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
-foreach (var r in ghostRenderers)
+                        foreach (var r in ghostRenderers)
                         {
                             Material[] sharedMaterials = r.sharedMaterials;
                             foreach (var m in sharedMaterials)
@@ -477,9 +486,6 @@ foreach (var r in ghostRenderers)
                             if (Application.isPlaying) c.enabled = false;
                             else DestroyImmediate(c);
                         }
-                        
-                        GhostRock ghostScript = ghost.AddComponent<GhostRock>();
-                        ghostScript.TargetRock = instance.transform;
                     }
                 }
 
@@ -584,26 +590,31 @@ foreach (var r in ghostRenderers)
                     instance.AddComponent<HiddenResource>();
                 }
 
-                // Ghost logic for wrapping
+                float margin = 20f;
+
                 for (int gx = -1; gx <= 1; gx++)
                 {
                     for (int gz = -1; gz <= 1; gz++)
                     {
                         if (gx == 0 && gz == 0) continue; 
+
+                        // Only spawn ghost if original is close enough to the opposite edge to be seen when wrapping
+                        bool xNeeded = (gx == 0) || (gx == -1 && spawnPos.x > mapWidthWorld - margin) || (gx == 1 && spawnPos.x < margin);
+                        bool zNeeded = (gz == 0) || (gz == -1 && spawnPos.z > mapHeightWorld - margin) || (gz == 1 && spawnPos.z < margin);
+                        
+                        if (!xNeeded || !zNeeded) continue;
                         
                         Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
-                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, transform);
-                        ghost.transform.localScale = instance.transform.localScale;
+                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
+                        ghost.name = "Ghost";
+                        ghost.transform.localScale = Vector3.one;
                         SetLayerRecursive(ghost, transparentLayer);
                         
                         foreach (var c in ghost.GetComponentsInChildren<Collider>())
-{
+                        {
                             if (Application.isPlaying) c.enabled = false;
                             else DestroyImmediate(c);
                         }
-                        
-                        GhostRock ghostScript = ghost.AddComponent<GhostRock>();
-                        ghostScript.TargetRock = instance.transform;
                     }
                 }
 
