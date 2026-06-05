@@ -9,6 +9,7 @@ namespace GameDevTV.RTS.Units
             base.Start();
             // The global commander is always owned by Player 1
             Owner = Owner.Player1;
+            gameObject.name = "Universal Command Center";
         }
     }
 }

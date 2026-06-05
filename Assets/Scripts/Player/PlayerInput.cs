@@ -214,26 +214,39 @@ namespace GameDevTV.RTS.Player
 
         private void PageBases(int direction)
         {
-            var bases = BaseBuilding.ActiveBuildings
+            var commandPosts = BaseBuilding.ActiveBuildings
                 .Where(b => b != null && b.Owner == Owner.Player1 &&
                        (b.name.Contains("Command") || (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command"))) &&
                        b.Progress.State == BuildingProgress.BuildingState.Completed)
-                .OrderBy(b => b.transform.position.x)
+                .Cast<AbstractCommandable>()
+                .ToList();
+
+            var globalCommander = FindAnyObjectByType<GlobalCommander>();
+            if (globalCommander != null)
+            {
+                commandPosts.Add(globalCommander);
+            }
+
+            commandPosts = commandPosts.OrderBy(b => b.transform.position.x)
                 .ThenBy(b => b.transform.position.z)
                 .ToList();
 
-            if (bases.Count == 0) return;
+            if (commandPosts.Count == 0) return;
 
             currentBaseIndex += direction;
-            if (currentBaseIndex < 0) currentBaseIndex = bases.Count - 1;
-            if (currentBaseIndex >= bases.Count) currentBaseIndex = 0;
+            if (currentBaseIndex < 0) currentBaseIndex = commandPosts.Count - 1;
+            if (currentBaseIndex >= commandPosts.Count) currentBaseIndex = 0;
 
-            BaseBuilding targetBase = bases[currentBaseIndex];
-            if (targetBase != null && cameraTarget != null)
+            AbstractCommandable target = commandPosts[currentBaseIndex];
+            if (target != null && cameraTarget != null)
             {
-                Vector3 pos = targetBase.transform.position;
+                Vector3 pos = target.transform.position;
                 pos.y = cameraTarget.position.y; // Keep current camera height
                 cameraTarget.position = pos;
+
+                // Automatically select the base when paged to.
+                DeselectAllUnits();
+                target.Select();
             }
         }
 

@@ -307,6 +307,12 @@ namespace GameDevTV.RTS.UI
         private void ResolveSingleUnitSelectedUI()
         {
             AbstractCommandable commandable = selectedUnits.First();
+            if (commandable == null)
+            {
+                selectedUnits.Clear();
+                DisableAllContainers();
+                return;
+            }
             unitIconUI.EnableFor(commandable);
 
             if (commandable is BaseBuilding building)

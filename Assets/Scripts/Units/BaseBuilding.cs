@@ -128,7 +128,7 @@ namespace GameDevTV.RTS.Units
             }
 
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
-            bool isCommandPost = BuildingSO != null && (BuildingSO.name.Contains("Command Post") || BuildingSO.name.Contains("Command Center"));
+            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command Post") || BuildingSO.Name.Contains("Command Center"));
             if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isCommandPost)
             {
                 if (!TryGetComponent<LifeSupportNode>(out _))
@@ -136,12 +136,40 @@ namespace GameDevTV.RTS.Units
                     var node = gameObject.AddComponent<LifeSupportNode>();
                     node.Radius = isCommandPost ? Mathf.Max(BuildingSO.LifeSupportRadius, 30f) : BuildingSO.LifeSupportRadius;
                 }
+
+                AssignUniqueName();
             }
 
             // Activate any procedural visual effects (e.g. SmokestackVisuals).
             GetComponent<SmokestackVisuals>()?.ActivateSmoke();
 
             RaiseSpawnEvent();
+        }
+
+        private void AssignUniqueName()
+        {
+            if (BuildingSO == null) return;
+
+            // If already has a #, we don't need to rename it
+            if (gameObject.name.Contains("#")) return;
+
+            int maxNum = 0;
+            string prefix = $"{BuildingSO.Name} #";
+
+            foreach (var b in ActiveBuildings)
+            {
+                if (b == this) continue;
+                if (b.Owner == Owner && b.name.StartsWith(prefix))
+                {
+                    string numPart = b.name.Substring(prefix.Length);
+                    if (int.TryParse(numPart, out int num))
+                    {
+                        if (num > maxNum) maxNum = num;
+                    }
+                }
+            }
+
+            gameObject.name = $"{prefix}{maxNum + 1}";
         }
 
         /// <summary>
