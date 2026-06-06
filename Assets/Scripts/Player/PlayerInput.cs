@@ -3,6 +3,7 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Commands;
+using GameDevTV.RTS.Environment;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -84,9 +85,10 @@ namespace GameDevTV.RTS.Player
             Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] += HandleUnitSelected;
             Bus<UnitDeselectedEvent>.OnEvent[Owner.Player1] += HandleUnitDeselected;
             Bus<UnitSpawnEvent>.OnEvent[Owner.Player1] += HandleUnitSpawn;
+            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += HandleBuildingSpawn;
             Bus<CommandSelectedEvent>.OnEvent[Owner.Player1] += HandleActionSelected;
             Bus<UnitDeathEvent>.OnEvent[Owner.Player1] += HandleUnitDeath;
-            
+
             GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated += CenterCameraOnMap;
         }
 
@@ -105,11 +107,25 @@ namespace GameDevTV.RTS.Player
             return globalCommander;
         }
 
+        private bool hasCameraBeenFocused = false;
+
         private void CenterCameraOnMap()
         {
             if (cameraTarget == null) return;
+            if (hasCameraBeenFocused) return;
             
-            // Wait for PlanetGenerator to be ready
+            // Prioritize centering on the base if one exists
+            var baseBuilding = BaseBuilding.ActiveBuildings.FirstOrDefault(b => b.Owner == Owner.Player1);
+            if (baseBuilding != null)
+            {
+                Vector3 basePos = baseBuilding.transform.position;
+                basePos.y = cameraTarget.position.y;
+                cameraTarget.position = basePos;
+                hasCameraBeenFocused = true;
+                return;
+            }
+
+            // Fallback: Center on the map
             if (GameDevTV.RTS.Environment.PlanetGenerator.Instance != null && GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config != null)
             {
                 float mapWidth = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.MapWidth * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize;
@@ -142,8 +158,23 @@ namespace GameDevTV.RTS.Player
         }
         private void HandleUnitDeselected(UnitDeselectedEvent evt) => selectedUnits.Remove(evt.Unit);
         private void HandleUnitSpawn(UnitSpawnEvent evt) => aliveUnits.Add(evt.Unit);
-        private void HandleUnitDeath(UnitDeathEvent evt)
+        private void HandleBuildingSpawn(BuildingSpawnEvent evt)
         {
+            // Auto-snap to the first Command building that appears for the player (e.g. initial base)
+            if (!hasCameraBeenFocused && evt.Building != null && evt.Building.BuildingSO != null 
+                && evt.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (cameraTarget != null)
+                {
+                    Vector3 targetPos = evt.Building.transform.position;
+                    targetPos.y = cameraTarget.position.y;
+                    cameraTarget.position = targetPos;
+                    hasCameraBeenFocused = true;
+                }
+            }
+        }
+        private void HandleUnitDeath(UnitDeathEvent evt)
+{
             aliveUnits.Remove(evt.Unit);
             selectedUnits.Remove(evt.Unit);
         }
@@ -151,13 +182,66 @@ namespace GameDevTV.RTS.Player
         private void HandleActionSelected(CommandSelectedEvent evt)
         {
             activeCommand = evt.Command;
+
+            // Auto-place logic for Command Posts: automatically build in the nearest unoccupied sector
+            if (activeCommand is BuildBuildingCommand commandPostBbc && commandPostBbc.Building != null && commandPostBbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                var sectorManager = SectorManager.Instance;
+                if (sectorManager != null)
+                {
+                    // Ensure sectors are ready even at the very start of the game
+                    if (sectorManager.Sectors.Count == 0) sectorManager.InitializeSectors();
+
+                    if (sectorManager.Sectors.Count > 0)
+                    {
+                        // Use the current selection as the reference point for expansion. 
+                        // If nothing is selected, fall back to the camera center or starting base.
+                        Vector3 refPos = cameraTarget != null ? cameraTarget.position : Vector3.zero;
+                        
+                        AbstractCommandable firstSelected = selectedUnits.FirstOrDefault() as AbstractCommandable;
+                        if (firstSelected != null)
+                        {
+                            refPos = firstSelected.transform.position;
+                        }
+                        else
+                        {
+                            GlobalCommander commander = GetGlobalCommander();
+                            if (commander != null) refPos = commander.transform.position;
+                        }
+
+                        var nearestUnoccupied = sectorManager.Sectors
+                            .Where(s => !s.IsOccupied)
+                            .OrderBy(s => Vector3.Distance(refPos, s.Center))
+                            .FirstOrDefault();
+
+                        if (nearestUnoccupied != null)
+                        {
+                            // Move camera to the auto-placement site so the player can see the construction begin
+                            if (cameraTarget != null)
+                            {
+                                Vector3 targetCameraPos = nearestUnoccupied.Center;
+                                targetCameraPos.y = cameraTarget.position.y; // Maintain current camera height/zoom
+                                cameraTarget.position = targetCameraPos;
+                                hasCameraBeenFocused = true;
+                            }
+
+                            RaycastHit simulatedHit = new RaycastHit();
+                            simulatedHit.point = nearestUnoccupied.Center;
+                            
+                            ActivateAction(simulatedHit);
+                            return;
+                        }
+                    }
+                }
+            }
+
             if (!activeCommand.RequiresClickToActivate)
             {
                 ActivateAction(new RaycastHit());
             }
             else 
             {
-                GameObject prefabToInstantiate = activeCommand.GhostPrefab;
+GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 
                 // If this is a building command, completely ignore the assigned GhostPrefab and just use 
                 // the actual building prefab. This guarantees the preview shape matches the final shape!
@@ -502,8 +586,20 @@ namespace GameDevTV.RTS.Player
                 ghostInstance = null;
             }
 
+            // Snap camera to the build site for building commands
+            if (activeCommand is BuildBuildingCommand && hit.point != Vector3.zero)
+            {
+                if (cameraTarget != null)
+                {
+                    Vector3 targetCameraPos = hit.point;
+                    targetCameraPos.y = cameraTarget.position.y;
+                    cameraTarget.position = targetCameraPos;
+                    hasCameraBeenFocused = true;
+                }
+}
+
             List<AbstractCommandable> abstractCommandables = selectedUnits
-                                .Where((unit) => unit is AbstractCommandable)
+.Where((unit) => unit is AbstractCommandable)
                                 .Cast<AbstractCommandable>()
                                 .ToList();
 

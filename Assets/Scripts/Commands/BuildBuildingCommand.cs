@@ -196,6 +196,9 @@ namespace GameDevTV.RTS.Commands
             // Biomass replaces minerals/gas. Compute biomass-equivalent cost.
             int biomassCost = Mathf.FloorToInt(Building.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
                 + Building.Cost.Gas * Supplies.GasToBiomassRateStatic);
+            
+            if (Supplies.Biomass == null) return false;
+            
             return biomassCost <= Supplies.Biomass[context.Owner];
         }
     }

@@ -173,8 +173,14 @@ namespace GameDevTV.RTS.Player
         {
             if (gameOverTriggered || !isPlanetGenerated) return;
 
+            if (Supplies.Biomass == null)
+            {
+                Debug.LogWarning("[GameOverManager] Supplies.Biomass is null during recovery check.");
+                return;
+            }
+
             int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int b) ? b : 0;
-            bool supplyNodesExist = AnySupplyNodesRemain();
+bool supplyNodesExist = AnySupplyNodesRemain();
             bool miningUnitsExist = AnyMiningUnitsAlive();
 
             // Logic Fix: Even if minerals exist on the map, if you have 0 workers and cannot afford to build one, you lose.

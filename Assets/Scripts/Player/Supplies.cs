@@ -15,8 +15,61 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private int startingBiomass = 1000;
 
         [SerializeField] private SupplySO oxygenSO;
-        public static Dictionary<Owner, float> Oxygen { get; private set; }
-        public static Dictionary<Owner, float> Integrity { get; private set; }
+        private static Dictionary<Owner, int> _biomass;
+        public static Dictionary<Owner, int> Biomass 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _biomass;
+            }
+            private set => _biomass = value;
+        }
+
+        private static Dictionary<Owner, int> _population;
+        public static Dictionary<Owner, int> Population 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _population;
+            }
+            private set => _population = value;
+        }
+
+        private static Dictionary<Owner, int> _populationLimit;
+        public static Dictionary<Owner, int> PopulationLimit 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _populationLimit;
+            }
+            private set => _populationLimit = value;
+        }
+
+        private static Dictionary<Owner, float> _oxygen;
+        public static Dictionary<Owner, float> Oxygen 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _oxygen;
+            }
+            private set => _oxygen = value;
+        }
+
+        private static Dictionary<Owner, float> _integrity;
+        public static Dictionary<Owner, float> Integrity 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _integrity;
+            }
+            private set => _integrity = value;
+        }
+
         public static event Action<Owner, float> OnOxygenChanged;
         public static event Action<Owner, float> OnIntegrityChanged;
 
@@ -26,10 +79,6 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private SupplySO mineralsSO;
         [SerializeField] private SupplySO gasSO;
 
-        public static Dictionary<Owner, int> Biomass { get; private set; }
-        public static Dictionary<Owner, int> Population { get; private set; }
-        public static Dictionary<Owner, int> PopulationLimit { get; private set; }
-
         public static event System.Action<Owner, int> OnBiomassChanged;
 
         public static void RaiseBiomassChanged(Owner owner, int value)
@@ -38,6 +87,26 @@ namespace GameDevTV.RTS.Player
         }
 
         public static Supplies Instance { get; private set; }
+
+        private static void EnsureInitialized()
+        {
+            if (_biomass != null) return;
+
+            _biomass = new Dictionary<Owner, int>();
+            _population = new Dictionary<Owner, int>();
+            _populationLimit = new Dictionary<Owner, int>();
+            _oxygen = new Dictionary<Owner, float>();
+            _integrity = new Dictionary<Owner, float>();
+
+            foreach (Owner owner in Enum.GetValues(typeof(Owner)))
+            {
+                _biomass[owner] = 1000;
+                _population[owner] = 0;
+                _populationLimit[owner] = 0;
+                _oxygen[owner] = 0f;
+                _integrity[owner] = 100f;
+            }
+        }
 
         private void Awake()
         {
@@ -49,34 +118,43 @@ namespace GameDevTV.RTS.Player
             }
             Instance = this;
 
-            // Clear static dictionaries to prevent persistence across Play Mode sessions
-            Biomass = new Dictionary<Owner, int>();
-            Population = new Dictionary<Owner, int>();
-            PopulationLimit = new Dictionary<Owner, int>();
-            Oxygen = new Dictionary<Owner, float>();
-            Integrity = new Dictionary<Owner, float>();
+            // Re-initialize to ensure instance settings (startingBiomass) are applied
+            _biomass = new Dictionary<Owner, int>();
+            _population = new Dictionary<Owner, int>();
+            _populationLimit = new Dictionary<Owner, int>();
+            _oxygen = new Dictionary<Owner, float>();
+            _integrity = new Dictionary<Owner, float>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                if (!Biomass.ContainsKey(owner)) Biomass.Add(owner, startingBiomass);
-                if (!Population.ContainsKey(owner)) Population.Add(owner, 0);
-                if (!PopulationLimit.ContainsKey(owner)) PopulationLimit.Add(owner, 0);
-                if (!Oxygen.ContainsKey(owner)) Oxygen.Add(owner, 0f);
-                if (!Integrity.ContainsKey(owner)) Integrity.Add(owner, 100f); // Default 100% integrity
+                _biomass.Add(owner, startingBiomass);
+                _population.Add(owner, 0);
+                _populationLimit.Add(owner, 0);
+                _oxygen.Add(owner, 0f);
+                _integrity.Add(owner, 100f);
             }
 
             MineralsToBiomassRateStatic = mineralsToBiomassRate;
             GasToBiomassRateStatic = gasToBiomassRate;
 
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent); 
-Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
+            Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
             
             Owner displayOwner = GameOverManager.MonitoredOwner;
             RaiseBiomassChanged(displayOwner, Biomass[displayOwner]);
         }
 
-        private void OnDestroy()
+        private void Start()
         {
+            if (PlayerPrefs.GetInt("LoadGameRequest", 0) == 1)
+            {
+                PlayerPrefs.SetInt("LoadGameRequest", 0);
+                SaveSystem.LoadGame(1); // Default to slot 1 for main menu load
+            }
+        }
+
+        private void OnDestroy()
+{
             if (Instance == this) Instance = null;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
         }

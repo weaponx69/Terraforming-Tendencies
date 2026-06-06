@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Main-Menu.unity
+    guid: 4b9ad2875f049feaca3d84ade1dbe98f
+  - enabled: 1
     path: Assets/Scenes/Terraforming-Tendencies.unity
     guid: 4fbfa757133b3418aa3fbd576cf18857
   m_configObjects:
