@@ -332,7 +332,8 @@ if (SectorManager.Instance != null)
                 }
             }
 
-            return packages;
+            // Filter to only include packages that contain a Command Center as requested.
+            return packages.Where(p => p.Items != null && p.Items.Any(i => i.Type == PackageItemType.CommandCenter)).ToList();
         }
 
         // Builds the per-unit item list for a package. Each unit is its own vetoable line.
@@ -604,9 +605,9 @@ if (SectorManager.Instance != null)
                 Vector3.Distance(b.transform.position, position) < radius);
         }
 
-        private Vector3 FindBuildSpotNear(Vector3 origin, float distance)
+        private Vector3 FindBuildSpotNear(Vector3 origin, float distance, int agentTypeId = 0)
         {
-            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = 0, areaMask = NavMesh.AllAreas };
+            NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas };
             for (int i = 0; i < 10; i++)
             {
                 Vector2 circle = Random.insideUnitCircle.normalized * distance;

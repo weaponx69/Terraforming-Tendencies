@@ -14,6 +14,19 @@ namespace GameDevTV.RTS.Commands
     {
         [field: SerializeField] public BuildingSO Building { get; private set; }
 
+        private Vector3 SnapToNearestSector(Vector3 point)
+        {
+            if (Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                var sector = GameDevTV.RTS.Environment.SectorManager.Instance?.GetNearestSector(point);
+                if (sector != null)
+                {
+                    return sector.Center;
+                }
+            }
+            return point;
+        }
+
         public override bool CanHandle(CommandContext context)
         {
             // If the commandable itself is a builder and is already building, abort
@@ -30,7 +43,7 @@ namespace GameDevTV.RTS.Commands
 
             // Removed maximum Command Center limit to allow building multiple bases.
             
-            Vector3 targetPos = context.Hit.point;
+            Vector3 targetPos = SnapToNearestSector(context.Hit.point);
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
             {
@@ -65,7 +78,7 @@ namespace GameDevTV.RTS.Commands
             }
 
             // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
-            Vector3 targetPos = context.Hit.point;
+            Vector3 targetPos = SnapToNearestSector(context.Hit.point);
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
             {

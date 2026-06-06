@@ -95,8 +95,9 @@ protected UnitSO unitSO;
             }
         }
 
-        protected virtual void OnEnable()
+        protected override void OnEnable()
         {
+            base.OnEnable();
             // Re-ensure blackboard variables are set whenever the unit is enabled.
             // This catches race conditions during spawning.
             RepairBlackboards();

@@ -61,14 +61,16 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        private void OnEnable()
+        protected override void OnEnable()
         {
+            base.OnEnable();
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
+            base.OnDisable();
             ActiveBuildings.Remove(this);
         }
 

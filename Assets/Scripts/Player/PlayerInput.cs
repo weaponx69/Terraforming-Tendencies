@@ -288,6 +288,13 @@ namespace GameDevTV.RTS.Player
 
             if (hitPos.HasValue)
             {
+                // Snap to sector if it's a command center
+                if (activeCommand is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    var sector = GameDevTV.RTS.Environment.SectorManager.Instance?.GetNearestSector(hitPos.Value);
+                    if (sector != null) hitPos = sector.Center;
+                }
+
                 // Snap to NavMesh to ensure the ghost isn't floating on top of large rock colliders
                 UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
                 if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))

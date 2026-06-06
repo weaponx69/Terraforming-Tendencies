@@ -128,6 +128,26 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        public Sector GetNearestSector(Vector3 position)
+        {
+            if (Sectors == null || Sectors.Count == 0) return null;
+
+            Sector nearest = null;
+            float minDistance = float.MaxValue;
+
+            foreach (var sector in Sectors)
+            {
+                float dist = Vector3.Distance(position, sector.Center);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    nearest = sector;
+                }
+            }
+
+            return nearest;
+        }
+
         public bool AreAllSectorsOccupied()
         {
             if (Sectors.Count == 0) 
