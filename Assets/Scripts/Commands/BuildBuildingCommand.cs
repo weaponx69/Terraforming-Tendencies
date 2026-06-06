@@ -14,14 +14,42 @@ namespace GameDevTV.RTS.Commands
     {
         [field: SerializeField] public BuildingSO Building { get; private set; }
 
-        private Vector3 SnapToNearestSector(Vector3 point)
+        public Vector3 SnapToNearestSector(Vector3 point)
         {
             if (Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
                 var sector = GameDevTV.RTS.Environment.SectorManager.Instance?.GetNearestSector(point);
                 if (sector != null)
                 {
-                    return sector.Center;
+                    // Try exact center first
+                    if (AllRestrictionsPass(sector.Center)) return sector.Center;
+
+                    // If center is blocked (e.g. by another building), try to find a valid spot nearby within the sector radius
+                    float maxSearchRadius = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.SectorOccupationRadius;
+                    
+                    // Spiral search for a valid spot
+                    for (int ring = 1; ring <= 5; ring++)
+                    {
+                        float currentRadius = (maxSearchRadius / 5f) * ring;
+                        int pointsInRing = ring * 8;
+                        for (int i = 0; i < pointsInRing; i++)
+                        {
+                            float angle = i * (360f / pointsInRing) * Mathf.Deg2Rad;
+                            Vector3 offset = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * currentRadius;
+                            Vector3 candidate = sector.Center + offset;
+
+                            // Adjust to NavMesh height
+                            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                            if (UnityEngine.AI.NavMesh.SamplePosition(candidate, out UnityEngine.AI.NavMeshHit navHit, 5f, filter))
+                            {
+                                candidate = navHit.position;
+                            }
+
+                            if (AllRestrictionsPass(candidate)) return candidate;
+                        }
+                    }
+
+                    return sector.Center; // Fallback
                 }
             }
             return point;
@@ -154,7 +182,16 @@ namespace GameDevTV.RTS.Commands
                     _ => 0
                 };
 
-                if (hits > 0) return false;
+                if (hits > 0)
+                {
+                    // Command posts crush supplies, so ignore those restrictions
+                    bool isCommandPost = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    bool isSuppliesRestriction = (restriction.LayerMask.value & LayerMask.GetMask("Supplies")) != 0;
+                    
+                    if (isCommandPost && isSuppliesRestriction) continue;
+                    
+                    return false;
+                }
             }
 
             // Enforce worker requirement for standard buildings
