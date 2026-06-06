@@ -314,26 +314,29 @@ if (SectorManager.Instance != null)
                 }
             }
 
-            // If no affordable expansion is available, offer a "Grow Colony" package at an existing base
+            // If no affordable expansion is available, offer a FREE bonus.
             if (packages.Count == 0 && activeCommandPosts.Count > 0)
             {
                 var grow = new ExpansionProposal
                 {
                     Position = activeCommandPosts[0].transform.position,
                     ResourceCount = 0,
-                    SiteName = "Grow Colony",
+                    SiteName = "FREE Colony Bonus",
                     IsExpansion = false,
                     Items = MakeItems(false)
                 };
-
-                if (grow.Items.Sum(i => i.Cost) <= biomass)
-                {
-                    packages.Add(grow);
-                }
+                packages.Add(grow);
             }
 
-            // Filter to only include packages that contain a Command Center as requested.
-            return packages.Where(p => p.Items != null && p.Items.Any(i => i.Type == PackageItemType.CommandCenter)).ToList();
+            // Include both Expansions (Command Centers) and the Free Bonus.
+            return packages.Where(p => p.Items != null && (p.Items.Any(i => i.Type == PackageItemType.CommandCenter) || !p.IsExpansion)).ToList();
+        }
+
+        private void Refund(UnlockableSO so)
+        {
+            if (so == null || so.Cost == null) return;
+            Bus<SupplyEvent>.Raise(aiOwner, new SupplyEvent(aiOwner, so.Cost.Minerals, so.Cost.MineralsSO));
+            Bus<SupplyEvent>.Raise(aiOwner, new SupplyEvent(aiOwner, so.Cost.Gas, so.Cost.GasSO));
         }
 
         // Builds the per-unit item list for a package. Each unit is its own vetoable line.
@@ -342,12 +345,18 @@ if (SectorManager.Instance != null)
             var items = new List<PackageItem>();
             if (expansion)
                 items.Add(new PackageItem { Name = "Command Center", Type = PackageItemType.CommandCenter, Cost = CostOf(commandPostSO) });
+            
+            // Growth packages (non-expansion) are now FREE bonuses.
+            int workerCost = expansion ? CostOf(workerSO) : 0;
+            int probeCost = expansion ? CostOf(probeSO) : 0;
+            int oxygenCost = expansion ? CostOf(oxygenProcessorSO) : 0;
+
             for (int i = 0; i < packageWorkers; i++)
-                items.Add(new PackageItem { Name = "Worker", Type = PackageItemType.Worker, Cost = CostOf(workerSO) });
+                items.Add(new PackageItem { Name = "Worker", Type = PackageItemType.Worker, Cost = workerCost });
             for (int i = 0; i < packageProbes; i++)
-                items.Add(new PackageItem { Name = "Probe", Type = PackageItemType.Probe, Cost = CostOf(probeSO) });
+                items.Add(new PackageItem { Name = "Probe", Type = PackageItemType.Probe, Cost = probeCost });
             for (int i = 0; i < packageOxygen; i++)
-                items.Add(new PackageItem { Name = "Oxygen Processor", Type = PackageItemType.OxygenProcessor, Cost = CostOf(oxygenProcessorSO) });
+                items.Add(new PackageItem { Name = "Oxygen Processor", Type = PackageItemType.OxygenProcessor, Cost = oxygenCost });
             return items;
         }
 
