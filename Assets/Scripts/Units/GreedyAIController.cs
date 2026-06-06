@@ -447,7 +447,14 @@ if (SectorManager.Instance != null)
 
                 if (builder != null)
                 {
-                    Vector3 spot = FindBuildSpotNear(hub != null ? hub.transform.position : pkg.Position, 12f);
+                    // Prefer the package position (e.g. the new expansion site) over the old hub
+                    // for support structures included in that package.
+                    Vector3 anchor = pkg.IsExpansion ? pkg.Position : (hub != null ? hub.transform.position : pkg.Position);
+                    
+                    int agentTypeId = 0;
+                    if (builder.TryGetComponent(out NavMeshAgent builderAgent)) agentTypeId = builderAgent.agentTypeID;
+                    
+                    Vector3 spot = FindBuildSpotNear(anchor, 12f, agentTypeId);
                     Debug.Log("[GreedyAI] Dispatching worker " + builder.name + " to build Oxygen Processor at " + spot);
                     builder.Build(oxygenProcessorSO, spot);
                     
@@ -802,11 +809,20 @@ if (SectorManager.Instance != null)
 
                     if (builder != null && CanAfford(commandPostSO))
                     {
-                        // Note: Cost is deducted inside builder.Build().
-                        Debug.Log("[GreedyAI] Dispatching worker " + builder.name + " to build expansion at " + position);
-                        builder.Build(commandPostSO, position);
+                        // Match the sampling to the worker's NavMesh agent type (e.g. Airborne)
+                        int agentTypeId = 0;
+                        if (builder.TryGetComponent(out NavMeshAgent builderAgent)) agentTypeId = builderAgent.agentTypeID;
+                        
+                        Vector3 buildPos = position;
+                        if (NavMesh.SamplePosition(position, out NavMeshHit hit, 15f, new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas }))
+                        {
+                            buildPos = hit.position;
+                        }
+
+                        Debug.Log("[GreedyAI] Dispatching worker " + builder.name + " to build expansion at " + buildPos);
+                        builder.Build(commandPostSO, buildPos);
                     }
-                    else
+else
                     {
                         // Could not build it — no cost was deducted. Re-open the expansion
                         // decision so the player is offered it again instead of being stuck.
