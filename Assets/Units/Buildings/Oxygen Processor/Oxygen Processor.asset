@@ -15,7 +15,7 @@ MonoBehaviour:
   <Name>k__BackingField: Oxygen Processor
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 40
-  <Icon>k__BackingField: {fileID: 21300000, guid: 5b1043abe99f2d943b94b631a2aa42d9, type: 3}
+  <Icon>k__BackingField: {fileID: 21300000, guid: ca66bc91edfb9b988b60086bc688a759, type: 3}
   <Cost>k__BackingField: {fileID: 11400000, guid: 58c9f72c1fa3a844f94d6922d94cb5ff, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField:

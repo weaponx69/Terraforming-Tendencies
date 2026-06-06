@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Minerals
   m_EditorClassIdentifier: 
   <MaxAmount>k__BackingField: 1500
-  <AmountPerGather>k__BackingField: 8
+  <AmountPerGather>k__BackingField: 20
   <BaseGatherTime>k__BackingField: 4

@@ -13,6 +13,13 @@ namespace GameDevTV.RTS.Units
     public class BaseBuilding : AbstractCommandable
     {
         public static readonly List<BaseBuilding> ActiveBuildings = new();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void ClearStaticData()
+        {
+            ActiveBuildings.Clear();
+        }
+
         public int QueueSize => buildingQueue.Count;
         public UnlockableSO[] Queue => buildingQueue.ToArray();
         [field: SerializeField] public float CurrentQueueStartTime { get; private set; }

@@ -109,7 +109,7 @@ namespace GameDevTV.RTS.Environment
                 bool found = false;
                 foreach (var building in BaseBuilding.ActiveBuildings)
                 {
-                    if (building.Owner != Owner.Player1) continue;
+                    if (building.Owner != GameOverManager.MonitoredOwner) continue;
                     if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
                     
                     // Check if it's a Command Post (using name contains check like in CompleteConstruction)

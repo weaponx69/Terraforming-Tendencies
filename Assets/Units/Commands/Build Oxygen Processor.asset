@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 32194d70ac3bc0647b55685549f2c196, type: 3}
   m_Name: Build Oxygen Processor
   m_EditorClassIdentifier: 
-  <Name>k__BackingField: Supply Hut
-  <Icon>k__BackingField: {fileID: 21300000, guid: 5b1043abe99f2d943b94b631a2aa42d9, type: 3}
+  <Name>k__BackingField: Oxygen Processor
+  <Icon>k__BackingField: {fileID: 21300000, guid: ca66bc91edfb9b988b60086bc688a759, type: 3}
   <Slot>k__BackingField: 1
   <RequiresClickToActivate>k__BackingField: 1
   <IsSingleUnitCommand>k__BackingField: 1

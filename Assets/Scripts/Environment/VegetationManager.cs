@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.EventBus;
+using GameDevTV.RTS.Events;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -25,9 +27,19 @@ namespace GameDevTV.RTS.Environment
         public int maxSpawnsPerFrame = 100;
 
         [Header("Growth Loop")]
-        public float spawnInterval = 1.5f;
-        public int spawnAttemptsPerInterval = 40;
+        public float spawnInterval = 5.0f;
+        public int spawnAttemptsPerInterval = 20;
         public LayerMask groundLayer;
+
+        [Header("Oxygen & Cost Balance")]
+        public float oxygenPerGrass = 0.0005f;
+        public float oxygenPerPlant = 0.001f;
+        public float biomassCostPerGrass = 0.02f;
+        public float biomassCostPerPlant = 0.1f;
+        [Range(0f, 1f)]
+        public float baseDecayChance = 0.002f;
+        public float orphanedDecayMultiplier = 10f;
+        public float balanceTickRate = 2f;
 
         [Header("Growth Control")]
         [Range(0.1f, 10f)]
@@ -43,6 +55,8 @@ namespace GameDevTV.RTS.Environment
         
         private List<LifeSupportNode> cachedNodes = new List<LifeSupportNode>();
         private float nodeCacheTimer = 0f;
+        private float balanceTickTimer = 0f;
+        private float biomassDebt = 0f;
 
         private class GrassInstance
         {
@@ -86,14 +100,86 @@ namespace GameDevTV.RTS.Environment
 
         private void Update()
         {
-            nodeCacheTimer += Time.deltaTime;
+            float dt = Time.deltaTime;
+            nodeCacheTimer += dt;
             if (nodeCacheTimer >= 5f)
             {
                 nodeCacheTimer = 0f;
                 UpdateNodeCache();
             }
 
+            balanceTickTimer += dt;
+            if (balanceTickTimer >= balanceTickRate)
+            {
+                balanceTickTimer = 0f;
+                ProcessBalanceTick();
+            }
+
             RenderGrassBatches();
+        }
+
+        private void ProcessBalanceTick()
+        {
+            Owner owner = GameOverManager.MonitoredOwner;
+            float totalOxygenBoost = 0f;
+
+            // 1. Calculate Oxygen and Process Decay for Plants
+            var zonesToCleanup = new List<LifeSupportNode>();
+            foreach (var kvp in zonePlants)
+            {
+                LifeSupportNode node = kvp.Key;
+                List<GameObject> plants = kvp.Value;
+                bool isOrphaned = node == null;
+
+                totalOxygenBoost += plants.Count * oxygenPerPlant;
+
+                // Decay plants
+                float chance = isOrphaned ? baseDecayChance * orphanedDecayMultiplier : baseDecayChance;
+                for (int i = plants.Count - 1; i >= 0; i--)
+                {
+                    if (plants[i] == null) { plants.RemoveAt(i); continue; }
+                    if (Random.value < chance)
+                    {
+                        Destroy(plants[i]);
+                        plants.RemoveAt(i);
+                    }
+                }
+                if (isOrphaned && plants.Count == 0) zonesToCleanup.Add(node);
+            }
+            foreach (var node in zonesToCleanup) zonePlants.Remove(node);
+            zonesToCleanup.Clear();
+
+            // 2. Calculate Oxygen and Process Decay for Grass
+            foreach (var kvp in zoneGrassBatches)
+            {
+                LifeSupportNode node = kvp.Key;
+                GrassBatch batch = kvp.Value;
+                bool isOrphaned = node == null;
+
+                totalOxygenBoost += batch.Instances.Count * oxygenPerGrass;
+
+                // Decay grass
+                float chance = isOrphaned ? baseDecayChance * orphanedDecayMultiplier : baseDecayChance;
+                bool changed = false;
+                for (int i = batch.Instances.Count - 1; i >= 0; i--)
+                {
+                    if (Random.value < chance)
+                    {
+                        batch.Instances.RemoveAt(i);
+                        changed = true;
+                    }
+                }
+                if (changed) batch.NeedsUpdate = true;
+                if (isOrphaned && batch.Instances.Count == 0) zonesToCleanup.Add(node);
+            }
+            foreach (var node in zonesToCleanup) zoneGrassBatches.Remove(node);
+
+            // 3. Update Global Oxygen
+            if (totalOxygenBoost > 0)
+            {
+                float currentOxygen = Supplies.Oxygen.TryGetValue(owner, out float val) ? val : 0;
+                Supplies.UpdateOxygen(owner, currentOxygen + totalOxygenBoost);
+            }
         }
 
         private void RenderGrassBatches()
@@ -201,7 +287,7 @@ namespace GameDevTV.RTS.Environment
                     continue;
                 }
 
-                float currentInterval = spawnInterval / Mathf.Clamp(oxygen, 0.1f, 10f);
+                float currentInterval = spawnInterval / Mathf.Clamp(oxygen, 0.1f, 2f);
                 yield return new WaitForSeconds(Mathf.Clamp(currentInterval, 0.5f, spawnInterval));
 
                 foreach (var node in cachedNodes)
@@ -209,7 +295,7 @@ namespace GameDevTV.RTS.Environment
                     if (node == null) continue;
                     EnsureNodeData(node);
 
-                    float oxFactor = Mathf.Clamp01(oxygen / 100f);
+                    float oxFactor = Mathf.Clamp01(oxygen / 40f);
                     int currentMaxPlants = Mathf.RoundToInt(maxPlantsPerZone * oxFactor);
                     int currentMaxGrass = Mathf.RoundToInt(maxGrassPerZone * oxFactor);
 
@@ -243,6 +329,19 @@ namespace GameDevTV.RTS.Environment
             int mask = groundLayer.value | (1 << LayerMask.NameToLayer("TransparentFX"));
             if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 100f, mask))
             {
+                // Biomass Cost Check
+                Owner owner = GameOverManager.MonitoredOwner;
+                int currentBiomass = Supplies.Biomass.TryGetValue(owner, out int b) ? b : 0;
+                if (currentBiomass <= 0) return;
+
+                biomassDebt += biomassCostPerGrass;
+                if (biomassDebt >= 1f)
+                {
+                    int toSubtract = Mathf.FloorToInt(biomassDebt);
+                    Bus<SupplyEvent>.Raise(owner, new SupplyEvent(owner, -toSubtract, null));
+                    biomassDebt -= toSubtract;
+                }
+
                 int prefabIdx = Random.Range(0, grassPrefabs.Length);
                 var inst = new GrassInstance
                 {
@@ -352,6 +451,19 @@ namespace GameDevTV.RTS.Environment
 
                 if (!tooClose)
                 {
+                    // Biomass Cost Check
+                    Owner owner = GameOverManager.MonitoredOwner;
+                    int currentBiomass = Supplies.Biomass.TryGetValue(owner, out int b) ? b : 0;
+                    if (currentBiomass < 50) return null;
+
+                    biomassDebt += biomassCostPerPlant;
+                    if (biomassDebt >= 1f)
+                    {
+                        int toSubtract = Mathf.FloorToInt(biomassDebt);
+                        Bus<SupplyEvent>.Raise(owner, new SupplyEvent(owner, -toSubtract, null));
+                        biomassDebt -= toSubtract;
+                    }
+
                     GameObject prefab = prefabs[Random.Range(0, prefabs.Length)];
                     GameObject item = Instantiate(prefab, hit.point, Quaternion.Euler(0, Random.Range(0, 360), 0));
                     item.transform.SetParent(transform);

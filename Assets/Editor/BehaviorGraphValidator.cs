@@ -17,7 +17,9 @@ public class BehaviorGraphValidator
 
     static BehaviorGraphValidator()
     {
-        EditorApplication.delayCall += RebuildAllGraphs;
+        // Use a double delay to ensure the editor has fully settled after domain reload
+        // and is not in the middle of a GUI layout/render pass.
+        EditorApplication.delayCall += () => EditorApplication.delayCall += RebuildAllGraphs;
     }
 
     [MenuItem("Tools/Behavior/Force Rebuild All Behavior Graphs")]
@@ -85,20 +87,32 @@ public class BehaviorGraphValidator
 
         Debug.Log($"[BehaviorGraphValidator] Rebuilding runtime data for {toRebuild.Count} Behavior Graph(s)...");
 
+        bool modified = false;
         foreach (Object graph in toRebuild)
         {
             try
             {
                 rebuildMethod.Invoke(graph, null);
+                EditorUtility.SetDirty(graph);
+                modified = true;
             }
             catch (System.Exception ex)
             {
                 var realEx = ex is System.Reflection.TargetInvocationException ? ex.InnerException : ex;
                 Debug.LogError($"[BehaviorGraphValidator] Failed to rebuild graph at {AssetDatabase.GetAssetPath(graph)}: {realEx?.Message}\n{realEx?.StackTrace}");
             }
-}
+        }
 
-        AssetDatabase.SaveAssets();
+        if (modified)
+        {
+            // Delay the save operation to avoid conflicts with the current GUI state
+            EditorApplication.delayCall += () =>
+            {
+                AssetDatabase.SaveAssets();
+                Debug.Log("[BehaviorGraphValidator] Behavior Graph runtime data saved to disk.");
+            };
+        }
+
         SessionState.SetBool(k_SessionKey, true);
         Debug.Log("[BehaviorGraphValidator] Behavior Graph runtime data rebuild complete.");
     }

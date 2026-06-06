@@ -16,6 +16,9 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private float height = 6f;
         [SerializeField] private float depth = 1.5f;
 
+        [Header("Custom Visuals")]
+        [SerializeField] private GameObject visualPrefab;
+
         [Header("Appearance")]
         [SerializeField] private Color ghostColor = new Color(0.45f, 0.47f, 0.50f, 0.75f);  // dull grey, slightly transparent
         [SerializeField] private Color finalColor = new Color(0.38f, 0.40f, 0.42f);           // dark industrial monolith
@@ -70,16 +73,38 @@ namespace GameDevTV.RTS.Units
 
             Material metalMat = GhostMaterial;
 
-            // Single Monolith Cube
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = "Monolith";
-            go.transform.SetParent(visualRoot, false);
-            // Center of the cube needs to be half-height so it sits on the ground
-            go.transform.localPosition = new Vector3(0, height * 0.5f, 0);
-            go.transform.localScale = new Vector3(width, height, depth);
-            
-            Destroy(go.GetComponent<BoxCollider>()); // colliders handled by BaseBuilding
-            go.GetComponent<MeshRenderer>().material = metalMat;
+            GameObject go;
+            if (visualPrefab != null)
+            {
+                go = Instantiate(visualPrefab, visualRoot);
+                go.name = "CustomMonolith";
+                // Scale the prefab to match dimensions, assuming it's a normalized 1x1x1 mesh.
+                go.transform.localPosition = new Vector3(0, height * 0.5f, 0);
+                go.transform.localScale = new Vector3(width, height, depth); 
+            }
+            else
+            {
+                // Single Monolith Cube
+                go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = "Monolith";
+                go.transform.SetParent(visualRoot, false);
+                // Center of the cube needs to be half-height so it sits on the ground
+                go.transform.localPosition = new Vector3(0, height * 0.5f, 0);
+                go.transform.localScale = new Vector3(width, height, depth);
+                Destroy(go.GetComponent<BoxCollider>()); // colliders handled by BaseBuilding
+            }
+
+            // Remove any colliders on the generated geometry
+            foreach (var col in go.GetComponentsInChildren<Collider>())
+            {
+                Destroy(col);
+            }
+
+            // Assign materials
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+            {
+                r.material = metalMat;
+            }
         }
 
         private static Material MakeMetal(Color color, float metallic = 0.80f, float smoothness = 0.25f, bool transparent = false)

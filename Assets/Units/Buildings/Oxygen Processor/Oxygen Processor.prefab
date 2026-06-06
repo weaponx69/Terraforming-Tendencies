@@ -185,6 +185,7 @@ MonoBehaviour:
   width: 1.5
   height: 6
   depth: 1.5
+  visualPrefab: {fileID: 2595850435611690952, guid: 403ac08500cef5f67a6fa6dc10167531, type: 3}
   ghostColor: {r: 0.45, g: 0.47, b: 0.5, a: 0.75}
   finalColor: {r: 0.38, g: 0.4, b: 0.42, a: 1}
   smokeEmissionRate: 6

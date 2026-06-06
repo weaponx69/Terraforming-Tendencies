@@ -31,8 +31,6 @@ namespace GameDevTV.RTS.Player
         public static Dictionary<Owner, int> PopulationLimit { get; private set; }
 
         public static event System.Action<Owner, int> OnBiomassChanged;
-        public static event System.Action OnVictory;
-        public static event System.Action OnIntegrityDepleted;
 
         public static void RaiseBiomassChanged(Owner owner, int value)
         {
@@ -84,11 +82,20 @@ Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
         }
 
         public static void UpdateOxygen(Owner owner, float value)
-{
+        {
             if (Oxygen != null && Oxygen.ContainsKey(owner))
             {
-                Oxygen[owner] = value;
-                OnOxygenChanged?.Invoke(owner, value);
+                float maxOxygen = 100f;
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                {
+                    int total = SectorManager.Instance.Sectors.Count;
+                    int occupied = 0;
+                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
+                    maxOxygen = ((float)occupied / total) * 100f;
+                }
+
+                Oxygen[owner] = Mathf.Min(value, maxOxygen);
+                OnOxygenChanged?.Invoke(owner, Oxygen[owner]);
             }
         }
 

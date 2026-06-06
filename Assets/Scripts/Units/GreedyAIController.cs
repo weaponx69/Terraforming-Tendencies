@@ -66,10 +66,11 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private AbstractUnitSO workerSO;
         
         [Header("Settings")]
+        [SerializeField] private bool proposalsEnabled = false;
         [SerializeField] private int probesPerBase = 2;
         [SerializeField] private int workersPerBase = 4;
-        [SerializeField] private float expansionRadius = 35f;
-        [SerializeField] private float minExpansionDistance = 45f;
+        [SerializeField] private float expansionRadius = 70f;
+        [SerializeField] private float minExpansionDistance = 90f;
         [SerializeField] private int minResourcesForExpansion = 3;
         [SerializeField] private int oxygenProcessorsPerBase = 1;
         [SerializeField] private float tickRate = 2f;
@@ -84,9 +85,12 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private int packageOxygen = 1;
         [Tooltip("Seconds to wait before offering a new package after the player decides.")]
         [SerializeField] private float offerCooldown = 20f;
+        [Tooltip("Seconds to wait specifically before offering another FREE bonus.")]
+        [SerializeField] private float freeBonusCooldown = 90f;
         [Tooltip("How long to keep trying to secure a builder for an approved command center before giving up (and re-offering).")]
         [SerializeField] private float expansionBuilderTimeout = 20f;
         private float nextOfferTime = 0f;
+        private float nextFreeBonusTime = 0f;
         
         private List<BaseBuilding> activeCommandPosts = new List<BaseBuilding>();
         private HashSet<HiddenResource> discoveredResources = new HashSet<HiddenResource>();
@@ -168,9 +172,14 @@ namespace GameDevTV.RTS.Units
             Vector3 center = Vector3.zero;
             if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
             {
-                float w = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
-                float h = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
-                center = new Vector3(w / 2f, 0, h / 2f);
+                var config = PlanetGenerator.Instance.Config;
+                float w = config.MapWidth * PlanetGenerator.Instance.CellSize;
+                float h = config.MapHeight * PlanetGenerator.Instance.CellSize;
+                
+                // Spawn in the center of the first sector (bottom-left)
+                float secW = w / config.SectorsX;
+                float secH = h / config.SectorsY;
+                center = new Vector3(secW * 0.5f, 0, secH * 0.5f);
             }
             else
             {
@@ -225,12 +234,19 @@ namespace GameDevTV.RTS.Units
             // One decision per command center. A new command center opens a fresh decision.
             // Bootstrap exception: the first time expansion becomes possible within an era
             // (probes have scouted a site), allow that single expansion decision.
-            // ADDITION: Always allow "Grow Colony" offers if enough time has passed.
-            bool allow = newEra || (expansionAvailable && !offeredExpansionThisEra) || !expansionAvailable;
+            // ADDITION: Allow "FREE Colony Bonus" offers if enough time has passed.
+            bool allow = newEra || (expansionAvailable && !offeredExpansionThisEra) || (!expansionAvailable && Time.time >= nextFreeBonusTime);
             if (!allow) return;
 
+            if (!expansionAvailable)
+            {
+                nextFreeBonusTime = Time.time + freeBonusCooldown;
+            }
+
+            if (!proposalsEnabled) return;
+
             Debug.Log("[GreedyAI] Offering " + packages.Count + " growth package(s) for player approval. (era CC=" + ccCount + ")");
-StartCoroutine(ProposalSequence(packages));
+            StartCoroutine(ProposalSequence(packages));
         }
 
         // ── Build the set of player-approvable packages ─────────────────────────
@@ -314,29 +330,8 @@ if (SectorManager.Instance != null)
                 }
             }
 
-            // If no affordable expansion is available, offer a FREE bonus.
-            if (packages.Count == 0 && activeCommandPosts.Count > 0)
-            {
-                var grow = new ExpansionProposal
-                {
-                    Position = activeCommandPosts[0].transform.position,
-                    ResourceCount = 0,
-                    SiteName = "FREE Colony Bonus",
-                    IsExpansion = false,
-                    Items = MakeItems(false)
-                };
-                packages.Add(grow);
-            }
-
-            // Include both Expansions (Command Centers) and the Free Bonus.
-            return packages.Where(p => p.Items != null && (p.Items.Any(i => i.Type == PackageItemType.CommandCenter) || !p.IsExpansion)).ToList();
-        }
-
-        private void Refund(UnlockableSO so)
-        {
-            if (so == null || so.Cost == null) return;
-            Bus<SupplyEvent>.Raise(aiOwner, new SupplyEvent(aiOwner, so.Cost.Minerals, so.Cost.MineralsSO));
-            Bus<SupplyEvent>.Raise(aiOwner, new SupplyEvent(aiOwner, so.Cost.Gas, so.Cost.GasSO));
+            // Filter to only include packages that contain a Command Center as requested.
+            return packages.Where(p => p.Items != null && p.Items.Any(i => i.Type == PackageItemType.CommandCenter)).ToList();
         }
 
         // Builds the per-unit item list for a package. Each unit is its own vetoable line.
@@ -345,18 +340,12 @@ if (SectorManager.Instance != null)
             var items = new List<PackageItem>();
             if (expansion)
                 items.Add(new PackageItem { Name = "Command Center", Type = PackageItemType.CommandCenter, Cost = CostOf(commandPostSO) });
-            
-            // Growth packages (non-expansion) are now FREE bonuses.
-            int workerCost = expansion ? CostOf(workerSO) : 0;
-            int probeCost = expansion ? CostOf(probeSO) : 0;
-            int oxygenCost = expansion ? CostOf(oxygenProcessorSO) : 0;
-
             for (int i = 0; i < packageWorkers; i++)
-                items.Add(new PackageItem { Name = "Worker", Type = PackageItemType.Worker, Cost = workerCost });
+                items.Add(new PackageItem { Name = "Worker", Type = PackageItemType.Worker, Cost = CostOf(workerSO) });
             for (int i = 0; i < packageProbes; i++)
-                items.Add(new PackageItem { Name = "Probe", Type = PackageItemType.Probe, Cost = probeCost });
+                items.Add(new PackageItem { Name = "Probe", Type = PackageItemType.Probe, Cost = CostOf(probeSO) });
             for (int i = 0; i < packageOxygen; i++)
-                items.Add(new PackageItem { Name = "Oxygen Processor", Type = PackageItemType.OxygenProcessor, Cost = oxygenCost });
+                items.Add(new PackageItem { Name = "Oxygen Processor", Type = PackageItemType.OxygenProcessor, Cost = CostOf(oxygenProcessorSO) });
             return items;
         }
 

@@ -12,18 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82d784a53ab118875a8a86409a3bce3d, type: 3}
   m_Name: Planet 1 - Easy
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.PlanetConfig
-  MapWidth: 100
-  MapHeight: 100
+  MapWidth: 200
+  MapHeight: 200
   NoiseScale: 75
   HeightMultiplier: 12
   ResourceCount: 40
   BaseDecayRate: 2
   ToxicityLevel: 0
-  BiomassDrainRate: 1
+  BiomassDrainRate: 0.2
   IntegrityDrainRate: 0.5
-  SectorsX: 3
-  SectorsY: 3
-  SectorOccupationRadius: 20
+  SectorsX: 2
+  SectorsY: 2
+  SectorOccupationRadius: 40
   EnvironmentDensity: 100
   EnvironmentPrefabs: []
   SurfaceFeatureDensity: 50

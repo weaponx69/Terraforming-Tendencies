@@ -15,10 +15,6 @@ namespace GameDevTV.RTS.Player
     ///      way to earn more (no GatherableSupply with resources left AND no
     ///      active mining units on the map).
     ///   B) All GatherableSupply nodes are exhausted AND biomass is 0.
-    ///
-    /// "No remaining mining capability" means:
-    ///   - Zero GatherableSupply objects still have Amount > 0
-    ///   - Zero Worker or MiningDrone units are alive for the AI owner
     /// </summary>
     public class GameOverManager : MonoBehaviour
     {
@@ -34,21 +30,12 @@ namespace GameDevTV.RTS.Player
         [Tooltip("Seconds between checks for the 'no recovery possible' condition.")]
         [SerializeField] private float checkInterval = 3f;
 
-        [Tooltip("Grace period (seconds) after biomass first hits 0 before triggering game over. "
-               + "Prevents instant loss from a momentary dip.")]
+        [Tooltip("Grace period (seconds) after biomass first hits 0 before triggering game over.")]
         [SerializeField] private float gracePeriod = 5f;
 
         // ── Public event ───────────────────────────────────────────────────────────
-        /// <summary>Why the run ended in failure, so the UI can show an appropriate message.</summary>
-        public enum GameOverReason
-        {
-            /// <summary>Colony life support collapsed (integrity depleted to 0).</summary>
-            LifeSupport,
-            /// <summary>No biomass left and no way to gather more.</summary>
-            Resources
-        }
+        public enum GameOverReason { LifeSupport, Resources }
 
-        /// <summary>Raised once when the game-over condition is confirmed.</summary>
         public static event System.Action<GameOverReason> OnGameOver;
         public static event System.Action OnVictory;
 
@@ -56,7 +43,7 @@ namespace GameDevTV.RTS.Player
 
         // ── State ──────────────────────────────────────────────────────────────────
         private bool gameOverTriggered;
-        private bool inGracePeriod;
+        private bool isPlanetGenerated;
 
         // ── Lifecycle ──────────────────────────────────────────────────────────────
         private void Awake()
@@ -67,71 +54,49 @@ namespace GameDevTV.RTS.Player
         private void OnEnable()
         {
             Supplies.OnBiomassChanged += HandleBiomassChanged;
-            Supplies.OnVictory += HandleVictory;
-            Supplies.OnIntegrityDepleted += HandleIntegrityDepleted;
-            // Subscribe directly to the change events as the authoritative win/loss detection.
-            // (Supplies' own internal relays are unreliable, so we evaluate thresholds here.)
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
-            Supplies.OnOxygenChanged += HandleOxygenChanged;
             Bus<SupplyDepletedEvent>.RegisterForAll(HandleSupplyDepleted);
+            PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
         }
 
         private void OnDisable()
         {
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
-            Supplies.OnVictory -= HandleVictory;
-            Supplies.OnIntegrityDepleted -= HandleIntegrityDepleted;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
-            Supplies.OnOxygenChanged -= HandleOxygenChanged;
             Bus<SupplyDepletedEvent>.UnregisterForAll(HandleSupplyDepleted);
+            PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
         }
 
-        /// <summary>
-        /// Authoritative loss check: colony integrity (life support) depleted to 0.
-        /// Fires immediately (past the brief startup guard), alongside the biomass loss.
-        /// </summary>
+        private void HandlePlanetGenerated()
+        {
+            isPlanetGenerated = true;
+            Debug.Log("[GameOverManager] Planet generation detected. Monitoring for loss conditions.");
+            
+            CancelInvoke(nameof(CheckNoRecovery));
+            InvokeRepeating(nameof(CheckNoRecovery), 30f, checkInterval);
+        }
+
         private void HandleIntegrityChanged(Owner owner, float value)
         {
-            if (gameOverTriggered) return;
+            if (gameOverTriggered || !isPlanetGenerated) return;
             if (owner != monitoredOwner) return;
             if (value > 0f) return;
-            // Avoid an instant loss at startup before the colony has spawned in.
-            if (Time.timeSinceLevelLoad < 5f) return;
+            if (Time.timeSinceLevelLoad < 30f) return;
 
             TriggerGameOver(GameOverReason.LifeSupport);
         }
 
-        /// <summary>Authoritative win check: oxygen sustainability reached 100%.</summary>
-        private void HandleOxygenChanged(Owner owner, float value)
-        {
-            if (gameOverTriggered) return;
-            if (owner != monitoredOwner) return;
-            if (value >= 100f)
-            {
-                TriggerVictory();
-            }
-        }
-
-        private void Start()
-        {
-            InvokeRepeating(nameof(CheckNoRecovery), 10f, checkInterval); // Wait 10s for initial spawn
-        }
-
-        /// <summary>
-        /// Authoritative win/loss polling. Reads the shared Supplies state directly each frame
-        /// (rather than relying on event delivery) so the conditions are robust and immediate:
-        ///   WIN  — oxygen sustainability reaches 100%.
-        ///   LOSS — colony integrity (life support) depletes to 0.
-        /// The biomass/no-recovery loss continues to work alongside this via CheckNoRecovery.
-        /// </summary>
         private void Update()
         {
-            if (gameOverTriggered) return;
+            if (gameOverTriggered || !isPlanetGenerated) return;
+            
+            // Wait for colony to bootstrap
+            if (Time.timeSinceLevelLoad < 30f) return;
 
-            // Win: oxygen sustainability at 100% AND all sectors occupied.
+            // 1. Authoritative Win Check
             bool oxygenComplete = Supplies.Oxygen != null
                 && Supplies.Oxygen.TryGetValue(monitoredOwner, out float oxygen)
-                && oxygen >= 100f;
+                && oxygen >= 99.9f;
 
             bool sectorsComplete = SectorManager.Instance != null && SectorManager.Instance.AreAllSectorsOccupied();
 
@@ -141,24 +106,29 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // Loss Condition 1: Colony life support coverage collapsed.
-// If there are no active LifeSupportNodes, the colony cannot survive.
-            // Brief startup guard avoids an instant loss before the starting base is completed.
-            if (Time.timeSinceLevelLoad >= 5f)
+            // 2. Authoritative immediate check: Biomass at 0 is a hard loss.
+            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(monitoredOwner, out int b) && b <= 0)
             {
-                if (!AnyLifeSupportNodesRemain(monitoredOwner))
-                {
-                    TriggerGameOver(GameOverReason.LifeSupport);
-                    return;
-                }
+                Debug.Log($"[GameOverManager] Hard biomass check triggered. Biomass: {b}");
+                TriggerGameOver(GameOverReason.Resources);
+                return;
+            }
 
-                // Loss Condition 2: Colony integrity (total HP) depleted to 0.
-                if (Supplies.Integrity != null
-                    && Supplies.Integrity.TryGetValue(monitoredOwner, out float integrity)
-                    && integrity <= 0f)
-                {
-                    TriggerGameOver(GameOverReason.LifeSupport);
-                }
+            // 3. Loss Condition 1: Colony life support coverage collapsed.
+            if (!AnyLifeSupportNodesRemain(monitoredOwner))
+            {
+                Debug.Log("[GameOverManager] No life support nodes remain. Colony collapsed.");
+                TriggerGameOver(GameOverReason.LifeSupport);
+                return;
+            }
+
+            // Loss Condition 2: Colony integrity depleted to 0.
+            if (Supplies.Integrity != null
+                && Supplies.Integrity.TryGetValue(monitoredOwner, out float integrity)
+                && integrity <= 0f)
+            {
+                Debug.Log("[GameOverManager] Integrity depleted to 0.");
+                TriggerGameOver(GameOverReason.LifeSupport);
             }
         }
 
@@ -169,29 +139,10 @@ namespace GameDevTV.RTS.Player
             {
                 if (node.TryGetComponent<BaseBuilding>(out var b) && b.Owner == owner)
                 {
-                    // Only count completed buildings; ghosts/under-construction buildings 
-                    // haven't activated their life support yet.
-                    if (b.Progress.State == BuildingProgress.BuildingState.Completed)
-                    {
-                        return true;
-                    }
+                    if (b.Progress.State == BuildingProgress.BuildingState.Completed) return true;
                 }
             }
             return false;
-        }
-
-        // ── Event handlers ─────────────────────────────────────────────────────────
-
-        private void HandleIntegrityDepleted()
-        {
-            if (gameOverTriggered) return;
-            
-            // Check if we actually have units before failing. 
-            // If integrity is 0 because of no units, don't fail immediately at start.
-            if (Time.timeSinceLevelLoad < 5f) return;
-            
-            // Integrity hitting 0 means colony life support has collapsed. Fire immediately.
-            TriggerGameOver(GameOverReason.LifeSupport);
         }
 
         private void HandleVictory()
@@ -200,88 +151,76 @@ namespace GameDevTV.RTS.Player
             TriggerVictory();
         }
 
-        /// <summary>Every time Player1 biomass changes, check if it just hit 0.</summary>
         private void HandleBiomassChanged(Owner owner, int newValue)
         {
-            if (gameOverTriggered) return;
+            if (gameOverTriggered || !isPlanetGenerated) return;
             if (owner != monitoredOwner) return;
 
-            if (newValue <= 0 && !inGracePeriod)
-            {
-                StartCoroutine(GracePeriodCoroutine());
-            }
-        }
-
-        /// <summary>Every time a supply node is exhausted, run an immediate full check.</summary>
-        private void HandleSupplyDepleted(SupplyDepletedEvent evt)
-        {
-            if (gameOverTriggered) return;
-            CheckNoRecovery();
-        }
-
-        // ── Condition checks ───────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Full check: is it impossible to ever earn more Biomass?
-        /// Triggers game over when:
-        ///   biomass == 0  AND  no supply nodes remain  AND  no mining units alive.
-        /// </summary>
-        private void CheckNoRecovery()
-        {
-            if (gameOverTriggered) return;
-
-            int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int b) ? b : 0;
-            if (biomass > 0) return;   // still have resources — no problem yet
-
-            bool supplyNodesExist = AnySupplyNodesRemain();
-            bool miningUnitsExist = AnyMiningUnitsAlive();
-
-            if (!supplyNodesExist && !miningUnitsExist)
+            // Immediate loss if biomass hits 0, but only after bootstrapping.
+            if (newValue <= 0 && Time.timeSinceLevelLoad > 30f)
             {
                 TriggerGameOver(GameOverReason.Resources);
             }
         }
 
-        private IEnumerator GracePeriodCoroutine()
+        private void HandleSupplyDepleted(SupplyDepletedEvent evt)
         {
-            inGracePeriod = true;
-            yield return new WaitForSeconds(gracePeriod);
-            inGracePeriod = false;
-
-            // After grace, do a full check
+            if (gameOverTriggered || !isPlanetGenerated) return;
             CheckNoRecovery();
         }
 
-        // ── Helpers ────────────────────────────────────────────────────────────────
+        private void CheckNoRecovery()
+        {
+            if (gameOverTriggered || !isPlanetGenerated) return;
+
+            int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int b) ? b : 0;
+            bool supplyNodesExist = AnySupplyNodesRemain();
+            bool miningUnitsExist = AnyMiningUnitsAlive();
+
+            // Logic Fix: Even if minerals exist on the map, if you have 0 workers and cannot afford to build one, you lose.
+            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || biomass >= 100);
+
+            if (!recoveryPossible)
+            {
+                Debug.Log($"[GameOverManager] Recovery check failed. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Biomass: {biomass}");
+                TriggerGameOver(GameOverReason.Resources);
+            }
+        }
 
         private static bool AnySupplyNodesRemain()
         {
-            GatherableSupply[] all = FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
+            GatherableSupply[] all = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
             foreach (GatherableSupply gs in all)
             {
-                if (gs.Amount > 0) return true;
+                if (gs != null && gs.Amount > 0) return true;
             }
             return false;
         }
 
         private bool AnyMiningUnitsAlive()
         {
-            // Workers belonging to either owner
-            Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+            Worker[] workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
             foreach (Worker w in workers)
             {
-                if (w.Owner == monitoredOwner || w.Owner == aiOwner) return true;
+                if (w != null && (w.Owner == monitoredOwner || w.Owner == aiOwner)) return true;
             }
 
-            // MiningDrones (added at runtime to Air Transport units)
-            MiningDrone[] drones = FindObjectsByType<MiningDrone>(FindObjectsInactive.Exclude);
+            MiningDrone[] drones = Object.FindObjectsByType<MiningDrone>(FindObjectsInactive.Exclude);
             foreach (MiningDrone d in drones)
             {
-                if (d.GetComponent<AbstractUnit>() is AbstractUnit u
+                if (d != null && d.TryGetComponent<AbstractUnit>(out var u)
                     && (u.Owner == monitoredOwner || u.Owner == aiOwner))
                     return true;
             }
 
+            BaseBuilding[] buildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var b in buildings)
+            {
+                if (b != null && (b.Owner == monitoredOwner || b.Owner == aiOwner))
+                {
+                    if (b.QueueSize > 0) return true; 
+                }
+            }
             return false;
         }
 
@@ -289,10 +228,9 @@ namespace GameDevTV.RTS.Player
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
-
+            Debug.Log($"[GameOverManager] Game Over triggered! Reason: {reason}");
             CancelInvoke(nameof(CheckNoRecovery));
             StopAllCoroutines();
-
             OnGameOver?.Invoke(reason);
         }
 
@@ -300,11 +238,10 @@ namespace GameDevTV.RTS.Player
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
-
+            Debug.Log("[GameOverManager] Victory triggered! All sectors occupied and oxygen complete.");
             CancelInvoke(nameof(CheckNoRecovery));
             StopAllCoroutines();
-
             OnVictory?.Invoke();
         }
-        }
-        }
+    }
+}

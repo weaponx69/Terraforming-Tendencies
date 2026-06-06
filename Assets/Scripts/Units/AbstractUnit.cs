@@ -141,114 +141,161 @@ protected UnitSO unitSO;
 
             try
             {
-                // Include Public for package-defined fields
-                var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public;
+                var bf = (System.Reflection.BindingFlags)52; // Public | NonPublic | Instance
                 var graphField = graphAgent.GetType().GetField("m_Graph", bf);
                 if (graphField == null) return;
 
                 var graph = graphField.GetValue(graphAgent) as Unity.Behavior.BehaviorGraph;
                 if (graph == null) return;
 
-                RepairGraphRecursive(graph, bf);
+                RepairGraphRecursive(graph, bf, new HashSet<object>());
             }
             catch {}
         }
 
-        private void RepairGraphRecursive(BehaviorGraph graph, System.Reflection.BindingFlags bf)
+        private void RepairGraphRecursive(BehaviorGraph graph, System.Reflection.BindingFlags bf, HashSet<object> visited)
         {
-            if (graph == null) return;
+            if (graph == null || !visited.Add(graph)) return;
 
-            // Access BehaviorGraph.Graphs (internal List<BehaviorGraphModule>)
-            var graphsField = graph.GetType().GetField("Graphs",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.Public);
+            var graphsField = graph.GetType().GetField("Graphs", bf);
             if (graphsField == null) return;
 
             var modules = graphsField.GetValue(graph) as System.Collections.IList;
             if (modules == null) return;
 
-            // BlackboardReference, Blackboard are public — look them up once
             var mSourceField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Source", bf);
             var mBlackboardField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Blackboard", bf);
             var generateMethod = typeof(Unity.Behavior.Blackboard).GetMethod("GenerateInstanceData", bf);
 
-            if (mSourceField == null || mBlackboardField == null || generateMethod == null) return;
-
             for (int i = 0; i < modules.Count; i++)
             {
                 var module = modules[i];
-                if (module == null) continue;
+                if (module == null || !visited.Add(module)) continue;
 
-                // 1. Recurse into subgraphs if this module has its own graph
-                var subGraphField = module.GetType().GetField("Graph", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (subGraphField != null)
+                RepairModule(module, mSourceField, mBlackboardField, generateMethod, bf, visited);
+            }
+        }
+
+        private void RepairModule(object module, System.Reflection.FieldInfo mSourceField, System.Reflection.FieldInfo mBlackboardField, System.Reflection.MethodInfo generateMethod, System.Reflection.BindingFlags bf, HashSet<object> visited)
+        {
+            // 1. Recurse into module's own graph field if it exists
+            var subGraphField = module.GetType().GetField("Graph", bf);
+            if (subGraphField != null)
+            {
+                var subGraph = subGraphField.GetValue(module) as BehaviorGraph;
+                if (subGraph != null)
                 {
-                    var subGraph = subGraphField.GetValue(module) as BehaviorGraph;
-                    if (subGraph != null && subGraph != graph)
-                    {
-                        RepairGraphRecursive(subGraph, bf);
-                    }
+                    RepairGraphRecursive(subGraph, bf, visited);
                 }
+            }
 
-                // 2. Repair this module's blackboard
-                var bbRefField = module.GetType().GetField("BlackboardReference",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (bbRefField == null) continue;
-
+            // 2. Repair this module's blackboard
+            var bbRefField = module.GetType().GetField("BlackboardReference", bf);
+            if (bbRefField != null)
+            {
                 var bbRef = bbRefField.GetValue(module);
-                if (bbRef == null) continue;
-
-                var source = mSourceField.GetValue(bbRef);
-                if (source == null) continue;
-
-                var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
-                if (blackboard == null) continue;
-
-                // Only repopulate if m_Variables is empty
-                if (blackboard.Variables.Count == 0)
+                if (bbRef != null && mSourceField != null && mBlackboardField != null && generateMethod != null)
                 {
-                    var sourceBB = source.GetType().GetProperty("Blackboard",
-                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                        ?.GetValue(source) as Unity.Behavior.Blackboard;
-                    if (sourceBB != null && sourceBB.Variables.Count > 0)
+                    var source = mSourceField.GetValue(bbRef);
+                    var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
+                    if (source != null && blackboard != null)
                     {
-                        generateMethod.Invoke(blackboard, new object[] { sourceBB, source });
-                    }
-                }
-
-                // Force core variables into every blackboard that has them defined.
-                Animator animator = GetComponentInChildren<Animator>(true);
-                foreach (var variable in blackboard.Variables)
-                {
-                    if (variable.Name == BlackboardConstants.SELF || variable.Name == "Agent")
-                    {
-                        variable.ObjectValue = gameObject;
-                    }
-                    else if (variable.Name == BlackboardConstants.UNIT)
-                    {
-                        variable.ObjectValue = this;
-                    }
-                    else if (variable.Name == "Animator" || (string.IsNullOrEmpty(variable.Name) && variable.Type == typeof(Animator)))
-                    {
-                        // ALWAYS set the value, even if animator is null, to ensure the 
-                        // behavior node sees an initialized (albeit null) variable.
-                        variable.ObjectValue = animator;
-                    }
-                }
-
-                // Scan all nodes in the module and inject animator directly into any animation fields.
-                // This catches "Local" values that aren't part of the named blackboard variables list.
-                var nodesField = module.GetType().GetField("m_Nodes", bf);
-                if (nodesField != null)
-                {
-                    var nodes = nodesField.GetValue(module) as System.Collections.IList;
-                    if (nodes != null)
-                    {
-                        foreach (var node in nodes)
+                        if (blackboard.Variables.Count == 0)
                         {
-                            if (node == null) continue;
-                            InjectAnimatorIntoNode(node, animator, bf);
+                            var sourceBB = source.GetType().GetProperty("Blackboard", bf)?.GetValue(source) as Unity.Behavior.Blackboard;
+                            if (sourceBB != null && sourceBB.Variables.Count > 0)
+                            {
+                                generateMethod.Invoke(blackboard, new object[] { sourceBB, source });
+                            }
                         }
+
+                        Animator animator = GetComponentInChildren<Animator>(true);
+                        foreach (var variable in blackboard.Variables)
+                        {
+                            if (variable.Name == BlackboardConstants.SELF || variable.Name == "Agent")
+                                variable.ObjectValue = gameObject;
+                            else if (variable.Name == BlackboardConstants.UNIT)
+                                variable.ObjectValue = this;
+                            else if (variable.Name == "Animator" || (string.IsNullOrEmpty(variable.Name) && variable.Type == typeof(Animator)))
+                                variable.ObjectValue = animator;
+                        }
+                    }
+                }
+            }
+
+            // 3. Traverse all nodes in the module starting from Root
+            var rootField = module.GetType().GetField("Root", bf);
+            if (rootField != null)
+            {
+                var root = rootField.GetValue(module);
+                if (root != null)
+                {
+                    TraverseNodesRecursive(root, bf, visited);
+                }
+            }
+            
+            // Fallback: some versions might still use m_Nodes
+            var nodesField = module.GetType().GetField("m_Nodes", bf);
+            if (nodesField != null)
+            {
+                var nodes = nodesField.GetValue(module) as System.Collections.IList;
+                if (nodes != null)
+                {
+                    foreach (var node in nodes) TraverseNodesRecursive(node, bf, visited);
+                }
+            }
+        }
+
+        private void TraverseNodesRecursive(object node, System.Reflection.BindingFlags bf, HashSet<object> visited)
+        {
+            if (node == null || !visited.Add(node)) return;
+
+            // Inject animator into this node
+            Animator animator = GetComponentInChildren<Animator>(true);
+            InjectAnimatorIntoNode(node, animator, bf);
+
+            // Recurse into children
+            // Composite: m_Children
+            var childrenField = node.GetType().GetField("m_Children", bf);
+            if (childrenField != null)
+            {
+                var children = childrenField.GetValue(node) as System.Collections.IEnumerable;
+                if (children != null)
+                {
+                    foreach (var child in children) TraverseNodesRecursive(child, bf, visited);
+                }
+            }
+
+            // Modifier/Decorator/Join: m_Child
+            var childField = node.GetType().GetField("m_Child", bf);
+            if (childField != null)
+            {
+                TraverseNodesRecursive(childField.GetValue(node), bf, visited);
+            }
+
+            // Branching: True, False
+            var trueField = node.GetType().GetField("True", bf);
+            if (trueField != null) TraverseNodesRecursive(trueField.GetValue(node), bf, visited);
+            var falseField = node.GetType().GetField("False", bf);
+            if (falseField != null) TraverseNodesRecursive(falseField.GetValue(node), bf, visited);
+
+            // Check for Subgraph references in nodes (e.g. RunSubgraph)
+            var subgraphField = node.GetType().GetField("Subgraph", bf);
+            if (subgraphField == null) subgraphField = node.GetType().GetField("m_Subgraph", bf);
+            if (subgraphField != null)
+            {
+                var subgraph = subgraphField.GetValue(node);
+                if (subgraph != null)
+                {
+                    // If it's a BehaviorGraph, recurse
+                    if (subgraph is BehaviorGraph bg)
+                    {
+                        RepairGraphRecursive(bg, bf, visited);
+                    }
+                    else
+                    {
+                        // If it's a module, repair it
+                        RepairModule(subgraph, null, null, null, bf, visited);
                     }
                 }
             }
@@ -256,31 +303,50 @@ protected UnitSO unitSO;
 
         private void InjectAnimatorIntoNode(object node, Animator animator, System.Reflection.BindingFlags bf)
         {
-            if (animator == null || node == null) return;
+            if (node == null) return;
 
-            // Check all fields for BlackboardVariable<Animator> or Animator
             foreach (var field in node.GetType().GetFields(bf))
             {
+                var fieldValue = field.GetValue(node);
+                if (fieldValue == null) continue;
+
+                // Handle Animator fields
                 if (field.FieldType == typeof(Animator))
                 {
-                    field.SetValue(node, animator);
+                    if (animator != null) field.SetValue(node, animator);
                 }
                 else 
                 {
-                    var fieldValue = field.GetValue(node);
-                    if (fieldValue == null) continue;
-                    
-                    // Most Behavior Graph variables (named or anonymous) have an ObjectValue property.
+                    // Handle BlackboardVariable<Animator> or subclasses
                     var objValProp = fieldValue.GetType().GetProperty("ObjectValue", bf);
                     if (objValProp != null)
                     {
-                        objValProp.SetValue(fieldValue, animator);
+                        // Special handling for GameObjectToComponentBlackboardVariable
+                        if (fieldValue.GetType().Name.Contains("GameObjectToComponentBlackboardVariable"))
+                        {
+                            var linkedVarField = fieldValue.GetType().GetField("m_LinkedVariable", bf);
+                            if (linkedVarField != null)
+                            {
+                                var linkedVar = linkedVarField.GetValue(fieldValue);
+                                if (linkedVar != null)
+                                {
+                                    var linkedObjValProp = linkedVar.GetType().GetProperty("ObjectValue", bf);
+                                    if (linkedObjValProp != null)
+                                    {
+                                        linkedObjValProp.SetValue(linkedVar, gameObject);
+                                    }
+                                }
+                            }
+                        }
+                        else if (animator != null)
+                        {
+                            try { objValProp.SetValue(fieldValue, animator); } catch {}
+                        }
                     }
                     else
                     {
-                        // Direct field access as fallback
                         var valField = fieldValue.GetType().GetField("m_Value", bf);
-                        if (valField != null && valField.FieldType == typeof(Animator))
+                        if (valField != null && valField.FieldType == typeof(Animator) && animator != null)
                         {
                             valField.SetValue(fieldValue, animator);
                         }
