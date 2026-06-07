@@ -38,18 +38,24 @@ namespace GameDevTV.RTS.Units
             List<IDamageable> targets = sensor.Damageables;
             if (targets == null || targets.Count == 0) return;
 
-            // Remove any null or destroyed entries before sorting
-            targets.RemoveAll(t => t == null || t.Transform == null);
+            // Remove any null or destroyed entries before sorting.
+            // Since IDamageable is an interface, we must cast to UnityEngine.Object to correctly check if it's destroyed.
+            targets.RemoveAll(t => t == null || (t is Object obj && obj == null));
             if (targets.Count == 0) return;
 
             // Sort: NaturalEventImpact (Meteors) first, then by distance
             targets.Sort((a, b) =>
             {
-                if (a == null || a.Transform == null) return 1;
-                if (b == null || b.Transform == null) return -1;
+                // Extra safety check during sorting as objects can be destroyed between frames
+                bool aValid = a != null && (a is Object aObj && aObj != null);
+                bool bValid = b != null && (b is Object bObj && bObj != null);
 
-                bool aIsMeteor = a.Transform.GetComponent<NaturalEventImpact>() != null;
-                bool bIsMeteor = b.Transform.GetComponent<NaturalEventImpact>() != null;
+                if (!aValid && !bValid) return 0;
+                if (!aValid) return 1;
+                if (!bValid) return -1;
+
+                bool aIsMeteor = a.Transform != null && a.Transform.GetComponent<NaturalEventImpact>() != null;
+                bool bIsMeteor = b.Transform != null && b.Transform.GetComponent<NaturalEventImpact>() != null;
 
                 if (aIsMeteor && !bIsMeteor) return -1;
                 if (!aIsMeteor && bIsMeteor) return 1;
@@ -63,7 +69,10 @@ namespace GameDevTV.RTS.Units
             List<GameObject> sortedEnemies = new List<GameObject>();
             foreach (var t in targets)
             {
-                if (t != null && t.Transform != null) sortedEnemies.Add(t.Transform.gameObject);
+                if (t != null && (t is Object obj && obj != null) && t.Transform != null) 
+                {
+                    sortedEnemies.Add(t.Transform.gameObject);
+                }
             }
 
             graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, sortedEnemies);

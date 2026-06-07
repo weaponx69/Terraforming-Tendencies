@@ -67,22 +67,41 @@ protected UnitSO unitSO;
             {
                 try
                 {
+                    // Primary variables
                     graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
                     graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
                     graphAgent.SetVariableValue(BlackboardConstants.COMMAND, currentCommand);
+                    
+                    // Naming convention fallbacks
+                    graphAgent.SetVariableValue("Self", gameObject);
+                    graphAgent.SetVariableValue("self", gameObject);
+                    graphAgent.SetVariableValue("Unit", this);
+                    graphAgent.SetVariableValue("unit", this);
+                    
+                    // Navigation Agent fallbacks
                     graphAgent.SetVariableValue("Agent", gameObject);
+                    graphAgent.SetVariableValue("agent", gameObject);
 
-                    Animator animator = GetComponentInChildren<Animator>();
-                    graphAgent.SetVariableValue("Animator", animator);
+                    // Animator fallbacks
+                    Animator animator = GetComponentInChildren<Animator>(true);
+                    if (animator != null)
+                    {
+                        graphAgent.SetVariableValue("Animator", animator);
+                        graphAgent.SetVariableValue("animator", animator);
+                    }
 
+                    // Attack configuration
                     if (unitSO != null && unitSO.AttackConfig != null)
                     {
                         graphAgent.SetVariableValue(BlackboardConstants.ATTACK_CONFIG, unitSO.AttackConfig);
+                        graphAgent.SetVariableValue("AttackConfig", unitSO.AttackConfig);
+                        graphAgent.SetVariableValue("attackConfig", unitSO.AttackConfig);
                     }
                 }
-                catch (System.Exception)
+                catch (System.Exception ex)
                 {
-                    // Initialization might happen later
+                    // Catch-all to prevent initialization failure from breaking the unit
+                    Debug.LogWarning($"[AbstractUnit] Exception during ReapplyCoreBlackboardVariables on {gameObject.name}: {ex.Message}");
                 }
             }
         }
@@ -136,12 +155,12 @@ protected UnitSO unitSO;
 
             foreach(UpgradeSO upgrade in unitSO.Upgrades)
             {
-                if (unitSO.TechTree.IsResearched(Owner, upgrade))
+                if (unitSO.TechTree != null && unitSO.TechTree.IsResearched(Owner, upgrade))
                 {
                     upgrade.Apply(unitSO);
                 }
             }
-        }
+}
 
         private float lastNavMeshSampleTime = 0f;
 private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
@@ -464,7 +483,10 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
         {
             List<GameObject> nearbyEnemies = SetNearbyEnemiesOnBlackboard();
 
-            if (damageable == null || damageable.Transform == null || 
+            // Safety check: casting to Object to detect destroyed Unity objects
+            bool isTargetValid = damageable != null && (damageable is Object obj && obj != null) && damageable.Transform != null;
+            
+            if (!isTargetValid || 
                 !graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVariable)
                 || damageable.Transform.gameObject != targetVariable.Value) return;
 
@@ -487,7 +509,8 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
             List<GameObject> nearbyEnemies = new List<GameObject>();
             foreach (var d in DamageableSensor.Damageables)
             {
-                if (d != null && d.Transform != null)
+                // Safety check for destroyed objects implementing IDamageable
+                if (d != null && (d is Object obj && obj != null) && d.Transform != null)
                 {
                     nearbyEnemies.Add(d.Transform.gameObject);
                 }

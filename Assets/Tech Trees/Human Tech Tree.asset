@@ -13,9 +13,8 @@ MonoBehaviour:
   m_Name: Human Tech Tree
   m_EditorClassIdentifier: 
   allUnlockables:
-  - {fileID: 11400000, guid: f15d9d4a0e8b3d848a49aaba59177157, type: 2}
   - {fileID: 11400000, guid: 8dd662d3b241c224ab9deac17c33674b, type: 2}
-  - {fileID: 11400000, guid: 3aac74df7495d4b40b3c6df03219294b, type: 2}
+  - {fileID: 11400000, guid: f79f6defe4af0aac49d77f21549a20d8, type: 2}
   - {fileID: 11400000, guid: 0997c20444ad8e64990f524ed591c91f, type: 2}
   - {fileID: 11400000, guid: d23aeaf68f2283446848bb2702e64d64, type: 2}
   - {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
@@ -27,6 +26,5 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b39eb73e31472a34b9d50f8cc7b1be7f, type: 2}
   - {fileID: 11400000, guid: e3fdd4caf0dc0224c83521c0ace2254a, type: 2}
   - {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}
-  - {fileID: 11400000, guid: f79f6defe4af0aac49d77f21549a20d8, type: 2}
   - {fileID: 11400000, guid: b888b7db674d79c2b8c081ec1266db4a, type: 2}
   - {fileID: 11400000, guid: dd3d5232544d8f837bb3f874e38e9d28, type: 2}

@@ -17,25 +17,37 @@ namespace GameDevTV.RTS.TechTree
         private Dictionary<Owner, Dictionary<UnlockableSO, Dependency>> techTrees;
         private Dictionary<Owner, HashSet<UnlockableSO>> unlockedDependencies;
 
-        public bool IsUnlocked(Owner owner, UnlockableSO unlockable) =>
-            techTrees[owner].TryGetValue(unlockable, out Dependency value) && value.IsUnlocked;
-        public bool IsResearched(Owner owner, UnlockableSO unlockable) =>
-            unlockedDependencies[owner].Contains(unlockable);
-        public UnlockableSO[] GetUnmetDependencies(Owner owner, UnlockableSO unlockableSO)
+        public bool IsUnlocked(Owner owner, UnlockableSO unlockable)
         {
-            if (techTrees[owner].TryGetValue(unlockableSO, out Dependency dependency))
-            {
-                return dependency.GetUnmetDependencies();
-            }
-
-            return Array.Empty<UnlockableSO>();
+            if (techTrees == null || !techTrees.ContainsKey(owner)) return true;
+            return techTrees[owner].TryGetValue(unlockable, out Dependency value) && value.IsUnlocked;
         }
+
+        public bool IsResearched(Owner owner, UnlockableSO unlockable)
+        {
+            if (unlockedDependencies == null || !unlockedDependencies.ContainsKey(owner)) return false;
+            return unlockedDependencies[owner].Contains(unlockable);
+        }
+public UnlockableSO[] GetUnmetDependencies(Owner owner, UnlockableSO unlockableSO)
+{
+    if (techTrees == null || !techTrees.ContainsKey(owner)) return Array.Empty<UnlockableSO>();
+    if (techTrees[owner].TryGetValue(unlockableSO, out Dependency dependency))
+    {
+        return dependency.GetUnmetDependencies();
+    }
+
+    return Array.Empty<UnlockableSO>();
+}
 
         private void OnEnable()
         {
-            if (techTrees == null)
+            try
             {
                 BuildTechTrees();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[TechTreeSO] Failed to build tech trees: {ex.Message}");
             }
 
             Bus<BuildingSpawnEvent>.RegisterForAll(HandleBuildingSpawn);
@@ -107,13 +119,13 @@ namespace GameDevTV.RTS.TechTree
 
             foreach(Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                techTrees.Add(owner, new Dictionary<UnlockableSO, Dependency>());
-                unlockedDependencies.Add(owner, new HashSet<UnlockableSO>());
+                techTrees[owner] = new Dictionary<UnlockableSO, Dependency>();
+                unlockedDependencies[owner] = new HashSet<UnlockableSO>();
 
                 foreach(UnlockableSO unlockableSO in allUnlockables)
                 {
                     if (unlockableSO == null) continue;
-                    techTrees[owner].Add(unlockableSO, new Dependency(unlockableSO));
+                    techTrees[owner][unlockableSO] = new Dependency(unlockableSO);
                 }
             }
         }

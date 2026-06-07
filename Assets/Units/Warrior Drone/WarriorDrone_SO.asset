@@ -21,7 +21,7 @@ MonoBehaviour:
   <unlockRequirements>k__BackingField:
   - {fileID: 11400000, guid: 484fa8e123befe4448234d913dccc773, type: 2}
   <Health>k__BackingField: 250
-  <Prefab>k__BackingField: {fileID: 5185431849914692672, guid: 96d4f1d1fe77e653ea9f7fd182e1e07e, type: 3}
+  <Prefab>k__BackingField: {fileID: 1076983579694789324, guid: 1db43eaef9216eb58863a68fd300a855, type: 3}
   <Upgrades>k__BackingField:
   - {fileID: 11400000, guid: 1a539722dcaa7bf4bbf2af09917a710d, type: 2}
   - {fileID: 11400000, guid: b7906a4f1eb2f2e429ac1da9d89dc60c, type: 2}
