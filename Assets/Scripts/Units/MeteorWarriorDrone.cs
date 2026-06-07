@@ -55,17 +55,29 @@ namespace GameDevTV.RTS.Units
             List<GameObject> sortedEnemies = targets.ConvertAll(t => t.Transform.gameObject);
             graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, sortedEnemies);
 
-            // If we don't have a target or our current target isn't a meteor but one is available, switch.
+            // Target Selection Logic
             if (graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVar))
             {
                 GameObject currentTarget = targetVar.Value;
-                bool targetIsMeteor = currentTarget != null && currentTarget.GetComponent<NaturalEventImpact>() != null;
-
-                if (!targetIsMeteor && targets[0].Transform.GetComponent<NaturalEventImpact>() != null)
+                
+                // If we have no target, pick the highest priority one (which will be a meteor if any exist)
+                if (currentTarget == null)
                 {
-                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, targets[0].Transform.gameObject);
+                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, sortedEnemies[0]);
+                    return;
+                }
+
+                // If our current target is NOT a meteor, check if there is a meteor we should switch to
+                bool currentIsMeteor = currentTarget.GetComponent<NaturalEventImpact>() != null;
+                if (!currentIsMeteor)
+                {
+                    bool bestIsMeteor = sortedEnemies[0].GetComponent<NaturalEventImpact>() != null;
+                    if (bestIsMeteor)
+                    {
+                        graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, sortedEnemies[0]);
+                    }
                 }
             }
-        }
+}
     }
 }

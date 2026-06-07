@@ -21,4 +21,4 @@ MonoBehaviour:
   <MaxEnemiesHitPerAttack>k__BackingField: 5
   <DamageableLayers>k__BackingField:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 1

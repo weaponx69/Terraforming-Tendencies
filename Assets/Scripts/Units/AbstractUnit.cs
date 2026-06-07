@@ -40,46 +40,35 @@ protected UnitSO unitSO;
             Agent = GetComponent<NavMeshAgent>();
             graphAgent = GetComponent<BehaviorGraphAgent>();
 
+            // Force enable the agent to ensure it can reach the NavMesh
+            if (Agent != null)
+            {
+                Agent.enabled = true;
+            }
+
             unitSO = UnitSO as UnitSO;
 
             SetCurrentCommand(UnitCommands.Stop);
 
-            // Ensure every unit has an Animator component (even if dummy)
-            // to prevent Unity Behavior's SetAnimatorBoolAction from spamming "No Animator set" warnings.
+            // Ensure every unit has an Animator component
             if (GetComponentInChildren<Animator>(true) == null)
             {
                 gameObject.AddComponent<Animator>();
             }
             
-            // Repair the blackboard immediately so variables can be set
-            RepairBlackboards();
+            // Initialization is handled by Unity Behavior package in Unity 6
             ReapplyCoreBlackboardVariables();
-            
-            // Run an extra repair in the next few frames to catch late-initialized graphs
-            StartCoroutine(DelayedRepair());
-        }
-
-        private System.Collections.IEnumerator DelayedRepair()
-        {
-            yield return null;
-            RepairBlackboards();
-            ReapplyCoreBlackboardVariables();
-            yield return new WaitForSeconds(0.5f);
-            RepairBlackboards();
         }
 
         protected virtual void ReapplyCoreBlackboardVariables()
         {
-            if (graphAgent != null)
+            if (graphAgent != null && graphAgent.isActiveAndEnabled)
             {
                 try
                 {
                     graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
                     graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
 
-                    // Ensure the Animator variable is set on the blackboard.
-                    // Even if null, we set it to avoid 'uninitialized variable' warnings 
-                    // from Behavior Graph actions that expect it.
                     Animator animator = GetComponentInChildren<Animator>();
                     graphAgent.SetVariableValue("Animator", animator);
 
@@ -90,7 +79,7 @@ protected UnitSO unitSO;
                 }
                 catch (System.Exception)
                 {
-                    // Debug.LogWarning($"[AbstractUnit] Failed to set blackboard variables: {e.Message}");
+                    // Initialization might happen later
                 }
             }
         }
@@ -100,7 +89,6 @@ protected UnitSO unitSO;
             base.OnEnable();
             // Re-ensure blackboard variables are set whenever the unit is enabled.
             // This catches race conditions during spawning.
-            RepairBlackboards();
             ReapplyCoreBlackboardVariables();
         }
 
@@ -119,7 +107,6 @@ protected UnitSO unitSO;
             // The BehaviorGraphAgent.Init() clones the graph but leaves each module's
             // m_Blackboard.m_Variables empty — variables are in m_Source (RuntimeBlackboardAsset).
             // We call GenerateInstanceData via reflection to populate the live blackboard.
-            RepairBlackboards();
             ReapplyCoreBlackboardVariables();
 
             base.Start();
@@ -142,228 +129,8 @@ protected UnitSO unitSO;
             }
         }
 
-        private void RepairBlackboards()
-        {
-            if (graphAgent == null) return;
-
-            try
-            {
-                var bf = (System.Reflection.BindingFlags)52; // Public | NonPublic | Instance
-                var graphField = graphAgent.GetType().GetField("m_Graph", bf);
-                if (graphField == null) return;
-
-                var graph = graphField.GetValue(graphAgent) as Unity.Behavior.BehaviorGraph;
-                if (graph == null) return;
-
-                RepairGraphRecursive(graph, bf, new HashSet<object>());
-            }
-            catch {}
-        }
-
-        private void RepairGraphRecursive(BehaviorGraph graph, System.Reflection.BindingFlags bf, HashSet<object> visited)
-        {
-            if (graph == null || !visited.Add(graph)) return;
-
-            var graphsField = graph.GetType().GetField("Graphs", bf);
-            if (graphsField == null) return;
-
-            var modules = graphsField.GetValue(graph) as System.Collections.IList;
-            if (modules == null) return;
-
-            var mSourceField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Source", bf);
-            var mBlackboardField = typeof(Unity.Behavior.BlackboardReference).GetField("m_Blackboard", bf);
-            var generateMethod = typeof(Unity.Behavior.Blackboard).GetMethod("GenerateInstanceData", bf);
-
-            for (int i = 0; i < modules.Count; i++)
-            {
-                var module = modules[i];
-                if (module == null || !visited.Add(module)) continue;
-
-                RepairModule(module, mSourceField, mBlackboardField, generateMethod, bf, visited);
-            }
-        }
-
-        private void RepairModule(object module, System.Reflection.FieldInfo mSourceField, System.Reflection.FieldInfo mBlackboardField, System.Reflection.MethodInfo generateMethod, System.Reflection.BindingFlags bf, HashSet<object> visited)
-        {
-            // 1. Recurse into module's own graph field if it exists
-            var subGraphField = module.GetType().GetField("Graph", bf);
-            if (subGraphField != null)
-            {
-                var subGraph = subGraphField.GetValue(module) as BehaviorGraph;
-                if (subGraph != null)
-                {
-                    RepairGraphRecursive(subGraph, bf, visited);
-                }
-            }
-
-            // 2. Repair this module's blackboard
-            var bbRefField = module.GetType().GetField("BlackboardReference", bf);
-            if (bbRefField != null)
-            {
-                var bbRef = bbRefField.GetValue(module);
-                if (bbRef != null && mSourceField != null && mBlackboardField != null && generateMethod != null)
-                {
-                    var source = mSourceField.GetValue(bbRef);
-                    var blackboard = mBlackboardField.GetValue(bbRef) as Unity.Behavior.Blackboard;
-                    if (source != null && blackboard != null)
-                    {
-                        if (blackboard.Variables.Count == 0)
-                        {
-                            var sourceBB = source.GetType().GetProperty("Blackboard", bf)?.GetValue(source) as Unity.Behavior.Blackboard;
-                            if (sourceBB != null && sourceBB.Variables.Count > 0)
-                            {
-                                generateMethod.Invoke(blackboard, new object[] { sourceBB, source });
-                            }
-                        }
-
-                        Animator animator = GetComponentInChildren<Animator>(true);
-                        foreach (var variable in blackboard.Variables)
-                        {
-                            if (variable.Name == BlackboardConstants.SELF || variable.Name == "Agent")
-                                variable.ObjectValue = gameObject;
-                            else if (variable.Name == BlackboardConstants.UNIT)
-                                variable.ObjectValue = this;
-                            else if (variable.Name == "Animator" || (string.IsNullOrEmpty(variable.Name) && variable.Type == typeof(Animator)))
-                                variable.ObjectValue = animator;
-                        }
-                    }
-                }
-            }
-
-            // 3. Traverse all nodes in the module starting from Root
-            var rootField = module.GetType().GetField("Root", bf);
-            if (rootField != null)
-            {
-                var root = rootField.GetValue(module);
-                if (root != null)
-                {
-                    TraverseNodesRecursive(root, bf, visited);
-                }
-            }
-            
-            // Fallback: some versions might still use m_Nodes
-            var nodesField = module.GetType().GetField("m_Nodes", bf);
-            if (nodesField != null)
-            {
-                var nodes = nodesField.GetValue(module) as System.Collections.IList;
-                if (nodes != null)
-                {
-                    foreach (var node in nodes) TraverseNodesRecursive(node, bf, visited);
-                }
-            }
-        }
-
-        private void TraverseNodesRecursive(object node, System.Reflection.BindingFlags bf, HashSet<object> visited)
-        {
-            if (node == null || !visited.Add(node)) return;
-
-            // Inject animator into this node
-            Animator animator = GetComponentInChildren<Animator>(true);
-            InjectAnimatorIntoNode(node, animator, bf);
-
-            // Recurse into children
-            // Composite: m_Children
-            var childrenField = node.GetType().GetField("m_Children", bf);
-            if (childrenField != null)
-            {
-                var children = childrenField.GetValue(node) as System.Collections.IEnumerable;
-                if (children != null)
-                {
-                    foreach (var child in children) TraverseNodesRecursive(child, bf, visited);
-                }
-            }
-
-            // Modifier/Decorator/Join: m_Child
-            var childField = node.GetType().GetField("m_Child", bf);
-            if (childField != null)
-            {
-                TraverseNodesRecursive(childField.GetValue(node), bf, visited);
-            }
-
-            // Branching: True, False
-            var trueField = node.GetType().GetField("True", bf);
-            if (trueField != null) TraverseNodesRecursive(trueField.GetValue(node), bf, visited);
-            var falseField = node.GetType().GetField("False", bf);
-            if (falseField != null) TraverseNodesRecursive(falseField.GetValue(node), bf, visited);
-
-            // Check for Subgraph references in nodes (e.g. RunSubgraph)
-            var subgraphField = node.GetType().GetField("Subgraph", bf);
-            if (subgraphField == null) subgraphField = node.GetType().GetField("m_Subgraph", bf);
-            if (subgraphField != null)
-            {
-                var subgraph = subgraphField.GetValue(node);
-                if (subgraph != null)
-                {
-                    // If it's a BehaviorGraph, recurse
-                    if (subgraph is BehaviorGraph bg)
-                    {
-                        RepairGraphRecursive(bg, bf, visited);
-                    }
-                    else
-                    {
-                        // If it's a module, repair it
-                        RepairModule(subgraph, null, null, null, bf, visited);
-                    }
-                }
-            }
-        }
-
-        private void InjectAnimatorIntoNode(object node, Animator animator, System.Reflection.BindingFlags bf)
-        {
-            if (node == null) return;
-
-            foreach (var field in node.GetType().GetFields(bf))
-            {
-                var fieldValue = field.GetValue(node);
-                if (fieldValue == null) continue;
-
-                // Handle Animator fields
-                if (field.FieldType == typeof(Animator))
-                {
-                    if (animator != null) field.SetValue(node, animator);
-                }
-                else 
-                {
-                    // Handle BlackboardVariable<Animator> or subclasses
-                    var objValProp = fieldValue.GetType().GetProperty("ObjectValue", bf);
-                    if (objValProp != null)
-                    {
-                        // Special handling for GameObjectToComponentBlackboardVariable
-                        if (fieldValue.GetType().Name.Contains("GameObjectToComponentBlackboardVariable"))
-                        {
-                            var linkedVarField = fieldValue.GetType().GetField("m_LinkedVariable", bf);
-                            if (linkedVarField != null)
-                            {
-                                var linkedVar = linkedVarField.GetValue(fieldValue);
-                                if (linkedVar != null)
-                                {
-                                    var linkedObjValProp = linkedVar.GetType().GetProperty("ObjectValue", bf);
-                                    if (linkedObjValProp != null)
-                                    {
-                                        linkedObjValProp.SetValue(linkedVar, gameObject);
-                                    }
-                                }
-                            }
-                        }
-                        else if (animator != null)
-                        {
-                            try { objValProp.SetValue(fieldValue, animator); } catch {}
-                        }
-                    }
-                    else
-                    {
-                        var valField = fieldValue.GetType().GetField("m_Value", bf);
-                        if (valField != null && valField.FieldType == typeof(Animator) && animator != null)
-                        {
-                            valField.SetValue(fieldValue, animator);
-                        }
-                    }
-                }
-            }
-        }
-
         private float lastNavMeshSampleTime = 0f;
-        private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
+private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
         private bool hasFirstFrameRepair = false;
 
         protected virtual void Update()
@@ -373,12 +140,11 @@ protected UnitSO unitSO;
             if (!hasFirstFrameRepair)
             {
                 hasFirstFrameRepair = true;
-                RepairBlackboards();
                 ReapplyCoreBlackboardVariables();
             }
 
             if (Agent != null && Agent.isActiveAndEnabled && !Agent.isOnNavMesh)
-            {
+{
                 if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
                 {
                     lastNavMeshSampleTime = Time.time;
@@ -388,6 +154,11 @@ protected UnitSO unitSO;
                         Agent.Warp(hit.position);
                     }
                 }
+            }
+            else if (Agent != null && !Agent.enabled)
+            {
+                // Force enable if it's currently disabled, to allow it to find the NavMesh
+                Agent.enabled = true;
             }
 
             if (this is Worker)
@@ -563,10 +334,9 @@ protected UnitSO unitSO;
                 try
                 {
                     graphAgent.Restart();
-                    RepairBlackboards();
                     ReapplyCoreBlackboardVariables();
                 }
-                catch (System.Exception ex)
+catch (System.Exception ex)
                 {
                     Debug.LogError($"[Command Queue] Failed to restart behavior graph: {ex.Message}");
                 }

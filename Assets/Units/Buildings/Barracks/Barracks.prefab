@@ -137,9 +137,8 @@ MonoBehaviour:
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
   <AvailableCommands>k__BackingField:
-  - {fileID: 11400000, guid: b52e644dd3b5a564abc2f7e477be148b, type: 2}
-  - {fileID: 11400000, guid: 8258cb2e05e86f348b76da1f7d531b3a, type: 2}
   - {fileID: 11400000, guid: 2e1eb4965418920b8a032e3883db6b3c, type: 2}
+  - {fileID: 11400000, guid: 2ebe41fb690ef785d99032c25551defa, type: 2}
   - {fileID: 11400000, guid: 3ef62f1f947fc5df5a509360e9c4e637, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: 88f39542ca9a1044296b78a2433d8468, type: 2}
   decalProjector: {fileID: 471924771103042942}

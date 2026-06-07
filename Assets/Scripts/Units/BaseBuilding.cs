@@ -394,10 +394,17 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                     }
                     else
                     {
-                        // // Debug.LogWarning($"[BaseBuilding] Could not find NavMesh for type {agentTypeID} near spawn position {spawnPosition} for unit {unitSO.Name}. Using fallback spread at flight height.");
                         // CRITICAL: Ensure the fallback spawn position is at the flight height for Air units
                         // so they are close enough to the Air NavMesh even if SamplePosition fails.
-                        spawnPosition = transform.position + offset;
+                        // Air Units have agentTypeID -1372625422 and standard flight height is 4.0
+                        if (agentTypeID == -1372625422)
+                        {
+                            spawnPosition = transform.position + offset + Vector3.up * 4f;
+                        }
+                        else
+                        {
+                            spawnPosition = transform.position + offset;
+                        }
                     }
 
                     GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);

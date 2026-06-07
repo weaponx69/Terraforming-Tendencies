@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 4513789493482001354}
   - component: {fileID: 3537037588988181313}
   - component: {fileID: 7493487029972600118}
-  - component: {fileID: 7472523534976717076}
+  - component: {fileID: 1755862998352305377}
   m_Layer: 6
   m_Name: Rifleman Drone
   m_TagString: Untagged
@@ -39,6 +39,7 @@ Transform:
   - {fileID: 8344611239148268380}
   - {fileID: 8259877147178603718}
   - {fileID: 8537540698754497745}
+  - {fileID: 485181318421434821}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!195 &682723972030030453
@@ -55,7 +56,7 @@ NavMeshAgent:
   m_Acceleration: 20
   avoidancePriority: 0
   m_AngularSpeed: 360
-  m_StoppingDistance: 0.25
+  m_StoppingDistance: 0.5
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
@@ -155,7 +156,7 @@ MonoBehaviour:
   references:
     version: 2
     RefIds: []
---- !u!114 &7472523534976717076
+--- !u!114 &1755862998352305377
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -164,21 +165,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 533002393341905087}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0e5e7b2deed511440a662e463b9372bd, type: 3}
+  m_Script: {fileID: 11500000, guid: abcb3b75f2e2d2ffaaeefa8c7d7baa72, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BaseMilitaryUnit
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.MeteorWarriorDrone
   <IsSelected>k__BackingField: 0
   <CurrentHealth>k__BackingField: 0
   <MaxHealth>k__BackingField: 0
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
-  <AvailableCommands>k__BackingField: []
+  <AvailableCommands>k__BackingField:
+  - {fileID: 11400000, guid: 5b88f1c2df63cea41a0b8cd466334886, type: 2}
+  - {fileID: 11400000, guid: 84c8d4cd8863b1244994c4ca7b8d09a6, type: 2}
+  - {fileID: 11400000, guid: 9d6e954ce0a9a934492a858213ad680e, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: f79f6defe4af0aac49d77f21549a20d8, type: 2}
   decalProjector: {fileID: 0}
   VisionTransform: {fileID: 0}
   <AttackingParticleSystem>k__BackingField: {fileID: 0}
-  DamageableSensor: {fileID: 0}
+  DamageableSensor: {fileID: 8875722071373798474}
   statusShader: {fileID: 0}
+  prioritizeMeteors: 1
 --- !u!1 &1696189794077745545
 GameObject:
   m_ObjectHideFlags: 0
@@ -5022,7 +5027,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 0}
+  - {fileID: 2100000, guid: 2d246e8b6569d865494df8eb350c3183, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -5076,6 +5081,79 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!1001 &5454773637043552512
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 5510372144328046617}
+    m_Modifications:
+    - target: {fileID: 1931094961596098796, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_Name
+      value: Rifleman
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 4.917149
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -8.777286
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+--- !u!4 &485181318421434821 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5550838747094831301, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+  m_PrefabInstance: {fileID: 5454773637043552512}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8875722071373798474 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3503758222440914250, guid: 89fa1dbd1317d914a9727e0841043e2c, type: 3}
+  m_PrefabInstance: {fileID: 5454773637043552512}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6f41716982c3304eb51f846ddaf1f3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &5532737757913321018
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5139,7 +5217,7 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: fc4b6195552128c49a48de7801e0e7b7, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: b35c532178876e94f917ff0196f65258, type: 2}
+      objectReference: {fileID: 2100000, guid: 342fdda0f168642ee9f32daf9f3fb934, type: 2}
     - target: {fileID: -7511558181221131132, guid: fc4b6195552128c49a48de7801e0e7b7, type: 3}
       propertyPath: 'm_Materials.Array.data[2]'
       value: 
