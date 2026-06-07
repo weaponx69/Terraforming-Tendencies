@@ -106,6 +106,13 @@ protected UnitSO unitSO;
 
         protected override void Start()
         {
+            if (UnitSO == null)
+            {
+                Debug.LogError($"[AbstractUnit] UnitSO is NULL on GameObject '{gameObject.name}'! This will cause crashes. Destroying unit.", gameObject);
+                Destroy(gameObject);
+                return;
+            }
+
             CurrentHealth = UnitSO.Health;
             MaxHealth = UnitSO.Health;
 

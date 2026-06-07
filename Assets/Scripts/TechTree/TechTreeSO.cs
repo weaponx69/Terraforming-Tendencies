@@ -92,6 +92,8 @@ namespace GameDevTV.RTS.TechTree
 
         private void HandleUnitDeath(UnitDeathEvent evt)
         {
+            if (evt.Unit == null || evt.Unit.UnitSO == null) return;
+
             foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
             {
                 keyValuePair.Value.LoseDependency(evt.Unit.UnitSO);
