@@ -65,7 +65,7 @@ namespace GameDevTV.RTS.Behavior
 
         protected override Status OnUpdate()
         {
-            if (animator != null)
+            if (animator != null && HasParameter(animator, AnimationConstants.SPEED))
             {
                 animator.SetFloat(AnimationConstants.SPEED, agent.velocity.magnitude);
             }
@@ -127,10 +127,20 @@ namespace GameDevTV.RTS.Behavior
 
         protected override void OnEnd()
         {
-            if (animator != null)
+            if (animator != null && HasParameter(animator, AnimationConstants.SPEED))
             {
                 animator.SetFloat(AnimationConstants.SPEED, 0);
             }
+        }
+
+        private bool HasParameter(Animator animator, int parameterHash)
+        {
+            if (animator == null || animator.runtimeAnimatorController == null) return false;
+            foreach (AnimatorControllerParameter param in animator.parameters)
+            {
+                if (param.nameHash == parameterHash) return true;
+            }
+            return false;
         }
 
         private Vector3 GetTargetPosition()

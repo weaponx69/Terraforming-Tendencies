@@ -33,13 +33,21 @@ namespace GameDevTV.RTS.Units
 
             // Get the list of nearby enemies from the sensor
             var sensor = GetComponentInChildren<DamageableSensor>();
-            if (sensor == null || sensor.Damageables.Count == 0) return;
+            if (sensor == null) return;
 
             List<IDamageable> targets = sensor.Damageables;
-            
+            if (targets == null || targets.Count == 0) return;
+
+            // Remove any null or destroyed entries before sorting
+            targets.RemoveAll(t => t == null || t.Transform == null);
+            if (targets.Count == 0) return;
+
             // Sort: NaturalEventImpact (Meteors) first, then by distance
             targets.Sort((a, b) =>
             {
+                if (a == null || a.Transform == null) return 1;
+                if (b == null || b.Transform == null) return -1;
+
                 bool aIsMeteor = a.Transform.GetComponent<NaturalEventImpact>() != null;
                 bool bIsMeteor = b.Transform.GetComponent<NaturalEventImpact>() != null;
 
@@ -52,11 +60,16 @@ namespace GameDevTV.RTS.Units
             });
 
             // Update the blackboard with the prioritized list
-            List<GameObject> sortedEnemies = targets.ConvertAll(t => t.Transform.gameObject);
+            List<GameObject> sortedEnemies = new List<GameObject>();
+            foreach (var t in targets)
+            {
+                if (t != null && t.Transform != null) sortedEnemies.Add(t.Transform.gameObject);
+            }
+
             graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, sortedEnemies);
 
             // Target Selection Logic
-            if (graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVar))
+            if (sortedEnemies.Count > 0 && graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVar))
             {
                 GameObject currentTarget = targetVar.Value;
                 
@@ -68,7 +81,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 // If our current target is NOT a meteor, check if there is a meteor we should switch to
-                bool currentIsMeteor = currentTarget.GetComponent<NaturalEventImpact>() != null;
+                bool currentIsMeteor = currentTarget != null && currentTarget.GetComponent<NaturalEventImpact>() != null;
                 if (!currentIsMeteor)
                 {
                     bool bestIsMeteor = sortedEnemies[0].GetComponent<NaturalEventImpact>() != null;
@@ -78,6 +91,6 @@ namespace GameDevTV.RTS.Units
                     }
                 }
             }
+        }
 }
-    }
 }

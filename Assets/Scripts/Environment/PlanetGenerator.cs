@@ -160,11 +160,18 @@ namespace GameDevTV.RTS.Environment
                     int mask = ~0;
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
                     int suppliesLayer = LayerMask.NameToLayer("Supplies");
+                    int transparentLayer = LayerMask.NameToLayer("TransparentFX");
                 
                     // Exclude buildings from static bake (they use NavMeshObstacles)
                     if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
                     // Air units ignore supplies on the ground
                     if (isAirAgent && suppliesLayer != -1) mask &= ~(1 << suppliesLayer);
+                    // CRITICAL: The FlyZone elevated geometry (used to bake the Air NavMesh at Y=4)
+                    // lives on the TransparentFX layer. It must NOT contaminate the GROUND bake,
+                    // otherwise a phantom walkable surface is created at flight height and
+                    // buildings/units snap upward into the air. The air surface uses
+                    // collectObjects=Children so it still bakes the FlyZone correctly.
+                    if (!isAirAgent && transparentLayer != -1) mask &= ~(1 << transparentLayer);
                 
                     surface.layerMask = mask;
                     surface.BuildNavMesh();

@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31030474969b5904c9aac6865b1a9d6d, type: 3}
   m_Name: GrenadierDrone_AttackConfig
   m_EditorClassIdentifier: 
-  <AttackRange>k__BackingField: 6
+  <AttackRange>k__BackingField: 15
   <AttackDelay>k__BackingField: 2
   <Damage>k__BackingField: 25
-  <HasProjectileAttacks>k__BackingField: 1
+  <HasProjectileAttacks>k__BackingField: 0
   <IsAreaOfEffect>k__BackingField: 1
   <AreaOfEffectRadius>k__BackingField: 3
   <MaxEnemiesHitPerAttack>k__BackingField: 5

@@ -77,7 +77,7 @@ namespace GameDevTV.RTS.Units
         {
             foreach(IDamageable damageable in allDamageables)
             {
-                if (damageable.Transform.TryGetComponent(out IHideable hideable))
+                if (damageable != null && damageable.Transform != null && damageable.Transform.TryGetComponent(out IHideable hideable))
                 {
                     hideable.OnVisibilityChanged -= HandleVisibilityChange;
                 }
@@ -87,7 +87,11 @@ namespace GameDevTV.RTS.Units
 
         private void HandleVisibilityChange(IHideable hideable, bool isVisible)
         {
+            if (hideable == null || hideable.Transform == null) return;
+
             IDamageable damageable = hideable.Transform.GetComponent<IDamageable>();
+            if (damageable == null) return;
+
             if (isVisible)
             {
                 visibleDamageables.Add(damageable);
@@ -108,9 +112,14 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        public void SetupFromRange(float range)
+        {
+            sphereCollider.radius = range;
+        }
+
         public void SetupFrom(AttackConfigSO attackConfig)
         {
             sphereCollider.radius = attackConfig.AttackRange;
         }
-    }
+}
 }

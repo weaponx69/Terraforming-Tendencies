@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31030474969b5904c9aac6865b1a9d6d, type: 3}
   m_Name: RiflemanDrone_AttackConfig
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.AttackConfigSO
-  <AttackRange>k__BackingField: 7
+  <AttackRange>k__BackingField: 20
   <AttackDelay>k__BackingField: 0.6
   <Damage>k__BackingField: 10
   <HasProjectileAttacks>k__BackingField: 0

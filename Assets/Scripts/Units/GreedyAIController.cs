@@ -749,9 +749,13 @@ if (SectorManager.Instance != null)
             // 1. Establish the actual ground height via Physics Raycast.
             // This prevents picking the Air NavMesh (Y=4) if the Ground NavMesh isn't baked at that specific spot.
             Ray ray = new Ray(position + Vector3.up * 50f, Vector3.down);
+            bool hasGroundHeight = false;
+            float groundY = position.y;
             if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
             {
                 position = groundHit.point;
+                groundY = groundHit.point.y;
+                hasGroundHeight = true;
             }
 
             // 2. Align to the Humanoid (Ground) NavMesh for valid placement.
@@ -759,6 +763,9 @@ if (SectorManager.Instance != null)
             if (NavMesh.SamplePosition(position, out NavMeshHit navHit, 20f, filter))
             {
                 position = navHit.position;
+                // Defensive: never let the NavMesh sample lift the building off the ground.
+                // (A phantom air-height NavMesh sample must not make the command center hover.)
+                if (hasGroundHeight) position.y = groundY;
             }
 
             if (immediate)

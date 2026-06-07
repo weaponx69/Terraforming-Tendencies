@@ -46,11 +46,11 @@ namespace GameDevTV.RTS.Behavior
                 enemyColliders = new Collider[AttackConfig.Value.MaxEnemiesHitPerAttack];
             }
 
-            if (!NearbyEnemies.Value.Contains(Target.Value))
+            if (!IsInRange())
             {
                 navMeshAgent.SetDestination(targetTransform.position);
                 navMeshAgent.isStopped = false;
-                if (animator != null)
+                if (animator != null && HasParameter(animator, AnimationConstants.ATTACK))
                 {
                     animator.SetBool(AnimationConstants.ATTACK, false);
                 }
@@ -67,20 +67,42 @@ namespace GameDevTV.RTS.Behavior
         {
             if (Target.Value == null || targetDamageable.CurrentHealth == 0) return Status.Success;
 
-            if (animator != null)
+            if (animator != null && HasParameter(animator, AnimationConstants.SPEED))
             {
                 animator.SetFloat(AnimationConstants.SPEED, navMeshAgent.velocity.magnitude);
             }
 
-            if (!NearbyEnemies.Value.Contains(Target.Value))
+            if (!IsInRange())
             {
+                // Update destination if target moves
+                Vector3 targetPos = targetTransform.position;
+                // Only update if target has moved significantly from current destination (horizontal distance)
+                Vector2 dest2D = new Vector2(navMeshAgent.destination.x, navMeshAgent.destination.z);
+                Vector2 target2D = new Vector2(targetPos.x, targetPos.z);
+
+                if (navMeshAgent.enabled && navMeshAgent.isOnNavMesh)
+                {
+                    if (Vector2.Distance(dest2D, target2D) > 2f)
+                    {
+                        navMeshAgent.SetDestination(targetPos);
+                    }
+                    navMeshAgent.isStopped = false;
+                }
+                
+                if (animator != null && HasParameter(animator, AnimationConstants.ATTACK))
+                {
+                    animator.SetBool(AnimationConstants.ATTACK, false);
+                }
                 return Status.Running;
             }
 
-            navMeshAgent.isStopped = true;
+            if (navMeshAgent.enabled && navMeshAgent.isOnNavMesh)
+            {
+                navMeshAgent.isStopped = true;
+            }
             LookAtTarget();
 
-            if (animator != null)
+            if (animator != null && HasParameter(animator, AnimationConstants.ATTACK))
             {
                 animator.SetBool(AnimationConstants.ATTACK, true);
             }
@@ -93,8 +115,16 @@ namespace GameDevTV.RTS.Behavior
             return Status.Running;
         }
 
-        private void LookAtTarget()
+        private bool IsInRange()
         {
+            if (Target.Value == null) return false;
+            float distSq = (targetTransform.position - selfTransform.position).sqrMagnitude;
+            float range = AttackConfig.Value.AttackRange;
+            return distSq <= (range * range) + 2.0f; // Add small buffer
+        }
+
+        private void LookAtTarget()
+{
             Quaternion lookRotation = Quaternion.LookRotation(
                 (targetTransform.position - selfTransform.position).normalized,
                 Vector3.up
@@ -145,7 +175,7 @@ namespace GameDevTV.RTS.Behavior
 
         protected override void OnEnd()
         {
-            if (animator != null)
+            if (animator != null && HasParameter(animator, AnimationConstants.ATTACK))
             {
                 animator.SetBool(AnimationConstants.ATTACK, false);
             }
@@ -155,8 +185,18 @@ namespace GameDevTV.RTS.Behavior
             }
         }
 
+        private bool HasParameter(Animator animator, int parameterHash)
+        {
+            if (animator == null || animator.runtimeAnimatorController == null) return false;
+            foreach (AnimatorControllerParameter param in animator.parameters)
+            {
+                if (param.nameHash == parameterHash) return true;
+            }
+            return false;
+        }
+
         private bool HasValidInputs() => Self.Value != null && Self.Value.TryGetComponent(out NavMeshAgent _)
-            && Self.Value.TryGetComponent(out AbstractUnit _)
+&& Self.Value.TryGetComponent(out AbstractUnit _)
             && Target.Value != null && Target.Value.TryGetComponent(out IDamageable _)
             && AttackConfig.Value != null && NearbyEnemies.Value != null;
     }

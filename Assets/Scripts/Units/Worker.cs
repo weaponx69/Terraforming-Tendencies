@@ -74,10 +74,6 @@ namespace GameDevTV.RTS.Units
             // Fix: Set every possible name the BT might use for the local unit
             if (graphAgent != null)
             {
-                graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
-                graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
-                graphAgent.SetVariableValue("Agent", gameObject);
-
                 // Ensure event channels are loaded into the blackboard
                 LoadEventChannels();
             }

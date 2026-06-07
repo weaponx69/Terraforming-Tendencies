@@ -24,6 +24,7 @@ namespace GameDevTV.RTS.Units
         public bool IsIdle => GetCurrentCommand() == UnitCommands.Stop;
         protected BehaviorGraphAgent graphAgent;
 protected UnitSO unitSO;
+        protected UnitCommands currentCommand = UnitCommands.Stop;
 
         private static int nextUnitId = 1;
         public int UnitID { get; private set; }
@@ -68,6 +69,8 @@ protected UnitSO unitSO;
                 {
                     graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject);
                     graphAgent.SetVariableValue(BlackboardConstants.UNIT, this);
+                    graphAgent.SetVariableValue(BlackboardConstants.COMMAND, currentCommand);
+                    graphAgent.SetVariableValue("Agent", gameObject);
 
                     Animator animator = GetComponentInChildren<Animator>();
                     graphAgent.SetVariableValue("Animator", animator);
@@ -117,7 +120,18 @@ protected UnitSO unitSO;
                 DamageableSensor.OnUnitEnter += HandleUnitEnter;
                 DamageableSensor.OnUnitExit += HandleUnitExit;
                 DamageableSensor.Owner = Owner;
-                DamageableSensor.SetupFrom(unitSO.AttackConfig);
+
+                // Use a larger detection range for drones to see meteors earlier.
+                // Combat drones have "Drone" in their name or use MeteorWarriorDrone script.
+                float detectionRange = unitSO.AttackConfig != null ? unitSO.AttackConfig.AttackRange : 15f;
+                bool isCombatDrone = this is MeteorWarriorDrone || name.Contains("Drone");
+                
+                if (isCombatDrone)
+                {
+                    detectionRange = Mathf.Max(detectionRange, 60f); 
+                }
+                
+                DamageableSensor.SetupFromRange(detectionRange);
             }
 
             foreach(UpgradeSO upgrade in unitSO.Upgrades)
@@ -135,29 +149,37 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
         protected virtual void Update()
         {
-            // One-shot: re-inject Animator into the behavior graph on the first Update,
-            // after BehaviorGraphAgent has fully initialized its graph (which happens in its own Start).
-            if (!hasFirstFrameRepair)
+            // Initialization check for blackboard
+            if (graphAgent != null && graphAgent.isActiveAndEnabled)
             {
-                hasFirstFrameRepair = true;
-                ReapplyCoreBlackboardVariables();
+                if (!hasFirstFrameRepair)
+                {
+                    if (graphAgent.SetVariableValue(BlackboardConstants.SELF, gameObject))
+                    {
+                        hasFirstFrameRepair = true;
+                        ReapplyCoreBlackboardVariables();
+                        graphAgent.Restart();
+                    }
+                }
             }
 
-            if (Agent != null && Agent.isActiveAndEnabled && !Agent.isOnNavMesh)
-{
-                if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
+            if (Agent != null && Agent.isActiveAndEnabled)
+            {
+                if (!Agent.isOnNavMesh)
                 {
-                    lastNavMeshSampleTime = Time.time;
-                    NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas };
-                    if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 15f, filter))
+                    if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
                     {
-                        Agent.Warp(hit.position);
+                        lastNavMeshSampleTime = Time.time;
+                        // Use a broad sample range to find the ground navmesh
+                        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 25f, new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas }))
+                        {
+                            Agent.Warp(hit.position);
+                        }
                     }
                 }
             }
             else if (Agent != null && !Agent.enabled)
             {
-                // Force enable if it's currently disabled, to allow it to find the NavMesh
                 Agent.enabled = true;
             }
 
@@ -310,6 +332,7 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
         public void SetCurrentCommand(UnitCommands cmd)
         {
+            currentCommand = cmd;
             if (graphAgent == null) return;
 
             // Primary: typed SetVariableValue
@@ -336,7 +359,7 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
                     graphAgent.Restart();
                     ReapplyCoreBlackboardVariables();
                 }
-catch (System.Exception ex)
+                catch (System.Exception ex)
                 {
                     Debug.LogError($"[Command Queue] Failed to restart behavior graph: {ex.Message}");
                 }
@@ -441,7 +464,8 @@ catch (System.Exception ex)
         {
             List<GameObject> nearbyEnemies = SetNearbyEnemiesOnBlackboard();
 
-            if (!graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVariable)
+            if (damageable == null || damageable.Transform == null || 
+                !graphAgent.GetVariable(BlackboardConstants.TARGET_GAME_OBJECT, out BlackboardVariable<GameObject> targetVariable)
                 || damageable.Transform.gameObject != targetVariable.Value) return;
 
             if (nearbyEnemies.Count > 0)
@@ -451,14 +475,24 @@ catch (System.Exception ex)
             else
             {
                 graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
-                graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, damageable.Transform.position);
+                if (damageable.Transform != null)
+                {
+                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, damageable.Transform.position);
+                }
             }
         }
 
         private List<GameObject> SetNearbyEnemiesOnBlackboard()
         {
-            List<GameObject> nearbyEnemies = DamageableSensor.Damageables
-                            .ConvertAll(damageable => damageable.Transform.gameObject);
+            List<GameObject> nearbyEnemies = new List<GameObject>();
+            foreach (var d in DamageableSensor.Damageables)
+            {
+                if (d != null && d.Transform != null)
+                {
+                    nearbyEnemies.Add(d.Transform.gameObject);
+                }
+            }
+
             nearbyEnemies.Sort(new ClosestGameObjectComparer(transform.position));
 
             graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, nearbyEnemies);
