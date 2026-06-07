@@ -166,6 +166,14 @@ protected UnitSO unitSO;
 private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
         private bool hasFirstFrameRepair = false;
 
+        // Direct-drive movement. The embedded behavior-graph "Move" sub-graph binds its
+        // movement/stop actions to a sub-graph-local "Self"/"Agent" variable that never
+        // receives the live value from the parent blackboard, so SetDestination is never
+        // called by the graph. For explicit Move commands we drive the NavMeshAgent
+        // directly here, which is reliable and verified on the NavMesh.
+        private bool hasDirectMoveTarget;
+        private Vector3 directMoveTarget;
+
         protected virtual void Update()
         {
             // Initialization check for blackboard
@@ -200,6 +208,24 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
             else if (Agent != null && !Agent.enabled)
             {
                 Agent.enabled = true;
+            }
+
+            // Maintain direct-drive movement for explicit Move commands.
+            if (hasDirectMoveTarget && Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+            {
+                if (!Agent.pathPending)
+                {
+                    if (Agent.hasPath && Agent.remainingDistance <= Mathf.Max(Agent.stoppingDistance, 0.5f))
+                    {
+                        hasDirectMoveTarget = false; // arrived
+                    }
+                    else if (!Agent.hasPath)
+                    {
+                        // Path was lost or not yet assigned — (re)assert the destination.
+                        Agent.isStopped = false;
+                        Agent.SetDestination(directMoveTarget);
+                    }
+                }
             }
 
             if (this is Worker)
@@ -441,18 +467,60 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
             graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, position);
             graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
             SetCurrentCommand(UnitCommands.Move);
+            DriveAgentTo(position);
         }
 
         public void MoveTo(Transform transform)
         {
             graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, transform.gameObject);
             SetCurrentCommand(UnitCommands.Move);
+            DriveAgentTo(transform.position);
         }
 
         public virtual void Stop()
         {
+            ClearDirectMove();
+            if (Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+            {
+                Agent.ResetPath();
+            }
             SetCommandOverrides(null);
             SetCurrentCommand(UnitCommands.Stop);
+        }
+
+        /// <summary>
+        /// Directly drives the NavMeshAgent toward a world position. Used for explicit
+        /// Move commands because the embedded behavior-graph move sub-graph never receives
+        /// its Agent binding and therefore never calls SetDestination.
+        /// </summary>
+        protected void DriveAgentTo(Vector3 worldPosition)
+        {
+            if (Agent == null) return;
+
+            Vector3 dest = worldPosition;
+            NavMeshQueryFilter filter = new NavMeshQueryFilter
+            {
+                agentTypeID = Agent.agentTypeID,
+                areaMask = NavMesh.AllAreas
+            };
+            if (NavMesh.SamplePosition(worldPosition, out NavMeshHit hit, 25f, filter))
+            {
+                dest = hit.position;
+            }
+
+            directMoveTarget = dest;
+            hasDirectMoveTarget = true;
+
+            if (Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+            {
+                Agent.isStopped = false;
+                Agent.SetDestination(dest);
+            }
+        }
+
+        protected void ClearDirectMove()
+        {
+            hasDirectMoveTarget = false;
         }
 
         public void Attack(IDamageable damageable)
