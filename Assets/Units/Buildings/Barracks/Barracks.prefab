@@ -51,11 +51,16 @@ MonoBehaviour:
   m_EndAngleFade: 180
   m_UVScale: {x: 1, y: 1}
   m_UVBias: {x: 0, y: 0}
-  m_DecalLayerMask: 2
+  m_RenderingLayerMask:
+    serializedVersion: 0
+    m_Bits: 2
   m_ScaleMode: 0
   m_Offset: {x: 0, y: 0, z: 4}
   m_Size: {x: 4, y: 4, z: 8}
   m_FadeFactor: 1
+  m_VisibleInScene: 1
+  version: 1
+  m_DecalLayerMask: 2
 --- !u!1 &5827066523746683823
 GameObject:
   m_ObjectHideFlags: 0
@@ -130,9 +135,12 @@ MonoBehaviour:
   <CurrentHealth>k__BackingField: 0
   <MaxHealth>k__BackingField: 0
   <Owner>k__BackingField: 0
+  <IsVisible>k__BackingField: 1
   <AvailableCommands>k__BackingField:
   - {fileID: 11400000, guid: b52e644dd3b5a564abc2f7e477be148b, type: 2}
   - {fileID: 11400000, guid: 8258cb2e05e86f348b76da1f7d531b3a, type: 2}
+  - {fileID: 11400000, guid: 2e1eb4965418920b8a032e3883db6b3c, type: 2}
+  - {fileID: 11400000, guid: 3ef62f1f947fc5df5a509360e9c4e637, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: 88f39542ca9a1044296b78a2433d8468, type: 2}
   decalProjector: {fileID: 471924771103042942}
   VisionTransform: {fileID: 7812053062812452437}
@@ -141,7 +149,7 @@ MonoBehaviour:
   <MainRenderer>k__BackingField: {fileID: 254357829607820714}
   <Progress>k__BackingField:
     <StartTime>k__BackingField: 0
-    <Progress>k__BackingField: 0
+    <Completion>k__BackingField: 1
     <State>k__BackingField: 3
   <BuildingSO>k__BackingField: {fileID: 0}
   primaryMaterial: {fileID: 2100000, guid: b35c532178876e94f917ff0196f65258, type: 2}

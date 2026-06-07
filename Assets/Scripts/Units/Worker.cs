@@ -83,8 +83,26 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        private void LoadEventChannels()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
+
+            if (gatherEventChannel != null)
+            {
+                gatherEventChannel.Event -= HandleGatherSupplies;
+            }
+
+            if (graphAgent != null && graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
+            {
+                if (buildEvt.Value != null)
+                {
+                    buildEvt.Value.Event -= HandleBuildingEvent;
+                }
+            }
+        }
+
+        private void LoadEventChannels()
+{
             if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> gatherEvt))
             {
                 if (gatherEvt.Value == null) gatherEvt.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
@@ -297,12 +315,11 @@ namespace GameDevTV.RTS.Units
 
         private void HandleGatherSupplies(GameObject self, int amount, SupplySO supply)
         {
-            if (self != gameObject) 
+            if (this == null || gameObject == null || self != gameObject) 
             {
-                // // // Debug.Log($"[Worker] {name} ignoring event for {self?.name ?? "null"}");
                 return; 
             }
-            
+
             if (supply == null)
             {
                 // // Debug.LogWarning($"HandleGatherSupplies called with null supply. Owner={Owner}, Self={(self != null ? self.name : "null")}, Amount={amount}");

@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 64e8d7b8cbe0b3cb7b9d4322ee3b5cd3, type: 3}
   m_Name: Repair
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Commands.RepairCommand
-  <Name>k__BackingField: Command
+  <Name>k__BackingField: Repair
   <Icon>k__BackingField: {fileID: 0}
-  <Slot>k__BackingField: 0
+  <Slot>k__BackingField: 4
   <RequiresClickToActivate>k__BackingField: 1
   <IsSingleUnitCommand>k__BackingField: 0
   <GhostPrefab>k__BackingField: {fileID: 0}

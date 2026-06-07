@@ -172,10 +172,10 @@ namespace GameDevTV.RTS.Units
                     repairTimer += Time.deltaTime;
                     if (repairTimer >= 0.5f) // Repair tick rate
                     {
-                        target.Heal(2); // Heal per tick
+                        target.Heal(10); // Heal per tick (20 health per second)
                         repairTimer = 0f;
                     }
-                    
+
                     if (Vector3.Distance(transform.position, target.transform.position) > agent.stoppingDistance + 2f)
                     {
                         break; 
