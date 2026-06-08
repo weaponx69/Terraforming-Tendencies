@@ -26,7 +26,14 @@ namespace GameDevTV.RTS.UI.Containers
             building.OnQueueUpdated += HandleQueueUpdated;
             SetupUnitButtons();
 
-            buildCoroutine = StartCoroutine(UpdateUnitProgress());
+            if (building.QueueSize > 0)
+            {
+                buildCoroutine = StartCoroutine(UpdateUnitProgress());
+            }
+            else
+            {
+                buildCoroutine = null;
+            }
         }
 
         private void SetupUnitButtons()
@@ -51,12 +58,16 @@ namespace GameDevTV.RTS.UI.Containers
             }
             gameObject.SetActive(false);
             building = null;
-            buildCoroutine = null;
+            if (buildCoroutine != null)
+            {
+                StopCoroutine(buildCoroutine);
+                buildCoroutine = null;
+            }
         }
 
         private void HandleQueueUpdated(UnlockableSO[] unitsInQueue)
         {
-            if (unitsInQueue.Length == 1 && buildCoroutine == null)
+            if (unitsInQueue.Length > 0 && buildCoroutine == null)
             {
                 buildCoroutine = StartCoroutine(UpdateUnitProgress());
             }

@@ -38,6 +38,7 @@ namespace GameDevTV.RTS.Units
 
         private Placeholder culledVisuals;
         private IBuildingBuilder unitBuildingThis;
+        private Coroutine productionCoroutine;
         private List<UnlockableSO> buildingQueue = new(MAX_QUEUE_SIZE);
         private const int MAX_QUEUE_SIZE = 5;
         private int spawnCount = 0; // Tracks how many units have been spawned, for angle distribution
@@ -73,6 +74,11 @@ namespace GameDevTV.RTS.Units
             base.OnEnable();
             if (!ActiveBuildings.Contains(this))
                 ActiveBuildings.Add(this);
+
+            if (buildingQueue != null && buildingQueue.Count > 0 && productionCoroutine == null)
+            {
+                productionCoroutine = StartCoroutine(DoBuildUnits());
+            }
         }
 
         protected override void OnDisable()
@@ -206,13 +212,11 @@ namespace GameDevTV.RTS.Units
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -unlockable.Cost.Gas, unlockable.Cost.GasSO));
 
             buildingQueue.Add(unlockable);
-            if (buildingQueue.Count == 1)
+            OnQueueUpdated?.Invoke(buildingQueue.ToArray());
+
+            if (productionCoroutine == null)
             {
-                StartCoroutine(DoBuildUnits());
-            }
-            else
-            {
-                OnQueueUpdated?.Invoke(buildingQueue.ToArray());
+                productionCoroutine = StartCoroutine(DoBuildUnits());
             }
         }
 
@@ -228,13 +232,18 @@ namespace GameDevTV.RTS.Units
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, unlockableSO.Cost.Minerals, unlockableSO.Cost.MineralsSO));
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, unlockableSO.Cost.Gas, unlockableSO.Cost.GasSO));
             buildingQueue.RemoveAt(index);
+            
             if (index == 0)
             {
-                StopAllCoroutines();
+                if (productionCoroutine != null)
+                {
+                    StopCoroutine(productionCoroutine);
+                    productionCoroutine = null;
+                }
 
                 if (buildingQueue.Count > 0)
                 {
-                    StartCoroutine(DoBuildUnits());
+                    productionCoroutine = StartCoroutine(DoBuildUnits());
                 }
                 else
                 {
@@ -438,6 +447,7 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
             }
 
             OnQueueUpdated?.Invoke(buildingQueue.ToArray());
+            productionCoroutine = null;
         }
 
         protected override void OnDestroy()
