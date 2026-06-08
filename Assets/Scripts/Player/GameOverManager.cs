@@ -114,10 +114,15 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // 3. Loss Condition 1: Colony life support coverage collapsed.
-            if (!AnyLifeSupportNodesRemain(monitoredOwner))
+            // 3. Check recovery potential BEFORE triggering life support failure.
+            // If the player has 400 biomass, they can orbital drop a new Command Center even if everything else is gone.
+            int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int currentBiomass) ? currentBiomass : 0;
+            bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRemain();
+
+            // Loss Condition 1: Colony life support coverage collapsed.
+            if (!AnyLifeSupportNodesRemain(monitoredOwner) && !canRebuild)
             {
-                Debug.Log("[GameOverManager] No life support nodes remain. Colony collapsed.");
+                Debug.Log("[GameOverManager] No life support nodes remain and cannot rebuild. Colony collapsed.");
                 TriggerGameOver(GameOverReason.LifeSupport);
                 return;
             }
@@ -125,9 +130,10 @@ namespace GameDevTV.RTS.Player
             // Loss Condition 2: Colony integrity depleted to 0.
             if (Supplies.Integrity != null
                 && Supplies.Integrity.TryGetValue(monitoredOwner, out float integrity)
-                && integrity <= 0f)
+                && integrity <= 0f
+                && !canRebuild)
             {
-                Debug.Log("[GameOverManager] Integrity depleted to 0.");
+                Debug.Log("[GameOverManager] Integrity depleted to 0 and cannot rebuild.");
                 TriggerGameOver(GameOverReason.LifeSupport);
             }
         }
@@ -183,8 +189,8 @@ namespace GameDevTV.RTS.Player
 bool supplyNodesExist = AnySupplyNodesRemain();
             bool miningUnitsExist = AnyMiningUnitsAlive();
 
-            // Logic Fix: Even if minerals exist on the map, if you have 0 workers and cannot afford to build one, you lose.
-            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || biomass >= 100);
+            // Logic Fix: Even if minerals exist on the map, if you have 0 workers and cannot afford to build a base (400 biomass), you lose.
+            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || biomass >= 400);
 
             if (!recoveryPossible)
             {

@@ -17,85 +17,85 @@ MonoBehaviour:
       lastSelectedModels:
         serializedData:
         - key:
-            rid: 7234512917582053535
+            rid: 7234512917582053865
           value:
-            rid: 7234512917582053536
+            rid: 7234512918530228660
         - key:
-            rid: 7234512917582053537
+            rid: 7234512917582053867
           value:
-            rid: 7234512917582053538
+            rid: 7234512918530228661
         - key:
-            rid: 7234512917582053539
+            rid: 7234512917582053869
           value:
-            rid: 7234512917582053540
+            rid: 7234512918530228662
         - key:
-            rid: 7234512917582053541
+            rid: 7234512917582053871
           value:
-            rid: 7234512917582053542
+            rid: 7234512918530228663
         - key:
-            rid: 7234512917582053543
+            rid: 7234512917582053873
           value:
-            rid: 7234512917582053544
+            rid: 7234512918530228664
         - key:
-            rid: 7234512917582053545
+            rid: 7234512917582053875
           value:
-            rid: 7234512917582053546
+            rid: 7234512918530228665
       previewSettings:
         sizeFactor: 1
   references:
     version: 2
     RefIds:
-    - rid: 7234512917582053535
+    - rid: 7234512917582053865
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 0
-    - rid: 7234512917582053536
-      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
-      data:
-        modelID: flux-2-pro
-    - rid: 7234512917582053537
+    - rid: 7234512917582053867
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 1
-    - rid: 7234512917582053538
-      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
-      data:
-        modelID: 
-    - rid: 7234512917582053539
+    - rid: 7234512917582053869
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 2
-    - rid: 7234512917582053540
-      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
-      data:
-        modelID: 
-    - rid: 7234512917582053541
+    - rid: 7234512917582053871
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 3
-    - rid: 7234512917582053542
-      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
-      data:
-        modelID: 
-    - rid: 7234512917582053543
+    - rid: 7234512917582053873
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 4
-    - rid: 7234512917582053544
-      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
-      data:
-        modelID: 
-    - rid: 7234512917582053545
+    - rid: 7234512917582053875
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Video
         mode: 6
-    - rid: 7234512917582053546
+    - rid: 7234512918530228660
+      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
+      data:
+        modelID: flux-2-pro
+    - rid: 7234512918530228661
+      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
+      data:
+        modelID: 
+    - rid: 7234512918530228662
+      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
+      data:
+        modelID: 
+    - rid: 7234512918530228663
+      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
+      data:
+        modelID: 
+    - rid: 7234512918530228664
+      type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
+      data:
+        modelID: 
+    - rid: 7234512918530228665
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 

@@ -23,6 +23,14 @@ namespace GameDevTV.RTS.Units
         public void Repair(AbstractCommandable target)
         {
             if (target == null) return;
+            
+            // If the target is an unfinished building, resume construction instead of just healing it.
+            if (target is BaseBuilding building && building.Progress.State == BuildingProgress.BuildingState.Paused)
+            {
+                ResumeBuilding(building);
+                return;
+            }
+
             Brain.Halt();
 
             if (Agent != null)
@@ -215,6 +223,7 @@ namespace GameDevTV.RTS.Units
 
         public void ResumeBuilding(BaseBuilding building)
         {
+            if (building == null) return;
             Brain.Halt();
 
             // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)
@@ -236,6 +245,9 @@ namespace GameDevTV.RTS.Units
             graphAgent.SetVariableValue("BuildingSO", building.BuildingSO);
             graphAgent.SetVariableValue<GameObject>("Ghost", null);
             SetCurrentCommand(UnitCommands.BuildBuilding);
+
+            // Trigger the actual construction loop in the C# brain.
+            Brain.StartBuild(building, building.BuildingSO, navDestination);
         }
 
         public void CancelBuilding()

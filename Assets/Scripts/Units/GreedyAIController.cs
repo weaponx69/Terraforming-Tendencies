@@ -215,6 +215,7 @@ namespace GameDevTV.RTS.Units
             }
 
             // Mining of existing drones stays automatic — it is what funds the packages.
+            AutoResumeBuildings();
             AssignIdleWorkers();
 
             // Nothing is purchased autonomously. Wait while a decision is pending,
@@ -623,6 +624,27 @@ if (SectorManager.Instance != null)
                     return hit.position;
             }
             return origin + new Vector3(distance, 0f, 0f);
+        }
+
+        private void AutoResumeBuildings()
+        {
+            var allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
+            var pausedBuildings = allBuildings
+                .Where(b => b != null && b.Owner == aiOwner && b.Progress.State == BuildingProgress.BuildingState.Paused)
+                .ToList();
+
+            foreach (var building in pausedBuildings)
+            {
+                // Check if anyone is already building this.
+                // Note: unitBuildingThis is private, but the state is Building if someone is.
+                // But we only look at Paused ones anyway.
+                
+                Worker builder = FindAvailableWorker();
+                if (builder == null) return; // No more free workers
+
+                Debug.Log($"[GreedyAI] Re-assigning worker {builder.name} to resume unfinished {building.name}");
+                builder.ResumeBuilding(building);
+            }
         }
 
         // ── Drone mining (ported from the old AIController) ─────────────────────

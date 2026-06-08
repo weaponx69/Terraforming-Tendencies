@@ -71,6 +71,7 @@ namespace GameDevTV.RTS.Commands
 
             // Removed maximum Command Center limit to allow building multiple bases.
             
+            // Check horizontal distance
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
@@ -78,32 +79,12 @@ namespace GameDevTV.RTS.Commands
                 targetPos = navHit.position;
             }
 
-            return HasEnoughSupplies(context) && AllRestrictionsPass(targetPos);
+            return HasEnoughSupplies(context) && AllRestrictionsPass(targetPos, context.Owner);
         }
 
         public override void Handle(CommandContext context)
         {
             IBuildingBuilder builder = context.Commandable as IBuildingBuilder;
-
-            // If the unit issuing the command isn't a builder (e.g. Command Center), find the nearest idle drone
-            if (builder == null)
-            {
-                float closestDist = float.MaxValue;
-                Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
-                
-                foreach (var w in workers)
-                {
-                    if (w.Owner == context.Owner && !w.IsBuilding)
-                    {
-                        float dist = Vector3.Distance(w.transform.position, context.Hit.point);
-                        if (dist < closestDist)
-                        {
-                            closestDist = dist;
-                            builder = w;
-                        }
-                    }
-                }
-            }
 
             // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
@@ -113,9 +94,30 @@ namespace GameDevTV.RTS.Commands
                 targetPos = navHit.position;
             }
 
+            // If the unit issuing the command isn't a builder (e.g. Command Center or Global Commander), find the nearest idle drone
             if (builder == null)
             {
-                if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
+                float closestDist = float.MaxValue;
+                Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+                
+                foreach (var w in workers)
+                {
+                    if (w.Owner == context.Owner && !w.IsBuilding)
+                    {
+                        float dist = Vector3.Distance(w.transform.position, targetPos);
+                        if (dist < closestDist)
+                        {
+                            closestDist = dist;
+                            builder = w;
+                        }
+                    }
+                }
+            }
+
+            if (builder == null)
+            {
+                bool isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+                if (!isCommandPost)
                 {
                     // // Debug.LogWarning("Only Command Centers can be orbital dropped! You must build a worker first.");
                     return;
@@ -160,7 +162,7 @@ namespace GameDevTV.RTS.Commands
             }
             else if (HasEnoughSupplies(context))
             {
-                bool pass = AllRestrictionsPass(targetPos);
+                bool pass = AllRestrictionsPass(targetPos, context.Owner);
                 if (pass)
                 {
                     builder.Build(Building, targetPos);
@@ -169,6 +171,11 @@ namespace GameDevTV.RTS.Commands
         }
 
         public override bool AllRestrictionsPass(Vector3 point)
+        {
+            return AllRestrictionsPass(point, Owner.Player1);
+        }
+
+        public bool AllRestrictionsPass(Vector3 point, Owner owner)
         {
             // Evaluate restrictions directly to ignore NavMesh holes!
             // The ground is covered in rocks which have NavMeshObstacles. This creates holes in the NavMesh.
@@ -195,13 +202,14 @@ namespace GameDevTV.RTS.Commands
             }
 
             // Enforce worker requirement for standard buildings
-            if (!Building.name.Contains("Command Post") && !Building.name.Contains("Command Center"))
+            bool isCP = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            if (!isCP)
             {
                 Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
                 bool hasWorker = false;
                 foreach (var w in workers)
                 {
-                    if (w.Owner == Owner.Player1)
+                    if (w.Owner == owner)
                     {
                         hasWorker = true;
                         break;
