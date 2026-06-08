@@ -116,6 +116,13 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        protected override void UpdateAnimation()
+        {
+            base.UpdateAnimation();
+            SetAnimBool("IsGathering", IsGathering);
+            SetAnimBool("IsBuilding", IsBuilding);
+        }
+
         public void LoadInto(ITransporter transporter)
         {
             MoveTo(transporter.Transform);
@@ -295,9 +302,9 @@ namespace GameDevTV.RTS.Units
 
         public override void Deselect()
         {
-            if (decalProjector != null)
+            if (selectionIndicator != null)
             {
-                decalProjector.gameObject.SetActive(false);
+                selectionIndicator.SetActive(false);
             }
 
             IsSelected = false;

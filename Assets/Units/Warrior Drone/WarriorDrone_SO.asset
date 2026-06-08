@@ -15,18 +15,18 @@ MonoBehaviour:
   <Name>k__BackingField: Warrior Drone
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
-  <Icon>k__BackingField: {fileID: 21300000, guid: 4d0944a6c62020d4f955f5b7174bb96f, type: 3}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 2b5f0089b0521d6f88202049f24e6115, type: 3}
   <Cost>k__BackingField: {fileID: 11400000, guid: 58c9f72c1fa3a844f94d6922d94cb5ff, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField:
   - {fileID: 11400000, guid: 484fa8e123befe4448234d913dccc773, type: 2}
-  <Health>k__BackingField: 250
-  <Prefab>k__BackingField: {fileID: 1076983579694789324, guid: 1db43eaef9216eb58863a68fd300a855, type: 3}
-  <Upgrades>k__BackingField:
+  health: 250
+  prefab: {fileID: 1076983579694789324, guid: 1db43eaef9216eb58863a68fd300a855, type: 3}
+  upgrades:
   - {fileID: 11400000, guid: 1a539722dcaa7bf4bbf2af09917a710d, type: 2}
   - {fileID: 11400000, guid: b7906a4f1eb2f2e429ac1da9d89dc60c, type: 2}
   - {fileID: 11400000, guid: b39eb73e31472a34b9d50f8cc7b1be7f, type: 2}
   - {fileID: 11400000, guid: e3fdd4caf0dc0224c83521c0ace2254a, type: 2}
-  <SightConfig>k__BackingField: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
-  <AttackConfig>k__BackingField: {fileID: 11400000, guid: f0d29042c54f4a514bab88fdd4e9595b, type: 2}
-  <TransportConfig>k__BackingField: {fileID: 0}
+  sightConfig: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
+  attackConfig: {fileID: 11400000, guid: f0d29042c54f4a514bab88fdd4e9595b, type: 2}
+  transportConfig: {fileID: 0}

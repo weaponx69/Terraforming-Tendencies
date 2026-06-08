@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDevTV.RTS.EventBus;
@@ -75,9 +74,13 @@ namespace GameDevTV.RTS.Units
 
         private void OnDestroy()
         {
-            foreach(IDamageable damageable in allDamageables)
+            foreach (IDamageable damageable in allDamageables)
             {
-                if (damageable != null && damageable.Transform != null && damageable.Transform.TryGetComponent(out IHideable hideable))
+                // A plain interface != null check does NOT use Unity's overloaded null
+                // operator, so we must cast to UnityEngine.Object to detect destroyed
+                // objects before touching .Transform (which would throw).
+                if (damageable == null || (damageable is Object obj && obj == null)) continue;
+                if (damageable.Transform != null && damageable.Transform.TryGetComponent(out IHideable hideable))
                 {
                     hideable.OnVisibilityChanged -= HandleVisibilityChange;
                 }
@@ -106,9 +109,14 @@ namespace GameDevTV.RTS.Units
 
         private void HandleUnitDeath(UnitDeathEvent evt)
         {
+            if (evt.Unit == null || (evt.Unit is Object o && o == null)) return;
             if (allDamageables.Contains(evt.Unit))
             {
-                OnTriggerExit(evt.Unit.GetComponent<Collider>());
+                Collider col = evt.Unit.GetComponent<Collider>();
+                if (col != null)
+                {
+                    OnTriggerExit(col);
+                }
             }
         }
 
@@ -121,5 +129,5 @@ namespace GameDevTV.RTS.Units
         {
             sphereCollider.radius = attackConfig.AttackRange;
         }
-}
+    }
 }

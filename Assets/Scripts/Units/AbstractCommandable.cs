@@ -31,7 +31,7 @@ namespace GameDevTV.RTS.Units
         public Transform Transform => this == null ? null : transform;
         [field: SerializeField] public BaseCommand[] AvailableCommands { get; private set; }
         [field: SerializeField] public AbstractUnitSO UnitSO { get; private set; }
-        [SerializeField] protected DecalProjector decalProjector;
+        [SerializeField] protected GameObject selectionIndicator;
         [SerializeField] protected Transform VisionTransform;
 
         public delegate void HealthUpdatedEvent(AbstractCommandable commandable, int lastHealth, int newHealth);
@@ -78,9 +78,9 @@ namespace GameDevTV.RTS.Units
 
         public virtual void Select()
         {
-            if (decalProjector != null)
+            if (selectionIndicator != null)
             {
-                decalProjector.gameObject.SetActive(true);
+                selectionIndicator.SetActive(true);
             }
 
             IsSelected = true;
@@ -89,9 +89,9 @@ namespace GameDevTV.RTS.Units
 
         public virtual void Deselect()
         {
-            if (decalProjector != null)
+            if (selectionIndicator != null)
             {
-                decalProjector.gameObject.SetActive(false);
+                selectionIndicator.SetActive(false);
             }
 
             IsSelected = false;
@@ -131,6 +131,7 @@ namespace GameDevTV.RTS.Units
 
         public void Die()
         {
+            Debug.Log($"[AbstractCommandable] {gameObject.name} (Owner: {Owner}) is DYING at {transform.position}.");
             Destroy(gameObject);
         }
 

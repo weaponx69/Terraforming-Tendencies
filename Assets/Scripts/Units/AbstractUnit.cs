@@ -32,6 +32,12 @@ protected UnitSO unitSO;
         private float lastStatusUpdateTime = 0f;
         private const float STATUS_UPDATE_INTERVAL = 0.2f;
 
+        // Animation is driven directly from C# rather than through the behavior graph,
+        // whose SetAnimatorBoolAction nodes bind to a sub-graph-local "Self" that never
+        // receives the live unit (logging "No Animator set.").
+        protected Animator unitAnimator;
+        private HashSet<string> animatorParameters;
+
         protected override void Awake()
         {
             base.Awake();
@@ -56,9 +62,60 @@ protected UnitSO unitSO;
             {
                 gameObject.AddComponent<Animator>();
             }
-            
+
+            // Cache the Animator and the parameters its controller actually exposes,
+            // so the C# animation driver only touches parameters that exist.
+            CacheAnimator();
+
             // Initialization is handled by Unity Behavior package in Unity 6
             ReapplyCoreBlackboardVariables();
+        }
+
+        private void CacheAnimator()
+        {
+            unitAnimator = GetComponentInChildren<Animator>(true);
+            animatorParameters = new HashSet<string>();
+            if (unitAnimator != null && unitAnimator.runtimeAnimatorController != null)
+            {
+                foreach (AnimatorControllerParameter p in unitAnimator.parameters)
+                {
+                    animatorParameters.Add(p.name);
+                }
+            }
+        }
+
+        protected void SetAnimBool(string parameter, bool value)
+        {
+            if (unitAnimator == null || animatorParameters == null) return;
+            if (!animatorParameters.Contains(parameter)) return;
+            unitAnimator.SetBool(parameter, value);
+        }
+
+        protected void SetAnimFloat(string parameter, float value)
+        {
+            if (unitAnimator == null || animatorParameters == null) return;
+            if (!animatorParameters.Contains(parameter)) return;
+            unitAnimator.SetFloat(parameter, value);
+        }
+
+        /// <summary>
+        /// Drives the unit's Animator from real state every frame. Base sets locomotion
+        /// speed and clears all state bools; subclasses call base then set the bools that
+        /// apply to them (e.g. Worker -> IsGathering/IsBuilding, combat -> IsAttacking).
+        /// </summary>
+        protected virtual void UpdateAnimation()
+        {
+            if (unitAnimator == null) return;
+
+            float speed = (Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+                ? Agent.velocity.magnitude
+                : 0f;
+            SetAnimFloat("Speed", speed);
+
+            // Defaults; subclasses override to set the ones that apply.
+            SetAnimBool("IsGathering", false);
+            SetAnimBool("IsBuilding", false);
+            SetAnimBool("IsAttacking", false);
         }
 
         protected virtual void ReapplyCoreBlackboardVariables()
@@ -116,8 +173,10 @@ protected UnitSO unitSO;
 
         protected override void Start()
         {
+            if (graphAgent == null) graphAgent = GetComponent<BehaviorGraphAgent>();
+            
             if (UnitSO == null)
-            {
+{
                 Debug.LogError($"[AbstractUnit] UnitSO is NULL on GameObject '{gameObject.name}'! This will cause crashes. Destroying unit.", gameObject);
                 Destroy(gameObject);
                 return;
@@ -227,6 +286,9 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
                     }
                 }
             }
+
+            // Drive animation from real state (replaces the broken graph animator nodes).
+            UpdateAnimation();
 
             if (this is Worker)
             {
@@ -464,15 +526,29 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
         public void MoveTo(Vector3 position)
         {
-            graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, position);
-            graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
+            if (graphAgent != null && graphAgent.isActiveAndEnabled)
+            {
+                try {
+                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, position);
+                    graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
+                } catch (System.Exception ex) {
+                    Debug.LogWarning($"[AbstractUnit] MoveTo failed to set blackboard variables on {gameObject.name}: {ex.Message}");
+                }
+            }
             SetCurrentCommand(UnitCommands.Move);
             DriveAgentTo(position);
         }
 
         public void MoveTo(Transform transform)
         {
-            graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, transform.gameObject);
+            if (graphAgent != null)
+            {
+                try {
+                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, transform.gameObject);
+                } catch (System.Exception ex) {
+                    Debug.LogWarning($"[AbstractUnit] MoveTo (Transform) failed to set blackboard variables on {gameObject.name}: {ex.Message}");
+                }
+            }
             SetCurrentCommand(UnitCommands.Move);
             DriveAgentTo(transform.position);
         }
@@ -525,14 +601,28 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
         public void Attack(IDamageable damageable)
         {
-            graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, damageable.Transform.gameObject);
+            if (graphAgent != null && graphAgent.isActiveAndEnabled)
+            {
+                try {
+                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_GAME_OBJECT, damageable.Transform.gameObject);
+                } catch (System.Exception ex) {
+                    Debug.LogWarning($"[AbstractUnit] Attack failed to set blackboard variables on {gameObject.name}: {ex.Message}");
+                }
+            }
             SetCurrentCommand(UnitCommands.Attack);
         }
 
         public void Attack(Vector3 location)
         {
-            graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
-            graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, location);
+            if (graphAgent != null && graphAgent.isActiveAndEnabled)
+            {
+                try {
+                    graphAgent.SetVariableValue<GameObject>(BlackboardConstants.TARGET_GAME_OBJECT, null);
+                    graphAgent.SetVariableValue(BlackboardConstants.TARGET_LOCATION, location);
+                } catch (System.Exception ex) {
+                    Debug.LogWarning($"[AbstractUnit] Attack (Vector3) failed to set blackboard variables on {gameObject.name}: {ex.Message}");
+                }
+            }
             SetCurrentCommand(UnitCommands.Attack);
         }
 
@@ -575,6 +665,10 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
         private List<GameObject> SetNearbyEnemiesOnBlackboard()
         {
             List<GameObject> nearbyEnemies = new List<GameObject>();
+
+            // If this unit is being destroyed, accessing 'transform' below would throw.
+            if (this == null || DamageableSensor == null) return nearbyEnemies;
+
             foreach (var d in DamageableSensor.Damageables)
             {
                 // Safety check for destroyed objects implementing IDamageable
@@ -586,7 +680,10 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
             nearbyEnemies.Sort(new ClosestGameObjectComparer(transform.position));
 
-            graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, nearbyEnemies);
+            if (graphAgent != null)
+            {
+                graphAgent.SetVariableValue(BlackboardConstants.NEARBY_ENEMIES, nearbyEnemies);
+            }
 
             return nearbyEnemies;
         }

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Build Rifleman Drone
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Commands.BuildUnitCommand
   <Name>k__BackingField: Rifleman Drone
-  <Icon>k__BackingField: {fileID: 21300000, guid: 44214f5ac3bd91f449743d6968d0d116, type: 3}
+  <Icon>k__BackingField: {fileID: 21300000, guid: cc8985ae6d67c834f99a52753c56c01d, type: 3}
   <Slot>k__BackingField: 2
   <RequiresClickToActivate>k__BackingField: 1
   <IsSingleUnitCommand>k__BackingField: 0

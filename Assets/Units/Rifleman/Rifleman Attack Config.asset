@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31030474969b5904c9aac6865b1a9d6d, type: 3}
   m_Name: Rifleman Attack Config
   m_EditorClassIdentifier: 
-  <AttackRange>k__BackingField: 7
-  <AttackDelay>k__BackingField: 1
-  <Damage>k__BackingField: 5
-  <HasProjectileAttacks>k__BackingField: 0
-  <IsAreaOfEffect>k__BackingField: 0
-  <AreaOfEffectRadius>k__BackingField: 3
-  <MaxEnemiesHitPerAttack>k__BackingField: 5
-  <DamageableLayers>k__BackingField:
+  attackRange: 7
+  attackDelay: 3
+  damage: 5
+  hasProjectileAttacks: 0
+  isAreaOfEffect: 0
+  areaOfEffectRadius: 3
+  maxEnemiesHitPerAttack: 5
+  damageableLayers:
     serializedVersion: 2
     m_Bits: 192

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.AttackConfigSO
   <AttackRange>k__BackingField: 20
   <AttackDelay>k__BackingField: 0.6
-  <Damage>k__BackingField: 10
+  <Damage>k__BackingField: 30
   <HasProjectileAttacks>k__BackingField: 0
   <IsAreaOfEffect>k__BackingField: 0
   <AreaOfEffectRadius>k__BackingField: 2
