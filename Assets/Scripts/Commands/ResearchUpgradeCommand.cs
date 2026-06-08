@@ -12,6 +12,8 @@ namespace GameDevTV.RTS.Commands
     {
         [field: SerializeField] public UpgradeSO Upgrade { get; private set; }
 
+        public override bool RequiresClickToActivate => false;
+
         private Dictionary<Owner, BaseBuilding.QueueUpdatedEvent> updateQueue = new();
 
         public override bool CanHandle(CommandContext context)

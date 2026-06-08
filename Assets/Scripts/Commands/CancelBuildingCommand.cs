@@ -7,6 +7,8 @@ namespace GameDevTV.RTS.Commands
     [CreateAssetMenu(fileName = "Cancel Building", menuName = "Units/Commands/Cancel Building")]
     public class CancelBuildingCommand : BaseCommand
     {
+        public override bool RequiresClickToActivate => false;
+
         public override bool CanHandle(CommandContext context)
         {
             return context.Commandable is IBuildingBuilder

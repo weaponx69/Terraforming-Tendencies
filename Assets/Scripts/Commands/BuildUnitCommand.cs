@@ -9,6 +9,8 @@ namespace GameDevTV.RTS.Commands
     public class BuildUnitCommand : BaseCommand, IUnlockableCommand
     {
         [field: SerializeField] public AbstractUnitSO Unit { get; private set; }
+        
+        public override bool RequiresClickToActivate => false;
 
         public override bool CanHandle(CommandContext context)
         {

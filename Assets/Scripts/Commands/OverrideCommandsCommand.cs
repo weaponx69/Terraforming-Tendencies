@@ -5,6 +5,8 @@ namespace GameDevTV.RTS.Commands
     [CreateAssetMenu(fileName = "Override Commands", menuName = "Units/Commands/Override Commands", order = 110)]
     public class OverrideCommandsCommand : BaseCommand
     {
+        public override bool RequiresClickToActivate => false;
+
         [field: SerializeField] public BaseCommand[] Commands { get; private set; }
 
         public override bool CanHandle(CommandContext context)

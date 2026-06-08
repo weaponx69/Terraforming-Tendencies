@@ -6,6 +6,8 @@ namespace GameDevTV.RTS.Commands
     [CreateAssetMenu(fileName = "Unload Units", menuName = "Units/Commands/Unload All Units", order = 107)]
     public class UnloadAllUnitsCommand : BaseCommand
     {
+        public override bool RequiresClickToActivate => false;
+
         public override bool CanHandle(CommandContext context)
         {
             return context.Commandable is ITransporter transporter && transporter.UsedCapacity > 0;
