@@ -58,14 +58,14 @@ namespace GameDevTV.RTS.Environment
             {
                 // The drone body uses a Shader Graph Toon material whose ONLY colour input is
                 // _EmissionColor — there is no _BaseColor/_Color tint (it is textured). Drive
-                // emission so probes glow cyan and read clearly distinct from the yellow drones.
+                // emission so probes glow green and read clearly distinct from the yellow drones.
                 Material mat = r.material; // instance (only a few probes, so this is fine)
                 
                 if (r.name.Contains("Vision"))
                 {
                     // Tint the vision cone to match
-                    if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(0f, 1f, 1f, 0.4f));
-                    if (mat.HasProperty("_Color")) mat.SetColor("_Color", new Color(0f, 1f, 1f, 0.4f));
+                    if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(0f, 1f, 0f, 0.4f));
+                    if (mat.HasProperty("_Color")) mat.SetColor("_Color", new Color(0f, 1f, 0f, 0.4f));
                     continue;
                 }
 
@@ -74,7 +74,7 @@ namespace GameDevTV.RTS.Environment
                     mat.EnableKeyword("_EMISSION");
                     mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                     // Extreme intensity to drown out the yellow texture
-                    mat.SetColor("_EmissionColor", new Color(0f, 1f, 1f) * 4.0f); 
+                    mat.SetColor("_EmissionColor", new Color(0f, 1f, 0f) * 4.0f); 
                 }
             }
             if (renderers.Length > 0) colorApplied = true;
