@@ -15,13 +15,13 @@ MonoBehaviour:
   <Name>k__BackingField: Probe
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
-  <Icon>k__BackingField: {fileID: 21300000, guid: 4d0944a6c62020d4f955f5b7174bb96f, type: 3}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 1e24cf5aac23bb17481d5d00517c32df, type: 3}
   <Cost>k__BackingField: {fileID: 11400000, guid: df0bafee89701b04784fd5146a3407ab, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField: []
-  <Health>k__BackingField: 200
-  <Prefab>k__BackingField: {fileID: 1076983579694789324, guid: a5f9436dffed4ff42a0e84878aef6c82, type: 3}
-  <Upgrades>k__BackingField: []
-  <SightConfig>k__BackingField: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
-  <AttackConfig>k__BackingField: {fileID: 0}
-  <TransportConfig>k__BackingField: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}
+  health: 200
+  prefab: {fileID: 1076983579694789324, guid: a5f9436dffed4ff42a0e84878aef6c82, type: 3}
+  upgrades: []
+  sightConfig: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
+  attackConfig: {fileID: 0}
+  transportConfig: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}
