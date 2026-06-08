@@ -52,6 +52,8 @@ namespace GameDevTV.RTS.Units
 
             renderers = GetComponentsInChildren<Renderer>();
             particleSystems = GetComponentsInChildren<ParticleSystem>();
+
+            initialCommands = AvailableCommands;
         }
 
         protected virtual void Start()
@@ -65,8 +67,6 @@ namespace GameDevTV.RTS.Units
                 bool isAI = Owner >= Owner.AI1 && Owner <= Owner.AI7;
                 VisionTransform.gameObject.SetActive(Owner == Owner.Player1 || isAI);
             }
-
-            initialCommands = AvailableCommands;
 
             Bus<UpgradeResearchedEvent>.OnEvent[Owner] += HandleUpgradeResearched;
         }
