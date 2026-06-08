@@ -16,23 +16,27 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void EnableFor(BaseBuilding item)
         {
-            if (building != null)
+            if (building == item && gameObject.activeSelf)
+            {
+                SetupUnitButtons();
+                return;
+            }
+
+            if (building != null && building != item)
             {
                 building.OnQueueUpdated -= HandleQueueUpdated;
             }
+
             progressBar.SetProgress(0);
             gameObject.SetActive(true);
             building = item;
+            building.OnQueueUpdated -= HandleQueueUpdated; // Safety unsubscribe
             building.OnQueueUpdated += HandleQueueUpdated;
             SetupUnitButtons();
 
-            if (building.QueueSize > 0)
+            if (building.QueueSize > 0 && buildCoroutine == null)
             {
                 buildCoroutine = StartCoroutine(UpdateUnitProgress());
-            }
-            else
-            {
-                buildCoroutine = null;
             }
         }
 
@@ -80,17 +84,30 @@ namespace GameDevTV.RTS.UI.Containers
 
         private IEnumerator UpdateUnitProgress()
         {
-            while(building != null && building.QueueSize > 0)
+            while (this != null && enabled && building != null && building.QueueSize > 0)
             {
+                if (building.SOBeingBuilt == null)
+                {
+                    yield return null;
+                    continue;
+                }
+
+                if (progressBar == null)
+                {
+                    yield break;
+                }
+
                 float startTime = building.CurrentQueueStartTime;
-                float endTime = startTime + building.SOBeingBuilt.BuildTime;
+                float buildTime = building.SOBeingBuilt.BuildTime;
+                if (buildTime <= 0) buildTime = 1f;
 
-                float progress = Mathf.Clamp01((Time.time - startTime) / (endTime - startTime));
-
+                float progress = Mathf.Clamp01((Time.time - startTime) / buildTime);
                 progressBar.SetProgress(progress);
+                
                 yield return null;
             }
 
+            if (progressBar != null) progressBar.SetProgress(0);
             buildCoroutine = null;
         }
     }

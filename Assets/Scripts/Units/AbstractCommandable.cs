@@ -40,11 +40,14 @@ namespace GameDevTV.RTS.Units
         public event IHideable.VisibilityChangeEvent OnVisibilityChanged;
 
         private BaseCommand[] initialCommands;
+        private bool isAbstractInitialized = false;
         private Renderer[] renderers = Array.Empty<Renderer>();
         private ParticleSystem[] particleSystems = Array.Empty<ParticleSystem>();
 
-        protected virtual void Awake()
+        public void InitializeIfNeeded()
         {
+            if (isAbstractInitialized) return;
+            
             if (UnitSO != null)
             {
                 UnitSO = UnitSO.Clone() as AbstractUnitSO;
@@ -54,6 +57,12 @@ namespace GameDevTV.RTS.Units
             particleSystems = GetComponentsInChildren<ParticleSystem>();
 
             initialCommands = AvailableCommands;
+            isAbstractInitialized = true;
+        }
+
+        protected virtual void Awake()
+        {
+            InitializeIfNeeded();
         }
 
         protected virtual void Start()

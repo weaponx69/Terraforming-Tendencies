@@ -16,9 +16,15 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void EnableFor(BaseBuilding building)
         {
+            if (selectedBuilding != null)
+            {
+                selectedBuilding.OnQueueUpdated -= OnBuildingQueueUpdated;
+                Bus<BuildingSpawnEvent>.OnEvent[selectedBuilding.Owner] -= HandleBuildingSpawn;
+            }
+
             selectedBuilding = building;
-            selectedBuilding.OnQueueUpdated -= OnBuildingQueueUpdated;
             selectedBuilding.OnQueueUpdated += OnBuildingQueueUpdated;
+            gameObject.SetActive(true);
 
             if (building.Progress.State == BuildingProgress.BuildingState.Completed)
             {
@@ -30,7 +36,7 @@ namespace GameDevTV.RTS.UI.Containers
                 buildingUnderConstructionUI.EnableFor(building);
                 buildingBuildingUI.Disable();
                 singleUnitSelectedUI.Disable();
-                Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += HandleBuildingSpawn;
+                Bus<BuildingSpawnEvent>.OnEvent[selectedBuilding.Owner] += HandleBuildingSpawn;
             }
         }
 
@@ -39,17 +45,24 @@ namespace GameDevTV.RTS.UI.Containers
             if (buildingBuildingUI != null) buildingBuildingUI.Disable();
             if (singleUnitSelectedUI != null) singleUnitSelectedUI.Disable();
             if (buildingUnderConstructionUI != null) buildingUnderConstructionUI.Disable();
-            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= HandleBuildingSpawn;
+            
             if (selectedBuilding != null)
             {
+                Bus<BuildingSpawnEvent>.OnEvent[selectedBuilding.Owner] -= HandleBuildingSpawn;
                 selectedBuilding.OnQueueUpdated -= OnBuildingQueueUpdated;
                 selectedBuilding = null;
             }
+            gameObject.SetActive(false);
         }
 
         private void OnBuildingQueueUpdated(UnlockableSO[] _ = null)
         {
-            if (selectedBuilding.QueueSize == 0)
+            if (selectedBuilding == null) return;
+
+            int queueSize = selectedBuilding.QueueSize;
+            // Debug.Log($"[BuildingSelectedUI] Refreshing. QueueSize: {queueSize}");
+
+            if (queueSize == 0)
             {
                 singleUnitSelectedUI.EnableFor(selectedBuilding);
                 buildingBuildingUI.Disable();
@@ -65,7 +78,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (evt.Building == selectedBuilding)
             {
-                Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= HandleBuildingSpawn;
+                Bus<BuildingSpawnEvent>.OnEvent[selectedBuilding.Owner] -= HandleBuildingSpawn;
                 OnBuildingQueueUpdated();
                 buildingUnderConstructionUI.Disable();
             }

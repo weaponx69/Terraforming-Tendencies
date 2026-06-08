@@ -43,14 +43,15 @@ namespace GameDevTV.RTS.Units
         private const int MAX_QUEUE_SIZE = 5;
         private int spawnCount = 0; // Tracks how many units have been spawned, for angle distribution
         private bool hasRaisedSpawnEvent = false;
+        private bool isBuildingInitialized = false;
 
-        protected override void Awake()
+        public new void InitializeIfNeeded()
         {
-            base.Awake();
+            if (isBuildingInitialized) return;
+            base.InitializeIfNeeded();
 
             BuildingSO = UnitSO as BuildingSO;
-            MaxHealth = BuildingSO.Health;
-            // Current health is set as the building is being built via Heal()
+            MaxHealth = BuildingSO != null ? BuildingSO.Health : 1000;
             
             if (MainRenderer == null)
             {
@@ -59,7 +60,6 @@ namespace GameDevTV.RTS.Units
 
             if (MainRenderer != null && primaryMaterial == null)
             {
-                // Auto-save the mesh's original material so it doesn't disappear if primaryMaterial wasn't set in the Inspector
                 primaryMaterial = MainRenderer.material;
             }
 
@@ -67,6 +67,12 @@ namespace GameDevTV.RTS.Units
             {
                 navMeshObstacle = GetComponentInChildren<UnityEngine.AI.NavMeshObstacle>();
             }
+            isBuildingInitialized = true;
+        }
+
+        protected override void Awake()
+        {
+            InitializeIfNeeded();
         }
 
         protected override void OnEnable()
@@ -85,6 +91,7 @@ namespace GameDevTV.RTS.Units
         {
             base.OnDisable();
             ActiveBuildings.Remove(this);
+            productionCoroutine = null;
         }
 
         private void RaiseSpawnEvent()
@@ -212,11 +219,14 @@ namespace GameDevTV.RTS.Units
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -unlockable.Cost.Gas, unlockable.Cost.GasSO));
 
             buildingQueue.Add(unlockable);
-            OnQueueUpdated?.Invoke(buildingQueue.ToArray());
 
-            if (productionCoroutine == null)
+            if (productionCoroutine == null && enabled)
             {
                 productionCoroutine = StartCoroutine(DoBuildUnits());
+            }
+            else
+            {
+                OnQueueUpdated?.Invoke(buildingQueue.ToArray());
             }
         }
 
@@ -286,7 +296,7 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
 
         public void StartBuilding(IBuildingBuilder buildingBuilder)
         {
-            Awake();
+            InitializeIfNeeded();
             unitBuildingThis = buildingBuilder;
             Owner = unitBuildingThis.Owner;
             if (MainRenderer != null)
@@ -446,6 +456,7 @@ else if (SOBeingBuilt is UpgradeSO upgrade)
                 buildingQueue.RemoveAt(0);
             }
 
+            SOBeingBuilt = null;
             OnQueueUpdated?.Invoke(buildingQueue.ToArray());
             productionCoroutine = null;
         }
