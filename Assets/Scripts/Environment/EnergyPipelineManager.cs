@@ -39,11 +39,14 @@ namespace GameDevTV.RTS.Environment
         {
             BaseBuilding best = null;
             float minDistance = float.MaxValue;
+
+            // 1. Search for completed Command Center/Post specifically
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
                 if (b == null || b.Owner != Owner.Player1) continue;
                 if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
-                if (b.name.Contains("Command") || (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command")))
+                if (b.name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) || 
+                    (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)))
                 {
                     float dist = Vector3.Distance(targetPosition, b.transform.position);
                     if (dist < minDistance)
@@ -53,7 +56,42 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
             }
-            return best != null ? best.transform.position : Vector3.zero;
+
+            if (best != null) return best.transform.position;
+
+            // 2. Fallback: Search for ANY completed Player 1 building in case of naming differences
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b.Owner != Owner.Player1) continue;
+                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+
+                float dist = Vector3.Distance(targetPosition, b.transform.position);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    best = b;
+                }
+            }
+
+            if (best != null) return best.transform.position;
+
+            // 3. Fallback: Scan scene directly in case registration in ActiveBuildings has a timing delay
+            var allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
+            foreach (var b in allBuildings)
+            {
+                if (b == null || b.Owner != Owner.Player1) continue;
+                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+
+                float dist = Vector3.Distance(targetPosition, b.transform.position);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    best = b;
+                }
+            }
+
+            // 4. Ultimate fallback: if absolutely no completed player buildings exist, start at targetPosition
+            return best != null ? best.transform.position : targetPosition;
         }
 
         private void Update()
@@ -102,7 +140,9 @@ namespace GameDevTV.RTS.Environment
 
         private void UpdateSegments()
         {
-            Vector3 dir = (targetPosition - startPosition).normalized;
+            Vector3 diff = targetPosition - startPosition;
+            if (diff.sqrMagnitude < 0.001f) return;
+            Vector3 dir = diff.normalized;
             int neededSegments = Mathf.FloorToInt(currentGrowthDist / segmentLength);
 
             while (segments.Count < neededSegments)
