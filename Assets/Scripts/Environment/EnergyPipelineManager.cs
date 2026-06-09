@@ -25,8 +25,74 @@ namespace GameDevTV.RTS.Environment
         private float lastDrainTime;
         private bool isAssemblyPhase = false;
 
-        public void Initialize(Vector3 target, SectorManager.Sector sec, GameObject realPrefab)
+        // Right-click cycle: 0 = growing (never interacted), 1 = paused, 2 = resumed (next click cancels)
+        private int cycleStep = 0;
+
+        public bool IsPaused { get; private set; }
+
+        public enum ExpansionAction { Paused, Resumed, Cancelled }
+
+        public float GetProgress()
         {
+            float totalDist = Vector3.Distance(startPosition, targetPosition);
+            if (totalDist < 0.01f) return 1f;
+
+            if (isAssemblyPhase) return 1f;
+
+            return currentGrowthDist / totalDist;
+        }
+
+        /// <summary>
+        /// Advances the right-click interaction cycle on this expansion:
+        /// Pause -> Resume -> Cancel. Returns the action that was performed.
+        /// </summary>
+        public ExpansionAction CycleRightClick()
+        {
+            if (cycleStep == 0)
+            {
+                IsPaused = true;
+                cycleStep = 1;
+                SetSegmentsPausedVisual(true);
+                Debug.Log($"[Expansion] Paused expansion to {sector.Center}. Biomass drain halted.");
+                return ExpansionAction.Paused;
+            }
+            else if (cycleStep == 1)
+            {
+                IsPaused = false;
+                // Avoid an immediate catch-up drain after a long pause.
+                lastDrainTime = Time.time;
+                cycleStep = 2;
+                SetSegmentsPausedVisual(false);
+                Debug.Log($"[Expansion] Resumed expansion to {sector.Center}.");
+                return ExpansionAction.Resumed;
+            }
+            else
+            {
+                Debug.Log($"[Expansion] Cancelled expansion to {sector.Center}.");
+                CancelExpansion();
+                return ExpansionAction.Cancelled;
+            }
+        }
+
+        private void SetSegmentsPausedVisual(bool paused)
+        {
+            Color c = paused
+                ? new Color(1f, 0.8f, 0f, 0.8f)   // amber while paused
+                : new Color(0f, 0.8f, 1f, 0.8f);  // cyan while active
+
+            foreach (var seg in segments)
+            {
+                if (seg == null) continue;
+                var renderer = seg.GetComponent<MeshRenderer>();
+                if (renderer != null && renderer.material != null)
+                {
+                    renderer.material.color = c;
+                }
+            }
+        }
+
+        public void Initialize(Vector3 target, SectorManager.Sector sec, GameObject realPrefab)
+{
             targetPosition = target;
             sector = sec;
             realCommandPostPrefab = realPrefab;
@@ -98,6 +164,9 @@ namespace GameDevTV.RTS.Environment
         {
             if (IsCompleted || isAssemblyPhase) return;
 
+            // While paused, hold growth in place and stop draining biomass.
+            if (IsPaused) return;
+
             if (Time.time >= lastDrainTime + resourceDrainInterval)
             {
                 lastDrainTime = Time.time;
@@ -113,10 +182,16 @@ namespace GameDevTV.RTS.Environment
                     if (currentGrowthDist > totalDist) currentGrowthDist = totalDist;
 
                     UpdateSegments();
+                    // Debug.Log($"[Expansion] Growing: {currentGrowthDist:F1}/{totalDist:F1} to {sector.Center}");
+                }
+                else
+                {
+                    // Debug.LogWarning($"[Expansion] Stalled! No resources for expansion to {sector.Center}");
                 }
             }
             else
             {
+                Debug.Log($"[Expansion] Growth complete. Starting boot-up sequence for {sector.Center}");
                 StartCoroutine(BootUpSequence());
             }
         }

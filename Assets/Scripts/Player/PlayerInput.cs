@@ -508,16 +508,20 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 Ray vetoRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
                 if (Physics.Raycast(vetoRay, out RaycastHit vetoHit, float.MaxValue, ~0, QueryTriggerInteraction.Collide))
                 {
+                    // Right-clicking an active expansion (its pipeline segments or the ghost
+                    // command post) cycles through Pause -> Resume -> Cancel.
+                    EnergyPipelineManager pipelineMgr = null;
                     if (vetoHit.collider.TryGetComponent<PipelineSegment>(out var seg))
                     {
-                        seg.Die();
-                        return;
+                        pipelineMgr = seg.Manager;
                     }
-
-                    var pipelineMgr = vetoHit.collider.GetComponentInParent<EnergyPipelineManager>();
+                    if (pipelineMgr == null)
+                    {
+                        pipelineMgr = vetoHit.collider.GetComponentInParent<EnergyPipelineManager>();
+                    }
                     if (pipelineMgr != null)
                     {
-                        pipelineMgr.CancelExpansion();
+                        pipelineMgr.CycleRightClick();
                         return;
                     }
 

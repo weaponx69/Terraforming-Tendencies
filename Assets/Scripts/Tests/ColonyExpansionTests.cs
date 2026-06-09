@@ -56,19 +56,11 @@ namespace GameDevTV.RTS.Tests
             type.GetField("realPrefab", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(colonyExpansionManager, realPrefab);
 
             // Setup Starting Completed Command Post
-            var commandPostSO = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Command Post/Command Post.asset");
-            baseBuildingObj = new GameObject("Command Post");
-            baseBuildingObj.transform.position = Vector3.zero;
-            baseBuilding = baseBuildingObj.AddComponent<BaseBuilding>();
-
-            var backingField = typeof(AbstractCommandable).GetField("<UnitSO>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (backingField != null)
-            {
-                backingField.SetValue(baseBuilding, commandPostSO);
-            }
+            baseBuildingObj = Object.Instantiate(realPrefab, Vector3.zero, Quaternion.identity);
+            baseBuildingObj.name = "Command Post";
+            baseBuilding = baseBuildingObj.GetComponent<BaseBuilding>();
 
             baseBuilding.Owner = Owner.Player1;
-            baseBuilding.InitializeIfNeeded();
             baseBuilding.CompleteConstruction();
             baseBuilding.enabled = true;
         }
@@ -98,6 +90,7 @@ namespace GameDevTV.RTS.Tests
         public IEnumerator ColonyExpansion_GeneratesNextCommandPost()
         {
             var sector1 = sectorManager.Sectors[1];
+            Debug.Log("[Test] Starting expansion check for sector 1 at " + sector1.Center);
 
             Assert.IsFalse(sector1.IsOccupied, "Sector 1 should not be occupied initially.");
             Assert.IsFalse(colonyExpansionManager.IsExpandingToSector(sector1), "Should not be expanding to Sector 1 initially.");
@@ -107,9 +100,12 @@ namespace GameDevTV.RTS.Tests
             colonyExpansionManager.StartExpansion(targetPosition, sector1);
 
             Assert.IsTrue(colonyExpansionManager.IsExpandingToSector(sector1), "Expansion to Sector 1 should be active.");
+            Debug.Log("[Test] Expansion started. Waiting 6 seconds...");
 
             // Wait for growth and boot-up sequence (which is 5 seconds long)
             yield return new WaitForSeconds(6.0f);
+
+            Debug.Log("[Test] Wait finished. Checking results...");
 
             // Verify that the expansion completed and was cleared
             Assert.IsFalse(colonyExpansionManager.IsExpandingToSector(sector1), "Expansion should be cleared after completion.");
@@ -129,9 +125,11 @@ namespace GameDevTV.RTS.Tests
             }
 
             Assert.IsNotNull(newCommandPost, "A new Command Post should have been spawned.");
+            Debug.Log("[Test] New Command Post found!");
             Assert.AreEqual(Owner.Player1, newCommandPost.Owner, "New Command Post should belong to Player 1.");
             Assert.AreEqual(BuildingProgress.BuildingState.Completed, newCommandPost.Progress.State, "New Command Post construction should be Completed.");
             Assert.IsTrue(Vector3.Distance(newCommandPost.transform.position, targetPosition) < 0.5f, "New Command Post should be spawned near Sector 1 center.");
+            Debug.Log("[Test] Colony expansion SUCCESSFUL.");
         }
     }
 }

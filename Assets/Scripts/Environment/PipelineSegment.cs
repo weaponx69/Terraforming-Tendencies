@@ -8,6 +8,8 @@ namespace GameDevTV.RTS.Environment
         private EnergyPipelineManager manager;
         private int segmentIndex;
 
+        public EnergyPipelineManager Manager => manager;
+
         public int MaxHealth => 10;
         public int CurrentHealth => 10;
         public Transform Transform => transform;

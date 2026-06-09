@@ -45,7 +45,7 @@ namespace GameDevTV.RTS.Units
         private bool hasRaisedSpawnEvent = false;
         private bool isBuildingInitialized = false;
 
-        public new void InitializeIfNeeded()
+        public override void InitializeIfNeeded()
         {
             if (isBuildingInitialized) return;
             base.InitializeIfNeeded();
@@ -72,7 +72,8 @@ namespace GameDevTV.RTS.Units
 
         protected override void Awake()
         {
-            InitializeIfNeeded();
+            // base.Awake() will call our overridden InitializeIfNeeded()
+            base.Awake();
         }
 
         protected override void OnEnable()
@@ -107,6 +108,9 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
 
+            // Ensure we are initialized before checking BuildingSO
+            InitializeIfNeeded();
+
             // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
             if (Progress.State != BuildingProgress.BuildingState.Paused)
             {
@@ -126,11 +130,14 @@ namespace GameDevTV.RTS.Units
 
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
 
-            foreach (UpgradeSO upgrade in BuildingSO.Upgrades)
+            if (BuildingSO != null && BuildingSO.Upgrades != null)
             {
-                if (BuildingSO.TechTree.IsResearched(Owner, upgrade))
+                foreach (UpgradeSO upgrade in BuildingSO.Upgrades)
                 {
-                    upgrade.Apply(BuildingSO);
+                    if (BuildingSO.TechTree.IsResearched(Owner, upgrade))
+                    {
+                        upgrade.Apply(BuildingSO);
+                    }
                 }
             }
         }

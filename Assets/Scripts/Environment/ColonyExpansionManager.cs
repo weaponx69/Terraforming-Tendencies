@@ -16,8 +16,10 @@ namespace GameDevTV.RTS.Environment
 
         private Dictionary<SectorManager.Sector, EnergyPipelineManager> activeExpansions = new Dictionary<SectorManager.Sector, EnergyPipelineManager>();
 
+        public IEnumerable<EnergyPipelineManager> ActiveExpansions => activeExpansions.Values;
+
         private void Awake()
-        {
+{
             if (Instance == null)
             {
                 Instance = this;

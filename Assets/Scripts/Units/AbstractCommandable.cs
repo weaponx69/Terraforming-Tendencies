@@ -44,7 +44,7 @@ namespace GameDevTV.RTS.Units
         private Renderer[] renderers = Array.Empty<Renderer>();
         private ParticleSystem[] particleSystems = Array.Empty<ParticleSystem>();
 
-        public void InitializeIfNeeded()
+        public virtual void InitializeIfNeeded()
         {
             if (isAbstractInitialized) return;
             

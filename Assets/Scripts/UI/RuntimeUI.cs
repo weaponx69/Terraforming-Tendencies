@@ -126,7 +126,47 @@ namespace GameDevTV.RTS.UI
 
             if (total > 0)
             {
-                sectorsValueText.SetText($"{occupied}/{total}");
+                string text = $"{occupied}/{total}";
+
+                bool showingStatus = false;
+
+                // 1. Check for Active Expansions (Pipeline Growth)
+                if (ColonyExpansionManager.Instance != null)
+                {
+                    var expansions = ColonyExpansionManager.Instance.ActiveExpansions.ToList();
+                    if (expansions.Count > 0)
+                    {
+                        // Report on the most-advanced expansion.
+                        var lead = expansions.OrderByDescending(e => e.GetProgress()).First();
+                        float maxProgress = lead.GetProgress();
+                        string pausedSuffix = lead.IsPaused ? " PAUSED" : "";
+                        text += $" (Exp: {maxProgress * 100:F0}%{pausedSuffix})";
+                        showingStatus = true;
+                    }
+                }
+
+                // 2. If no expansion is active, check for Probes analyzing (Preparation)
+                if (!showingStatus)
+                {
+                    var probes = Object.FindObjectsByType<ProbeLogic>(FindObjectsInactive.Exclude);
+                    float maxPrep = 0f;
+                    bool anyAnalyzing = false;
+                    foreach (var p in probes)
+                    {
+                        if (p.IsAnalyzing)
+                        {
+                            anyAnalyzing = true;
+                            if (p.AnalysisProgress > maxPrep) maxPrep = p.AnalysisProgress;
+                        }
+                    }
+
+                    if (anyAnalyzing)
+                    {
+                        text += $" (Prep: {maxPrep * 100:F0}%)";
+                    }
+                }
+
+                sectorsValueText.SetText(text);
             }
         }
 
