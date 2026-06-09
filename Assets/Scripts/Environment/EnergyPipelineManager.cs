@@ -17,12 +17,10 @@ namespace GameDevTV.RTS.Environment
         private Vector3 startPosition;
         private List<GameObject> segments = new List<GameObject>();
         private float segmentLength = 2.0f;
-        private float growthSpeed = 2.0f;
-        private float resourceDrainInterval = 1.0f;
-        private int resourceDrainAmount = 5;
+        private int segmentBiomassCost = 2; // Cost per section
 
-        private float currentGrowthDist = 0f;
-        private float lastDrainTime;
+        private int neededSegments = 0;
+        private int builtSegments = 0;
         private bool isAssemblyPhase = false;
 
         // Right-click cycle: 0 = growing (never interacted), 1 = paused, 2 = resumed (next click cancels)
@@ -34,12 +32,10 @@ namespace GameDevTV.RTS.Environment
 
         public float GetProgress()
         {
-            float totalDist = Vector3.Distance(startPosition, targetPosition);
-            if (totalDist < 0.01f) return 1f;
-
+            if (neededSegments <= 0) return 1f;
             if (isAssemblyPhase) return 1f;
 
-            return currentGrowthDist / totalDist;
+            return (float)builtSegments / neededSegments;
         }
 
         /// <summary>
@@ -59,8 +55,6 @@ namespace GameDevTV.RTS.Environment
             else if (cycleStep == 1)
             {
                 IsPaused = false;
-                // Avoid an immediate catch-up drain after a long pause.
-                lastDrainTime = Time.time;
                 cycleStep = 2;
                 SetSegmentsPausedVisual(false);
                 Debug.Log($"[Expansion] Resumed expansion to {sector.Center}.");
@@ -91,14 +85,15 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-        public void Initialize(Vector3 target, SectorManager.Sector sec, GameObject realPrefab)
-{
             targetPosition = target;
             sector = sec;
             realCommandPostPrefab = realPrefab;
 
             startPosition = FindNearestCompletedCommandCenter();
-            lastDrainTime = Time.time;
+
+            float totalDist = Vector3.Distance(startPosition, targetPosition);
+            neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
+            builtSegments = 0;
         }
 
         private Vector3 FindNearestCompletedCommandCenter()
@@ -162,96 +157,85 @@ namespace GameDevTV.RTS.Environment
 
         private void Update()
         {
-            if (IsCompleted || isAssemblyPhase) return;
-
-            // While paused, hold growth in place and stop draining biomass.
-            if (IsPaused) return;
-
-            if (Time.time >= lastDrainTime + resourceDrainInterval)
+            // Update loop no longer auto-builds the pipeline! 
+            // Drones now call BuildNextSegment() physically.
+            if (!IsCompleted && !isAssemblyPhase && builtSegments >= neededSegments)
             {
-                lastDrainTime = Time.time;
-                DrainResources();
-            }
-
-            float totalDist = Vector3.Distance(startPosition, targetPosition);
-            if (currentGrowthDist < totalDist)
-            {
-                if (HasResources())
-                {
-                    currentGrowthDist += growthSpeed * Time.deltaTime;
-                    if (currentGrowthDist > totalDist) currentGrowthDist = totalDist;
-
-                    UpdateSegments();
-                    // Debug.Log($"[Expansion] Growing: {currentGrowthDist:F1}/{totalDist:F1} to {sector.Center}");
-                }
-                else
-                {
-                    // Debug.LogWarning($"[Expansion] Stalled! No resources for expansion to {sector.Center}");
-                }
-            }
-            else
-            {
-                Debug.Log($"[Expansion] Growth complete. Starting boot-up sequence for {sector.Center}");
+                Debug.Log($"[Expansion] Growth complete by drones. Starting boot-up sequence for {sector.Center}");
                 StartCoroutine(BootUpSequence());
             }
         }
 
-        private bool HasResources()
+        public bool HasPendingSegments()
         {
-            if (Supplies.Biomass == null) return false;
-            return Supplies.Biomass.TryGetValue(Owner.Player1, out int b) && b >= resourceDrainAmount;
+            return !IsCompleted && !isAssemblyPhase && !IsPaused && builtSegments < neededSegments;
         }
 
-        private void DrainResources()
+        public Vector3 GetNextSegmentPosition()
         {
-            if (Supplies.Biomass == null) return;
+            if (builtSegments >= neededSegments) return targetPosition;
+
+            Vector3 diff = targetPosition - startPosition;
+            Vector3 dir = diff.normalized;
+            float spawnDist = (builtSegments + 0.5f) * segmentLength;
+            Vector3 spawnPos = startPosition + dir * spawnDist;
+
+            Ray ray = new Ray(spawnPos + Vector3.up * 50f, Vector3.down);
+            if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
+            {
+                spawnPos.y = groundHit.point.y;
+            }
+
+            return spawnPos;
+        }
+
+        public bool CanAffordNextSegment()
+        {
+            if (Supplies.Biomass == null) return false;
+            return Supplies.Biomass.TryGetValue(Owner.Player1, out int b) && b >= segmentBiomassCost;
+        }
+
+        public bool BuildNextSegment()
+        {
+            if (!HasPendingSegments()) return false;
+            if (!CanAffordNextSegment()) return false;
+
+            // Drain cost
             if (Supplies.Biomass.TryGetValue(Owner.Player1, out int b))
             {
-                int nextVal = Mathf.Max(0, b - resourceDrainAmount);
+                int nextVal = Mathf.Max(0, b - segmentBiomassCost);
                 Supplies.Biomass[Owner.Player1] = nextVal;
                 Supplies.RaiseBiomassChanged(Owner.Player1, nextVal);
             }
-        }
 
-        private void UpdateSegments()
-        {
-            Vector3 diff = targetPosition - startPosition;
-            if (diff.sqrMagnitude < 0.001f) return;
-            Vector3 dir = diff.normalized;
-            int neededSegments = Mathf.FloorToInt(currentGrowthDist / segmentLength);
+            // Spawn the segment physically
+            Vector3 spawnPos = GetNextSegmentPosition();
+            Vector3 dir = (targetPosition - startPosition).normalized;
 
-            while (segments.Count < neededSegments)
+            GameObject seg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            seg.name = "PipelineSegment";
+            seg.transform.position = spawnPos;
+            seg.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(90f, 0f, 0f);
+            seg.transform.localScale = new Vector3(0.5f, segmentLength * 0.5f, 0.5f);
+
+            var renderer = seg.GetComponent<MeshRenderer>();
+            if (renderer != null)
             {
-                float spawnDist = (segments.Count + 0.5f) * segmentLength;
-                Vector3 spawnPos = startPosition + dir * spawnDist;
-
-                Ray ray = new Ray(spawnPos + Vector3.up * 50f, Vector3.down);
-                if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
-                {
-                    spawnPos.y = groundHit.point.y;
-                }
-
-                GameObject seg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                seg.name = "PipelineSegment";
-                seg.transform.position = spawnPos;
-                seg.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(90f, 0f, 0f);
-                seg.transform.localScale = new Vector3(0.5f, segmentLength * 0.5f, 0.5f);
-
-                var renderer = seg.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    Material mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                    if (mat == null) mat = new Material(Shader.Find("Unlit/Color"));
-                    mat.color = new Color(0f, 0.8f, 1f, 0.8f);
-                    renderer.material = mat;
-                }
-
-                PipelineSegment segComp = seg.AddComponent<PipelineSegment>();
-                segComp.Initialize(this, segments.Count);
-
-                segments.Add(seg);
+                Material mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                if (mat == null) mat = new Material(Shader.Find("Unlit/Color"));
+                mat.color = new Color(0f, 0.8f, 1f, 0.8f);
+                renderer.material = mat;
             }
+
+            PipelineSegment segComp = seg.AddComponent<PipelineSegment>();
+            segComp.Initialize(this, builtSegments);
+            segments.Add(seg);
+
+            builtSegments++;
+            return true;
         }
+
+
 
         public void HandleSegmentDestroyed(int index)
         {
@@ -264,7 +248,7 @@ namespace GameDevTV.RTS.Environment
                 segments.RemoveAt(i);
             }
 
-            currentGrowthDist = segments.Count * segmentLength;
+            builtSegments = segments.Count;
         }
 
         public void CancelExpansion()

@@ -220,6 +220,12 @@ namespace GameDevTV.RTS.Units
             return instance;
         }
 
+        public void BuildPipeline(EnergyPipelineManager pipelineManager)
+        {
+            if (pipelineManager == null) return;
+            SetCurrentCommand(UnitCommands.Build);
+            Brain.StartPipelineBuild(pipelineManager);
+        }
 
         public void ResumeBuilding(BaseBuilding building)
         {

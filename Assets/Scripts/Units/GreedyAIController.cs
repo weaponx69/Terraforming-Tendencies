@@ -64,6 +64,7 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private BuildingSO oxygenProcessorSO;
         [SerializeField] private AbstractUnitSO probeSO;
         [SerializeField] private AbstractUnitSO workerSO;
+        [SerializeField] private AbstractUnitSO constructionDroneSO;
         
 #pragma warning disable 0414
         [Header("Settings")]
@@ -138,6 +139,7 @@ namespace GameDevTV.RTS.Units
             if (oxygenProcessorSO == null) oxygenProcessorSO = Resources.Load<BuildingSO>("Buildings/OxygenProcessor");
             if (probeSO == null) probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
             if (workerSO == null) workerSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+            if (constructionDroneSO == null) constructionDroneSO = Resources.Load<AbstractUnitSO>("Units/ConstructionDrone");
         }
 
         private void Start()
@@ -212,6 +214,7 @@ namespace GameDevTV.RTS.Units
             AssignIdleWorkers();
             ManageProduction();
             ManageBaseBuildings();
+            ManagePipelines();
         }
 
         // ── Build the set of player-approvable packages ─────────────────────────
@@ -404,7 +407,7 @@ if (SectorManager.Instance != null)
                 float deadline = Time.time + expansionBuilderTimeout;
                 while (Time.time < deadline)
                 {
-                    builder = FindWorkerForExpansion();
+                    builder = FindConstructionWorker();
                     if (builder != null) break;
                     yield return new WaitForSeconds(1f);
                 }
@@ -494,15 +497,26 @@ if (SectorManager.Instance != null)
                 var allUnits = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude)
                     .Where(u => u.Owner == aiOwner).ToList();
 
-                // Count workers (those without ProbeMovement)
-                int workerCount = allUnits.Count(u => u is Worker && u.GetComponent<ProbeMovement>() == null);
+                // Count workers (mining drones only)
+                int workerCount = allUnits.Count(u => u is Worker && u.GetComponent<ProbeMovement>() == null && (u.UnitSO == null || u.UnitSO.Name != "Construction Drone"));
                 
                 if (workerCount < workersPerBase)
                 {
                     if (workerSO != null && CanAfford(workerSO)) 
                     {
-                        Debug.Log("[GreedyAI] Building Worker at " + cp.name);
+                        Debug.Log("[GreedyAI] Building Mining Drone at " + cp.name);
                         cp.BuildUnlockable(workerSO);
+                    }
+                }
+
+                // Count construction drones
+                int builderCount = allUnits.Count(u => u is Worker && u.UnitSO != null && u.UnitSO.Name == "Construction Drone");
+                if (builderCount < activeCommandPosts.Count * 1) // Ensure 1 builder per base
+                {
+                    if (constructionDroneSO != null && CanAfford(constructionDroneSO) && cp.QueueSize < 3) 
+                    {
+                        Debug.Log("[GreedyAI] Building Construction Drone at " + cp.name);
+                        cp.BuildUnlockable(constructionDroneSO);
                     }
                 }
                 
@@ -542,8 +556,8 @@ if (SectorManager.Instance != null)
 
                 if (!CanAfford(oxygenProcessorSO)) continue;
 
-                Worker builder = FindAvailableWorker();
-                if (builder == null) return; // no free worker right now; try again next tick
+                Worker builder = FindConstructionWorker();
+                if (builder == null) return; // no free builder right now; try again next tick
 
                 Vector3 spot = FindBuildSpotNear(cp.transform.position, 12f);
                 Debug.Log("[GreedyAI] Dispatching " + builder.name + " to build Oxygen Processor near " + cp.name);
@@ -558,6 +572,30 @@ if (SectorManager.Instance != null)
             isBuildingStructure = true;
             yield return new WaitForSeconds(15f);
             isBuildingStructure = false;
+        }
+
+        private void ManagePipelines()
+        {
+            var pipelines = Object.FindObjectsByType<EnergyPipelineManager>(FindObjectsInactive.Exclude);
+            foreach (var pipeline in pipelines)
+            {
+                if (pipeline.HasPendingSegments() && pipeline.CanAffordNextSegment())
+                {
+                    // Check if a builder is already assigned to this pipeline
+                    bool isAssigned = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
+                        .Any(w => w.GetComponent<WorkerBrainController>()?.CurrentPipeline == pipeline);
+                    
+                    if (!isAssigned)
+                    {
+                        Worker builder = FindConstructionWorker();
+                        if (builder != null)
+                        {
+                            Debug.Log($"[GreedyAI] Assigning Construction Drone {builder.name} to build pipeline to {pipeline.sector?.Center}");
+                            builder.BuildPipeline(pipeline);
+                        }
+                    }
+                }
+            }
         }
 
         private int CountBuildingsNear(BuildingSO so, Vector3 position, float radius)
@@ -603,12 +641,18 @@ if (SectorManager.Instance != null)
                 // Note: unitBuildingThis is private, but the state is Building if someone is.
                 // But we only look at Paused ones anyway.
                 
-                Worker builder = FindAvailableWorker();
-                if (builder == null) return; // No more free workers
+                Worker builder = FindConstructionWorker();
+                if (builder == null) return; // No more free builders
 
-                Debug.Log($"[GreedyAI] Re-assigning worker {builder.name} to resume unfinished {building.name}");
+                Debug.Log($"[GreedyAI] Re-assigning builder {builder.name} to resume unfinished {building.name}");
                 builder.ResumeBuilding(building);
             }
+        }
+
+        private Worker FindConstructionWorker()
+        {
+            return Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
+                .FirstOrDefault(w => w != null && w.Owner == aiOwner && w.UnitSO != null && w.UnitSO.Name == "Construction Drone" && w.IsIdle);
         }
 
         // ── Drone mining (ported from the old AIController) ─────────────────────
@@ -629,6 +673,7 @@ if (SectorManager.Instance != null)
                 .Where(w => w != null
                             && w.Owner == aiOwner
                             && w.GetComponent<ProbeMovement>() == null            // not a Probe
+                            && (w.UnitSO == null || w.UnitSO.Name != "Construction Drone") // not a Builder
                             && w.IsIdle)
                 .ToList();
 
@@ -796,7 +841,7 @@ if (SectorManager.Instance != null)
                     float deadline = Time.time + expansionBuilderTimeout;
                     while (Time.time < deadline)
                     {
-                        builder = FindWorkerForExpansion();
+                        builder = FindConstructionWorker();
                         if (builder != null) break;
                         yield return new WaitForSeconds(1f);
                     }

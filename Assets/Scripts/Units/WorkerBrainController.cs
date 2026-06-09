@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.Units
     [RequireComponent(typeof(NavMeshAgent), typeof(Worker))]
     public class WorkerBrainController : MonoBehaviour
     {
-        public enum State { Idle, MovingToSupply, Gathering, MovingToBase, MovingToBuild, Building, MovingToRepair, Repairing }
+        public enum State { Idle, MovingToSupply, Gathering, MovingToBase, MovingToBuild, Building, MovingToRepair, Repairing, BuildingPipeline }
 
         public State CurrentState { get; private set; } = State.Idle;
 
@@ -26,6 +26,8 @@ namespace GameDevTV.RTS.Units
         private Transform homeBase;
 
         private GatherableSupply targetSupply;
+        private BaseBuilding targetBuilding;
+        public EnergyPipelineManager CurrentPipeline { get; private set; }
         private Coroutine runningCoroutine;
 
         private void Awake()
@@ -70,6 +72,12 @@ namespace GameDevTV.RTS.Units
             Restart(RepairLoop(target));
         }
 
+        public void StartPipelineBuild(EnergyPipelineManager pipelineManager)
+        {
+            CurrentPipeline = pipelineManager;
+            Restart(PipelineBuildLoop());
+        }
+
         public void Halt()
         {
             StopRunning();
@@ -78,6 +86,7 @@ namespace GameDevTV.RTS.Units
                 targetSupply.AbortGather();
                 targetSupply = null;
             }
+            CurrentPipeline = null;
             if (agent.isOnNavMesh) agent.ResetPath();
             CurrentState = State.Idle;
         }
@@ -97,6 +106,58 @@ namespace GameDevTV.RTS.Units
                 StopCoroutine(runningCoroutine);
                 runningCoroutine = null;
             }
+        }
+
+        private IEnumerator PipelineBuildLoop()
+        {
+            while (CurrentPipeline != null && CurrentPipeline.HasPendingSegments())
+            {
+                Vector3 targetPos = CurrentPipeline.GetNextSegmentPosition();
+                
+                CurrentState = State.MovingToBuild;
+                if (agent.isOnNavMesh)
+                {
+                    agent.stoppingDistance = 1.0f;
+                    agent.SetDestination(targetPos);
+                }
+
+                // Wait until we reach the target (using distance check)
+                while (agent.pathPending || agent.remainingDistance > agent.stoppingDistance)
+                {
+                    if (CurrentPipeline == null || !CurrentPipeline.HasPendingSegments() || CurrentPipeline.IsPaused)
+                    {
+                        break;
+                    }
+                    yield return null;
+                }
+
+                if (CurrentPipeline == null || !CurrentPipeline.HasPendingSegments() || CurrentPipeline.IsPaused)
+                    break;
+
+                CurrentState = State.BuildingPipeline;
+
+                // Stop moving while building
+                if (agent.isOnNavMesh) agent.ResetPath();
+                
+                // Simulate build time for one segment
+                yield return new WaitForSeconds(1.5f); 
+
+                if (CurrentPipeline != null && CurrentPipeline.CanAffordNextSegment())
+                {
+                    bool built = CurrentPipeline.BuildNextSegment();
+                    if (!built) break; // Something went wrong or we ran out of biomass
+                }
+                else
+                {
+                    break; // Out of biomass, abort and let GreedyAI re-assign later
+                }
+
+                yield return null;
+            }
+
+            CurrentState = State.Idle;
+            runningCoroutine = null;
+            worker.Stop();
         }
 
         private IEnumerator GatherLoop()
