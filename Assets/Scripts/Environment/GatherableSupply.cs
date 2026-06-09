@@ -34,6 +34,7 @@ namespace GameDevTV.RTS.Environment
         private Placeholder culledVisuals;
         private Renderer[] renderers = Array.Empty<Renderer>();
         private ParticleSystem[] particleSystems = Array.Empty<ParticleSystem>();
+        private Collider[] colliders = Array.Empty<Collider>();
 
         public event IHideable.VisibilityChangeEvent OnVisibilityChanged;
 
@@ -41,12 +42,26 @@ namespace GameDevTV.RTS.Environment
         {
             renderers = GetComponentsInChildren<Renderer>();
             particleSystems = GetComponentsInChildren<ParticleSystem>();
+            colliders = GetComponentsInChildren<Collider>();
+        }
+
+        public void ToggleColliders(bool enabled)
+        {
+            foreach (Collider c in colliders)
+            {
+                if (c != null) c.enabled = enabled;
+            }
         }
 
         private void Start()
         {
             Amount = Supply != null ? Supply.MaxAmount : 100;
             Bus<SupplySpawnEvent>.Raise(Owner.Unowned, new SupplySpawnEvent(this));
+
+            if (TryGetComponent<HiddenResource>(out var hr) && !hr.IsDiscovered)
+            {
+                OnLoseVisibility();
+            }
         }
 
         private void OnDestroy()
@@ -100,6 +115,11 @@ namespace GameDevTV.RTS.Environment
 
         public void SetVisible(bool isVisible)
         {
+            if (TryGetComponent<HiddenResource>(out var hr) && !hr.IsDiscovered)
+            {
+                isVisible = false;
+            }
+
             if (isVisible == IsVisible) return;
 
             IsVisible = isVisible;
@@ -117,6 +137,7 @@ namespace GameDevTV.RTS.Environment
 
         private void OnGainVisibility()
         {
+            ToggleColliders(true);
             foreach (Renderer renderer in renderers)
             {
                 renderer.enabled = true;
@@ -143,6 +164,16 @@ namespace GameDevTV.RTS.Environment
             foreach (ParticleSystem particleSystem in particleSystems)
             {
                 particleSystem.gameObject.SetActive(false);
+            }
+
+            if (TryGetComponent<HiddenResource>(out var hr) && !hr.IsDiscovered)
+            {
+                ToggleColliders(false);
+                if (culledVisuals != null)
+                {
+                    culledVisuals.gameObject.SetActive(false);
+                }
+                return;
             }
 
             if (culledVisuals == null)

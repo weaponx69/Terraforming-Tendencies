@@ -259,7 +259,8 @@ namespace GameDevTV.RTS.Units
             node.ResourcesInRange.Clear();
             Vector3 pos = node.CommandPost.transform.position;
             var supplies = GatherableSupply.ActiveSupplies
-                .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null))
+                .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null)
+                            && (!s.TryGetComponent<HiddenResource>(out var hr) || hr.IsDiscovered))
 .Where(s => Vector3.Distance(s.transform.position, pos) <= nodeRadius)
                 .OrderBy(s => Vector3.Distance(s.transform.position, pos));
 

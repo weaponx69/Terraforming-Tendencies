@@ -21,6 +21,11 @@ namespace GameDevTV.RTS.Environment
             if (IsDiscovered) return;
             
             IsDiscovered = true;
+            if (TryGetComponent<GatherableSupply>(out var supply))
+            {
+                supply.ToggleColliders(true);
+                supply.SetVisible(true);
+            }
             Bus<ResourceDiscoveredEvent>.Raise(Owner.Unowned, new ResourceDiscoveredEvent(this));
             // // Debug.Log($"Rock surface charted at {transform.position}!");
         }

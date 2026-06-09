@@ -696,6 +696,7 @@ if (SectorManager.Instance != null)
                 GatherableSupply supply = GatherableSupply.ActiveSupplies
                     .Where(s => s != null && s.Amount > 0 && !s.IsBusy
                                 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null)
+                                && (!s.TryGetComponent<HiddenResource>(out var hr) || hr.IsDiscovered)
 && !claimed.Contains(s))
                     .OrderBy(s => (s.transform.position - drone.transform.position).sqrMagnitude)
                     .FirstOrDefault();
@@ -705,7 +706,8 @@ if (SectorManager.Instance != null)
                 if (supply == null)
                 {
                     supply = GatherableSupply.ActiveSupplies
-                        .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null))
+                        .Where(s => s != null && s.Amount > 0 && (s.transform.parent != null && s.transform.parent.GetComponent<PlanetGenerator>() != null)
+                                    && (!s.TryGetComponent<HiddenResource>(out var hr) || hr.IsDiscovered))
 .OrderBy(s => (s.transform.position - drone.transform.position).sqrMagnitude)
                         .FirstOrDefault();
                 }
