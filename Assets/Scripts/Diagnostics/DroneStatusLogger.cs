@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.Diagnostics
             if (Time.time - lastLogTime < LOG_INTERVAL) return;
             lastLogTime = Time.time;
 
-            var units = Object.FindObjectsByType<AbstractUnit>(FindObjectsSortMode.None);
+            var units = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude);
             foreach (var unit in units)
             {
                 if (!unit.name.Contains("Drone")) continue;

@@ -14,7 +14,7 @@ public class DroneStatusLogger : MonoBehaviour
         if (Time.time - lastLogTime < LOG_INTERVAL) return;
         lastLogTime = Time.time;
 
-        var units = Object.FindObjectsByType<AbstractUnit>(FindObjectsSortMode.None);
+        var units = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude);
         bool found = false;
         foreach (var unit in units)
         {

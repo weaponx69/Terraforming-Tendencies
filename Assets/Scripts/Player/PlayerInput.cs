@@ -603,10 +603,11 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             if (playerCamera == null) { return ; }
 
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            RaycastHit hit;
 
             if (activeCommand == null)
             {
-                if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, selectableUnitsLayers)
+                if (Physics.Raycast(cameraRay, out hit, float.MaxValue, selectableUnitsLayers)
                     && hit.collider.TryGetComponent(out ISelectable selectable))
                 {
                     selectable.Select();

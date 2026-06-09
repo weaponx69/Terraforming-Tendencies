@@ -30,8 +30,10 @@ namespace GameDevTV.RTS.Player
         [Tooltip("Seconds between checks for the 'no recovery possible' condition.")]
         [SerializeField] private float checkInterval = 3f;
 
+#pragma warning disable 0414
         [Tooltip("Grace period (seconds) after biomass first hits 0 before triggering game over.")]
         [SerializeField] private float gracePeriod = 5f;
+#pragma warning restore 0414
 
         // ── Public event ───────────────────────────────────────────────────────────
         public enum GameOverReason { LifeSupport, Resources }
