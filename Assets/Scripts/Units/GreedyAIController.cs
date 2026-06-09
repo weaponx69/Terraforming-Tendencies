@@ -65,6 +65,7 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private AbstractUnitSO probeSO;
         [SerializeField] private AbstractUnitSO workerSO;
         
+#pragma warning disable 0414
         [Header("Settings")]
         [SerializeField] private bool proposalsEnabled = false;
         [SerializeField] private int probesPerBase = 2;
@@ -109,6 +110,7 @@ namespace GameDevTV.RTS.Units
         // we allow that single expansion decision so the colony can keep growing.
         private int lastOfferedCommandPostCount = -1;
         private bool offeredExpansionThisEra = false;
+#pragma warning restore 0414
 
         public event System.Action<List<ExpansionProposal>, float> OnExpansionProposed;
 
