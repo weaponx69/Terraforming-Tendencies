@@ -17,85 +17,85 @@ MonoBehaviour:
       lastSelectedModels:
         serializedData:
         - key:
-            rid: 7234512929338950327
+            rid: 7234512929338950596
           value:
-            rid: 7234512929338950328
+            rid: 7234512929338950597
         - key:
-            rid: 7234512929338950329
+            rid: 7234512929338950598
           value:
-            rid: 7234512929338950330
+            rid: 7234512929338950599
         - key:
-            rid: 7234512929338950331
+            rid: 7234512929338950600
           value:
-            rid: 7234512929338950332
+            rid: 7234512929338950601
         - key:
-            rid: 7234512929338950333
+            rid: 7234512929338950602
           value:
-            rid: 7234512929338950334
+            rid: 7234512929338950603
         - key:
-            rid: 7234512929338950335
+            rid: 7234512929338950604
           value:
-            rid: 7234512929338950336
+            rid: 7234512929338950605
         - key:
-            rid: 7234512929338950337
+            rid: 7234512929338950606
           value:
-            rid: 7234512929338950338
+            rid: 7234512929338950607
       previewSettings:
         sizeFactor: 1.54
   references:
     version: 2
     RefIds:
-    - rid: 7234512929338950327
+    - rid: 7234512929338950596
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 0
-    - rid: 7234512929338950328
+    - rid: 7234512929338950597
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: gpt-image-1-5
-    - rid: 7234512929338950329
+    - rid: 7234512929338950598
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 1
-    - rid: 7234512929338950330
+    - rid: 7234512929338950599
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234512929338950331
+    - rid: 7234512929338950600
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 2
-    - rid: 7234512929338950332
+    - rid: 7234512929338950601
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234512929338950333
+    - rid: 7234512929338950602
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 3
-    - rid: 7234512929338950334
+    - rid: 7234512929338950603
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234512929338950335
+    - rid: 7234512929338950604
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 4
-    - rid: 7234512929338950336
+    - rid: 7234512929338950605
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234512929338950337
+    - rid: 7234512929338950606
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Video
         mode: 6
-    - rid: 7234512929338950338
+    - rid: 7234512929338950607
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
