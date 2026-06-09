@@ -603,18 +603,17 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             if (playerCamera == null) { return ; }
 
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
-            RaycastHit hit;
 
             if (activeCommand == null)
             {
-                if (Physics.Raycast(cameraRay, out hit, float.MaxValue, selectableUnitsLayers)
+                if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, selectableUnitsLayers)
                     && hit.collider.TryGetComponent(out ISelectable selectable))
                 {
                     selectable.Select();
                 }
-                else if (Physics.Raycast(cameraRay, out hit, float.MaxValue, ~floorLayers))
+                else if (Physics.Raycast(cameraRay, out RaycastHit hitFallback, float.MaxValue, ~floorLayers))
                 {
-                    ISelectable fallbackSelectable = hit.collider.GetComponentInParent<ISelectable>();
+                    ISelectable fallbackSelectable = hitFallback.collider.GetComponentInParent<ISelectable>();
                     if (fallbackSelectable != null)
                     {
                         fallbackSelectable.Select();
@@ -624,14 +623,14 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             else if (activeCommand != null
                 && !EventSystem.current.IsPointerOverGameObject())
             {
-                if (Physics.Raycast(cameraRay, out hit, float.MaxValue, interactableLayers | floorLayers))
+                if (Physics.Raycast(cameraRay, out RaycastHit hitAction, float.MaxValue, interactableLayers | floorLayers))
                 {
-                    ActivateAction(hit);
+                    ActivateAction(hitAction);
                 }
                 // Fallback: If the user forgot to set their floorLayers mask, try to place it on literally anything
-                else if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
+                else if (Physics.Raycast(cameraRay, out RaycastHit hitAny, float.MaxValue))
                 {
-                    ActivateAction(hit);
+                    ActivateAction(hitAny);
                 }
             }
         }

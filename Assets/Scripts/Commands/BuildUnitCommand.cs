@@ -25,8 +25,18 @@ namespace GameDevTV.RTS.Commands
             building.BuildUnlockable(Unit);
         }
 
-        public override bool IsLocked(CommandContext context) =>
-            !HasEnoughSupplies(context) || !Unit.TechTree.IsUnlocked(context.Owner, Unit);
+        public override bool IsLocked(CommandContext context)
+        {
+            if (!HasEnoughSupplies(context)) return true;
+            if (!Unit.TechTree.IsUnlocked(context.Owner, Unit)) return true;
+            
+            if (context.Commandable is BaseBuilding building)
+            {
+                if (building.QueueSize >= BaseBuilding.MAX_QUEUE_SIZE) return true;
+            }
+            
+            return false;
+        }
 
         public UnlockableSO[] GetUnmetDependencies(Owner owner)
         {

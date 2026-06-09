@@ -40,7 +40,7 @@ namespace GameDevTV.RTS.Units
         private IBuildingBuilder unitBuildingThis;
         private Coroutine productionCoroutine;
         private List<UnlockableSO> buildingQueue = new(MAX_QUEUE_SIZE);
-        private const int MAX_QUEUE_SIZE = 5;
+        public const int MAX_QUEUE_SIZE = 5;
         private int spawnCount = 0; // Tracks how many units have been spawned, for angle distribution
         private bool hasRaisedSpawnEvent = false;
         private bool isBuildingInitialized = false;
@@ -211,7 +211,7 @@ namespace GameDevTV.RTS.Units
         {
             if (buildingQueue.Count == MAX_QUEUE_SIZE)
             {
-                Debug.LogError("BuildUnit called when the queue was already full! This is not supported!");
+                Debug.LogWarning($"[BaseBuilding] Cannot build {unlockable.Name}: Queue is full ({MAX_QUEUE_SIZE}/{MAX_QUEUE_SIZE}).");
                 return;
             }
 

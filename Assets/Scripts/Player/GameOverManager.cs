@@ -27,13 +27,10 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private Owner aiOwner = Owner.AI1;
 
         [Header("Timing")]
-        [Tooltip("Seconds between checks for the 'no recovery possible' condition.")]
-        [SerializeField] private float checkInterval = 3f;
-
-#pragma warning disable 0414
-        [Tooltip("Grace period (seconds) after biomass first hits 0 before triggering game over.")]
-        [SerializeField] private float gracePeriod = 5f;
-#pragma warning restore 0414
+        #pragma warning disable 0414
+                [Tooltip("Seconds between checks for the 'no recovery possible' condition.")]
+                [SerializeField] private float checkInterval = 3f;
+        #pragma warning restore 0414
 
         // ── Public event ───────────────────────────────────────────────────────────
         public enum GameOverReason { LifeSupport, Resources }
