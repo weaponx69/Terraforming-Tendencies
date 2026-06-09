@@ -108,6 +108,7 @@ namespace GameDevTV.RTS.Player
         }
 
         private bool hasCameraBeenFocused = false;
+        private bool hasCameraSnappedToCommandPost = false;
 
         private void CenterCameraOnMap()
         {
@@ -161,7 +162,7 @@ namespace GameDevTV.RTS.Player
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
         {
             // Auto-snap to the first Command building that appears for the player (e.g. initial base)
-            if (!hasCameraBeenFocused && evt.Building != null && evt.Building.BuildingSO != null 
+            if (!hasCameraSnappedToCommandPost && evt.Building != null && evt.Building.BuildingSO != null 
                 && evt.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
                 if (cameraTarget != null)
@@ -169,7 +170,7 @@ namespace GameDevTV.RTS.Player
                     Vector3 targetPos = evt.Building.transform.position;
                     targetPos.y = cameraTarget.position.y;
                     cameraTarget.position = targetPos;
-                    hasCameraBeenFocused = true;
+                    hasCameraSnappedToCommandPost = true;
                 }
             }
         }
@@ -401,8 +402,6 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
 
         private void HandleDragSelect()
         {
-            if (selectionBox == null) { return; }
-
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
                 HandleMouseDown();
@@ -429,7 +428,10 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             {
                 unit.Select();
             }
-            selectionBox.gameObject.SetActive(false);
+            if (selectionBox != null)
+            {
+                selectionBox.gameObject.SetActive(false);
+            }
 
             // If the click landed on empty space (nothing got selected and it wasn't a UI
             // interaction or an active command placement), fall back to selecting the Global Commander.
@@ -461,8 +463,11 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
 
         private void HandleMouseDown()
         {
-            selectionBox.sizeDelta = Vector2.zero;
-            selectionBox.gameObject.SetActive(true);
+            if (selectionBox != null)
+            {
+                selectionBox.sizeDelta = Vector2.zero;
+                selectionBox.gameObject.SetActive(true);
+            }
             startingMousePosition = Mouse.current.position.ReadValue();
             addedUnits.Clear();
             wasMouseDownOnUI = EventSystem.current.IsPointerOverGameObject();
@@ -484,10 +489,16 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             float width = mousePosition.x - startingMousePosition.x;
             float height = mousePosition.y - startingMousePosition.y;
 
-            selectionBox.anchoredPosition = startingMousePosition + new Vector2(width / 2, height / 2);
-            selectionBox.sizeDelta = new Vector2(Mathf.Abs(width), Mathf.Abs(height));
+            Vector2 anchoredPos = startingMousePosition + new Vector2(width / 2, height / 2);
+            Vector2 sizeDelta = new Vector2(Mathf.Abs(width), Mathf.Abs(height));
 
-            return new Bounds(selectionBox.anchoredPosition, selectionBox.sizeDelta);
+            if (selectionBox != null)
+            {
+                selectionBox.anchoredPosition = anchoredPos;
+                selectionBox.sizeDelta = sizeDelta;
+            }
+
+            return new Bounds(anchoredPos, sizeDelta);
         }
 
         private void HandleRightClick()
@@ -593,11 +604,21 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
 
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-            if (activeCommand == null
-                && Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, selectableUnitsLayers)
-                && hit.collider.TryGetComponent(out ISelectable selectable))
+            if (activeCommand == null)
             {
-                selectable.Select();
+                if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, selectableUnitsLayers)
+                    && hit.collider.TryGetComponent(out ISelectable selectable))
+                {
+                    selectable.Select();
+                }
+                else if (Physics.Raycast(cameraRay, out hit, float.MaxValue, ~floorLayers))
+                {
+                    ISelectable fallbackSelectable = hit.collider.GetComponentInParent<ISelectable>();
+                    if (fallbackSelectable != null)
+                    {
+                        fallbackSelectable.Select();
+                    }
+                }
             }
             else if (activeCommand != null
                 && !EventSystem.current.IsPointerOverGameObject())

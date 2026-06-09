@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.EventBus;
+using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Player;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -26,6 +29,31 @@ namespace GameDevTV.RTS.Environment
             }
 
             LoadPrefabs();
+            Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] += HandlePlayerBuildingDeath;
+        }
+
+        private void OnDestroy()
+        {
+            Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] -= HandlePlayerBuildingDeath;
+        }
+
+        private void HandlePlayerBuildingDeath(BuildingDeathEvent evt)
+        {
+            if (evt.Building != null && evt.Building.BuildingSO != null 
+                && evt.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (evt.Building.Progress.State != BuildingProgress.BuildingState.Completed)
+                {
+                    if (SectorManager.Instance != null)
+                    {
+                        var sector = SectorManager.Instance.GetNearestSector(evt.Building.transform.position);
+                        if (sector != null)
+                        {
+                            VetoSector(sector);
+                        }
+                    }
+                }
+            }
         }
 
         private void LoadPrefabs()
@@ -77,6 +105,22 @@ namespace GameDevTV.RTS.Environment
             {
                 activeExpansions.Remove(sector);
             }
+        }
+
+        private HashSet<SectorManager.Sector> vetoedSectors = new HashSet<SectorManager.Sector>();
+
+        public void VetoSector(SectorManager.Sector sector)
+        {
+            if (sector != null)
+            {
+                vetoedSectors.Add(sector);
+                ClearExpansion(sector);
+            }
+        }
+
+        public bool IsSectorVetoed(SectorManager.Sector sector)
+        {
+            return sector != null && vetoedSectors.Contains(sector);
         }
     }
 }

@@ -98,12 +98,6 @@ namespace GameDevTV.RTS.Environment
 
         private void UpdateOccupancy()
         {
-            var pg = PlanetGenerator.Instance;
-            if (pg == null) pg = Object.FindAnyObjectByType<PlanetGenerator>();
-            if (pg == null || pg.Config == null) return;
-
-            float radius = pg.Config.SectorOccupationRadius;
-
             foreach (var sector in Sectors)
             {
                 bool found = false;
@@ -116,7 +110,7 @@ namespace GameDevTV.RTS.Environment
                     bool isCommandPost = building.BuildingSO != null && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
                     if (!isCommandPost) continue;
 
-                    if (Vector3.Distance(building.transform.position, sector.Center) <= radius)
+                    if (GetNearestSector(building.transform.position) == sector)
                     {
                         found = true;
                         sector.OccupyingBuilding = building;

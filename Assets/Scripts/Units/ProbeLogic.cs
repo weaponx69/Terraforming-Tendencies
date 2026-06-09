@@ -43,7 +43,7 @@ namespace GameDevTV.RTS.Environment
                 if (SectorManager.Instance != null && ColonyExpansionManager.Instance != null)
                 {
                     var sector = SectorManager.Instance.GetNearestSector(transform.position);
-                    if (sector != null && !sector.IsOccupied && !ColonyExpansionManager.Instance.IsExpandingToSector(sector))
+                    if (sector != null && !sector.IsOccupied && !ColonyExpansionManager.Instance.IsExpandingToSector(sector) && !ColonyExpansionManager.Instance.IsSectorVetoed(sector))
                     {
                         Vector3 buildPos = transform.position;
                         UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
@@ -58,6 +58,12 @@ namespace GameDevTV.RTS.Environment
                             {
                                 buildPos = groundHit.point;
                             }
+                        }
+
+                        // Ensure building position is actually in the target sector, fallback to sector center if not
+                        if (SectorManager.Instance.GetNearestSector(buildPos) != sector)
+                        {
+                            buildPos = sector.Center;
                         }
 
                         ColonyExpansionManager.Instance.StartExpansion(buildPos, sector);

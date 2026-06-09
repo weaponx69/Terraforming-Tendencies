@@ -241,7 +241,7 @@ if (SectorManager.Instance != null)
 
                 foreach (var sector in SectorManager.Instance.Sectors)
                 {
-                    if (!sector.IsOccupied)
+                    if (!sector.IsOccupied && (ColonyExpansionManager.Instance == null || !ColonyExpansionManager.Instance.IsSectorVetoed(sector)))
                     {
                         // Check if we are already proposing this site or if a base is already nearby (using occupation radius + buffer)
                         if (!CommandPostExistsNear(sector.Center, occupationRadius))

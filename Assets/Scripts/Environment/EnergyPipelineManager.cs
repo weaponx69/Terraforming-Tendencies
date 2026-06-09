@@ -162,7 +162,7 @@ namespace GameDevTV.RTS.Environment
 
             if (ColonyExpansionManager.Instance != null)
             {
-                ColonyExpansionManager.Instance.ClearExpansion(sector);
+                ColonyExpansionManager.Instance.VetoSector(sector);
             }
 
             Destroy(gameObject);
