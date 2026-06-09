@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0dfa12f3e60a8441b5388bf205af9e7, type: 3}
+  m_Name: ConstructionDrone
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Construction Drone
+  <IsOneTimeUnlock>k__BackingField: 0
+  <BuildTime>k__BackingField: 10
+  <Icon>k__BackingField: {fileID: 21300000, guid: 0dcecedc0e22d8823add8d47e029747e, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: 58c9f72c1fa3a844f94d6922d94cb5ff, type: 2}
+  <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
+  <unlockRequirements>k__BackingField: []
+  health: 200
+  prefab: {fileID: 1076983579694789324, guid: eda2ea17c2524af8196e19ed931012bb, type: 3}
+  upgrades: []
+  sightConfig: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
+  attackConfig: {fileID: 0}
+  transportConfig: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}

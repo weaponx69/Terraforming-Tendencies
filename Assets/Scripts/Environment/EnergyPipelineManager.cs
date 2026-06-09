@@ -11,7 +11,7 @@ namespace GameDevTV.RTS.Environment
         public bool IsCompleted { get; private set; }
 
         private Vector3 targetPosition;
-        private SectorManager.Sector sector;
+        public SectorManager.Sector sector;
         private GameObject realCommandPostPrefab;
 
         private Vector3 startPosition;
@@ -85,16 +85,18 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-            targetPosition = target;
-            sector = sec;
-            realCommandPostPrefab = realPrefab;
+            public void Initialize(Vector3 target, SectorManager.Sector sec, GameObject realPrefab)
+            {
+                targetPosition = target;
+                sector = sec;
+                realCommandPostPrefab = realPrefab;
 
-            startPosition = FindNearestCompletedCommandCenter();
+                startPosition = FindNearestCompletedCommandCenter();
 
-            float totalDist = Vector3.Distance(startPosition, targetPosition);
-            neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
-            builtSegments = 0;
-        }
+                float totalDist = Vector3.Distance(startPosition, targetPosition);
+                neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
+                builtSegments = 0;
+            }
 
         private Vector3 FindNearestCompletedCommandCenter()
         {
