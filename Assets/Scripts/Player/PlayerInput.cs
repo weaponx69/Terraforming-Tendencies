@@ -380,7 +380,7 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 }
 
                 // Snap to NavMesh to ensure the ghost isn't floating on top of large rock colliders
-    UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
                 if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
                 {
                     hitPos = navHit.position;
