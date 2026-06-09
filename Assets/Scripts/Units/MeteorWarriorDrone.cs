@@ -35,6 +35,9 @@ namespace GameDevTV.RTS.Units
 
         private int currentAmmo;
         private Vector3 homePosition;
+        private Vector3 currentCenterPosition;
+        private Vector3 patrolTarget;
+        private float lastCenterCheckTime = float.NegativeInfinity;
         private bool isReloading;
         private LineRenderer tracer;
         private float tracerDuration = 0.05f;
@@ -47,6 +50,8 @@ namespace GameDevTV.RTS.Units
             attackConfig = unitSO != null ? unitSO.AttackConfig : null;
             
             homePosition = transform.position;
+            currentCenterPosition = homePosition;
+            patrolTarget = homePosition;
             currentAmmo = maxAmmo;
             SetupTracer();
         }
@@ -95,6 +100,21 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
+            // Periodically find the nearest command center
+            if (Time.time >= lastCenterCheckTime + 2.0f)
+            {
+                lastCenterCheckTime = Time.time;
+                BaseBuilding center = FindNearestCommandCenter();
+                if (center != null)
+                {
+                    currentCenterPosition = center.transform.position;
+                }
+                else
+                {
+                    currentCenterPosition = homePosition;
+                }
+            }
+
             // Reload logic
             if (currentAmmo <= 0 || isReloading)
             {
@@ -106,16 +126,19 @@ namespace GameDevTV.RTS.Units
             
             if (currentTarget == null)
             {
-                // No target: Return to home if far away
-                float distToHome = Vector3.Distance(transform.position, homePosition);
-                if (distToHome > 2f)
+                // No target: Patrol around the command center
+                float distToPatrol = Vector3.Distance(transform.position, patrolTarget);
+                float distToCenter = Vector3.Distance(patrolTarget, currentCenterPosition);
+                
+                // If we arrived at patrol target, or if the patrol target is too far from current command center
+                if (distToPatrol <= 2f || distToCenter > 20f)
                 {
-                    DriveAgentTo(homePosition);
+                    float angle = Random.Range(0f, Mathf.PI * 2f);
+                    float radius = Random.Range(8f, 15f);
+                    patrolTarget = currentCenterPosition + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
                 }
-                else if (Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh && !Agent.pathPending && Agent.remainingDistance <= Agent.stoppingDistance)
-                {
-                    Agent.isStopped = true;
-                }
+
+                DriveAgentTo(patrolTarget);
                 return;
             }
 
@@ -130,9 +153,9 @@ namespace GameDevTV.RTS.Units
 
             if (horizontalDistance > attackConfig.AttackRange * 0.9f)
             {
-                // Chase only if target is within leash of home
-                float targetDistToHome = Vector3.Distance(targetPos, homePosition);
-                if (targetDistToHome <= guardLeashRange)
+                // Chase only if target is within leash of the command center
+                float targetDistToCenter = Vector3.Distance(targetPos, currentCenterPosition);
+                if (targetDistToCenter <= guardLeashRange)
                 {
                     // Move towards the target but stop at the edge of attack range.
                     // This keeps drones from flying directly into meteor impact zones.
@@ -146,9 +169,8 @@ namespace GameDevTV.RTS.Units
                 }
                 else
                 {
-                    // Target too far from home: stay/return home
+                    // Target too far from command center: clear target and return to patrol
                     currentTarget = null;
-                    DriveAgentTo(homePosition);
                 }
             }
             else
@@ -300,6 +322,10 @@ namespace GameDevTV.RTS.Units
                 if (d == null || (d is Object o && o == null) || d.Transform == null) continue;
                 if (d.CurrentHealth <= 0) continue;
 
+                // Skip if target is outside leash range of command center
+                float targetDistToCenter = Vector3.Distance(d.Transform.position, currentCenterPosition);
+                if (targetDistToCenter > guardLeashRange) continue;
+
                 bool isMeteor = d.Transform.GetComponent<NaturalEventImpact>() != null;
                 float distance = Vector3.Distance(transform.position, d.Transform.position);
 
@@ -331,6 +357,31 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            return best;
+        }
+
+        private BaseBuilding FindNearestCommandCenter()
+        {
+            BaseBuilding best = null;
+            float minDistance = float.MaxValue;
+            foreach (var building in BaseBuilding.ActiveBuildings)
+            {
+                if (building == null || building.Owner != Owner) continue;
+                
+                string name = "";
+                if (building.BuildingSO != null) name = building.BuildingSO.Name;
+                else if (building.UnitSO != null) name = building.UnitSO.Name;
+
+                if (name.Contains("Command Post") || name.Contains("Command Center"))
+                {
+                    float dist = Vector3.Distance(transform.position, building.transform.position);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        best = building;
+                    }
+                }
+            }
             return best;
         }
 
