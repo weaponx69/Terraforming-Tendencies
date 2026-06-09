@@ -8,6 +8,7 @@ namespace GameDevTV.RTS.Environment
     {
         public float ScanRadius = 20f;
         private AbstractUnit unit;
+        private float nextSectorCheckTime = 0f;
 
         private void Awake()
         {
@@ -31,6 +32,35 @@ namespace GameDevTV.RTS.Environment
                     if (Vector3.Distance(transform.position, res.transform.position) <= ScanRadius)
                     {
                         res.Discover();
+                    }
+                }
+            }
+
+            if (Time.time >= nextSectorCheckTime)
+            {
+                nextSectorCheckTime = Time.time + 1.5f;
+
+                if (SectorManager.Instance != null && ColonyExpansionManager.Instance != null)
+                {
+                    var sector = SectorManager.Instance.GetNearestSector(transform.position);
+                    if (sector != null && !sector.IsOccupied && !ColonyExpansionManager.Instance.IsExpandingToSector(sector))
+                    {
+                        Vector3 buildPos = transform.position;
+                        UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
+                        if (UnityEngine.AI.NavMesh.SamplePosition(transform.position, out UnityEngine.AI.NavMeshHit hit, 20f, filter))
+                        {
+                            buildPos = hit.position;
+                        }
+                        else
+                        {
+                            Ray ray = new Ray(transform.position + Vector3.up * 50f, Vector3.down);
+                            if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
+                            {
+                                buildPos = groundHit.point;
+                            }
+                        }
+
+                        ColonyExpansionManager.Instance.StartExpansion(buildPos, sector);
                     }
                 }
             }

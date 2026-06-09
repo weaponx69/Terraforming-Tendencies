@@ -492,6 +492,43 @@ UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
 
         private void HandleRightClick()
         {
+            if (Mouse.current.rightButton.wasReleasedThisFrame)
+            {
+                Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+                if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, ~0, QueryTriggerInteraction.Collide))
+                {
+                    if (hit.collider.TryGetComponent<PipelineSegment>(out var seg))
+                    {
+                        seg.Die();
+                        return;
+                    }
+
+                    var pipelineMgr = hit.collider.GetComponentInParent<EnergyPipelineManager>();
+                    if (pipelineMgr != null)
+                    {
+                        pipelineMgr.CancelExpansion();
+                        return;
+                    }
+
+                    if (hit.collider.TryGetComponent<BaseBuilding>(out var building))
+                    {
+                        if (building.Progress.State != BuildingProgress.BuildingState.Completed)
+                        {
+                            building.Die();
+                            return;
+                        }
+                    }
+                    else if (hit.collider.transform.parent != null && hit.collider.transform.parent.TryGetComponent<BaseBuilding>(out var parentBuilding))
+                    {
+                        if (parentBuilding.Progress.State != BuildingProgress.BuildingState.Completed)
+                        {
+                            parentBuilding.Die();
+                            return;
+                        }
+                    }
+                }
+            }
+
             if (selectedUnits.Count == 0) { return; }
 
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());

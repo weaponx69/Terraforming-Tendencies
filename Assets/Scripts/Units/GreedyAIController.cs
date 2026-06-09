@@ -201,53 +201,15 @@ namespace GameDevTV.RTS.Units
         {
             UpdateCommandPosts();
             
-            // If no completed bases exist, check if any base at all exists (ghost, building, etc.)
             if (activeCommandPosts.Count == 0 && !isSpawning)
             {
-                // ... (existing base-check logic)
                 return;
             }
 
-            // Brain is active - log status occasionally
-            if (Time.frameCount % 300 == 0)
-            {
-                Debug.Log($"[GreedyAI] Tick: {activeCommandPosts.Count} bases, {Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude).Count(u => u.Owner == aiOwner)} units.");
-            }
-
-            // Mining of existing drones stays automatic — it is what funds the packages.
             AutoResumeBuildings();
             AssignIdleWorkers();
-
-            // Nothing is purchased autonomously. Wait while a decision is pending,
-            // a base is spawning, or a previously-approved package is still executing.
-            if (isProposalActive || isSpawning || isExecutingPackage) return;
-            if (Time.time < nextOfferTime) return;
-
-            // Once we've banked enough to afford a meaningful batch, consider one decision.
-            List<ExpansionProposal> packages = BuildPackages();
-            if (packages.Count == 0) return;
-
-            int ccCount = activeCommandPosts.Count;
-            bool newEra = ccCount > lastOfferedCommandPostCount;           // a new command center since last offer
-            if (newEra) offeredExpansionThisEra = false;                   // fresh era → expansion decision available again
-            bool expansionAvailable = packages.Any(p => p.IsExpansion);
-
-            // One decision per command center. A new command center opens a fresh decision.
-            // Bootstrap exception: the first time expansion becomes possible within an era
-            // (probes have scouted a site), allow that single expansion decision.
-            // ADDITION: Allow "FREE Colony Bonus" offers if enough time has passed.
-            bool allow = newEra || (expansionAvailable && !offeredExpansionThisEra) || (!expansionAvailable && Time.time >= nextFreeBonusTime);
-            if (!allow) return;
-
-            if (!expansionAvailable)
-            {
-                nextFreeBonusTime = Time.time + freeBonusCooldown;
-            }
-
-            if (!proposalsEnabled) return;
-
-            Debug.Log("[GreedyAI] Offering " + packages.Count + " growth package(s) for player approval. (era CC=" + ccCount + ")");
-            StartCoroutine(ProposalSequence(packages));
+            ManageProduction();
+            ManageBaseBuildings();
         }
 
         // ── Build the set of player-approvable packages ─────────────────────────
