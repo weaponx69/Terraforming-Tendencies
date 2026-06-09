@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Build Probe
   m_EditorClassIdentifier: 
   <Name>k__BackingField: Build Probe
-  <Icon>k__BackingField: {fileID: 21300000, guid: 4d0944a6c62020d4f955f5b7174bb96f, type: 3}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 1e24cf5aac23bb17481d5d00517c32df, type: 3}
   <Slot>k__BackingField: 2
   <RequiresClickToActivate>k__BackingField: 0
   <IsSingleUnitCommand>k__BackingField: 0
