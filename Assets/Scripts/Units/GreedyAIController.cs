@@ -836,7 +836,7 @@ else
         {
             return Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .OrderBy(w => Vector3.Distance(w.transform.position, transform.position))
-                .FirstOrDefault(w => w.Owner == aiOwner && w.IsIdle && !w.HasSupplies);
+                .FirstOrDefault(w => w.Owner == aiOwner && w.IsIdle && !w.HasSupplies && w.GetComponent<ProbeMovement>() == null);
         }
 
         // Like FindAvailableWorker but, if no worker is idle, falls back to pulling a

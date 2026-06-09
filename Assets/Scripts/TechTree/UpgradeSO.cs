@@ -55,5 +55,42 @@ namespace GameDevTV.RTS.TechTree
 
             return returnValue;
         }
+
+        protected void SetValue<T>(object target, PropertyInfo propertyInfo, T value)
+        {
+            if (propertyInfo.CanWrite)
+            {
+                propertyInfo.SetValue(target, value);
+            }
+            else
+            {
+                Type type = target.GetType();
+                string propName = propertyInfo.Name;
+                string[] fieldNames = new string[]
+                {
+                    propName,
+                    char.ToLower(propName[0]) + propName.Substring(1),
+                    "_" + char.ToLower(propName[0]) + propName.Substring(1),
+                    "_" + propName,
+                    $"<{propName}>k__BackingField"
+                };
+
+                FieldInfo fieldInfo = null;
+                foreach (var fn in fieldNames)
+                {
+                    fieldInfo = type.GetField(fn, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (fieldInfo != null) break;
+                }
+
+                if (fieldInfo != null)
+                {
+                    fieldInfo.SetValue(target, value);
+                }
+                else
+                {
+                    throw new System.ArgumentException($"Property {propName} has no setter and no matching backing field was found.");
+                }
+            }
+        }
     }
 }
