@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 7659088254311543417}
   - component: {fileID: -8137679711796263097}
   m_Layer: 9
-  m_Name: Minerals
+  m_Name: Regolith
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -87,7 +87,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 729bb45b4c50acd449385bcc3c54bb31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.GatherableSupply
-  <Supply>k__BackingField: {fileID: 11400000, guid: 0f09e06b77849bc49aa0ec4f318c0dd2, type: 2}
+  <Supply>k__BackingField: {fileID: 11400000, guid: 86b1d122a0c1c9e5cbf4ade8bcda6df3, type: 2}
   <Amount>k__BackingField: 1500
   <IsBusy>k__BackingField: 0
   <IsVisible>k__BackingField: 0
@@ -127,7 +127,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a319095e2c82e11848e5607fbc3948f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.ResourceHoverLabel
-  resourceName: 
+  resourceName: Regolith
   labelPrefab: {fileID: 0}
   offset: {x: 0, y: 2.5, z: 0}
 --- !u!1001 &5343783336325319574
@@ -193,11 +193,11 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: fc85adbede8e9f34487a19936a20444f, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: b35c532178876e94f917ff0196f65258, type: 2}
+      objectReference: {fileID: 2100000, guid: c0838c4f60e611d6080c8fa5236bebbf, type: 2}
     - target: {fileID: -7511558181221131132, guid: fc85adbede8e9f34487a19936a20444f, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5c5c4adf8f7dd504fab07d2190b1a92a, type: 2}
+      objectReference: {fileID: 2100000, guid: 9f703dbc11ed1471b81da86619743ef1, type: 2}
     - target: {fileID: 919132149155446097, guid: fc85adbede8e9f34487a19936a20444f, type: 3}
       propertyPath: m_Name
       value: Model

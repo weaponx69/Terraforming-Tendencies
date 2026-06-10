@@ -35,7 +35,7 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private GameObject[] eventPrefabs;
 
         [Header("Debug")]
-        [SerializeField] private bool autoStart = true;
+        [SerializeField] private bool autoStart = false;
 
         public int CurrentWave { get; private set; }
 

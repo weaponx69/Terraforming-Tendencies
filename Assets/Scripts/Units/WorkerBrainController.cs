@@ -190,17 +190,50 @@ namespace GameDevTV.RTS.Units
 
                 if (targetSupply == null) break;
 
+                SupplySO gatheredSupplySO = targetSupply.Supply;
                 int gathered = targetSupply.EndGather();
 
-                if (eventChannel != null && gathered > 0)
-                    eventChannel.SendEventMessage(gameObject, gathered, targetSupply?.Supply);
+                // Only the crawler-fuel resources (Regolith / Iron) are delivered to the
+                // Foundry Crawler's hoppers. Gas, Minerals and everything else continue to
+                // feed the biomass economy exactly as before.
+                string supplyName = gatheredSupplySO != null ? gatheredSupplySO.name : "";
+                bool isIron = supplyName.Contains("Iron");
+                bool isRegolith = supplyName.Contains("Regolith");
+
+                FoundryCrawler nearestCrawler = null;
+                if (isIron || isRegolith)
+                {
+                    var crawlers = Object.FindObjectsByType<FoundryCrawler>(FindObjectsInactive.Include);
+                    float minDist = float.MaxValue;
+                    foreach (var c in crawlers)
+                    {
+                        if (c == null) continue;
+                        float dist = Vector3.Distance(transform.position, c.transform.position);
+                        if (dist < minDist)
+                        {
+                            minDist = dist;
+                            nearestCrawler = c;
+                        }
+                    }
+                }
+
+                if (nearestCrawler != null)
+                {
+                    if (isIron) nearestCrawler.AddIron(gathered);
+                    else if (isRegolith) nearestCrawler.AddRegolith(gathered);
+                }
+                else if (eventChannel != null && gathered > 0)
+                {
+                    eventChannel.SendEventMessage(gameObject, gathered, gatheredSupplySO);
+                }
 
                 // ── State: Return to base ──────────────────────────────
-                if (homeBase != null && agent.isOnNavMesh)
+                Transform returnTarget = nearestCrawler != null ? nearestCrawler.transform : homeBase;
+                if (returnTarget != null && agent.isOnNavMesh)
                 {
                     CurrentState = State.MovingToBase;
-                    agent.SetDestination(homeBase.position);
-                    yield return WaitUntilNear(homeBase, 3f, timeout: 30f);
+                    agent.SetDestination(returnTarget.position);
+                    yield return WaitUntilNear(returnTarget, 3f, timeout: 30f);
                     if (agent.isOnNavMesh) agent.ResetPath();
                 }
 

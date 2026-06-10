@@ -637,7 +637,14 @@ namespace GameDevTV.RTS.Units
             if (unlockable?.Cost == null) return true;
             int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Player.Supplies.MineralsToBiomassRateStatic + unlockable.Cost.Gas * Player.Supplies.GasToBiomassRateStatic);
             int available = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
-            return cost + biomassReserve <= available;
+
+            // Logarithmic spending limit: starts at 50% (half the max) and drops off over time
+            float logarithmicFraction = 0.5f - 0.05f * Mathf.Log(Time.time + 1f);
+            logarithmicFraction = Mathf.Clamp(logarithmicFraction, 0f, 0.5f);
+
+            int dynamicReserve = Mathf.FloorToInt((1f - logarithmicFraction) * available);
+            int finalReserve = Mathf.Max(biomassReserve, dynamicReserve);
+            return cost <= (available - finalReserve);
         }
 
         private bool IsDroneEligibleForAssignment(Worker drone)

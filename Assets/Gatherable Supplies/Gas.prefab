@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 3302149800397012042}
   - component: {fileID: 1679232807606695370}
   - component: {fileID: 5913413181411727376}
+  - component: {fileID: 4705361350053792452}
   m_Layer: 9
   m_Name: Gas
   m_TagString: Untagged
@@ -102,6 +103,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dadfe932fc85d033b13f98bbc5c9b39, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Environment.HiddenResource
+--- !u!114 &4705361350053792452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2281804471223176727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a319095e2c82e11848e5607fbc3948f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.ResourceHoverLabel
+  resourceName: 
+  labelPrefab: {fileID: 0}
+  offset: {x: 0, y: 2.5, z: 0}
 --- !u!1001 &2685076412139502142
 PrefabInstance:
   m_ObjectHideFlags: 0

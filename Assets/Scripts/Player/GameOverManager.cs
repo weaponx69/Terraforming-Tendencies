@@ -235,7 +235,7 @@ bool supplyNodesExist = AnySupplyNodesRemain();
             return false;
         }
 
-        private void TriggerGameOver(GameOverReason reason)
+        public void TriggerGameOver(GameOverReason reason)
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;

@@ -83,6 +83,7 @@ namespace GameDevTV.RTS.Environment
         public void StartExpansion(Vector3 position, SectorManager.Sector sector)
         {
             if (sector == null || IsExpandingToSector(sector)) return;
+            if (activeExpansions.Count > 0) return; // Only one supply line built at a time globally
 
             // Spawn the ghost blueprint
             GameObject ghostObj = Instantiate(ghostPrefab, position, Quaternion.identity);

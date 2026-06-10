@@ -19,14 +19,30 @@ namespace GameDevTV.RTS.Environment
         private float segmentLength = 2.0f;
         private int segmentBiomassCost = 2; // Cost per section
 
+        // Gatherable crawler-fuel deposits placed alongside the supply line.
+        // The planet surface is rich in Regolith and Iron, so building the line
+        // exposes minable deposits the player can harvest to feed the crawler.
+        private GameObject regolithDepositPrefab;
+        private GameObject ironDepositPrefab;
+        private int segmentsSinceLastDeposit = 0;
+        private const int DEPOSIT_INTERVAL = 4;        // expose deposits every N segments
+        private const float DEPOSIT_AHEAD_OFFSET = 4.5f; // distance ahead/behind the foundry along travel
+        private const float DEPOSIT_PAIR_SPREAD = 1.5f;  // lateral gap so the pair doesn't overlap
+
         private int neededSegments = 0;
         private int builtSegments = 0;
         private bool isAssemblyPhase = false;
+
+        private GameObject spawnedForge;
 
         // Right-click cycle: 0 = growing (never interacted), 1 = paused, 2 = resumed (next click cancels)
         private int cycleStep = 0;
 
         public bool IsPaused { get; private set; }
+
+        public Vector3 StartPosition => startPosition;
+        public float SegmentLength => segmentLength;
+        public int BuiltSegments => builtSegments;
 
         public enum ExpansionAction { Paused, Resumed, Cancelled }
 
@@ -96,6 +112,48 @@ namespace GameDevTV.RTS.Environment
                 float totalDist = Vector3.Distance(startPosition, targetPosition);
                 neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
                 builtSegments = 0;
+
+                SpawnForge();
+            }
+
+            private void SpawnForge()
+            {
+                GameObject foundryPrefab = null;
+#if UNITY_EDITOR
+                foundryPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Buildings/Foundry/Foundry.prefab");
+#endif
+                if (foundryPrefab == null)
+                {
+                    foundryPrefab = Resources.Load<GameObject>("Buildings/Foundry");
+                }
+
+                if (foundryPrefab != null)
+                {
+                    spawnedForge = Instantiate(foundryPrefab, startPosition, Quaternion.identity);
+                    spawnedForge.name = "FoundryCrawler";
+                    
+                    var crawler = spawnedForge.GetComponent<FoundryCrawler>();
+                    if (crawler == null)
+                    {
+                        crawler = spawnedForge.AddComponent<FoundryCrawler>();
+                    }
+                    crawler.PipelineManager = this;
+                    crawler.targetPosition = targetPosition;
+                    crawler.movementSpeed = 0.5f; // move slow
+                    crawler.isOnPipeline = true;
+                }
+                else
+                {
+                    Debug.LogWarning("[Pipeline] Could not load Foundry prefab to spawn forge!");
+                }
+            }
+
+            private void OnDestroy()
+            {
+                if (!IsCompleted && spawnedForge != null)
+                {
+                    Destroy(spawnedForge);
+                }
             }
 
         private Vector3 FindNearestCompletedCommandCenter()
@@ -163,8 +221,12 @@ namespace GameDevTV.RTS.Environment
             // Drones now call BuildNextSegment() physically.
             if (!IsCompleted && !isAssemblyPhase && builtSegments >= neededSegments)
             {
-                Debug.Log($"[Expansion] Growth complete by drones. Starting boot-up sequence for {sector.Center}");
-                StartCoroutine(BootUpSequence());
+                var crawler = spawnedForge != null ? spawnedForge.GetComponent<FoundryCrawler>() : null;
+                if (crawler == null || crawler.HasReachedTarget)
+                {
+                    Debug.Log($"[Expansion] Growth complete and crawler arrived at target. Starting boot-up sequence for {sector.Center}");
+                    StartCoroutine(BootUpSequence());
+                }
             }
         }
 
@@ -234,7 +296,92 @@ namespace GameDevTV.RTS.Environment
             segments.Add(seg);
 
             builtSegments++;
+
+            // Expose minable Regolith / Iron deposits along the supply line.
+            TryExposeSupplyLineDeposits(spawnPos, dir);
             return true;
+        }
+
+        /// <summary>
+        /// Periodically exposes gatherable Regolith and Iron deposits ahead of and
+        /// behind the foundry crawler along its line of travel, so the player always
+        /// has a clear, nearby place to mine crawler fuel as the machine advances.
+        /// </summary>
+        private void TryExposeSupplyLineDeposits(Vector3 segmentPos, Vector3 dir)
+        {
+            segmentsSinceLastDeposit++;
+            if (segmentsSinceLastDeposit < DEPOSIT_INTERVAL) return;
+            segmentsSinceLastDeposit = 0;
+
+            LoadDepositPrefabs();
+
+            // Anchor on the foundry crawler so fuel appears relative to the machine.
+            Vector3 anchor = spawnedForge != null ? spawnedForge.transform.position : segmentPos;
+
+            Vector3 travelDir = targetPosition - startPosition;
+            travelDir = travelDir.sqrMagnitude > 0.001f ? travelDir.normalized : dir;
+
+            Vector3 side = Vector3.Cross(travelDir, Vector3.up).normalized;
+            if (side.sqrMagnitude < 0.001f) side = Vector3.right;
+
+            // A Regolith + Iron pair ahead of the foundry...
+            Vector3 ahead = anchor + travelDir * DEPOSIT_AHEAD_OFFSET;
+            ExposeDeposit(regolithDepositPrefab, ahead + side * DEPOSIT_PAIR_SPREAD, "Regolith");
+            ExposeDeposit(ironDepositPrefab, ahead - side * DEPOSIT_PAIR_SPREAD, "Iron");
+
+            // ...and another pair behind it.
+            Vector3 behind = anchor - travelDir * DEPOSIT_AHEAD_OFFSET;
+            ExposeDeposit(regolithDepositPrefab, behind + side * DEPOSIT_PAIR_SPREAD, "Regolith");
+            ExposeDeposit(ironDepositPrefab, behind - side * DEPOSIT_PAIR_SPREAD, "Iron");
+        }
+
+        private void LoadDepositPrefabs()
+        {
+#if UNITY_EDITOR
+            if (regolithDepositPrefab == null) regolithDepositPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Regolith.prefab");
+            if (ironDepositPrefab == null) ironDepositPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Iron.prefab");
+#endif
+            if (regolithDepositPrefab == null) regolithDepositPrefab = Resources.Load<GameObject>("Gatherable Supplies/Regolith");
+            if (ironDepositPrefab == null) ironDepositPrefab = Resources.Load<GameObject>("Gatherable Supplies/Iron");
+        }
+
+        private void ExposeDeposit(GameObject prefab, Vector3 position, string label)
+        {
+            if (prefab == null) return;
+
+            // Drop the deposit onto the ground surface.
+            Ray ray = new Ray(position + Vector3.up * 50f, Vector3.down);
+            if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
+            {
+                position.y = groundHit.point.y;
+            }
+
+            GameObject deposit = Instantiate(prefab, position, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+            deposit.name = label;
+
+            AddPersistentLabel(deposit, label);
+        }
+
+        /// <summary>
+        /// Adds an always-visible, camera-facing world-space label above a deposit so the
+        /// player can immediately see what it is and where to click to mine it.
+        /// </summary>
+        private void AddPersistentLabel(GameObject deposit, string label)
+        {
+            GameObject labelGo = new GameObject("Deposit Label");
+            labelGo.transform.SetParent(deposit.transform, false);
+            labelGo.transform.localPosition = new Vector3(0f, 3f, 0f);
+
+            TMPro.TextMeshPro text = labelGo.AddComponent<TMPro.TextMeshPro>();
+            text.text = label;
+            text.fontSize = 4;
+            text.alignment = TMPro.TextAlignmentOptions.Center;
+            text.color = label == "Iron" ? new Color(0.7f, 0.78f, 0.9f) : new Color(0.95f, 0.78f, 0.5f);
+
+            RectTransform rt = labelGo.GetComponent<RectTransform>();
+            if (rt != null) rt.sizeDelta = new Vector2(6f, 2f);
+
+            labelGo.AddComponent<GameDevTV.RTS.UI.Components.FaceCamera>();
         }
 
 
@@ -283,9 +430,14 @@ namespace GameDevTV.RTS.Environment
                 building.CompleteConstruction();
             }
 
+            // Keep the built segments in the world permanently when completed
             foreach (var seg in segments)
             {
-                if (seg != null) Destroy(seg);
+                if (seg != null)
+                {
+                    var segComp = seg.GetComponent<PipelineSegment>();
+                    if (segComp != null) Destroy(segComp);
+                }
             }
             segments.Clear();
 

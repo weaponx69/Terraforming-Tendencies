@@ -138,7 +138,7 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        public void Die()
+        public virtual void Die()
         {
             Debug.Log($"[AbstractCommandable] {gameObject.name} (Owner: {Owner}) is DYING at {transform.position}.");
             Destroy(gameObject);

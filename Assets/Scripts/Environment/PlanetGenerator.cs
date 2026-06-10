@@ -40,8 +40,8 @@ namespace GameDevTV.RTS.Environment
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
             }
 
-            if (MineralsSupplySO == null) MineralsSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Minerals");
-            if (GasSupplySO == null) GasSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Gas");
+            if (MineralsSupplySO == null) MineralsSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
+            if (GasSupplySO == null) GasSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
             
             if (MineralsSupplySO == null || GasSupplySO == null)
             {
@@ -505,14 +505,14 @@ namespace GameDevTV.RTS.Environment
                     foreach (GatherableSupply gs in GetComponentsInChildren<GatherableSupply>(true))
                     {
                         string nameLower = gs.name.ToLower();
-                        bool isGas = nameLower.Contains("gas");
-                        bool isMinerals = nameLower.Contains("crystal") || nameLower.Contains("mineral") || nameLower.Contains("rock");
+                        bool isGas = nameLower.Contains("gas") || nameLower.Contains("regolith");
+                        bool isMinerals = nameLower.Contains("crystal") || nameLower.Contains("mineral") || nameLower.Contains("rock") || nameLower.Contains("iron");
 
-                        if (isGas && (gs.Supply == null || gs.Supply.name != "Gas"))
+                        if (isGas && (gs.Supply == null || gs.Supply.name != "Regolith"))
                         {
                             gs.Supply = GasSupplySO;
                         }
-                        else if (isMinerals && (gs.Supply == null || gs.Supply.name != "Minerals"))
+                        else if (isMinerals && (gs.Supply == null || gs.Supply.name != "Iron"))
                         {
                             gs.Supply = MineralsSupplySO;
                         }

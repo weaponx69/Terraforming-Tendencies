@@ -68,6 +68,22 @@ namespace GameDevTV.RTS.Units
         
 #pragma warning disable 0414
         [Header("Settings")]
+        [SerializeField] private bool autoSpendEnabled = true;
+
+        public bool AutoSpendEnabled
+        {
+            get => autoSpendEnabled;
+            set => autoSpendEnabled = value;
+        }
+
+        [SerializeField] private float aiSpendingAllowance = 0.4f; // Range: 0.0f to 1.0f
+
+        public float AISpendingAllowance
+        {
+            get => aiSpendingAllowance;
+            set => aiSpendingAllowance = Mathf.Clamp01(value);
+        }
+
         [SerializeField] private bool proposalsEnabled = false;
         [SerializeField] private int probesPerBase = 2;
         [SerializeField] private int workersPerBase = 4;
@@ -212,9 +228,13 @@ namespace GameDevTV.RTS.Units
 
             AutoResumeBuildings();
             AssignIdleWorkers();
-            ManageProduction();
-            ManageBaseBuildings();
-            ManagePipelines();
+
+            if (autoSpendEnabled)
+            {
+                ManageProduction();
+                ManageBaseBuildings();
+                ManagePipelines();
+            }
         }
 
         // ── Build the set of player-approvable packages ─────────────────────────
@@ -945,7 +965,15 @@ else
             if (unlockable?.Cost == null) return true;
             int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToBiomassRateStatic + unlockable.Cost.Gas * Supplies.GasToBiomassRateStatic);
             int available = Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
-            return cost <= available;
+            
+            // Logarithmic spending fraction: starts at 50% (half the max) and drops off over time
+            float logarithmicFraction = 0.5f - 0.05f * Mathf.Log(Time.time + 1f);
+            logarithmicFraction = Mathf.Clamp(logarithmicFraction, 0f, 0.5f);
+
+            // Factor in player spending allowance slider (0% to 100%)
+            float spendingFraction = logarithmicFraction * aiSpendingAllowance;
+            int dynamicReserve = Mathf.FloorToInt((1f - spendingFraction) * available);
+            return cost <= (available - dynamicReserve);
         }
     }
 }

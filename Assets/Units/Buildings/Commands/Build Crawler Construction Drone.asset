@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7a565f53600038f385f99014adfd7f3, type: 3}
+  m_Name: Build Crawler Construction Drone
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Commands.BuildCrawlerDroneCommand
+  <Name>k__BackingField: Build Construction Drone
+  <Icon>k__BackingField: {fileID: 21300000, guid: 0dcecedc0e22d8823add8d47e029747e, type: 3}
+  <Slot>k__BackingField: 1
+  <RequiresClickToActivate>k__BackingField: 1
+  <IsSingleUnitCommand>k__BackingField: 0
+  <GhostPrefab>k__BackingField: {fileID: 0}
+  <Restrictions>k__BackingField: []
+  droneType: 1
+  pipeCost: 4

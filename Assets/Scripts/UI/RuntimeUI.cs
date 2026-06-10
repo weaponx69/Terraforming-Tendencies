@@ -31,6 +31,8 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private UnitIconUI unitIconUI;
         [SerializeField] private SingleUnitSelectedUI singleUnitSelectedUI;
         [SerializeField] private UnitTransportUI unitTransportUI;
+        [SerializeField] private GlobalCommanderUI globalCommanderUI;
+        [SerializeField] private FoundryCrawlerUI foundryCrawlerUI;
         [SerializeField] private Image iconImage;
 
         [SerializeField] private AbstractCommandable globalCommander;
@@ -303,6 +305,7 @@ namespace GameDevTV.RTS.UI
         {
             if (selectedUnits.Count > 0)
             {
+                TryDisable(globalCommanderUI);
                 actionsUI.EnableFor(selectedUnits);
 
                 if (selectedUnits.Count == 1)
@@ -325,6 +328,11 @@ namespace GameDevTV.RTS.UI
                 {
                     actionsUI.EnableFor(new HashSet<AbstractCommandable> { globalCommander });
                     actionsUI.gameObject.SetActive(true);
+                    
+                    if (globalCommanderUI != null)
+                    {
+                        globalCommanderUI.EnableFor(globalCommander);
+                    }
                 }
             }
         }
@@ -336,6 +344,8 @@ namespace GameDevTV.RTS.UI
             TryDisable(unitIconUI);
             TryDisable(singleUnitSelectedUI);
             TryDisable(unitTransportUI);
+            TryDisable(globalCommanderUI);
+            TryDisable(foundryCrawlerUI);
         }
 
         // Safely call Disable on UI container objects that may have partially-destroyed child components.
@@ -351,6 +361,8 @@ namespace GameDevTV.RTS.UI
                     case GameDevTV.RTS.UI.Containers.UnitIconUI u: u.Disable(); return;
                     case GameDevTV.RTS.UI.Containers.SingleUnitSelectedUI s: s.Disable(); return;
                     case GameDevTV.RTS.UI.Containers.UnitTransportUI t: t.Disable(); return;
+                    case GameDevTV.RTS.UI.Containers.GlobalCommanderUI g: g.Disable(); return;
+                    case GameDevTV.RTS.UI.Containers.FoundryCrawlerUI f: f.Disable(); return;
                 }
 
                 // Fallback: try to invoke a Disable method via reflection (covers unexpected types)
@@ -382,18 +394,28 @@ namespace GameDevTV.RTS.UI
             {
                 singleUnitSelectedUI.Disable();
                 unitTransportUI.Disable();
+                foundryCrawlerUI.Disable();
                 buildingSelectedUI.EnableFor(building);
+            }
+            else if (commandable is FoundryCrawler crawler)
+            {
+                buildingSelectedUI.Disable();
+                unitTransportUI.Disable();
+                singleUnitSelectedUI.EnableFor(commandable);
+                foundryCrawlerUI.EnableFor(crawler);
             }
             else if (commandable is ITransporter transporter && transporter.UsedCapacity > 0)
             {
                 unitTransportUI.EnableFor(transporter);
                 buildingSelectedUI.Disable();
                 singleUnitSelectedUI.Disable();
+                foundryCrawlerUI.Disable();
             }
             else
             {
                 buildingSelectedUI.Disable();
                 unitTransportUI.Disable();
+                foundryCrawlerUI.Disable();
                 singleUnitSelectedUI.EnableFor(commandable);
             }
         }

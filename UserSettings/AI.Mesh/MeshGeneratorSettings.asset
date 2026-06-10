@@ -18,34 +18,34 @@ MonoBehaviour:
         serializedData:
         - key: 0
           value:
-            rid: 7234512945089086089
+            rid: 7234512969731933079
         - key: 1
           value:
-            rid: 7234512945089086090
+            rid: 7234512969731933080
         - key: 2
           value:
-            rid: 7234512945089086091
+            rid: 7234512969731933081
         - key: 3
           value:
-            rid: 7234512945089086092
+            rid: 7234512969731933082
       previewSettings:
         sizeFactor: 1
   references:
     version: 2
     RefIds:
-    - rid: 7234512945089086089
+    - rid: 7234512969731933079
       type: {class: ModelSelection, ns: Unity.AI.Mesh.Services.Stores.States, asm: Unity.AI.Mesh}
       data:
         modelID: model3d-tripo-p1
-    - rid: 7234512945089086090
+    - rid: 7234512969731933080
       type: {class: ModelSelection, ns: Unity.AI.Mesh.Services.Stores.States, asm: Unity.AI.Mesh}
       data:
         modelID: 
-    - rid: 7234512945089086091
+    - rid: 7234512969731933081
       type: {class: ModelSelection, ns: Unity.AI.Mesh.Services.Stores.States, asm: Unity.AI.Mesh}
       data:
         modelID: 
-    - rid: 7234512945089086092
+    - rid: 7234512969731933082
       type: {class: ModelSelection, ns: Unity.AI.Mesh.Services.Stores.States, asm: Unity.AI.Mesh}
       data:
         modelID: 
