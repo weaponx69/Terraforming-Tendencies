@@ -528,7 +528,8 @@ if (SectorManager.Instance != null)
                     // If we haven't queued one yet, try to queue it
                     if (!cp.IsFirstInQueueProbe())
                     {
-                        if (probeSO != null && CanAfford(probeSO)) 
+                        // Bypass the AI's spending reserve so it doesn't get deadlocked trying to afford the probe
+                        if (probeSO != null && CanAfford(probeSO, ignoreReserve: true)) 
                         {
                             Debug.Log("[GreedyAI] Building Probe at " + cp.name);
                             cp.BuildUnlockable(probeSO);
@@ -970,11 +971,16 @@ else
             if (evt.Building.BuildingSO == commandPostSO) UpdateCommandPosts();
         }
 
-        private bool CanAfford(UnlockableSO unlockable)
+        private bool CanAfford(UnlockableSO unlockable, bool ignoreReserve = false)
         {
             if (unlockable?.Cost == null) return true;
             int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToBiomassRateStatic + unlockable.Cost.Gas * Supplies.GasToBiomassRateStatic);
             int available = Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            
+            if (ignoreReserve)
+            {
+                return cost <= available;
+            }
             
             // Logarithmic spending fraction: starts at 50% (half the max) and drops off over time
             float logarithmicFraction = 0.5f - 0.05f * Mathf.Log(Time.time + 1f);
