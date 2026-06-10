@@ -214,6 +214,46 @@ namespace GameDevTV.RTS.Units
 
 
 
+        public void ClearQueue()
+        {
+            if (productionCoroutine != null)
+            {
+                StopCoroutine(productionCoroutine);
+                productionCoroutine = null;
+            }
+            buildingQueue.Clear();
+            SOBeingBuilt = null;
+            OnQueueUpdated?.Invoke(buildingQueue.ToArray());
+        }
+
+        public void BuildPriorityUnlockable(UnlockableSO unlockable)
+        {
+            if (unlockable == null) return;
+            
+            // Deduct resources
+            Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -unlockable.Cost.Minerals, unlockable.Cost.MineralsSO));
+            Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -unlockable.Cost.Gas, unlockable.Cost.GasSO));
+
+            // If we were building something, push it back.
+            // But if we want it to be "first before anything else", we should probably clear or handle the swap.
+            buildingQueue.Insert(0, unlockable);
+            Debug.Log($"[BaseBuilding] Priority build queued at index 0: {unlockable.Name}");
+
+            // Restart production coroutine to ensure the first item is processed immediately
+            if (productionCoroutine != null)
+            {
+                StopCoroutine(productionCoroutine);
+                productionCoroutine = null;
+            }
+
+            if (enabled)
+            {
+                productionCoroutine = StartCoroutine(DoBuildUnits());
+            }
+
+            OnQueueUpdated?.Invoke(buildingQueue.ToArray());
+        }
+
         public void BuildUnlockable(UnlockableSO unlockable)
         {
             if (buildingQueue.Count == MAX_QUEUE_SIZE)

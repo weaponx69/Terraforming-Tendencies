@@ -19,12 +19,12 @@ namespace GameDevTV.RTS.Units
         }
 
         [Header("Resource Capacities")]
-        public float maxRegolith = 100f;
-        public float maxIron = 100f;
+        public float maxRegolith = 1000f;
+        public float maxIron = 1000f;
         
         [Header("Current Resources")]
-        [SerializeField] private float currentRegolith = 25f;
-        [SerializeField] private float currentIron = 10f;
+        [SerializeField] private float currentRegolith = 100f;
+        [SerializeField] private float currentIron = 100f;
         [SerializeField] private int pipeBuffer = 0;
 
         [Header("Drone Production")]
@@ -41,8 +41,8 @@ namespace GameDevTV.RTS.Units
         [Tooltip("Current engine heat, from 0 to 100")]
         [Range(0f, 100f)]
         [SerializeField] private float engineTemperature = 0f;
-        private const float PASSIVE_HEAT_RATE = 1.0f; // +1% heat per second
-        private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry ice
+        private const float PASSIVE_HEAT_RATE = 0.02f; // Even slower passive heat buildup
+private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry ice
 
         [Header("Movement & Pathing")]
         public float movementSpeed = 0.5f;
@@ -55,9 +55,7 @@ namespace GameDevTV.RTS.Units
 
         [Header("Resource Spawning")]
         private Vector3 lastSpawnPosition;
-        private const float SPAWN_DISTANCE_THRESHOLD = 8.0f; // Spawn resources every 8 meters
-        private GameObject gasPrefab;
-        private GameObject mineralsPrefab;
+        private const float SPAWN_DISTANCE_THRESHOLD = 8.0f; // Expose minable deposits every 8 meters
 
         [Header("Production Settings")]
         private const float REGOLITH_COST = 5.0f;
@@ -68,8 +66,10 @@ namespace GameDevTV.RTS.Units
         private bool isProducing = false;
 
         [Header("Starvation Settings")]
-        [SerializeField] private float maxStarvationDuration = 60f;
+        [SerializeField] private float maxStarvationDuration = 120f;
         [SerializeField] private float starvationTimer = 0f;
+
+        private bool gameOverTriggered = false;
 
         protected override void Awake()
         {
@@ -78,6 +78,7 @@ namespace GameDevTV.RTS.Units
             healthFloat = MaxHealth;
             Owner = Owner.Player1;
 
+            ResetHoppers();
             base.Awake();
 
             if (selectionIndicator == null)
@@ -116,11 +117,18 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
             lastSpawnPosition = transform.position;
-            LoadResourcePrefabs();
+            
+            // Ensure we are fueled at start regardless of prefab state.
+            if (currentRegolith < REGOLITH_COST || currentIron < IRON_COST)
+            {
+                ResetHoppers();
+            }
         }
 
         private void Update()
         {
+            if (gameOverTriggered) return;
+
             HandleMovement();
             HandleThermalDynamics();
             HandleStructuralIntegrity();
@@ -129,52 +137,15 @@ namespace GameDevTV.RTS.Units
             HandleStarvation();
         }
 
-        private void LoadResourcePrefabs()
-        {
-#if UNITY_EDITOR
-            gasPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Gas.prefab");
-            mineralsPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Minerals.prefab");
-#endif
-            if (gasPrefab == null) gasPrefab = Resources.Load<GameObject>("Gatherable Supplies/Gas");
-            if (mineralsPrefab == null) mineralsPrefab = Resources.Load<GameObject>("Gatherable Supplies/Minerals");
-        }
-
         private void CheckAndSpawnResources()
         {
+            if (PipelineManager == null || PipelineManager.IsCompleted) return;
+
             if (Vector3.Distance(transform.position, lastSpawnPosition) >= SPAWN_DISTANCE_THRESHOLD)
             {
-                SpawnResourceNode();
+                PipelineManager.ExposeForgeDeposits();
                 lastSpawnPosition = transform.position;
             }
-        }
-
-        private void SpawnResourceNode()
-        {
-            if (gasPrefab == null || mineralsPrefab == null)
-            {
-                LoadResourcePrefabs();
-            }
-
-            GameObject prefab = Random.value > 0.5f ? gasPrefab : mineralsPrefab;
-            if (prefab == null) return;
-
-            // Spawn slightly ahead / to the side of the crawler
-            float angle = Random.Range(-45f, 45f); // 90 degree arc in front
-            Vector3 forward = transform.forward;
-            Vector3 spawnDir = Quaternion.Euler(0, angle, 0) * forward;
-            
-            float dist = Random.Range(5f, 10f);
-            Vector3 spawnPos = transform.position + spawnDir * dist;
-
-            // Project down onto terrain/floor
-            Ray ray = new Ray(spawnPos + Vector3.up * 50f, Vector3.down);
-            if (Physics.Raycast(ray, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
-            {
-                spawnPos.y = hit.point.y;
-            }
-
-            GameObject resNode = Instantiate(prefab, spawnPos, Quaternion.identity);
-            resNode.name = prefab.name;
         }
 
         private void HandleStarvation()
@@ -187,10 +158,10 @@ namespace GameDevTV.RTS.Units
                 {
                     starvationTimer += Time.deltaTime;
                     
-                    // Periodically log warning every 5 seconds to let player know
                     if (Mathf.FloorToInt(starvationTimer) % 5 == 0 && Time.frameCount % 45 == 0)
                     {
-                        Debug.LogWarning($"[FoundryCrawler] Starvation Warning: Hoppers empty! Crawler halted. Game Over in {maxStarvationDuration - starvationTimer:F0} seconds unless supplied.");
+                        float remaining = Mathf.Max(0, maxStarvationDuration - starvationTimer);
+                        Debug.LogWarning($"[FoundryCrawler] Starvation Warning: Hoppers empty! Crawler halted. Game Over in {remaining:F0} seconds unless supplied.");
                     }
 
                     if (starvationTimer >= maxStarvationDuration)
@@ -200,79 +171,66 @@ namespace GameDevTV.RTS.Units
                 }
                 else
                 {
-                    starvationTimer = 0f; // Reset if supplied
+                    starvationTimer = 0f;
                 }
+            }
+            else
+            {
+                // Safety: reset if no longer on a mission
+                starvationTimer = 0f;
             }
         }
 
-        /// <summary>
-        /// Moves the Crawler toward its target position restricted to the already built pipeline segments.
-        /// </summary>
         private void HandleMovement()
         {
-            // Only move if supplied with materials to keep going
+            if (PipelineManager == null || PipelineManager.IsCompleted) return;
+
             bool hasResources = currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST;
-            if (!hasResources)
+            if (!hasResources) return;
+
+            if (Vector3.Distance(transform.position, targetPosition) <= 0.1f) return;
+
+            Vector3 direction = (targetPosition - transform.position).normalized;
+            transform.position += direction * (movementSpeed * Time.deltaTime);
+
+            if (direction != Vector3.zero) transform.rotation = Quaternion.LookRotation(direction);
+
+            float traveled = Vector3.Distance(PipelineManager.StartPosition, transform.position);
+            int segmentsNeededByNow = Mathf.FloorToInt(traveled / PipelineManager.SegmentLength);
+            int guard = 0;
+            while (PipelineManager.BuiltSegments < segmentsNeededByNow && guard < 8)
             {
-                return; // Halted due to lack of supplies
-            }
-
-            if (PipelineManager == null)
-            {
-                // Fallback behavior: move towards targetPosition without restrictions
-                if (Vector3.Distance(transform.position, targetPosition) > 0.1f)
-                {
-                    Vector3 direction = (targetPosition - transform.position).normalized;
-                    transform.position += direction * (movementSpeed * Time.deltaTime);
-                    
-                    if (direction != Vector3.zero)
-                    {
-                        transform.rotation = Quaternion.LookRotation(direction);
-                    }
-                }
-                return;
-            }
-
-            // Lock movement to currently built segments
-            float maxDistance = PipelineManager.BuiltSegments * PipelineManager.SegmentLength;
-            Vector3 startToTarget = (targetPosition - PipelineManager.StartPosition);
-            float totalLength = startToTarget.magnitude;
-            if (totalLength < 0.1f) return;
-
-            Vector3 dir = startToTarget / totalLength;
-            Vector3 currentOffset = transform.position - PipelineManager.StartPosition;
-            float currentDist = Vector3.Dot(currentOffset, dir);
-
-            if (currentDist >= maxDistance)
-            {
-                // Snap to maximum allowed distance along the line so we don't drift past
-                transform.position = PipelineManager.StartPosition + dir * maxDistance;
-                return;
-            }
-
-            if (Vector3.Distance(transform.position, targetPosition) > 0.1f)
-            {
-                float step = movementSpeed * Time.deltaTime;
-                float nextDist = currentDist + step;
-                if (nextDist > maxDistance)
-                {
-                    nextDist = maxDistance;
-                }
-                transform.position = PipelineManager.StartPosition + dir * nextDist;
-                
-                if (dir != Vector3.zero)
-                {
-                    transform.rotation = Quaternion.LookRotation(dir);
-                }
+                if (!PipelineManager.BuildNextSegment()) break;
+                guard++;
             }
         }
 
-        /// <summary>
-        /// Increases heat over time. Triggers game over if maximum temperature is reached.
-        /// </summary>
+        public void ResetHoppers()
+        {
+            currentRegolith = 500f;
+            currentIron = 200f;
+            starvationTimer = 0f;
+            engineTemperature = 0f;
+            gameOverTriggered = false;
+            Debug.Log($"[FoundryCrawler] Hoppers reset to baseline: Regolith={currentRegolith}, Iron={currentIron}");
+        }
+
         private void HandleThermalDynamics()
         {
-            engineTemperature += PASSIVE_HEAT_RATE * Time.deltaTime;
+            // Engine heat only builds while actively moving on the mission.
+            // If the crawler is stationary (e.g. out of fuel, reached target, or waiting), it cools down.
+            bool hasResources = currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST;
+            bool isMoving = hasResources && !HasReachedTarget;
+            
+            if (PipelineManager != null && !PipelineManager.IsCompleted && isOnPipeline && isMoving)
+            {
+                engineTemperature += PASSIVE_HEAT_RATE * Time.deltaTime;
+            }
+            else
+            {
+                // Cool down naturally when stationary, out of resources, or mission completed
+                engineTemperature = Mathf.Max(0f, engineTemperature - (PASSIVE_HEAT_RATE * 2.0f * Time.deltaTime));
+            }
             
             if (engineTemperature >= 100f)
             {
@@ -281,24 +239,15 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        /// <summary>
-        /// Punishes the crawler for leaving the logistics pipeline network.
-        /// </summary>
         private void HandleStructuralIntegrity()
         {
             if (!isOnPipeline)
             {
                 healthFloat -= OFFLINE_DAMAGE_RATE * Time.deltaTime;
                 int nextHealth = Mathf.Max(0, Mathf.FloorToInt(healthFloat));
-                if (nextHealth < CurrentHealth)
-                {
-                    TakeDamage(CurrentHealth - nextHealth);
-                }
+                if (nextHealth < CurrentHealth) TakeDamage(CurrentHealth - nextHealth);
             }
-            else
-            {
-                healthFloat = CurrentHealth; // Sync up if healed
-            }
+            else healthFloat = CurrentHealth;
         }
 
         public override void Die()
@@ -307,14 +256,11 @@ namespace GameDevTV.RTS.Units
             GameOver("Structural Failure: Crawler destroyed due to lack of pipeline support.");
         }
 
-        /// <summary>
-        /// Consumes raw resources over a set interval to generate output pipes.
-        /// </summary>
         private void HandleProduction()
         {
-            // Check if we have enough resources to start or sustain a cycle
-            bool hasResources = currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST;
+            if (PipelineManager == null || PipelineManager.IsCompleted) { isProducing = false; return; }
 
+            bool hasResources = currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST;
             if (hasResources)
             {
                 isProducing = true;
@@ -322,14 +268,9 @@ namespace GameDevTV.RTS.Units
 
                 if (productionTimer >= PRODUCTION_CYCLE_TIME)
                 {
-                    // Consume resources
                     currentRegolith -= REGOLITH_COST;
                     currentIron -= IRON_COST;
-                    
-                    // Increment output buffer
                     pipeBuffer++;
-                    
-                    // Reset timer for the next batch
                     productionTimer = 0f;
                     OnStatusUpdated?.Invoke();
                 }
@@ -337,109 +278,63 @@ namespace GameDevTV.RTS.Units
             else
             {
                 isProducing = false;
-                productionTimer = 0f; // Reset progress if starved of resources
+                productionTimer = 0f;
             }
         }
 
-        /// <summary>
-        /// Injects coolant into the engine to reduce temperature.
-        /// </summary>
-        /// <param name="amount">Units of dry ice consumed.</param>
         public void ConsumeDryIce(float amount)
         {
             if (amount <= 0) return;
-
-            float coolingProvided = amount * DRY_ICE_COOLING_FACTOR;
-            engineTemperature = Mathf.Max(0f, engineTemperature - coolingProvided);
-            
+            engineTemperature = Mathf.Max(0f, engineTemperature - (amount * DRY_ICE_COOLING_FACTOR));
             Debug.Log("Venting vapor!");
         }
 
-        /// <summary>
-        /// Handles the failure state of the Crawler.
-        /// </summary>
         private void GameOver(string reason)
         {
-            // Disable crawler operations
+            if (gameOverTriggered) return;
+            gameOverTriggered = true;
+
             enabled = false;
             Debug.LogError("[FoundryCrawler] Game Over: " + reason);
 
-            // Hook into the central GameOverManager losing condition
             var gom = Object.FindAnyObjectByType<GameDevTV.RTS.Player.GameOverManager>();
             if (gom != null)
             {
-                gom.TriggerGameOver(GameDevTV.RTS.Player.GameOverManager.GameOverReason.Resources);
+                var gameReason = reason.IndexOf("meltdown", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    ? GameDevTV.RTS.Player.GameOverManager.GameOverReason.MachineryFailure 
+                    : GameDevTV.RTS.Player.GameOverManager.GameOverReason.Resources;
+                
+                Debug.Log($"[FoundryCrawler] Notifying GameOverManager with reason: {gameReason}");
+                gom.TriggerGameOver(gameReason);
             }
         }
 
-        // --- Helper Methods for external scripts to load resources ---
-        
-        public int PipeBuffer
-        {
-            get => pipeBuffer;
-            set => pipeBuffer = value;
-        }
-
-        public float CurrentRegolith
-        {
-            get => currentRegolith;
-            set => currentRegolith = value;
-        }
-
-        public float CurrentIron
-        {
-            get => currentIron;
-            set => currentIron = value;
-        }
-
-        public bool IsStarving => PipelineManager != null && !PipelineManager.IsCompleted && !(currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST);
+        public int PipeBuffer { get => pipeBuffer; set { pipeBuffer = value; OnStatusUpdated?.Invoke(); } }
+        public float CurrentRegolith { get => currentRegolith; set { currentRegolith = value; OnStatusUpdated?.Invoke(); } }
+        public float CurrentIron { get => currentIron; set { currentIron = value; OnStatusUpdated?.Invoke(); } }
+public bool IsStarving => PipelineManager != null && !PipelineManager.IsCompleted && !(currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST);
         public float StarvationTimer => starvationTimer;
         public float MaxStarvationDuration => maxStarvationDuration;
-
         public bool HasReachedTarget => Vector3.Distance(transform.position, targetPosition) <= 0.2f;
 
         public event System.Action OnStatusUpdated;
 
-        /// <summary>
-        /// Attempts to build a drone from the pipe buffer.
-        /// </summary>
         public bool TryBuildDrone(DroneType type)
         {
             int cost = 0;
             GameObject prefab = null;
-
             switch (type)
             {
-                case DroneType.Mining:
-                    cost = miningDronePipeCost;
-                    prefab = miningDronePrefab;
-                    break;
-                case DroneType.Construction:
-                    cost = constructionDronePipeCost;
-                    prefab = constructionDronePrefab;
-                    break;
-                case DroneType.Warrior:
-                    cost = warriorDronePipeCost;
-                    prefab = warriorDronePrefab;
-                    break;
+                case DroneType.Mining: cost = miningDronePipeCost; prefab = miningDronePrefab; break;
+                case DroneType.Construction: cost = constructionDronePipeCost; prefab = constructionDronePrefab; break;
+                case DroneType.Warrior: cost = warriorDronePipeCost; prefab = warriorDronePrefab; break;
             }
 
-            if (prefab == null)
-            {
-                Debug.LogWarning("[FoundryCrawler] Drone prefab is null for type: " + type);
-                return false;
-            }
-
-            if (pipeBuffer < cost)
-            {
-                Debug.LogWarning("[FoundryCrawler] Not enough pipes to build " + type + " Drone! Cost: " + cost + ", Buffer: " + pipeBuffer);
-                return false;
-            }
+            if (prefab == null || pipeBuffer < cost) return false;
 
             pipeBuffer -= cost;
             OnStatusUpdated?.Invoke();
 
-            // Spawn drone with small offset
             Vector3 spawnOffset = Random.insideUnitSphere * 2.0f;
             spawnOffset.y = 0;
             Vector3 spawnPos = transform.position + spawnOffset;
@@ -447,11 +342,7 @@ namespace GameDevTV.RTS.Units
             GameObject drone = Instantiate(prefab, spawnPos, Quaternion.identity);
             if (drone != null)
             {
-                if (drone.TryGetComponent(out AbstractCommandable cmd))
-                {
-                    cmd.Owner = Owner.Player1;
-                }
-
+                if (drone.TryGetComponent(out AbstractCommandable cmd)) cmd.Owner = Owner.Player1;
                 if (drone.TryGetComponent(out NavMeshAgent agent))
                 {
                     agent.enabled = false;
@@ -461,7 +352,6 @@ namespace GameDevTV.RTS.Units
                 }
                 return true;
             }
-
             return false;
         }
 

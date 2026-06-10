@@ -20,8 +20,6 @@ namespace GameDevTV.RTS.Environment
         private int segmentBiomassCost = 2; // Cost per section
 
         // Gatherable crawler-fuel deposits placed alongside the supply line.
-        // The planet surface is rich in Regolith and Iron, so building the line
-        // exposes minable deposits the player can harvest to feed the crawler.
         private GameObject regolithDepositPrefab;
         private GameObject ironDepositPrefab;
         private int segmentsSinceLastDeposit = 0;
@@ -54,10 +52,6 @@ namespace GameDevTV.RTS.Environment
             return (float)builtSegments / neededSegments;
         }
 
-        /// <summary>
-        /// Advances the right-click interaction cycle on this expansion:
-        /// Pause -> Resume -> Cancel. Returns the action that was performed.
-        /// </summary>
         public ExpansionAction CycleRightClick()
         {
             if (cycleStep == 0)
@@ -101,72 +95,181 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-            public void Initialize(Vector3 target, SectorManager.Sector sec, GameObject realPrefab)
+        public void Initialize(Vector3 target, SectorManager.Sector sec, GameObject realPrefab)
+        {
+            targetPosition = target;
+            sector = sec;
+            realCommandPostPrefab = realPrefab;
+
+            startPosition = FindNearestCompletedCommandCenter();
+
+            float totalDist = Vector3.Distance(startPosition, targetPosition);
+            neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
+            builtSegments = 0;
+
+            // Pre-build 4 segments for free to establish the starting line so the crawler
+            // has room to move and doesn't sit on top of the base.
+            for (int i = 0; i < 4 && builtSegments < neededSegments; i++)
             {
-                targetPosition = target;
-                sector = sec;
-                realCommandPostPrefab = realPrefab;
-
-                startPosition = FindNearestCompletedCommandCenter();
-
-                float totalDist = Vector3.Distance(startPosition, targetPosition);
-                neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
-                builtSegments = 0;
-
-                SpawnForge();
+                SpawnSegmentPhysically(true); // true = free
             }
 
-            private void SpawnForge()
+            SpawnForge();
+        }
+
+        private void SpawnSegmentPhysically(bool isFree)
+        {
+            if (builtSegments >= neededSegments) return;
+
+            // Drain cost if not free
+            if (!isFree && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int b))
             {
-                GameObject foundryPrefab = null;
+                int nextVal = Mathf.Max(0, b - segmentBiomassCost);
+                Supplies.Biomass[Owner.Player1] = nextVal;
+                Supplies.RaiseBiomassChanged(Owner.Player1, nextVal);
+            }
+
+            Vector3 spawnPos = GetNextSegmentPosition();
+            Vector3 dir = (targetPosition - startPosition).normalized;
+
+            GameObject seg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            seg.name = "PipelineSegment";
+            seg.transform.position = spawnPos;
+            seg.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(90f, 0f, 0f);
+            seg.transform.localScale = new Vector3(0.5f, segmentLength * 0.5f, 0.5f);
+
+            var renderer = seg.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                Material mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                if (mat == null) mat = new Material(Shader.Find("Unlit/Color"));
+                mat.color = new Color(0f, 0.8f, 1f, 0.8f);
+                renderer.material = mat;
+            }
+
+            PipelineSegment segComp = seg.AddComponent<PipelineSegment>();
+            segComp.Initialize(this, builtSegments);
+            segments.Add(seg);
+
+            builtSegments++;
+
+            // Periodically expose minable deposits alongside the line.
+            TryExposeSupplyLineDeposits(spawnPos, dir);
+        }
+
+        public bool BuildNextSegment()
+        {
+            if (!HasPendingSegments()) return false;
+            if (!CanAffordNextSegment()) return false;
+
+            SpawnSegmentPhysically(false); // false = not free
+            return true;
+        }
+
+        private void TryExposeSupplyLineDeposits(Vector3 segmentPos, Vector3 dir)
+        {
+            segmentsSinceLastDeposit++;
+            if (segmentsSinceLastDeposit < DEPOSIT_INTERVAL) return;
+            segmentsSinceLastDeposit = 0;
+
+            ExposeForgeDeposits();
+        }
+
+        public void ExposeForgeDeposits()
+        {
+            LoadDepositPrefabs();
+
+            // Anchor on the foundry crawler so fuel appears relative to the machine.
+            Vector3 anchor = spawnedForge != null ? spawnedForge.transform.position : startPosition;
+
+            Vector3 travelDir = targetPosition - startPosition;
+            travelDir = travelDir.sqrMagnitude > 0.001f ? travelDir.normalized : Vector3.forward;
+
+            Vector3 side = Vector3.Cross(travelDir, Vector3.up).normalized;
+            if (side.sqrMagnitude < 0.001f) side = Vector3.right;
+
+            // A Regolith + Iron pair ahead of the foundry...
+            Vector3 ahead = anchor + travelDir * DEPOSIT_AHEAD_OFFSET;
+            ExposeDeposit(regolithDepositPrefab, ahead + side * DEPOSIT_PAIR_SPREAD, "Regolith");
+            ExposeDeposit(ironDepositPrefab, ahead - side * DEPOSIT_PAIR_SPREAD, "Iron");
+
+            // ...and another pair behind it.
+            Vector3 behind = anchor - travelDir * DEPOSIT_AHEAD_OFFSET;
+            ExposeDeposit(regolithDepositPrefab, behind + side * DEPOSIT_PAIR_SPREAD, "Regolith");
+            ExposeDeposit(ironDepositPrefab, behind - side * DEPOSIT_PAIR_SPREAD, "Iron");
+        }
+
+        private void SpawnForge()
+        {
+            GameObject foundryPrefab = null;
 #if UNITY_EDITOR
-                foundryPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Buildings/Foundry/Foundry.prefab");
+            foundryPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Buildings/Foundry/Foundry.prefab");
 #endif
-                if (foundryPrefab == null)
-                {
-                    foundryPrefab = Resources.Load<GameObject>("Buildings/Foundry");
-                }
+            if (foundryPrefab == null) foundryPrefab = Resources.Load<GameObject>("Buildings/Foundry");
 
-                if (foundryPrefab != null)
-                {
-                    spawnedForge = Instantiate(foundryPrefab, startPosition, Quaternion.identity);
-                    spawnedForge.name = "FoundryCrawler";
-                    
-                    var crawler = spawnedForge.GetComponent<FoundryCrawler>();
-                    if (crawler == null)
-                    {
-                        crawler = spawnedForge.AddComponent<FoundryCrawler>();
-                    }
-                    crawler.PipelineManager = this;
-                    crawler.targetPosition = targetPosition;
-                    crawler.movementSpeed = 0.5f; // move slow
-                    crawler.isOnPipeline = true;
-
-                    // Start the crawler with full hoppers so the player has ample time to
-                    // set up a Regolith/Iron mining supply chain before starvation can occur.
-                    crawler.CurrentRegolith = crawler.maxRegolith;
-                    crawler.CurrentIron = crawler.maxIron;
-                }
-                else
-                {
-                    Debug.LogWarning("[Pipeline] Could not load Foundry prefab to spawn forge!");
-                }
-            }
-
-            private void OnDestroy()
+            if (foundryPrefab != null)
             {
-                if (!IsCompleted && spawnedForge != null)
+                Vector3 toTarget = targetPosition - startPosition;
+                Vector3 spawnDir = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : Vector3.forward;
+                Vector3 forgeSpawnPos = startPosition + spawnDir * 8f;
+
+                Ray forgeGroundRay = new Ray(forgeSpawnPos + Vector3.up * 50f, Vector3.down);
+                if (Physics.Raycast(forgeGroundRay, out RaycastHit forgeGroundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
                 {
-                    Destroy(spawnedForge);
+                    forgeSpawnPos.y = forgeGroundHit.point.y;
                 }
+
+                spawnedForge = Instantiate(foundryPrefab, forgeSpawnPos, Quaternion.identity);
+                spawnedForge.name = "FoundryCrawler";
+                
+                var crawler = spawnedForge.GetComponent<FoundryCrawler>();
+                if (crawler == null) crawler = spawnedForge.AddComponent<FoundryCrawler>();
+                
+                crawler.PipelineManager = this;
+                crawler.targetPosition = targetPosition;
+                crawler.movementSpeed = 0.5f;
+                crawler.isOnPipeline = true;
+
+                // Ensure the crawler is fully fueled and reset immediately upon instantiation.
+                crawler.CurrentRegolith = 1000f;
+                crawler.CurrentIron = 1000f;
+
+                ExposeInitialDeposits();
             }
+            else
+            {
+                Debug.LogWarning("[Pipeline] Could not load Foundry prefab to spawn forge!");
+            }
+        }
+
+        private void ExposeInitialDeposits()
+        {
+            LoadDepositPrefabs();
+
+            Vector3 travelDir = targetPosition - startPosition;
+            travelDir = travelDir.sqrMagnitude > 0.001f ? travelDir.normalized : Vector3.forward;
+
+            Vector3 side = Vector3.Cross(travelDir, Vector3.up).normalized;
+            if (side.sqrMagnitude < 0.001f) side = Vector3.right;
+
+            for (int i = 1; i <= 2; i++)
+            {
+                Vector3 spot = startPosition + travelDir * (DEPOSIT_AHEAD_OFFSET * i);
+                ExposeDeposit(regolithDepositPrefab, spot + side * DEPOSIT_PAIR_SPREAD, "Regolith");
+                ExposeDeposit(ironDepositPrefab, spot - side * DEPOSIT_PAIR_SPREAD, "Iron");
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (!IsCompleted && spawnedForge != null) Destroy(spawnedForge);
+        }
 
         private Vector3 FindNearestCompletedCommandCenter()
         {
             BaseBuilding best = null;
             float minDistance = float.MaxValue;
 
-            // 1. Search for completed Command Center/Post specifically
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
                 if (b == null || b.Owner != Owner.Player1) continue;
@@ -175,33 +278,12 @@ namespace GameDevTV.RTS.Environment
                     (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)))
                 {
                     float dist = Vector3.Distance(targetPosition, b.transform.position);
-                    if (dist < minDistance)
-                    {
-                        minDistance = dist;
-                        best = b;
-                    }
+                    if (dist < minDistance) { minDistance = dist; best = b; }
                 }
             }
 
             if (best != null) return best.transform.position;
 
-            // 2. Fallback: Search for ANY completed Player 1 building in case of naming differences
-            foreach (var b in BaseBuilding.ActiveBuildings)
-            {
-                if (b == null || b.Owner != Owner.Player1) continue;
-                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
-
-                float dist = Vector3.Distance(targetPosition, b.transform.position);
-                if (dist < minDistance)
-                {
-                    minDistance = dist;
-                    best = b;
-                }
-            }
-
-            if (best != null) return best.transform.position;
-
-            // 3. Fallback: Scan scene directly in case registration in ActiveBuildings has a timing delay
             var allBuildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
             foreach (var b in allBuildings)
             {
@@ -209,21 +291,14 @@ namespace GameDevTV.RTS.Environment
                 if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
 
                 float dist = Vector3.Distance(targetPosition, b.transform.position);
-                if (dist < minDistance)
-                {
-                    minDistance = dist;
-                    best = b;
-                }
+                if (dist < minDistance) { minDistance = dist; best = b; }
             }
 
-            // 4. Ultimate fallback: if absolutely no completed player buildings exist, start at targetPosition
             return best != null ? best.transform.position : targetPosition;
         }
 
         private void Update()
         {
-            // Update loop no longer auto-builds the pipeline! 
-            // Drones now call BuildNextSegment() physically.
             if (!IsCompleted && !isAssemblyPhase && builtSegments >= neededSegments)
             {
                 var crawler = spawnedForge != null ? spawnedForge.GetComponent<FoundryCrawler>() : null;
@@ -264,82 +339,6 @@ namespace GameDevTV.RTS.Environment
             return Supplies.Biomass.TryGetValue(Owner.Player1, out int b) && b >= segmentBiomassCost;
         }
 
-        public bool BuildNextSegment()
-        {
-            if (!HasPendingSegments()) return false;
-            if (!CanAffordNextSegment()) return false;
-
-            // Drain cost
-            if (Supplies.Biomass.TryGetValue(Owner.Player1, out int b))
-            {
-                int nextVal = Mathf.Max(0, b - segmentBiomassCost);
-                Supplies.Biomass[Owner.Player1] = nextVal;
-                Supplies.RaiseBiomassChanged(Owner.Player1, nextVal);
-            }
-
-            // Spawn the segment physically
-            Vector3 spawnPos = GetNextSegmentPosition();
-            Vector3 dir = (targetPosition - startPosition).normalized;
-
-            GameObject seg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            seg.name = "PipelineSegment";
-            seg.transform.position = spawnPos;
-            seg.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(90f, 0f, 0f);
-            seg.transform.localScale = new Vector3(0.5f, segmentLength * 0.5f, 0.5f);
-
-            var renderer = seg.GetComponent<MeshRenderer>();
-            if (renderer != null)
-            {
-                Material mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                if (mat == null) mat = new Material(Shader.Find("Unlit/Color"));
-                mat.color = new Color(0f, 0.8f, 1f, 0.8f);
-                renderer.material = mat;
-            }
-
-            PipelineSegment segComp = seg.AddComponent<PipelineSegment>();
-            segComp.Initialize(this, builtSegments);
-            segments.Add(seg);
-
-            builtSegments++;
-
-            // Expose minable Regolith / Iron deposits along the supply line.
-            TryExposeSupplyLineDeposits(spawnPos, dir);
-            return true;
-        }
-
-        /// <summary>
-        /// Periodically exposes gatherable Regolith and Iron deposits ahead of and
-        /// behind the foundry crawler along its line of travel, so the player always
-        /// has a clear, nearby place to mine crawler fuel as the machine advances.
-        /// </summary>
-        private void TryExposeSupplyLineDeposits(Vector3 segmentPos, Vector3 dir)
-        {
-            segmentsSinceLastDeposit++;
-            if (segmentsSinceLastDeposit < DEPOSIT_INTERVAL) return;
-            segmentsSinceLastDeposit = 0;
-
-            LoadDepositPrefabs();
-
-            // Anchor on the foundry crawler so fuel appears relative to the machine.
-            Vector3 anchor = spawnedForge != null ? spawnedForge.transform.position : segmentPos;
-
-            Vector3 travelDir = targetPosition - startPosition;
-            travelDir = travelDir.sqrMagnitude > 0.001f ? travelDir.normalized : dir;
-
-            Vector3 side = Vector3.Cross(travelDir, Vector3.up).normalized;
-            if (side.sqrMagnitude < 0.001f) side = Vector3.right;
-
-            // A Regolith + Iron pair ahead of the foundry...
-            Vector3 ahead = anchor + travelDir * DEPOSIT_AHEAD_OFFSET;
-            ExposeDeposit(regolithDepositPrefab, ahead + side * DEPOSIT_PAIR_SPREAD, "Regolith");
-            ExposeDeposit(ironDepositPrefab, ahead - side * DEPOSIT_PAIR_SPREAD, "Iron");
-
-            // ...and another pair behind it.
-            Vector3 behind = anchor - travelDir * DEPOSIT_AHEAD_OFFSET;
-            ExposeDeposit(regolithDepositPrefab, behind + side * DEPOSIT_PAIR_SPREAD, "Regolith");
-            ExposeDeposit(ironDepositPrefab, behind - side * DEPOSIT_PAIR_SPREAD, "Iron");
-        }
-
         private void LoadDepositPrefabs()
         {
 #if UNITY_EDITOR
@@ -354,7 +353,6 @@ namespace GameDevTV.RTS.Environment
         {
             if (prefab == null) return;
 
-            // Drop the deposit onto the ground surface.
             Ray ray = new Ray(position + Vector3.up * 50f, Vector3.down);
             if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
             {
@@ -367,10 +365,6 @@ namespace GameDevTV.RTS.Environment
             AddPersistentLabel(deposit, label);
         }
 
-        /// <summary>
-        /// Adds an always-visible, camera-facing world-space label above a deposit so the
-        /// player can immediately see what it is and where to click to mine it.
-        /// </summary>
         private void AddPersistentLabel(GameObject deposit, string label)
         {
             GameObject labelGo = new GameObject("Deposit Label");
@@ -389,35 +383,21 @@ namespace GameDevTV.RTS.Environment
             labelGo.AddComponent<GameDevTV.RTS.UI.Components.FaceCamera>();
         }
 
-
-
         public void HandleSegmentDestroyed(int index)
         {
             for (int i = segments.Count - 1; i >= index; i--)
             {
-                if (segments[i] != null)
-                {
-                    Destroy(segments[i]);
-                }
+                if (segments[i] != null) Destroy(segments[i]);
                 segments.RemoveAt(i);
             }
-
             builtSegments = segments.Count;
         }
 
         public void CancelExpansion()
         {
-            foreach (var seg in segments)
-            {
-                if (seg != null) Destroy(seg);
-            }
+            foreach (var seg in segments) if (seg != null) Destroy(seg);
             segments.Clear();
-
-            if (ColonyExpansionManager.Instance != null)
-            {
-                ColonyExpansionManager.Instance.VetoSector(sector);
-            }
-
+            if (ColonyExpansionManager.Instance != null) ColonyExpansionManager.Instance.VetoSector(sector);
             Destroy(gameObject);
         }
 
@@ -428,17 +408,23 @@ namespace GameDevTV.RTS.Environment
             yield return new WaitForSeconds(5.0f);
 
             GameObject cc = Instantiate(realCommandPostPrefab, targetPosition, Quaternion.identity);
+            cc.SetActive(true); // Ensure it's active immediately
+            
             if (cc.TryGetComponent(out BaseBuilding building))
             {
-                building.enabled = true;
                 building.Owner = Owner.Player1;
+                building.enabled = true;
                 building.CompleteConstruction();
+                building.ClearQueue(); // Wipe any default queue state
+
+                yield return null;
 
                 // A freshly established command center builds a Probe drone first.
                 AbstractUnitSO probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
                 if (probeSO != null)
                 {
-                    building.BuildUnlockable(probeSO);
+                    building.BuildPriorityUnlockable(probeSO);
+                    Debug.Log("[Expansion] Queued starter probe as PRIORITY first item in the new Command Post queue.");
                 }
                 else
                 {
@@ -446,7 +432,6 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            // Keep the built segments in the world permanently when completed
             foreach (var seg in segments)
             {
                 if (seg != null)

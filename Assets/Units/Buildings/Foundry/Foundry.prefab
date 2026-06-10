@@ -114,8 +114,8 @@ MonoBehaviour:
   VisionTransform: {fileID: 0}
   maxRegolith: 100
   maxIron: 100
-  currentRegolith: 25
-  currentIron: 10
+  currentRegolith: 100
+  currentIron: 100
   pipeBuffer: 0
   miningDronePrefab: {fileID: 1076983579694789324, guid: 4d0c2e8c3bd76b64097b86828a286bc6, type: 3}
   constructionDronePrefab: {fileID: 1076983579694789324, guid: eda2ea17c2524af8196e19ed931012bb, type: 3}
@@ -127,8 +127,6 @@ MonoBehaviour:
   movementSpeed: 0.5
   targetPosition: {x: 0, y: 0, z: 0}
   isOnPipeline: 1
-  regolithPrefab: {fileID: 2470480825251639189, guid: 7e215b78a9e6b6345b307083acec8164, type: 3}
-  ironPrefab: {fileID: 2470480825251639189, guid: 04e81fed784395b11ad15e02746e1f48, type: 3}
   maxStarvationDuration: 60
   starvationTimer: 0
 --- !u!65 &637016120870651646

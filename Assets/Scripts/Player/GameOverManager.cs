@@ -33,7 +33,7 @@ namespace GameDevTV.RTS.Player
         #pragma warning restore 0414
 
         // ── Public event ───────────────────────────────────────────────────────────
-        public enum GameOverReason { LifeSupport, Resources }
+        public enum GameOverReason { LifeSupport, Resources, MachineryFailure }
 
         public static event System.Action<GameOverReason> OnGameOver;
         public static event System.Action OnVictory;
@@ -115,8 +115,12 @@ namespace GameDevTV.RTS.Player
 
             // 3. Check recovery potential BEFORE triggering life support failure.
             // If the player has 400 biomass, they can orbital drop a new Command Center even if everything else is gone.
-            int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int currentBiomass) ? currentBiomass : 0;
-            bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRemain();
+            int biomass = 0;
+            if (Supplies.Biomass != null)
+            {
+                biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int currentBiomass) ? currentBiomass : 0;
+            }
+bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRemain();
 
             // Loss Condition 1: Colony life support coverage collapsed.
             if (!AnyLifeSupportNodesRemain(monitoredOwner) && !canRebuild)
@@ -239,10 +243,29 @@ bool supplyNodesExist = AnySupplyNodesRemain();
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
-            Debug.Log($"[GameOverManager] Game Over triggered! Reason: {reason}");
+            Debug.Log($"[GameOverManager] TriggerGameOver called. Reason: {reason}. Initializing shutdown sequence...");
+            
             CancelInvoke(nameof(CheckNoRecovery));
-            StopAllCoroutines();
-            OnGameOver?.Invoke(reason);
+            
+            // Note: We don't stop ALL coroutines here to avoid breaking UI transitions 
+            // that might be running on this object.
+            
+            if (OnGameOver != null)
+            {
+                try
+                {
+                    Debug.Log("[GameOverManager] Invoking OnGameOver event listeners...");
+                    OnGameOver.Invoke(reason);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[GameOverManager] Exception in OnGameOver listener: {e}");
+                }
+            }
+            else
+            {
+                Debug.LogError("[GameOverManager] CRITICAL: No listeners for OnGameOver event! The game over screen will not appear.");
+            }
         }
 
         private void TriggerVictory()

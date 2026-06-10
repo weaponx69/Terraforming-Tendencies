@@ -72,6 +72,7 @@ namespace GameDevTV.RTS.UI
 
         private void HandleGameOver(GameOverManager.GameOverReason reason)
         {
+            Debug.Log($"[GameOverUI] HandleGameOver called with reason: {reason}");
             if (headlineText != null)
                 headlineText.SetText("MISSION FAILED");
 
@@ -81,6 +82,9 @@ namespace GameDevTV.RTS.UI
                 {
                     case GameOverManager.GameOverReason.LifeSupport:
                         reasonText.SetText("Life support has collapsed.\nThe colony can no longer sustain itself.");
+                        break;
+                    case GameOverManager.GameOverReason.MachineryFailure:
+                        reasonText.SetText("Critical machinery has failed.\nExpansion and terraforming are no longer possible.");
                         break;
                     case GameOverManager.GameOverReason.Resources:
                     default:
@@ -94,6 +98,7 @@ namespace GameDevTV.RTS.UI
 
         private void ShowGameOverUI()
         {
+            Debug.Log("[GameOverUI] Showing Game Over UI. Panel: " + (overlayPanel != null ? overlayPanel.name : "NULL"));
             if (overlayPanel != null)
                 overlayPanel.SetActive(true);
 
@@ -103,6 +108,8 @@ namespace GameDevTV.RTS.UI
             // Fade in
             if (canvasGroup != null)
                 StartCoroutine(FadeIn());
+            else
+                Debug.LogWarning("[GameOverUI] CanvasGroup is null, no fade will occur.");
         }
 
         // ── Helpers ────────────────────────────────────────────────────────────────
