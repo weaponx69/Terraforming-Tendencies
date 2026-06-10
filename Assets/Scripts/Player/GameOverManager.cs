@@ -209,6 +209,15 @@ bool supplyNodesExist = AnySupplyNodesRemain();
             {
                 if (gs != null && gs.Amount > 0) return true;
             }
+            
+            // Fix: If a pipeline is still building, it will periodically expose new deposits.
+            // Do not trigger a "no resources left" game over if an active pipeline exists.
+            EnergyPipelineManager[] pipelines = Object.FindObjectsByType<EnergyPipelineManager>(FindObjectsInactive.Exclude);
+            foreach (var p in pipelines)
+            {
+                if (p != null && !p.IsCompleted) return true;
+            }
+            
             return false;
         }
 

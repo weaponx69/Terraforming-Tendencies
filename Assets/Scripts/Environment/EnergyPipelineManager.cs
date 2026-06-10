@@ -230,9 +230,8 @@ namespace GameDevTV.RTS.Environment
                 crawler.movementSpeed = 0.5f;
                 crawler.isOnPipeline = true;
 
-                // Ensure the crawler is fully fueled and reset immediately upon instantiation.
-                crawler.CurrentRegolith = 1000f;
-                crawler.CurrentIron = 1000f;
+                // Ensure the crawler is properly initialized and not permanently stuffed full
+                crawler.ResetHoppers();
 
                 ExposeInitialDeposits();
             }
