@@ -131,6 +131,36 @@ namespace GameDevTV.RTS.Tests
             Assert.IsTrue(Vector3.Distance(newCommandPost.transform.position, targetPosition) < 0.5f, "New Command Post should be spawned near Sector 1 center.");
             Debug.Log("[Test] Colony expansion SUCCESSFUL.");
         }
+
+        [UnityTest]
+        public IEnumerator ColonyExpansion_BuildsProbeDroneFirst()
+        {
+            var sector1 = sectorManager.Sectors[1];
+            
+            // Start the expansion
+            colonyExpansionManager.StartExpansion(sector1.Center, sector1);
+
+            // Wait for growth and boot-up sequence (5 seconds)
+            yield return new WaitForSeconds(6.0f);
+
+            // Verify that the new completed Command Post is spawned and has the probe first
+            BaseBuilding newCommandPost = null;
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b == baseBuilding) continue;
+                if (b.Owner == Owner.Player1 &&
+                    (b.name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) ||
+                     (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))))
+                {
+                    newCommandPost = b;
+                    break;
+                }
+            }
+
+            Assert.IsNotNull(newCommandPost, "A new Command Post should have been spawned.");
+            Assert.IsTrue(newCommandPost.IsFirstInQueueProbe(), "The first item in the queue must be the Probe drone.");
+            Debug.Log("[Test] Verified: Probe drone is prioritized in the new Command Post.");
+        }
     }
 }
 #endif

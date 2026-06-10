@@ -417,8 +417,6 @@ namespace GameDevTV.RTS.Environment
                 building.CompleteConstruction();
                 building.ClearQueue(); // Wipe any default queue state
 
-                yield return null;
-
                 // A freshly established command center builds a Probe drone first.
                 AbstractUnitSO probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
                 if (probeSO != null)

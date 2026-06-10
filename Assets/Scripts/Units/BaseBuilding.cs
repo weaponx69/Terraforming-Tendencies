@@ -214,6 +214,12 @@ namespace GameDevTV.RTS.Units
 
 
 
+        public bool IsFirstInQueueProbe()
+        {
+            if (buildingQueue == null || buildingQueue.Count == 0) return false;
+            return buildingQueue[0] != null && buildingQueue[0].Name.Contains("Probe");
+        }
+
         public void ClearQueue()
         {
             if (productionCoroutine != null)

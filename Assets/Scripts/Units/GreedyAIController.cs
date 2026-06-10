@@ -514,6 +514,10 @@ if (SectorManager.Instance != null)
             {
                 if (cp == null || cp.QueueSize >= 3) continue;
 
+                // If the building is currently prioritizing a starter probe (from expansion), 
+                // don't clutter the queue yet.
+                if (cp.IsFirstInQueueProbe()) continue;
+
                 var allUnits = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude)
                     .Where(u => u.Owner == aiOwner).ToList();
 
