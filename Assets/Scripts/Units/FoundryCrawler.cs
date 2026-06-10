@@ -79,6 +79,37 @@ namespace GameDevTV.RTS.Units
             Owner = Owner.Player1;
 
             base.Awake();
+
+            if (selectionIndicator == null)
+            {
+                // Auto-generate a flat green cylinder as a selection indicator
+                selectionIndicator = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                selectionIndicator.name = "SelectionIndicator";
+                selectionIndicator.transform.SetParent(transform);
+                
+                // Make it a flat circle under the crawler
+                selectionIndicator.transform.localPosition = new Vector3(0, 0.1f, 0);
+                selectionIndicator.transform.localScale = new Vector3(3f, 0.05f, 3f);
+                
+                // Remove collider so it doesn't block clicks/navmesh
+                Destroy(selectionIndicator.GetComponent<Collider>());
+                
+                // Color it a transparent selection green
+                Renderer rend = selectionIndicator.GetComponent<Renderer>();
+                if (rend != null)
+                {
+                    Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    mat.color = new Color(0f, 1f, 0f, 0.5f);
+                    mat.SetFloat("_Surface", 1); // Set to Transparent
+                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    mat.SetInt("_ZWrite", 0);
+                    mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                    rend.material = mat;
+                }
+                
+                selectionIndicator.SetActive(false);
+            }
         }
 
         protected override void Start()
