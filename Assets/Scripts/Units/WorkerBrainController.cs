@@ -193,9 +193,7 @@ namespace GameDevTV.RTS.Units
                 SupplySO gatheredSupplySO = targetSupply.Supply;
                 int gathered = targetSupply.EndGather();
 
-                // Only the crawler-fuel resources (Regolith / Iron) are delivered to the
-                // Foundry Crawler's hoppers. Gas, Minerals and everything else continue to
-                // feed the biomass economy exactly as before.
+                // Determine where to return the resources
                 string supplyName = gatheredSupplySO != null ? gatheredSupplySO.name : "";
                 bool isIron = supplyName.Contains("Iron");
                 bool isRegolith = supplyName.Contains("Regolith");
@@ -208,6 +206,14 @@ namespace GameDevTV.RTS.Units
                     foreach (var c in crawlers)
                     {
                         if (c == null) continue;
+                        
+                        // Ignore crawlers that are done building their pipeline
+                        if (c.PipelineManager != null && c.PipelineManager.IsCompleted) continue;
+                        
+                        // Ignore crawlers that are already full on this resource
+                        if (isIron && c.CurrentIron >= c.maxIron) continue;
+                        if (isRegolith && c.CurrentRegolith >= c.maxRegolith) continue;
+
                         float dist = Vector3.Distance(transform.position, c.transform.position);
                         if (dist < minDist)
                         {
@@ -217,24 +223,26 @@ namespace GameDevTV.RTS.Units
                     }
                 }
 
-                if (nearestCrawler != null)
-                {
-                    if (isIron) nearestCrawler.AddIron(gathered);
-                    else if (isRegolith) nearestCrawler.AddRegolith(gathered);
-                }
-                else if (eventChannel != null && gathered > 0)
-                {
-                    eventChannel.SendEventMessage(gameObject, gathered, gatheredSupplySO);
-                }
+                Transform returnTarget = nearestCrawler != null ? nearestCrawler.transform : homeBase;
 
                 // ── State: Return to base ──────────────────────────────
-                Transform returnTarget = nearestCrawler != null ? nearestCrawler.transform : homeBase;
                 if (returnTarget != null && agent.isOnNavMesh)
                 {
                     CurrentState = State.MovingToBase;
                     agent.SetDestination(returnTarget.position);
                     yield return WaitUntilNear(returnTarget, 3f, timeout: 30f);
                     if (agent.isOnNavMesh) agent.ResetPath();
+                    
+                    // Physically drop off the resources ONLY after arriving
+                    if (nearestCrawler != null)
+                    {
+                        if (isIron) nearestCrawler.AddIron(gathered);
+                        else if (isRegolith) nearestCrawler.AddRegolith(gathered);
+                    }
+                    else if (eventChannel != null && gathered > 0)
+                    {
+                        eventChannel.SendEventMessage(gameObject, gathered, gatheredSupplySO);
+                    }
                 }
 
                 yield return null;

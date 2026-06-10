@@ -141,6 +141,11 @@ namespace GameDevTV.RTS.Environment
                     crawler.targetPosition = targetPosition;
                     crawler.movementSpeed = 0.5f; // move slow
                     crawler.isOnPipeline = true;
+
+                    // Start the crawler with full hoppers so the player has ample time to
+                    // set up a Regolith/Iron mining supply chain before starvation can occur.
+                    crawler.CurrentRegolith = crawler.maxRegolith;
+                    crawler.CurrentIron = crawler.maxIron;
                 }
                 else
                 {
@@ -428,6 +433,17 @@ namespace GameDevTV.RTS.Environment
                 building.enabled = true;
                 building.Owner = Owner.Player1;
                 building.CompleteConstruction();
+
+                // A freshly established command center builds a Probe drone first.
+                AbstractUnitSO probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
+                if (probeSO != null)
+                {
+                    building.BuildUnlockable(probeSO);
+                }
+                else
+                {
+                    Debug.LogWarning("[Expansion] Could not load Probe SO at Resources/Units/Probe to auto-build first probe.");
+                }
             }
 
             // Keep the built segments in the world permanently when completed

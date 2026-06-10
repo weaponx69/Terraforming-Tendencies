@@ -34,7 +34,7 @@ namespace GameDevTV.RTS.UI.Containers
                 float remainingTime = Mathf.Max(0f, crawler.MaxStarvationDuration - crawler.StarvationTimer);
                 if (warningText != null)
                 {
-                    warningText.SetText($"<color=#FF2222><size=130%>⚠️ CRITICAL WARNING: CRAWLER STARVING! ⚠️</size></color>\nHoppers empty! Feed Crawler or Game Over in <color=#FFAA00>{remainingTime:F1}s</color>!");
+                    warningText.SetText($"<color=#FF2222><size=130%>// CRITICAL WARNING: CRAWLER STARVING //</size></color>\nHoppers empty! Feed Crawler or Game Over in <color=#FFAA00>{remainingTime:F1}s</color>!");
                 }
 
                 if (backgroundImage != null)
