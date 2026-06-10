@@ -361,6 +361,11 @@ namespace GameDevTV.RTS.Environment
 
             GameObject deposit = Instantiate(prefab, position, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
             deposit.name = label;
+            
+            if (PlanetGenerator.Instance != null)
+            {
+                deposit.transform.SetParent(PlanetGenerator.Instance.transform);
+            }
 
             AddPersistentLabel(deposit, label);
         }

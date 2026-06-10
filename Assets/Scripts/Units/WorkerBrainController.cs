@@ -195,6 +195,13 @@ namespace GameDevTV.RTS.Units
 
                 // Determine where to return the resources
                 string supplyName = gatheredSupplySO != null ? gatheredSupplySO.name.ToLower() : "";
+                
+                // Fallback just in case the prefab is missing its SupplySO in the Inspector
+                if (string.IsNullOrEmpty(supplyName) && targetSupply != null)
+                {
+                    supplyName = targetSupply.gameObject.name.ToLower();
+                }
+                
                 bool isIron = supplyName.Contains("iron") || supplyName.Contains("gas");
                 bool isRegolith = supplyName.Contains("regolith") || supplyName.Contains("mineral");
 

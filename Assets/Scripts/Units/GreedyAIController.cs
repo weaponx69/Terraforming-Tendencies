@@ -521,24 +521,29 @@ if (SectorManager.Instance != null)
                 var allUnits = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude)
                     .Where(u => u.Owner == aiOwner).ToList();
 
-                // 1. Prioritize Probes first
+                // 1. Prioritize Probes
                 int probeCount = allUnits.Count(u => u.GetComponent<ProbeMovement>() != null);
+                
+                // A. Strict Priority: If we have literally 0 probes (spawned or building), we MUST save up for one.
+                if (probeCount == 0 && !cp.IsFirstInQueueProbe())
+                {
+                    if (probeSO != null && CanAfford(probeSO, ignoreReserve: true)) 
+                    {
+                        Debug.Log("[GreedyAI] Building Priority Starter Probe at " + cp.name);
+                        cp.BuildUnlockable(probeSO);
+                    }
+                    // Block all other production until that first starter probe is at least safely in the queue!
+                    continue; 
+                }
+                
+                // B. Normal Priority: Build remaining probes up to the quota, but allow other units to build too
                 if (probeCount < activeCommandPosts.Count * probesPerBase)
                 {
-                    // If we haven't queued one yet, try to queue it
-                    if (!cp.IsFirstInQueueProbe())
+                    if (probeSO != null && CanAfford(probeSO) && cp.QueueSize < 3) 
                     {
-                        // Bypass the AI's spending reserve so it doesn't get deadlocked trying to afford the probe
-                        if (probeSO != null && CanAfford(probeSO, ignoreReserve: true)) 
-                        {
-                            Debug.Log("[GreedyAI] Building Probe at " + cp.name);
-                            cp.BuildUnlockable(probeSO);
-                        }
+                        Debug.Log("[GreedyAI] Building Additional Probe at " + cp.name);
+                        cp.BuildUnlockable(probeSO);
                     }
-                    // Strict Priority: Do not evaluate or queue Construction/Mining Drones
-                    // until we actually get our Probe! (This prevents the AI from spending 
-                    // its Biomass on cheaper drones while saving up for the Probe).
-                    continue; 
                 }
 
                 // 2. Ensure exactly 1 Construction Drone per base
