@@ -517,21 +517,20 @@ if (SectorManager.Instance != null)
                 var allUnits = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude)
                     .Where(u => u.Owner == aiOwner).ToList();
 
-                // Count workers (mining drones only)
-                int workerCount = allUnits.Count(u => u is Worker && u.GetComponent<ProbeMovement>() == null && (u.UnitSO == null || u.UnitSO.Name != "Construction Drone"));
-                
-                if (workerCount < workersPerBase)
+                // 1. Prioritize Probes first
+                int probeCount = allUnits.Count(u => u.GetComponent<ProbeMovement>() != null);
+                if (probeCount < activeCommandPosts.Count * probesPerBase)
                 {
-                    if (workerSO != null && CanAfford(workerSO)) 
+                    if (probeSO != null && CanAfford(probeSO)) 
                     {
-                        Debug.Log("[GreedyAI] Building Mining Drone at " + cp.name);
-                        cp.BuildUnlockable(workerSO);
+                        Debug.Log("[GreedyAI] Building Probe at " + cp.name);
+                        cp.BuildUnlockable(probeSO);
                     }
                 }
 
-                // Count construction drones
+                // 2. Ensure exactly 1 Construction Drone per base
                 int builderCount = allUnits.Count(u => u is Worker && u.UnitSO != null && u.UnitSO.Name == "Construction Drone");
-                if (builderCount < activeCommandPosts.Count * 1) // Ensure 1 builder per base
+                if (builderCount < activeCommandPosts.Count * 1)
                 {
                     if (constructionDroneSO != null && CanAfford(constructionDroneSO) && cp.QueueSize < 3) 
                     {
@@ -539,16 +538,15 @@ if (SectorManager.Instance != null)
                         cp.BuildUnlockable(constructionDroneSO);
                     }
                 }
-                
-                // Count Probes (those with ProbeMovement)
-                int probeCount = allUnits.Count(u => u.GetComponent<ProbeMovement>() != null);
-                
-                if (probeCount < activeCommandPosts.Count * probesPerBase)
+
+                // 3. Finally, build Mining Drones
+                int workerCount = allUnits.Count(u => u is Worker && u.GetComponent<ProbeMovement>() == null && (u.UnitSO == null || u.UnitSO.Name != "Construction Drone"));
+                if (workerCount < workersPerBase)
                 {
-                    if (probeSO != null && CanAfford(probeSO)) 
+                    if (workerSO != null && CanAfford(workerSO) && cp.QueueSize < 3) 
                     {
-                        Debug.Log("[GreedyAI] Building Probe at " + cp.name);
-                        cp.BuildUnlockable(probeSO);
+                        Debug.Log("[GreedyAI] Building Mining Drone at " + cp.name);
+                        cp.BuildUnlockable(workerSO);
                     }
                 }
             }

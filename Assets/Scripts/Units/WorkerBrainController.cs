@@ -194,9 +194,9 @@ namespace GameDevTV.RTS.Units
                 int gathered = targetSupply.EndGather();
 
                 // Determine where to return the resources
-                string supplyName = gatheredSupplySO != null ? gatheredSupplySO.name : "";
-                bool isIron = supplyName.Contains("Iron");
-                bool isRegolith = supplyName.Contains("Regolith");
+                string supplyName = gatheredSupplySO != null ? gatheredSupplySO.name.ToLower() : "";
+                bool isIron = supplyName.Contains("iron") || supplyName.Contains("gas");
+                bool isRegolith = supplyName.Contains("regolith") || supplyName.Contains("mineral");
 
                 FoundryCrawler nearestCrawler = null;
                 if (isIron || isRegolith)
