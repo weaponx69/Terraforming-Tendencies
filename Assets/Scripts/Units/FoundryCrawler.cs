@@ -76,6 +76,9 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
             // Force capacities to at least 1000, overriding any old values saved in the prefab's Inspector
             if (maxRegolith < 1000f) maxRegolith = 1000f;
             if (maxIron < 1000f) maxIron = 1000f;
+            
+            // Force movement speed to the new slow value, bypassing old Inspector prefab values
+            movementSpeed = 0.05f;
 
             MaxHealth = 1000;
             CurrentHealth = MaxHealth;
