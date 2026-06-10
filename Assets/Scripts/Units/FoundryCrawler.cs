@@ -45,7 +45,7 @@ namespace GameDevTV.RTS.Units
 private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry ice
 
         [Header("Movement & Pathing")]
-        public float movementSpeed = 0.5f;
+        public float movementSpeed = 0.05f;
         public Vector3 targetPosition;
         public bool isOnPipeline = true;
         public GameDevTV.RTS.Environment.EnergyPipelineManager PipelineManager { get; set; }

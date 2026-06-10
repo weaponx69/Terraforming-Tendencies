@@ -227,7 +227,6 @@ namespace GameDevTV.RTS.Environment
                 
                 crawler.PipelineManager = this;
                 crawler.targetPosition = targetPosition;
-                crawler.movementSpeed = 0.5f;
                 crawler.isOnPipeline = true;
 
                 // Ensure the crawler is properly initialized and not permanently stuffed full
