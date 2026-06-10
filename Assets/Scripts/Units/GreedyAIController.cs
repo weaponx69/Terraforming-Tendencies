@@ -525,11 +525,19 @@ if (SectorManager.Instance != null)
                 int probeCount = allUnits.Count(u => u.GetComponent<ProbeMovement>() != null);
                 if (probeCount < activeCommandPosts.Count * probesPerBase)
                 {
-                    if (probeSO != null && CanAfford(probeSO)) 
+                    // If we haven't queued one yet, try to queue it
+                    if (!cp.IsFirstInQueueProbe())
                     {
-                        Debug.Log("[GreedyAI] Building Probe at " + cp.name);
-                        cp.BuildUnlockable(probeSO);
+                        if (probeSO != null && CanAfford(probeSO)) 
+                        {
+                            Debug.Log("[GreedyAI] Building Probe at " + cp.name);
+                            cp.BuildUnlockable(probeSO);
+                        }
                     }
+                    // Strict Priority: Do not evaluate or queue Construction/Mining Drones
+                    // until we actually get our Probe! (This prevents the AI from spending 
+                    // its Biomass on cheaper drones while saving up for the Probe).
+                    continue; 
                 }
 
                 // 2. Ensure exactly 1 Construction Drone per base
