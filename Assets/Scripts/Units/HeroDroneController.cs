@@ -76,7 +76,17 @@ namespace GameDevTV.RTS.Units
             {
                 EndManualControl();
             }
+
+            // ALWAYS keep the agent's internal position glued to the transform, even at rest.
+            // Without this, releasing WASD freezes the agent's internal position while the
+            // transform continues to be at the new location. The divergence grows until
+            // something touches the agent and it snaps the transform back to its internal position.
+            if (agent != null && agent.enabled && agent.isOnNavMesh)
+            {
+                agent.nextPosition = transform.position;
+            }
         }
+
 
         private void ApplyMovement(Vector3 dir)
         {
