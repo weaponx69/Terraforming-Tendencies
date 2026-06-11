@@ -22,8 +22,10 @@ namespace GameDevTV.RTS.Units
 
         [Header("NavMesh")]
         [Tooltip("Adopt NavMesh height while moving so the drone follows terrain/flight-zone elevation.")]
-        [SerializeField] private bool snapToNavMeshHeight = true;
+        [SerializeField] private bool snapToNavMesh = true;
         [SerializeField] private float navMeshSampleDistance = 5f;
+        [Tooltip("Fallback hover height above Y=0 when no air NavMesh is found at the sampled position.")]
+        [SerializeField] private float fallbackHoverHeight = 4f;
 
         private NavMeshAgent agent;
         private AbstractUnit unit;
@@ -89,10 +91,16 @@ namespace GameDevTV.RTS.Units
             // Keep our freely-moved XZ; only adopt the NavMesh height so the drone follows
             // terrain/flight-zone elevation. We MUST pass the agentTypeID filter so air drones
             // don't sample the ground NavMesh and slam into the floor!
-            if (snapToNavMeshHeight
+            if (snapToNavMesh
                 && NavMesh.SamplePosition(targetPos, out NavMeshHit hit, navMeshSampleDistance, filter))
             {
                 targetPos.y = hit.position.y + (agent != null ? agent.baseOffset : 0f);
+            }
+            else
+            {
+                // No NavMesh hit — keep the XZ movement but lock Y to the configured hover height
+                // so the drone never falls through the floor while moving outside baked areas.
+                targetPos.y = fallbackHoverHeight;
             }
 
             transform.position = targetPos;

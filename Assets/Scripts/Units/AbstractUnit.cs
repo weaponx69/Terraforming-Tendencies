@@ -193,6 +193,9 @@ protected UnitSO unitSO;
             base.Start();
             Bus<UnitSpawnEvent>.Raise(Owner, new UnitSpawnEvent(this));
 
+            // Cache the HeroDroneController once so we don't GetComponent every Update frame.
+            heroDroneController = GetComponent<HeroDroneController>();
+
             if (DamageableSensor != null)
             {
                 DamageableSensor.OnUnitEnter += HandleUnitEnter;
@@ -222,8 +225,9 @@ protected UnitSO unitSO;
 }
 
         private float lastNavMeshSampleTime = 0f;
-private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
+        private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
         private bool hasFirstFrameRepair = false;
+        private HeroDroneController heroDroneController;
 
         // Direct-drive movement. The embedded behavior-graph "Move" sub-graph binds its
         // movement/stop actions to a sub-graph-local "Self"/"Agent" variable that never
@@ -251,11 +255,12 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
             if (Agent != null && Agent.isActiveAndEnabled)
             {
-                bool isManuallyControlled = false;
-                var heroCtrl = GetComponent<HeroDroneController>();
-                if (heroCtrl != null) isManuallyControlled = heroCtrl.IsBeingManuallyControlled;
+                // If this unit has a HeroDroneController, that script fully owns the
+                // transform position — never let the warp guard override it, regardless
+                // of whether the player is actively pressing a key right now.
+                bool isHeroDrone = heroDroneController != null;
 
-                if (!Agent.isOnNavMesh && !isManuallyControlled)
+                if (!Agent.isOnNavMesh && !isHeroDrone)
                 {
                     if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
                     {
