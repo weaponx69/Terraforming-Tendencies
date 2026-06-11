@@ -52,6 +52,28 @@ namespace GameDevTV.RTS.Units
         private void Start()
         {
             DecoupleAgent();
+
+            // Set starting height to the correct hover/air NavMesh height.
+            Vector3 startPos = transform.position;
+            NavMeshQueryFilter filter = new NavMeshQueryFilter 
+            { 
+                agentTypeID = agent != null ? agent.agentTypeID : 0, 
+                areaMask = NavMesh.AllAreas 
+            };
+            if (snapToNavMesh && NavMesh.SamplePosition(startPos, out NavMeshHit hit, navMeshSampleDistance, filter))
+            {
+                startPos.y = hit.position.y + (agent != null ? agent.baseOffset : 0f);
+            }
+            else
+            {
+                startPos.y = fallbackHoverHeight;
+            }
+            transform.position = startPos;
+
+            if (agent != null && agent.enabled && agent.isOnNavMesh)
+            {
+                agent.nextPosition = transform.position;
+            }
         }
 
         /// <summary>

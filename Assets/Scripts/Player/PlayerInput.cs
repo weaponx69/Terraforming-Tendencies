@@ -322,6 +322,7 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
         private void LateUpdate()
         {
             HandleCameraFollow();
+            HandleHeroCameraFollow();
         }
 
         private void HandleCameraFollow()
@@ -897,13 +898,19 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             }
 
             heroDrone.SetMoveInput(new Vector2(worldDir.x, worldDir.z));
+        }
 
-            // The moment a movement key is pressed, snap the camera back onto the Hero Drone.
-            if (worldDir.sqrMagnitude > 0.0001f && cameraTarget != null)
+        private void HandleHeroCameraFollow()
+        {
+            if (useHeroControlMode && heroDrone != null && cameraTarget != null)
             {
-                Vector3 targetPos = heroDrone.transform.position;
-                targetPos.y = cameraTarget.position.y; // preserve current zoom height
-                cameraTarget.position = targetPos;
+                Vector2 wasd = GetRawWasd();
+                if (wasd.sqrMagnitude > 0.0001f)
+                {
+                    Vector3 targetPos = heroDrone.transform.position;
+                    targetPos.y = cameraTarget.position.y; // preserve current zoom height
+                    cameraTarget.position = targetPos;
+                }
             }
         }
 

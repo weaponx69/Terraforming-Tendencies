@@ -60,6 +60,7 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private BaseCommand CancelBuildingCommand;
 
         private GatherSuppliesEventChannel gatherEventChannel;
+        private BuildingEventChannel buildingEventChannel;
         private WorkerBrainController brain;
         private WorkerBrainController Brain
         {
@@ -96,12 +97,9 @@ namespace GameDevTV.RTS.Units
                 gatherEventChannel.Event -= HandleGatherSupplies;
             }
 
-            if (graphAgent != null && graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
+            if (buildingEventChannel != null)
             {
-                if (buildEvt.Value != null)
-                {
-                    buildEvt.Value.Event -= HandleBuildingEvent;
-                }
+                buildingEventChannel.Event -= HandleBuildingEvent;
             }
         }
 
@@ -120,7 +118,11 @@ namespace GameDevTV.RTS.Units
             if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
             {
                 if (buildEvt.Value == null) buildEvt.Value = Resources.Load<BuildingEventChannel>("Events/BuildingEventChannel");
-                if (buildEvt.Value != null) buildEvt.Value.Event += HandleBuildingEvent;
+                if (buildEvt.Value != null)
+                {
+                    buildingEventChannel = buildEvt.Value;
+                    buildEvt.Value.Event += HandleBuildingEvent;
+                }
             }
         }
 
