@@ -193,10 +193,9 @@ GameObject:
   - component: {fileID: 1834166965680423873}
   - component: {fileID: 971274180351626417}
   - component: {fileID: 2898100052120534313}
-  - component: {fileID: 6541543038849683152}
-  - component: {fileID: 5851717949471753026}
   - component: {fileID: 3678404215251120026}
   - component: {fileID: 8393370271858032204}
+  - component: {fileID: 9029792125566220538}
   m_Layer: 6
   m_Name: Hero Drone
   m_TagString: Untagged
@@ -316,57 +315,6 @@ CapsuleCollider:
   m_Height: 1.2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &6541543038849683152
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5981931941316692690}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_Graph: {fileID: 4598362100129326914, guid: 10e583af0fed7ba439be975c79f1f0fc, type: 2}
-  m_BlackboardVariableOverridesList: []
-  m_OriginalGraph: {fileID: 0}
-  m_IsInitialised: 0
-  m_IsStarted: 0
-  references:
-    version: 2
-    RefIds: []
---- !u!114 &5851717949471753026
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5981931941316692690}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0ba652ed6c643d4aad123a742989803, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameDevTV.RTS.Units.Worker
-  <IsSelected>k__BackingField: 0
-  <CurrentHealth>k__BackingField: 100
-  <MaxHealth>k__BackingField: 100
-  <Owner>k__BackingField: 0
-  <IsVisible>k__BackingField: 1
-  <AvailableCommands>k__BackingField:
-  - {fileID: 11400000, guid: b0a82efc1c269c841a10f51737b9c172, type: 2}
-  - {fileID: 11400000, guid: df7069dfd83dca0a8b1c6cd49dcd95e3, type: 2}
-  - {fileID: 11400000, guid: 7f531236f4e6dd37782edd2b411994aa, type: 2}
-  - {fileID: 11400000, guid: cc4c6cbe12074ef4381e6e573f4503b5, type: 2}
-  - {fileID: 11400000, guid: 9e1c2a8f8d6b41228e932b11cd58fb9c, type: 2}
-  - {fileID: 11400000, guid: ac42e8f50d8e2cffe85c89075d65a911, type: 2}
-  <UnitSO>k__BackingField: {fileID: 11400000, guid: f6b38bef630bb884195c6d3f702eefb9, type: 2}
-  selectionIndicator: {fileID: 5689958090522785342}
-  VisionTransform: {fileID: 7746824181691591708}
-  <AttackingParticleSystem>k__BackingField: {fileID: 0}
-  DamageableSensor: {fileID: 0}
-  statusShader: {fileID: 0}
-  CancelBuildingCommand: {fileID: 11400000, guid: 166415456c8d4cd4282c9686f36a509b, type: 2}
 --- !u!114 &3678404215251120026
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -396,8 +344,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 780b15c39bd146eccb4f4b5f857ceabc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.HeroDroneDebugger
-  maxHistory: 120
-  recordInterval: 0.05
+  logInterval: 0.25
+  divergenceAlertThreshold: 0.5
+--- !u!114 &9029792125566220538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5981931941316692690}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d593cb0b2c2a32c20ad9c80cdc1a5f11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.HeroDrone
+  <IsSelected>k__BackingField: 0
+  <CurrentHealth>k__BackingField: 0
+  <MaxHealth>k__BackingField: 0
+  <Owner>k__BackingField: 0
+  <IsVisible>k__BackingField: 1
+  <AvailableCommands>k__BackingField: []
+  <UnitSO>k__BackingField: {fileID: 0}
+  selectionIndicator: {fileID: 0}
+  VisionTransform: {fileID: 0}
 --- !u!1 &8380058240677277642
 GameObject:
   m_ObjectHideFlags: 0

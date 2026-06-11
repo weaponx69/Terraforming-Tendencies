@@ -153,9 +153,7 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
                 }
 
                 // Hero Drone acts as a mobile life support node
-                if (node.TryGetComponent<HeroDroneController>(out _)
-                    && node.TryGetComponent<AbstractCommandable>(out var cmd)
-                    && cmd.Owner == owner)
+                if (node.TryGetComponent<HeroDrone>(out var hero) && hero.Owner == owner)
                 {
                     return true;
                 }
