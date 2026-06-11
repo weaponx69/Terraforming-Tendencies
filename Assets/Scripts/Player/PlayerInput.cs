@@ -150,14 +150,28 @@ namespace GameDevTV.RTS.Player
             GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated -= CenterCameraOnMap;
         }
 
+        private bool isFollowingSelectedCrawler = false;
+
         private void HandleUnitSelected(UnitSelectedEvent evt)
         {
             if (!selectedUnits.Contains(evt.Unit))
             {
                 selectedUnits.Add(evt.Unit);
             }
+            
+            if (evt.Unit is FoundryCrawler)
+            {
+                isFollowingSelectedCrawler = true;
+            }
         }
-        private void HandleUnitDeselected(UnitDeselectedEvent evt) => selectedUnits.Remove(evt.Unit);
+        private void HandleUnitDeselected(UnitDeselectedEvent evt)
+        {
+            selectedUnits.Remove(evt.Unit);
+            if (evt.Unit is FoundryCrawler)
+            {
+                isFollowingSelectedCrawler = false;
+            }
+        }
         private void HandleUnitSpawn(UnitSpawnEvent evt) => aliveUnits.Add(evt.Unit);
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
         {
@@ -175,9 +189,13 @@ namespace GameDevTV.RTS.Player
             }
         }
         private void HandleUnitDeath(UnitDeathEvent evt)
-{
+        {
             aliveUnits.Remove(evt.Unit);
             selectedUnits.Remove(evt.Unit);
+            if (evt.Unit is FoundryCrawler)
+            {
+                isFollowingSelectedCrawler = false;
+            }
         }
 
         private void HandleActionSelected(CommandSelectedEvent evt)
@@ -294,6 +312,29 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             HandleRightClick();
             HandleDragSelect();
             HandleBasePaging();
+            HandleCameraFollow();
+        }
+
+        private void HandleCameraFollow()
+        {
+            if (!isFollowingSelectedCrawler || cameraTarget == null) return;
+            
+            if (selectedUnits.Count == 1 && selectedUnits[0] is FoundryCrawler crawler)
+            {
+                // If the player tries to manually move the camera, break the lock so they aren't trapped!
+                Vector2 keyboardMove = GetKeyboardMoveAmount();
+                Vector2 mouseMove = GetMouseMoveAmount();
+                if (keyboardMove.sqrMagnitude > 0.001f || mouseMove.sqrMagnitude > 0.001f)
+                {
+                    isFollowingSelectedCrawler = false;
+                    return;
+                }
+
+                // Snap the camera target to the crawler's position, preserving current zoom height
+                Vector3 targetPos = crawler.transform.position;
+                targetPos.y = cameraTarget.position.y;
+                cameraTarget.position = targetPos;
+            }
         }
 
         private void HandleBasePaging()
