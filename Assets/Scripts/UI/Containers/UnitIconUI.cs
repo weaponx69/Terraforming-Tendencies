@@ -25,6 +25,16 @@ namespace GameDevTV.RTS.UI.Containers
                 icon.sprite = commandable.UnitSO.Icon;
             }
 
+            bool isCrawler = commandable is FoundryCrawler;
+            foreach (Transform child in transform)
+            {
+                string childName = child.name.ToLower();
+                if (childName.Contains("damage") || childName.Contains("armor"))
+                {
+                    child.gameObject.SetActive(!isCrawler);
+                }
+            }
+
             commandable.OnHealthUpdated -= OnHealthUpdated;
             commandable.OnHealthUpdated += OnHealthUpdated;
         }

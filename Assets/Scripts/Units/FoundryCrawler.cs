@@ -106,7 +106,7 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
                                 selectionIndicator.name = "SelectionIndicator";
                                 selectionIndicator.transform.localPosition = new Vector3(0, 0.1f, 0);
                                 selectionIndicator.transform.localRotation = prefabInd.transform.localRotation;
-                                selectionIndicator.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                                selectionIndicator.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
                                 selectionIndicator.SetActive(false);
                             }
                         }
@@ -121,7 +121,7 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
                     selectionIndicator.transform.SetParent(transform);
                     selectionIndicator.transform.localPosition = new Vector3(0, 0.1f, 0);
                     selectionIndicator.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // Lay flat on ground
-                    selectionIndicator.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                    selectionIndicator.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
                     Destroy(selectionIndicator.GetComponent<Collider>());
                     
                     Renderer rend = selectionIndicator.GetComponent<Renderer>();
