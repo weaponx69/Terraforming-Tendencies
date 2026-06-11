@@ -196,6 +196,7 @@ GameObject:
   - component: {fileID: 6541543038849683152}
   - component: {fileID: 5851717949471753026}
   - component: {fileID: 3678404215251120026}
+  - component: {fileID: 8393370271858032204}
   m_Layer: 6
   m_Name: Hero Drone
   m_TagString: Untagged
@@ -382,6 +383,21 @@ MonoBehaviour:
   rotationSpeed: 720
   snapToNavMesh: 1
   navMeshSampleDistance: 5
+  fallbackHoverHeight: 4
+--- !u!114 &8393370271858032204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5981931941316692690}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 780b15c39bd146eccb4f4b5f857ceabc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.HeroDroneDebugger
+  maxHistory: 120
+  recordInterval: 0.05
 --- !u!1 &8380058240677277642
 GameObject:
   m_ObjectHideFlags: 0
