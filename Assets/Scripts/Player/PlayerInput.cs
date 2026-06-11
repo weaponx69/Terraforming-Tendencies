@@ -744,6 +744,14 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
 
         private void HandleRotation()
         {
+            // Full 360-degree free rotation using Middle Mouse Button
+            if (cameraTarget != null && Mouse.current.middleButton.isPressed)
+            {
+                float rotationInput = Mouse.current.delta.x.ReadValue();
+                float rotationSpeed = cameraConfig.RotationSpeed * 0.2f; 
+                cameraTarget.transform.Rotate(Vector3.up, rotationInput * rotationSpeed, Space.World);
+            }
+
             if (cinemachineFollow == null) return;
 
             if (ShouldSetRotationStartTime())
@@ -839,7 +847,8 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             
             if (cameraTarget != null)
             {
-                cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.World);
+                // Use Space.Self so panning respects the new camera rotation angle!
+                cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.Self);
             }
         }
 
