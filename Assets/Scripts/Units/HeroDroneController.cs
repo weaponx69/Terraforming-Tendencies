@@ -150,20 +150,18 @@ namespace GameDevTV.RTS.Units
                 areaMask = NavMesh.AllAreas 
             };
 
-            // Keep our freely-moved XZ; only adopt the NavMesh height so the drone follows
-            // terrain/flight-zone elevation. We MUST pass the agentTypeID filter so air drones
-            // don't sample the ground NavMesh and slam into the floor!
-            if (snapToNavMesh
-                && NavMesh.SamplePosition(targetPos, out NavMeshHit hit, navMeshSampleDistance, filter))
+            // Smoothly interpolate the Y position so the drone doesn't violently snap
+            // up and down when terrain elevation changes or NavMesh tracking is briefly lost.
+            float targetY;
+            if (snapToNavMesh && NavMesh.SamplePosition(targetPos, out NavMeshHit hit, navMeshSampleDistance, filter))
             {
-                targetPos.y = hit.position.y + (agent != null ? agent.baseOffset : 0f);
+                targetY = hit.position.y + (agent != null ? agent.baseOffset : 0f);
             }
             else
             {
-                // No NavMesh hit — keep the XZ movement but lock Y to the configured hover height
-                // so the drone never falls through the floor while moving outside baked areas.
-                targetPos.y = fallbackHoverHeight;
+                targetY = fallbackHoverHeight;
             }
+            targetPos.y = Mathf.Lerp(transform.position.y, targetY, Time.deltaTime * 10f);
 
             // Wrap around map edges so the drone seamlessly appears on the opposite side,
             // matching the toroidal world used by MapWrapper and ProbeMovement.
