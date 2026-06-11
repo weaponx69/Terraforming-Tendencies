@@ -12,16 +12,6 @@ namespace GameDevTV.RTS.UI.Containers
         {
             gameObject.SetActive(true);
             unitName.SetText(ResolveDisplayName(item));
-
-            bool isCrawler = item is FoundryCrawler;
-            foreach (Transform child in transform)
-            {
-                string childName = child.name.ToLower();
-                if (childName.Contains("damage") || childName.Contains("armor"))
-                {
-                    child.gameObject.SetActive(!isCrawler);
-                }
-            }
         }
 
         // Buildings such as Command Posts are renamed with a unique suffix (e.g. "Command Post #2")
