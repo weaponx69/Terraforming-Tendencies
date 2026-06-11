@@ -51,7 +51,10 @@ namespace GameDevTV.RTS.Units
 
         private void Start()
         {
-            DecoupleAgent();
+            if (agent != null)
+            {
+                agent.enabled = false;
+            }
 
             // Set starting height to the correct hover/air NavMesh height.
             Vector3 startPos = transform.position;
@@ -60,15 +63,34 @@ namespace GameDevTV.RTS.Units
                 agentTypeID = agent != null ? agent.agentTypeID : 0, 
                 areaMask = NavMesh.AllAreas 
             };
-            if (snapToNavMesh && NavMesh.SamplePosition(startPos, out NavMeshHit hit, navMeshSampleDistance, filter))
+            
+            bool gotNavMeshHit = false;
+            NavMeshHit hit = default;
+            if (snapToNavMesh && NavMesh.SamplePosition(startPos, out hit, navMeshSampleDistance, filter))
             {
                 startPos.y = hit.position.y + (agent != null ? agent.baseOffset : 0f);
+                gotNavMeshHit = true;
             }
             else
             {
                 startPos.y = fallbackHoverHeight;
             }
             transform.position = startPos;
+
+            if (agent != null)
+            {
+                agent.enabled = true;
+                if (gotNavMeshHit)
+                {
+                    agent.Warp(hit.position);
+                }
+                else
+                {
+                    agent.Warp(startPos);
+                }
+            }
+
+            DecoupleAgent();
 
             if (agent != null && agent.enabled && agent.isOnNavMesh)
             {
@@ -189,6 +211,25 @@ namespace GameDevTV.RTS.Units
         {
             if (!isManuallyControlled) return;
             isManuallyControlled = false;
+
+            // Align agent's position with the final manual position
+            if (agent != null && agent.enabled)
+            {
+                NavMeshQueryFilter filter = new NavMeshQueryFilter 
+                { 
+                    agentTypeID = agent.agentTypeID, 
+                    areaMask = NavMesh.AllAreas 
+                };
+                if (snapToNavMesh && NavMesh.SamplePosition(transform.position, out NavMeshHit hit, navMeshSampleDistance, filter))
+                {
+                    agent.Warp(hit.position);
+                }
+                else
+                {
+                    agent.Warp(transform.position);
+                }
+            }
+
             // Intentionally keep the agent decoupled; the drone simply hovers where the player
             // left it. Re-coupling would teleport the transform back to the agent's internal position.
         }

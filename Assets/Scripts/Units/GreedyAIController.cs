@@ -709,6 +709,7 @@ if (SectorManager.Instance != null)
                 .Where(w => w != null
                             && w.Owner == aiOwner
                             && w.GetComponent<ProbeMovement>() == null            // not a Probe
+                            && w.GetComponent<HeroDroneController>() == null      // not the Hero Drone
                             && (w.UnitSO == null || w.UnitSO.Name != "Construction Drone") // not a Builder
                             && w.IsIdle)
                 .ToList();
@@ -928,6 +929,7 @@ else
             var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .Where(w => w != null && w.Owner == aiOwner
                             && w.GetComponent<ProbeMovement>() == null   // never a probe
+                            && w.GetComponent<HeroDroneController>() == null // never the Hero Drone
                             && !w.HasSupplies)
                 .ToList();
 
@@ -959,6 +961,7 @@ else
                 if (w == null) continue;
                 if (w.Owner != aiOwner) continue;
                 if (w.GetComponent<ProbeMovement>() != null) continue; // never a probe
+                if (w.GetComponent<HeroDroneController>() != null) continue; // never the Hero Drone
                 if (w.HasSupplies) continue;                           // busy hauling
                 if (w.IsBuilding) continue;                            // already building
                 return true;                                           // idle OR mining (reassignable)
