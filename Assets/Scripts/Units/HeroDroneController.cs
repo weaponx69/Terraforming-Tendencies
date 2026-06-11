@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.Behavior;
 using GameDevTV.RTS.Environment;
 
 namespace GameDevTV.RTS.Units
@@ -31,6 +32,7 @@ namespace GameDevTV.RTS.Units
         private NavMeshAgent agent;
         private AbstractUnit unit;
         private WorkerBrainController brain;
+        private BehaviorGraphAgent graphAgent;
 
         private Vector2 pendingMove;
         private bool isManuallyControlled;
@@ -45,6 +47,7 @@ namespace GameDevTV.RTS.Units
             agent = GetComponent<NavMeshAgent>();
             unit = GetComponent<AbstractUnit>();
             brain = GetComponent<WorkerBrainController>();
+            graphAgent = GetComponent<BehaviorGraphAgent>();
             
             if (TryGetComponent<Rigidbody>(out Rigidbody rb))
             {
@@ -208,6 +211,10 @@ namespace GameDevTV.RTS.Units
             if (brain != null) brain.Halt();
             if (unit != null) unit.Stop();
 
+            // Suspend the behavior graph so its per-frame tick stops calling agent.ResetPath(),
+            // toggling isStopped, and other NavMeshAgent methods that create movement jitter.
+            if (graphAgent != null) graphAgent.enabled = false;
+
             DecoupleAgent();
         }
 
@@ -250,6 +257,9 @@ namespace GameDevTV.RTS.Units
                     agent.Warp(transform.position);
                 }
             }
+
+            // Re-enable the behavior graph so the unit can respond to AI commands again.
+            if (graphAgent != null) graphAgent.enabled = true;
 
             // Intentionally keep the agent decoupled; the drone simply hovers where the player
             // left it. Re-coupling would teleport the transform back to the agent's internal position.
