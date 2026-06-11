@@ -62,6 +62,13 @@ namespace GameDevTV.RTS.Units
                 commandable.Owner = Owner.Player1;
             }
 
+            // Attach LifeSupportNode to make the Hero Drone act as a mobile support zone
+            if (!instance.TryGetComponent<LifeSupportNode>(out _))
+            {
+                var lifeSupport = instance.AddComponent<LifeSupportNode>();
+                lifeSupport.Radius = 30f;
+            }
+
             // Link into PlayerInput so WASD pilots this drone.
             PlayerInput input = Object.FindAnyObjectByType<PlayerInput>(FindObjectsInactive.Include);
             if (input != null && instance.TryGetComponent(out HeroDroneController hero))
