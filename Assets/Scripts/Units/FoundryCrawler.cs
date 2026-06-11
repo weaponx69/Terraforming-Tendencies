@@ -90,33 +90,54 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
 
             if (selectionIndicator == null)
             {
-                // Auto-generate a flat green cylinder as a selection indicator
-                selectionIndicator = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                selectionIndicator.name = "SelectionIndicator";
-                selectionIndicator.transform.SetParent(transform);
-                
-                // Make it a flat circle under the crawler
-                selectionIndicator.transform.localPosition = new Vector3(0, 0.1f, 0);
-                selectionIndicator.transform.localScale = new Vector3(3f, 0.05f, 3f);
-                
-                // Remove collider so it doesn't block clicks/navmesh
-                Destroy(selectionIndicator.GetComponent<Collider>());
-                
-                // Color it a transparent selection green
-                Renderer rend = selectionIndicator.GetComponent<Renderer>();
-                if (rend != null)
+                // Attempt to perfectly match the stylistic outline of the other units by cloning their indicator
+                if (constructionDronePrefab != null)
                 {
-                    Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                    mat.color = new Color(0f, 1f, 0f, 0.5f);
-                    mat.SetFloat("_Surface", 1); // Set to Transparent
-                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                    mat.SetInt("_ZWrite", 0);
-                    mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-                    rend.material = mat;
+                    var droneCmd = constructionDronePrefab.GetComponent<AbstractCommandable>();
+                    if (droneCmd != null)
+                    {
+                        var field = typeof(AbstractCommandable).GetField("selectionIndicator", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (field != null)
+                        {
+                            GameObject prefabInd = field.GetValue(droneCmd) as GameObject;
+                            if (prefabInd != null)
+                            {
+                                selectionIndicator = Instantiate(prefabInd, transform);
+                                selectionIndicator.name = "SelectionIndicator";
+                                selectionIndicator.transform.localPosition = new Vector3(0, 0.1f, 0);
+                                selectionIndicator.transform.localRotation = prefabInd.transform.localRotation;
+                                selectionIndicator.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                                selectionIndicator.SetActive(false);
+                            }
+                        }
+                    }
                 }
-                
-                selectionIndicator.SetActive(false);
+
+                // Fallback to a flat quad if the clone failed
+                if (selectionIndicator == null)
+                {
+                    selectionIndicator = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    selectionIndicator.name = "SelectionIndicator";
+                    selectionIndicator.transform.SetParent(transform);
+                    selectionIndicator.transform.localPosition = new Vector3(0, 0.1f, 0);
+                    selectionIndicator.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // Lay flat on ground
+                    selectionIndicator.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                    Destroy(selectionIndicator.GetComponent<Collider>());
+                    
+                    Renderer rend = selectionIndicator.GetComponent<Renderer>();
+                    if (rend != null)
+                    {
+                        Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                        mat.color = new Color(0f, 1f, 0f, 0.5f);
+                        mat.SetFloat("_Surface", 1);
+                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        mat.SetInt("_ZWrite", 0);
+                        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                        rend.material = mat;
+                    }
+                    selectionIndicator.SetActive(false);
+                }
             }
         }
 
