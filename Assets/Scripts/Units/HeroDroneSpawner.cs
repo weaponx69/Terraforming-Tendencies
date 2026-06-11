@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.AI;
@@ -10,6 +11,8 @@ namespace GameDevTV.RTS.Units
     /// Spawns the player's Hero Drone (mobile command center) once the planet has been
     /// generated, places it at the player's start location, marks it as Player1, and links
     /// it into <see cref="PlayerInput"/> so WASD piloting works with no manual scene wiring.
+    /// Defers spawning until a Player1 command post exists so the drone always appears
+    /// near the base rather than at map center.
     /// </summary>
     public class HeroDroneSpawner : MonoBehaviour
     {
@@ -17,6 +20,8 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private string heroPrefabResourcePath = "Units/Hero Drone";
         [Tooltip("Spawn the drone this many world units in front of the start point so it isn't on top of the base.")]
         [SerializeField] private float spawnForwardOffset = 6f;
+        [Tooltip("Maximum seconds to wait for the initial command post before falling back to map center.")]
+        [SerializeField] private float maxWaitForBase = 10f;
 
         private bool hasSpawned;
 
@@ -38,12 +43,28 @@ namespace GameDevTV.RTS.Units
         private void HandlePlanetGenerated()
         {
             if (hasSpawned) return;
+            hasSpawned = true; // Prevent duplicate coroutine starts
+            StartCoroutine(WaitForBaseAndSpawn());
+        }
 
+        private IEnumerator WaitForBaseAndSpawn()
+        {
             GameObject prefab = Resources.Load<GameObject>(heroPrefabResourcePath);
             if (prefab == null)
             {
                 Debug.LogError($"[HeroDroneSpawner] Could not load Hero Drone prefab at Resources/{heroPrefabResourcePath}.");
-                return;
+                yield break;
+            }
+
+            // Wait until a Player1 base exists (the GreedyAIController spawns it in Start()).
+            float waited = 0f;
+            while (waited < maxWaitForBase)
+            {
+                BaseBuilding playerBase = BaseBuilding.ActiveBuildings
+                    .FirstOrDefault(b => b != null && b.Owner == Owner.Player1);
+                if (playerBase != null) break;
+                yield return new WaitForSeconds(0.25f);
+                waited += 0.25f;
             }
 
             Vector3 spawnPos = ResolveSpawnPosition();
@@ -76,7 +97,6 @@ namespace GameDevTV.RTS.Units
                 input.AssignHeroDrone(hero);
             }
 
-            hasSpawned = true;
             Debug.Log($"[HeroDroneSpawner] Hero Drone spawned at {spawnPos}.");
         }
 
@@ -90,13 +110,15 @@ namespace GameDevTV.RTS.Units
                 return playerBase.transform.position + playerBase.transform.forward * spawnForwardOffset;
             }
 
-            // Fall back to the centre of the map.
+            // Fall back to the first sector center (matches GreedyAI initial base location).
             PlanetGenerator pg = PlanetGenerator.Instance;
             if (pg != null && pg.Config != null)
             {
                 float w = pg.Config.MapWidth * pg.CellSize;
                 float h = pg.Config.MapHeight * pg.CellSize;
-                return new Vector3(w / 2f, 0f, h / 2f);
+                float secW = w / pg.Config.SectorsX;
+                float secH = h / pg.Config.SectorsY;
+                return new Vector3(secW * 0.5f, 0f, secH * 0.5f);
             }
 
             return Vector3.zero;

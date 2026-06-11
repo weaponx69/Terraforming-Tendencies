@@ -146,9 +146,18 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
             var nodes = Object.FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
             foreach (var node in nodes)
             {
+                // Completed buildings with life support
                 if (node.TryGetComponent<BaseBuilding>(out var b) && b.Owner == owner)
                 {
                     if (b.Progress.State == BuildingProgress.BuildingState.Completed) return true;
+                }
+
+                // Hero Drone acts as a mobile life support node
+                if (node.TryGetComponent<HeroDroneController>(out _)
+                    && node.TryGetComponent<AbstractCommandable>(out var cmd)
+                    && cmd.Owner == owner)
+                {
+                    return true;
                 }
             }
             return false;

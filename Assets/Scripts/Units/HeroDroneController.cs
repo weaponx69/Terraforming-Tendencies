@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using GameDevTV.RTS.Environment;
 
 namespace GameDevTV.RTS.Units
 {
@@ -33,6 +34,8 @@ namespace GameDevTV.RTS.Units
 
         private Vector2 pendingMove;
         private bool isManuallyControlled;
+        private float mapWidth;
+        private float mapHeight;
 
         /// <summary>True while the player is actively piloting this drone with WASD.</summary>
         public bool IsBeingManuallyControlled => isManuallyControlled;
@@ -51,6 +54,13 @@ namespace GameDevTV.RTS.Units
 
         private void Start()
         {
+            // Cache map dimensions for boundary clamping.
+            if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
+            {
+                mapWidth = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
+                mapHeight = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
+            }
+
             if (agent != null)
             {
                 agent.enabled = false;
@@ -155,6 +165,17 @@ namespace GameDevTV.RTS.Units
                 // No NavMesh hit — keep the XZ movement but lock Y to the configured hover height
                 // so the drone never falls through the floor while moving outside baked areas.
                 targetPos.y = fallbackHoverHeight;
+            }
+
+            // Wrap around map edges so the drone seamlessly appears on the opposite side,
+            // matching the toroidal world used by MapWrapper and ProbeMovement.
+            if (mapWidth > 0f && mapHeight > 0f)
+            {
+                if (targetPos.x < 0f) targetPos.x += mapWidth;
+                else if (targetPos.x > mapWidth) targetPos.x -= mapWidth;
+
+                if (targetPos.z < 0f) targetPos.z += mapHeight;
+                else if (targetPos.z > mapHeight) targetPos.z -= mapHeight;
             }
 
             transform.position = targetPos;
