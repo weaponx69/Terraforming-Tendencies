@@ -80,13 +80,19 @@ namespace GameDevTV.RTS.Units
         {
             Vector3 targetPos = transform.position + dir * (moveSpeed * Time.deltaTime);
 
+            NavMeshQueryFilter filter = new NavMeshQueryFilter 
+            { 
+                agentTypeID = agent != null ? agent.agentTypeID : 0, 
+                areaMask = NavMesh.AllAreas 
+            };
+
             // Keep our freely-moved XZ; only adopt the NavMesh height so the drone follows
-            // terrain/flight-zone elevation. Snapping XZ to the nearest NavMesh point would pin
-            // air units (whose NavMesh is a small elevated patch) back in place.
+            // terrain/flight-zone elevation. We MUST pass the agentTypeID filter so air drones
+            // don't sample the ground NavMesh and slam into the floor!
             if (snapToNavMeshHeight
-                && NavMesh.SamplePosition(targetPos, out NavMeshHit hit, navMeshSampleDistance, NavMesh.AllAreas))
+                && NavMesh.SamplePosition(targetPos, out NavMeshHit hit, navMeshSampleDistance, filter))
             {
-                targetPos.y = hit.position.y;
+                targetPos.y = hit.position.y + (agent != null ? agent.baseOffset : 0f);
             }
 
             transform.position = targetPos;

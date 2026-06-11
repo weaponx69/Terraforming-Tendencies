@@ -317,6 +317,10 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             HandleRightClick();
             HandleDragSelect();
             HandleBasePaging();
+        }
+
+        private void LateUpdate()
+        {
             HandleCameraFollow();
         }
 
