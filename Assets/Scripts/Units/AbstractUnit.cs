@@ -251,7 +251,11 @@ private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
 
             if (Agent != null && Agent.isActiveAndEnabled)
             {
-                if (!Agent.isOnNavMesh)
+                bool isManuallyControlled = false;
+                var heroCtrl = GetComponent<HeroDroneController>();
+                if (heroCtrl != null) isManuallyControlled = heroCtrl.IsBeingManuallyControlled;
+
+                if (!Agent.isOnNavMesh && !isManuallyControlled)
                 {
                     if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
                     {

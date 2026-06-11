@@ -40,6 +40,11 @@ namespace GameDevTV.RTS.Units
             agent = GetComponent<NavMeshAgent>();
             unit = GetComponent<AbstractUnit>();
             brain = GetComponent<WorkerBrainController>();
+            
+            if (TryGetComponent<Rigidbody>(out Rigidbody rb))
+            {
+                rb.isKinematic = true;
+            }
         }
 
         private void Start()
