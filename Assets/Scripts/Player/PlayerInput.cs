@@ -22,6 +22,11 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private LayerMask selectableUnitsLayers;
         [SerializeField] private LayerMask interactableLayers;
         [SerializeField] private LayerMask floorLayers;
+        [Header("Hero Drone (Mobile Command Center)")]
+        [Tooltip("When enabled, WASD pilots the assigned Hero Drone instead of panning the camera. The mouse (edge-pan, click, drag-select) stays fully free.")]
+        [SerializeField] private bool useHeroControlMode = true;
+        [Tooltip("The Hero Drone piloted with WASD. Drag the Hero Drone from the hierarchy here.")]
+        [SerializeField] private GameDevTV.RTS.Units.HeroDroneController heroDrone;
         [SerializeField] private RectTransform selectionBox;
         [SerializeField] [ColorUsage(showAlpha: true, hdr: true)]
         private Color errorTintColor = Color.red;
@@ -840,7 +845,11 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
 
         private void HandlePanning()
         {
-            Vector2 moveAmount = GetKeyboardMoveAmount();
+            bool heroActive = useHeroControlMode && heroDrone != null;
+
+            // In hero mode WASD pilots the drone, so it no longer contributes to camera panning.
+            // Mouse edge-pan is always honored.
+            Vector2 moveAmount = heroActive ? Vector2.zero : GetKeyboardMoveAmount();
             moveAmount += GetMouseMoveAmount();
 
             Vector3 velocity = new Vector3(moveAmount.x, 0, moveAmount.y);
@@ -850,6 +859,62 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 // Use Space.Self so panning respects the new camera rotation angle!
                 cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.Self);
             }
+
+            if (heroActive)
+            {
+                HandleHeroControl();
+            }
+        }
+
+        /// <summary>
+        /// Assigns the Hero Drone at runtime (called by HeroDroneSpawner after it spawns the drone).
+        /// </summary>
+        public void AssignHeroDrone(GameDevTV.RTS.Units.HeroDroneController hero)
+        {
+            heroDrone = hero;
+        }
+
+        private void HandleHeroControl()
+        {
+            Vector2 wasd = GetRawWasd();
+            Vector3 worldDir = Vector3.zero;
+
+            if (wasd.sqrMagnitude > 0.0001f && cameraTarget != null)
+            {
+                // Convert WASD into a camera-relative world direction so 'W' always moves the
+                // drone away from the camera, matching the feel of Space.Self camera panning.
+                Vector3 forward = cameraTarget.transform.forward;
+                forward.y = 0f;
+                forward.Normalize();
+                Vector3 right = cameraTarget.transform.right;
+                right.y = 0f;
+                right.Normalize();
+                worldDir = (forward * wasd.y + right * wasd.x).normalized;
+            }
+
+            heroDrone.SetMoveInput(new Vector2(worldDir.x, worldDir.z));
+
+            // The moment a movement key is pressed, snap the camera back onto the Hero Drone.
+            if (worldDir.sqrMagnitude > 0.0001f && cameraTarget != null)
+            {
+                Vector3 targetPos = heroDrone.transform.position;
+                targetPos.y = cameraTarget.position.y; // preserve current zoom height
+                cameraTarget.position = targetPos;
+            }
+        }
+
+        private Vector2 GetRawWasd()
+        {
+            Vector2 move = Vector2.zero;
+
+            if (!Application.isFocused) return move;
+
+            if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed) move.y += 1f;
+            if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed) move.y -= 1f;
+            if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed) move.x -= 1f;
+            if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed) move.x += 1f;
+
+            return move;
         }
 
         private Vector2 GetMouseMoveAmount()
