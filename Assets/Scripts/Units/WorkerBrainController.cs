@@ -198,11 +198,15 @@ namespace GameDevTV.RTS.Units
                 string goName = targetSupply != null ? targetSupply.gameObject.name.ToLower() : "";
                 string supplyName = soName + " " + goName;
                 
-                bool isIron = supplyName.Contains("iron") || supplyName.Contains("gas");
-                bool isRegolith = supplyName.Contains("regolith") || supplyName.Contains("mineral");
+                bool isIron = supplyName.Contains("iron");
+                bool isRegolith = supplyName.Contains("regolith");
+                bool isGas = supplyName.Contains("gas");
+                bool isMineral = supplyName.Contains("mineral");
+                
+                bool isCrawlerResource = isIron || isRegolith || isGas || isMineral;
 
                 FoundryCrawler nearestCrawler = null;
-                if (isIron || isRegolith)
+                if (isCrawlerResource)
                 {
                     var crawlers = Object.FindObjectsByType<FoundryCrawler>(FindObjectsInactive.Include);
                     float minDist = float.MaxValue;
@@ -241,6 +245,11 @@ namespace GameDevTV.RTS.Units
                     {
                         if (isIron) nearestCrawler.AddIron(gathered);
                         else if (isRegolith) nearestCrawler.AddRegolith(gathered);
+                        else if ((isGas || isMineral) && eventChannel != null && gathered > 0)
+                        {
+                            // Gas and Minerals deposited at the Forge are immediately converted to Biomass
+                            eventChannel.SendEventMessage(gameObject, gathered, gatheredSupplySO);
+                        }
                     }
                     else if (eventChannel != null && gathered > 0)
                     {
