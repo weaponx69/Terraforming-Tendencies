@@ -350,10 +350,12 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
         }
 
         private void PageBases(int direction)
-        {
+        {   // use set builder notation to get all player-owned buildings and foundries in the game, 
+            // including ones that are not active. 
             var commandPosts = BaseBuilding.ActiveBuildings
                 .Where(b => b != null && b.Owner == Owner.Player1 &&
-                       (b.name.Contains("Command") || (b.BuildingSO != null && b.BuildingSO.Name.Contains("Command"))) &&
+                       (b.name.Contains("Command") || b.name.Contains("Foundry") || 
+                       (b.BuildingSO != null && (b.BuildingSO.Name.Contains("Command") || b.BuildingSO.Name.Contains("Foundry")))) &&
                        b.Progress.State == BuildingProgress.BuildingState.Completed)
                 .Cast<AbstractCommandable>()
                 .ToList();
@@ -362,6 +364,15 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             if (commander != null)
             {
                 commandPosts.Add(commander);
+            }
+
+            var crawlers = Object.FindObjectsByType<FoundryCrawler>(FindObjectsInactive.Exclude);
+            foreach (var crawler in crawlers)
+            {
+                if (crawler != null && crawler.Owner == Owner.Player1)
+                {
+                    commandPosts.Add(crawler);
+                }
             }
 
             commandPosts = commandPosts.OrderBy(b => b.transform.position.x)
