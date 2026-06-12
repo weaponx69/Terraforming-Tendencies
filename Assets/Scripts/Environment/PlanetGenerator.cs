@@ -568,8 +568,8 @@ namespace GameDevTV.RTS.Environment
                     float exclusionRadius = 15f; 
                     Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-                    GameObject ironPrefab = Resources.Load<GameObject>("Gatherable Supplies/Iron");
-                    GameObject regolithPrefab = Resources.Load<GameObject>("Gatherable Supplies/Regolith");
+                    GameObject ironPrefab = Resources.Load<GameObject>("Gatherable Supplies 1/Iron");
+                    GameObject regolithPrefab = Resources.Load<GameObject>("Gatherable Supplies 1/Regolith");
                     GameObject[] specificPrefabs = new GameObject[] { ironPrefab, regolithPrefab };
 
                     int count = 250;

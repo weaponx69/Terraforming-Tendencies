@@ -10,6 +10,8 @@ namespace GameDevTV.RTS.Units
     /// </summary>
     public class HeroDrone : AbstractCommandable
     {
+        public event System.Action OnCargoChanged;
+
         [Header("Cargo Capacity")]
         [SerializeField] private int maxCapacity = 25;
         
@@ -26,12 +28,14 @@ namespace GameDevTV.RTS.Units
                 CarriedAmount = 0;
             }
             CarriedAmount += amount;
+            OnCargoChanged?.Invoke();
         }
 
         public void ClearCargo()
         {
             CarriedSupply = null;
             CarriedAmount = 0;
+            OnCargoChanged?.Invoke();
         }
 
         protected override void Awake()

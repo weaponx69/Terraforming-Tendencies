@@ -68,7 +68,7 @@ namespace GameDevTV.RTS.Units
         
 #pragma warning disable 0414
         [Header("Settings")]
-        [SerializeField] private bool autoSpendEnabled = true;
+        [SerializeField] private bool autoSpendEnabled = false;
 
         public bool AutoSpendEnabled
         {

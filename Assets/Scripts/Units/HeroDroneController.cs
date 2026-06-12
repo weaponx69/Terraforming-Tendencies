@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.AI;
+using TMPro;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.UI.Components;
+using System.Linq;
 
 namespace GameDevTV.RTS.Units
 {
@@ -32,8 +35,12 @@ namespace GameDevTV.RTS.Units
         [Tooltip("How often the drone auto-vacuums or auto-deposits (seconds).")]
         [SerializeField] private float interactionCooldown = 0.5f;
         [Tooltip("Radius around the drone to search for resources or drop-off points.")]
-        [SerializeField] private float interactionRadius = 5f;
+        [SerializeField] private float interactionRadius = 6f;
         [SerializeField] private GameDevTV.RTS.Behavior.GatherSuppliesEventChannel gatherEventChannel;
+        [SerializeField] private float harvestDuration = 5f;
+        [SerializeField] private float movementTolerance = 1.0f;
+        [SerializeField] private WorldProgressBar harvestProgressBar;
+        [SerializeField] private TextMeshPro harvestCargoText;
 
         private NavMeshAgent agent;
         private HeroDrone heroDrone;
@@ -44,8 +51,18 @@ namespace GameDevTV.RTS.Units
         private float mapHeight;
         private float interactionTimer;
 
+        // Harvesting state
+        private GatherableSupply currentHarvestTarget;
+        private float harvestTimer;
+        private Vector3 harvestStartPos;
+
         /// <summary>True while the player is actively piloting this drone with WASD.</summary>
         public bool IsBeingManuallyControlled => isManuallyControlled;
+
+        public void SetProgressBar(WorldProgressBar bar)
+        {
+            harvestProgressBar = bar;
+        }
 
         private void Awake()
         {
@@ -135,6 +152,37 @@ namespace GameDevTV.RTS.Units
             else if (isManuallyControlled)
             {
                 EndManualControl();
+            }
+
+            // Update Cargo Text
+            if (harvestCargoText != null)
+            {
+                if (heroDrone != null && heroDrone.CarriedAmount > 0)
+                {
+                    string supplyName = heroDrone.CarriedSupply != null ? heroDrone.CarriedSupply.name : "Resources";
+                    harvestCargoText.text = $"{heroDrone.CarriedAmount}/{heroDrone.MaxCapacity} {supplyName}";
+                    harvestCargoText.gameObject.SetActive(true);
+                }
+                else
+                {
+                    harvestCargoText.gameObject.SetActive(false);
+                }
+            }
+
+            // Harvesting timer increment
+            if (currentHarvestTarget != null)
+            {
+                harvestTimer += Time.deltaTime;
+                float progress = harvestTimer / harvestDuration;
+                if (harvestProgressBar != null) 
+                {
+                    harvestProgressBar.SetProgress(progress);
+                }
+
+                if (harvestTimer >= harvestDuration)
+                {
+                    CompleteHarvest();
+                }
             }
 
             // Auto-gather and deposit logic (Vacuum effect)
@@ -257,8 +305,23 @@ namespace GameDevTV.RTS.Units
         {
             if (heroDrone == null) return;
 
+            // Handle ongoing harvest
+            if (currentHarvestTarget != null)
+            {
+                if (currentHarvestTarget == null || currentHarvestTarget.Amount <= 0 || Vector3.Distance(transform.position, currentHarvestTarget.transform.position) > interactionRadius || Vector3.Distance(transform.position, harvestStartPos) > movementTolerance)
+                {
+                    CancelHarvest();
+                }
+                else
+                {
+                    // Timer is now handled in Update for better precision
+                    return; // Don't look for new things while harvesting
+                }
+            }
+
             // 0. Auto-Discover nearby hidden resources so their colliders enable for the vacuum
-            foreach (var supply in GameDevTV.RTS.Environment.GatherableSupply.ActiveSupplies)
+            var supplies = GameDevTV.RTS.Environment.GatherableSupply.ActiveSupplies.ToArray();
+            foreach (var supply in supplies)
             {
                 if (supply == null || supply.Transform == null) continue;
                 if (Vector3.Distance(transform.position, supply.Transform.position) <= interactionRadius)
@@ -287,14 +350,20 @@ namespace GameDevTV.RTS.Units
 
                         if (isIron && crawler.CurrentIron < crawler.maxIron)
                         {
-                            crawler.AddIron(heroDrone.CarriedAmount);
+                            int amount = heroDrone.CarriedAmount;
+                            crawler.AddIron(amount);
                             heroDrone.ClearCargo();
+                            FloatingPopup.Create(crawler.transform.position + Vector3.up * 6f, $"+{amount} Iron", new Color(0.7f, 0.7f, 0.7f));
+                            Debug.Log($"[HeroDrone] Deposited {amount} Iron at {crawler.name}");
                             return;
                         }
                         else if (isRegolith && crawler.CurrentRegolith < crawler.maxRegolith)
                         {
-                            crawler.AddRegolith(heroDrone.CarriedAmount);
+                            int amount = heroDrone.CarriedAmount;
+                            crawler.AddRegolith(amount);
                             heroDrone.ClearCargo();
+                            FloatingPopup.Create(crawler.transform.position + Vector3.up * 6f, $"+{amount} Regolith", new Color(0.6f, 0.4f, 0.2f));
+                            Debug.Log($"[HeroDrone] Deposited {amount} Regolith at {crawler.name}");
                             return;
                         }
                     }
@@ -307,8 +376,11 @@ namespace GameDevTV.RTS.Units
                         
                         if (gatherEventChannel != null)
                         {
-                            gatherEventChannel.SendEventMessage(gameObject, heroDrone.CarriedAmount, heroDrone.CarriedSupply);
+                            int amount = heroDrone.CarriedAmount;
+                            gatherEventChannel.SendEventMessage(gameObject, amount, heroDrone.CarriedSupply);
                             heroDrone.ClearCargo();
+                            FloatingPopup.Create(baseBuilding.transform.position + Vector3.up * 8f, $"+{amount} Biomass", Color.green);
+                            Debug.Log($"[HeroDrone] Deposited {amount} cargo at {baseBuilding.name} for Biomass");
                             return;
                         }
                     }
@@ -325,17 +397,66 @@ namespace GameDevTV.RTS.Units
                         // Ensure we only mix the same supply type, or if we are empty
                         if (heroDrone.CarriedSupply == null || heroDrone.CarriedSupply == supply.Supply)
                         {
-                            // Safely lock it from other drones while we extract
-                            if (supply.BeginGather())
-                            {
-                                int gathered = supply.EndGather();
-                                heroDrone.AddCargo(supply.Supply, gathered);
-                                return; // Only gather from one node per tick
-                            }
+                            StartHarvest(supply);
+                            return;
                         }
                     }
                 }
             }
+        }
+
+        private void StartHarvest(GatherableSupply supply)
+        {
+            currentHarvestTarget = supply;
+            harvestTimer = 0f;
+            harvestStartPos = transform.position;
+            if (harvestProgressBar != null) harvestProgressBar.SetProgress(0.001f); // Set tiny progress to activate
+            Debug.Log($"[HeroDrone] Started harvesting {supply.Supply?.name} at {supply.transform.position}");
+        }
+
+        private void CancelHarvest()
+        {
+            if (currentHarvestTarget != null)
+            {
+                Debug.Log($"[HeroDrone] Harvesting of {currentHarvestTarget.Supply?.name} cancelled (moved or target gone).");
+            }
+            currentHarvestTarget = null;
+            harvestTimer = 0f;
+            if (harvestProgressBar != null) harvestProgressBar.SetProgress(0f);
+        }
+
+        private void CompleteHarvest()
+        {
+            if (currentHarvestTarget == null) return;
+
+            // Safely lock it from other drones while we extract
+            if (currentHarvestTarget.BeginGather())
+            {
+                int gathered = currentHarvestTarget.EndGather();
+                heroDrone.AddCargo(currentHarvestTarget.Supply, gathered);
+                
+                // Feedback for gathering
+                string sName = currentHarvestTarget.Supply != null ? currentHarvestTarget.Supply.name : "Resources";
+                Color sColor = GetResourceColor(sName);
+                FloatingPopup.Create(transform.position + Vector3.up * 4f, $"+{gathered} {sName}", sColor);
+                Debug.Log($"[HeroDrone] Successfully harvested {gathered} {sName}");
+            }
+            else
+            {
+                Debug.LogWarning($"[HeroDrone] Failed to complete harvest: target {currentHarvestTarget.name} was busy or empty.");
+            }
+
+            CancelHarvest();
+        }
+
+        private Color GetResourceColor(string name)
+        {
+            string n = name.ToLower();
+            if (n.Contains("iron")) return new Color(0.7f, 0.7f, 0.7f);
+            if (n.Contains("regolith")) return new Color(0.6f, 0.4f, 0.2f);
+            if (n.Contains("mineral")) return Color.cyan;
+            if (n.Contains("gas")) return Color.magenta;
+            return Color.yellow;
         }
     }
 }

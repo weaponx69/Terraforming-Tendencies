@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-1410996767311366736
+--- !u!114 &-4476289422173393986
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,8 +20,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Iron_Mat_0
-  m_Shader: {fileID: -6465566751694194690, guid: 6ff43a6a50cb4ec4baa0d1cb71de164e, type: 3}
+  m_Name: Regolith_Mat_0
+  m_Shader: {fileID: 4800000, guid: cd519c7c8cb186c6f9c9f7e0e4a8018b, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []

@@ -57,23 +57,4 @@ namespace GameDevTV.RTS.UI.Components
             }
         }
     }
-
-    public class FaceCamera : MonoBehaviour
-    {
-        private Transform camTransform;
-
-        private void Start()
-        {
-            if (Camera.main != null)
-                camTransform = Camera.main.transform;
-        }
-
-        private void LateUpdate()
-        {
-            if (camTransform != null)
-            {
-                transform.rotation = Quaternion.LookRotation(transform.position - camTransform.position);
-            }
-        }
-    }
 }

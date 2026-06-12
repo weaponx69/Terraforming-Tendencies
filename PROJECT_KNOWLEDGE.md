@@ -112,3 +112,24 @@ These appeared transiently while code was mid-refactor. They are no longer prese
 - `FoundryCrawler.cs(174,33): error CS1061: 'EnergyPipelineManager' does not contain a definition for 'ExposeForgeDeposits'`
 - `HeroDroneController.cs(291,71): error CS0234: The type or namespace name 'Owner' does not exist in the namespace 'GameDevTV.RTS.Player'`
   - Note if this recurs: `Owner` lives in a different namespace (e.g. `GameDevTV.RTS.Units`); reference it with the correct namespace rather than `GameDevTV.RTS.Player.Owner`.
+
+## 10. Hero Drone Harvesting & HUD Updates
+
+### Harvesting Fixes
+- **Interaction Radius:** Increased `interactionRadius` in `HeroDroneController.cs` from 5f to 6f to reliably reach ground resources while hovering.
+- **Auto-Discovery:** Added logic to `HeroDroneController.HandleAutoInteraction` to call `HiddenResource.Discover()` on nearby resources. This enables their colliders, allowing the drone's physics-based vacuum to detect them.
+- **Resource Spawning:** Fixed `PlanetGenerator.ScatterFuelResources` loading paths. It now correctly looks in `Gatherable Supplies 1/Iron` and `Gatherable Supplies 1/Regolith` to match the project's prefab folder structure.
+
+### HUD Updates
+- **Hero Cargo Category:** Displays current cargo held by the Hero Drone (e.g., "12/25 Iron"). Only visible when carrying resources.
+- **Probe Progress Category:** Displays the analysis percentage of the most advanced active Probe (e.g., "Scanning: 85%").
+- **Logic:** `RuntimeUI.cs` now auto-links these containers by name and subscribes to `HeroDrone.OnCargoChanged` to provide real-time updates.
+- **Visuals:** Added `Hero Cargo Container` and `Probe Progress Container` to the `Supplies Bar` in the scene, styled to match existing resource containers.
+
+## 11. Hero Drone Delayed Harvesting
+
+### Harvesting Juice & Feedback
+- **Delayed Collection:** Vacuuming resources is no longer instant. It now requires the drone to remain stationary (within a 0.5 unit tolerance) for **5 seconds** over a resource.
+- **Progress Bar:** A world-space progress bar (cloned from the Probe prefab) appears above the Hero Drone during the harvesting process.
+- **Auto-Reset:** Moving the drone significantly or flying away from the resource will reset the harvesting progress.
+- **Logic:** The `HeroDroneController` tracks `currentHarvestTarget` and `harvestTimer` in `Update`. `HandleAutoInteraction` (every 0.5s) initiates the harvest but the precise timing and UI updates happen frame-by-frame.

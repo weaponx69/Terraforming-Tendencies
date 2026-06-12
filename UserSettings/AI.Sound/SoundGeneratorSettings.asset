@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.AI.Sound::Unity.AI.Sound.Services.SessionPersistence.SoundGeneratorSettings
   m_Session:
     settings:
-      lastSelectedModelID: 
+      lastSelectedModelID: google-lyria-3-pro
       previewSettings:
         sizeFactor: 1
       microphoneSettings:

@@ -37,7 +37,14 @@ namespace GameDevTV.RTS.UI
 
         [SerializeField] private AbstractCommandable globalCommander;
 
-        private HashSet<AbstractCommandable> selectedUnits = new(12);
+        [Header("Hero & Probe HUD")]
+        [SerializeField] private TextMeshProUGUI heroCargoLabelText;
+        [SerializeField] private TextMeshProUGUI heroCargoValueText;
+        [SerializeField] private TextMeshProUGUI probeProgressLabelText;
+        [SerializeField] private TextMeshProUGUI probeProgressValueText;
+
+        private HeroDrone heroDroneReference;
+private HashSet<AbstractCommandable> selectedUnits = new(12);
         private Owner displayedOwner = Owner.Player1;
 
         private void OnEnable()
@@ -76,6 +83,11 @@ namespace GameDevTV.RTS.UI
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
+
+            if (heroDroneReference != null)
+            {
+                heroDroneReference.OnCargoChanged -= HandleHeroCargoChanged;
+            }
         }
 
         private void Awake()
@@ -84,9 +96,11 @@ namespace GameDevTV.RTS.UI
             FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
+            FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
+            FindAndLinkUI("Probe Progress Container", ref probeProgressLabelText, ref probeProgressValueText, "Probe Progress Header");
             
             // Special case for the duplicate population text if it exists
-            if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
+if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
         }
 
         private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, string headerName)
@@ -117,6 +131,71 @@ namespace GameDevTV.RTS.UI
         private void Update()
         {
             UpdateSectorsUI();
+            UpdateProbeProgressUI();
+            UpdateHeroDroneSubscription();
+        }
+
+        private void UpdateProbeProgressUI()
+{
+            if (probeProgressValueText == null) return;
+
+            GameObject container = probeProgressValueText.transform.parent?.parent?.gameObject;
+            if (container == null) return;
+
+            var probes = Object.FindObjectsByType<ProbeLogic>(FindObjectsInactive.Exclude);
+            float maxPrep = 0f;
+            bool anyAnalyzing = false;
+            foreach (var p in probes)
+            {
+                if (p.IsAnalyzing)
+                {
+                    anyAnalyzing = true;
+                    if (p.AnalysisProgress > maxPrep) maxPrep = p.AnalysisProgress;
+                }
+            }
+
+            if (anyAnalyzing)
+            {
+                probeProgressValueText.SetText($"{maxPrep * 100:F0}%");
+                if (probeProgressLabelText != null) probeProgressLabelText.SetText("Probe Analysis");
+                container.SetActive(true);
+            }
+            else
+            {
+                container.SetActive(false);
+            }
+        }
+
+        private void UpdateHeroDroneSubscription()
+        {
+            if (heroDroneReference != null) return;
+
+            heroDroneReference = Object.FindAnyObjectByType<HeroDrone>();
+            if (heroDroneReference != null)
+            {
+                heroDroneReference.OnCargoChanged += HandleHeroCargoChanged;
+                HandleHeroCargoChanged();
+            }
+        }
+
+        private void HandleHeroCargoChanged()
+        {
+            if (heroDroneReference == null || heroCargoValueText == null) return;
+
+            GameObject container = heroCargoValueText.transform.parent?.parent?.gameObject;
+            if (container == null) return;
+
+            if (heroDroneReference.CarriedAmount > 0)
+            {
+                string supplyName = heroDroneReference.CarriedSupply != null ? heroDroneReference.CarriedSupply.name : "Resources";
+                heroCargoValueText.SetText($"{heroDroneReference.CarriedAmount}/{heroDroneReference.MaxCapacity} ({supplyName})");
+                if (heroCargoLabelText != null) heroCargoLabelText.SetText("Hero Cargo");
+                container.SetActive(true);
+            }
+            else
+            {
+                container.SetActive(false);
+            }
         }
 
         private void UpdateSectorsUI()
@@ -129,42 +208,17 @@ namespace GameDevTV.RTS.UI
             if (total > 0)
             {
                 string text = $"{occupied}/{total}";
-
-                bool showingStatus = false;
-
-                // 1. Check for Active Expansions (Pipeline Growth)
+                
+                // Integrated expansion progress (the original "Exp" display)
                 if (ColonyExpansionManager.Instance != null)
                 {
                     var expansions = ColonyExpansionManager.Instance.ActiveExpansions.ToList();
                     if (expansions.Count > 0)
                     {
-                        // Report on the most-advanced expansion.
                         var lead = expansions.OrderByDescending(e => e.GetProgress()).First();
                         float maxProgress = lead.GetProgress();
                         string pausedSuffix = lead.IsPaused ? " PAUSED" : "";
                         text += $" (Exp: {maxProgress * 100:F0}%{pausedSuffix})";
-                        showingStatus = true;
-                    }
-                }
-
-                // 2. If no expansion is active, check for Probes analyzing (Preparation)
-                if (!showingStatus)
-                {
-                    var probes = Object.FindObjectsByType<ProbeLogic>(FindObjectsInactive.Exclude);
-                    float maxPrep = 0f;
-                    bool anyAnalyzing = false;
-                    foreach (var p in probes)
-                    {
-                        if (p.IsAnalyzing)
-                        {
-                            anyAnalyzing = true;
-                            if (p.AnalysisProgress > maxPrep) maxPrep = p.AnalysisProgress;
-                        }
-                    }
-
-                    if (anyAnalyzing)
-                    {
-                        text += $" (Prep: {maxPrep * 100:F0}%)";
                     }
                 }
 
