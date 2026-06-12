@@ -19,15 +19,6 @@ namespace GameDevTV.RTS.Environment
         private float segmentLength = 2.0f;
         private int segmentBiomassCost = 2; // Cost per section
 
-        // Gatherable crawler-fuel deposits placed alongside the supply line.
-        private GameObject regolithDepositPrefab;
-        private GameObject ironDepositPrefab;
-        private int segmentsSinceLastDeposit = 0;
-        private const int DEPOSIT_INTERVAL = 4;        // expose deposits every N segments
-        private const float DEPOSIT_AHEAD_OFFSET = 4.5f; // distance ahead/behind the foundry along travel
-        private const float DEPOSIT_PAIR_SPREAD = 1.5f;  // lateral gap so the pair doesn't overlap
-
-        private int neededSegments = 0;
         private int builtSegments = 0;
         private bool isAssemblyPhase = false;
 
@@ -152,9 +143,6 @@ namespace GameDevTV.RTS.Environment
             segments.Add(seg);
 
             builtSegments++;
-
-            // Periodically expose minable deposits alongside the line.
-            TryExposeSupplyLineDeposits(spawnPos, dir);
         }
 
         public bool BuildNextSegment()
@@ -166,38 +154,7 @@ namespace GameDevTV.RTS.Environment
             return true;
         }
 
-        private void TryExposeSupplyLineDeposits(Vector3 segmentPos, Vector3 dir)
-        {
-            segmentsSinceLastDeposit++;
-            if (segmentsSinceLastDeposit < DEPOSIT_INTERVAL) return;
-            segmentsSinceLastDeposit = 0;
 
-            ExposeForgeDeposits();
-        }
-
-        public void ExposeForgeDeposits()
-        {
-            LoadDepositPrefabs();
-
-            // Anchor on the foundry crawler so fuel appears relative to the machine.
-            Vector3 anchor = spawnedForge != null ? spawnedForge.transform.position : startPosition;
-
-            Vector3 travelDir = targetPosition - startPosition;
-            travelDir = travelDir.sqrMagnitude > 0.001f ? travelDir.normalized : Vector3.forward;
-
-            Vector3 side = Vector3.Cross(travelDir, Vector3.up).normalized;
-            if (side.sqrMagnitude < 0.001f) side = Vector3.right;
-
-            // A Regolith + Iron pair ahead of the foundry...
-            Vector3 ahead = anchor + travelDir * DEPOSIT_AHEAD_OFFSET;
-            ExposeDeposit(regolithDepositPrefab, ahead + side * DEPOSIT_PAIR_SPREAD, "Regolith");
-            ExposeDeposit(ironDepositPrefab, ahead - side * DEPOSIT_PAIR_SPREAD, "Iron");
-
-            // ...and another pair behind it.
-            Vector3 behind = anchor - travelDir * DEPOSIT_AHEAD_OFFSET;
-            ExposeDeposit(regolithDepositPrefab, behind + side * DEPOSIT_PAIR_SPREAD, "Regolith");
-            ExposeDeposit(ironDepositPrefab, behind - side * DEPOSIT_PAIR_SPREAD, "Iron");
-        }
 
         private void SpawnForge()
         {
@@ -231,30 +188,10 @@ namespace GameDevTV.RTS.Environment
 
                 // Ensure the crawler is properly initialized and not permanently stuffed full
                 crawler.ResetHoppers();
-
-                ExposeInitialDeposits();
             }
             else
             {
                 Debug.LogWarning("[Pipeline] Could not load Foundry prefab to spawn forge!");
-            }
-        }
-
-        private void ExposeInitialDeposits()
-        {
-            LoadDepositPrefabs();
-
-            Vector3 travelDir = targetPosition - startPosition;
-            travelDir = travelDir.sqrMagnitude > 0.001f ? travelDir.normalized : Vector3.forward;
-
-            Vector3 side = Vector3.Cross(travelDir, Vector3.up).normalized;
-            if (side.sqrMagnitude < 0.001f) side = Vector3.right;
-
-            for (int i = 1; i <= 2; i++)
-            {
-                Vector3 spot = startPosition + travelDir * (DEPOSIT_AHEAD_OFFSET * i);
-                ExposeDeposit(regolithDepositPrefab, spot + side * DEPOSIT_PAIR_SPREAD, "Regolith");
-                ExposeDeposit(ironDepositPrefab, spot - side * DEPOSIT_PAIR_SPREAD, "Iron");
             }
         }
 
@@ -337,54 +274,7 @@ namespace GameDevTV.RTS.Environment
             return Supplies.Biomass.TryGetValue(Owner.Player1, out int b) && b >= segmentBiomassCost;
         }
 
-        private void LoadDepositPrefabs()
-        {
-#if UNITY_EDITOR
-            if (regolithDepositPrefab == null) regolithDepositPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Regolith.prefab");
-            if (ironDepositPrefab == null) ironDepositPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gatherable Supplies/Iron.prefab");
-#endif
-            if (regolithDepositPrefab == null) regolithDepositPrefab = Resources.Load<GameObject>("Gatherable Supplies/Regolith");
-            if (ironDepositPrefab == null) ironDepositPrefab = Resources.Load<GameObject>("Gatherable Supplies/Iron");
-        }
 
-        private void ExposeDeposit(GameObject prefab, Vector3 position, string label)
-        {
-            if (prefab == null) return;
-
-            Ray ray = new Ray(position + Vector3.up * 50f, Vector3.down);
-            if (Physics.Raycast(ray, out RaycastHit groundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
-            {
-                position.y = groundHit.point.y;
-            }
-
-            GameObject deposit = Instantiate(prefab, position, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
-            deposit.name = label;
-            
-            if (PlanetGenerator.Instance != null)
-            {
-                deposit.transform.SetParent(PlanetGenerator.Instance.transform);
-            }
-
-            AddPersistentLabel(deposit, label);
-        }
-
-        private void AddPersistentLabel(GameObject deposit, string label)
-        {
-            GameObject labelGo = new GameObject("Deposit Label");
-            labelGo.transform.SetParent(deposit.transform, false);
-            labelGo.transform.localPosition = new Vector3(0f, 3f, 0f);
-
-            TMPro.TextMeshPro text = labelGo.AddComponent<TMPro.TextMeshPro>();
-            text.text = label;
-            text.fontSize = 4;
-            text.alignment = TMPro.TextAlignmentOptions.Center;
-            text.color = label == "Iron" ? new Color(0.7f, 0.78f, 0.9f) : new Color(0.95f, 0.78f, 0.5f);
-
-            RectTransform rt = labelGo.GetComponent<RectTransform>();
-            if (rt != null) rt.sizeDelta = new Vector2(6f, 2f);
-
-            labelGo.AddComponent<GameDevTV.RTS.UI.Components.FaceCamera>();
-        }
 
         public void HandleSegmentDestroyed(int index)
         {

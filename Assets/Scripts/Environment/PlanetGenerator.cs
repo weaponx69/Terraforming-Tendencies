@@ -333,14 +333,36 @@ namespace GameDevTV.RTS.Environment
 
                         MeshCollider mc = ghost.AddComponent<MeshCollider>();
                         mc.sharedMesh = mesh;
-}
+                    }
                 }
 
                 ScatterSurfaceFeatures();
-                ScatterResources();
+                if (SpawnFloraOnStart)
+                {
+                    ScatterFlora();
+                }
 
-                BakeAllNavMeshes();
-                OnPlanetGenerated?.Invoke();
+                ScatterResources();
+                ScatterFuelResources();
+
+                if (OnPlanetGenerated != null)
+                {
+                    OnPlanetGenerated?.Invoke();
+                }
+                }
+
+                private void ScatterResources()
+                {
+                    if (Config.ResourcePrefabs == null) return;
+                    foreach (var prefab in Config.ResourcePrefabs)
+                    {
+                        // Logic to scatter resources...
+                    }
+                }
+
+                private void ScatterFuelResources()
+                {
+                    // Logic to scatter Iron and Regolith...
                 }
 
                 private void SetLayerRecursive(GameObject obj, int layer)
@@ -546,56 +568,56 @@ namespace GameDevTV.RTS.Environment
 
                 private void ScatterResources()
                 {
-                if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
+                    if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
 
-                int width = Config.MapWidth;
-                int height = Config.MapHeight;
-                float mapWidthWorld = width * CellSize;
-                float mapHeightWorld = height * CellSize;
-            
-                float exclusionRadius = 15f; 
-                Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
-
-                int count = Config.ResourceCount;
-                int maxAttempts = count * 20;
-                int spawnedCount = 0;
-                float minSpacing = 5f;
-                System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
-
-                int transparentLayer = LayerMask.NameToLayer("TransparentFX");
-
-                for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
-                {
-                float randomX = Random.Range(0f, mapWidthWorld);
-                float randomZ = Random.Range(0f, mapHeightWorld);
-                Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                    int width = Config.MapWidth;
+                    int height = Config.MapHeight;
+                    float mapWidthWorld = width * CellSize;
+                    float mapHeightWorld = height * CellSize;
                 
-                if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+                    float exclusionRadius = 15f; 
+                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-                bool tooClose = false;
-                foreach (Vector3 pos in spawnedPositions)
-                {
-                    if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                    int count = Config.ResourceCount;
+                    int maxAttempts = count * 20;
+                    int spawnedCount = 0;
+                    float minSpacing = 5f;
+                    System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                    int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+
+                    for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
                     {
-                        tooClose = true;
-                        break;
-                    }
-                }
-                if (tooClose) continue;
-                spawnedPositions.Add(spawnPos);
+                        float randomX = Random.Range(0f, mapWidthWorld);
+                        float randomZ = Random.Range(0f, mapHeightWorld);
+                        Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                        
+                        if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
 
-                GameObject prefab = Config.ResourcePrefabs[Random.Range(0, Config.ResourcePrefabs.Length)];
-                Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-                GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
-                
-                // Ensure GatherableSupply is correctly configured
-                SupplySO so = instance.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
-                EnsureGatherableSupply(instance, so);
+                        bool tooClose = false;
+                        foreach (Vector3 pos in spawnedPositions)
+                        {
+                            if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                            {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (tooClose) continue;
+                        spawnedPositions.Add(spawnPos);
 
-                if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
-                {
-                    instance.AddComponent<HiddenResource>();
-                }
+                        GameObject prefab = Config.ResourcePrefabs[Random.Range(0, Config.ResourcePrefabs.Length)];
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                        
+                        // Ensure GatherableSupply is correctly configured
+                        SupplySO so = instance.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
+                        EnsureGatherableSupply(instance, so);
+
+                        if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
+                        {
+                            instance.AddComponent<HiddenResource>();
+                        }
 
                 float margin = 20f;
 
