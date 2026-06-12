@@ -387,8 +387,8 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            // 2. Try to GATHER if we have space
-            if (heroDrone.CarriedAmount < heroDrone.MaxCapacity)
+            // 2. Try to GATHER if we are empty (must drop off before mining again)
+            if (heroDrone.CarriedAmount == 0)
             {
                 foreach (Collider hit in hits)
                 {

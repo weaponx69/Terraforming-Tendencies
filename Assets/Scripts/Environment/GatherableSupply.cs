@@ -53,8 +53,11 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        private Vector3 initialScale;
+
         private void Start()
         {
+            initialScale = transform.localScale;
             Amount = Supply != null ? Supply.MaxAmount : 100;
             Bus<SupplySpawnEvent>.Raise(Owner.Unowned, new SupplySpawnEvent(this));
 
@@ -97,12 +100,22 @@ namespace GameDevTV.RTS.Environment
             if (transform.parent != null && transform.parent.GetComponent<GatherableSupply>() is GatherableSupply original)
             {
                 original.Amount -= amountGathered;
+                if (original.Supply != null && original.Supply.MaxAmount > 0)
+                {
+                    float originalRatio = (float)original.Amount / original.Supply.MaxAmount;
+                    original.transform.localScale = original.initialScale * Mathf.Clamp(originalRatio, 0.3f, 1f);
+                }
                 if (original.Amount <= 0) Destroy(original.gameObject);
             }
 
             if (Amount <= 0)
             {
                 Destroy(gameObject);
+            }
+            else if (Supply != null && Supply.MaxAmount > 0)
+            {
+                float ratio = (float)Amount / Supply.MaxAmount;
+                transform.localScale = initialScale * Mathf.Clamp(ratio, 0.3f, 1f);
             }
 
             return amountGathered;
