@@ -3,6 +3,7 @@ using UnityEngine;
 namespace GameDevTV.RTS.Environment
 {
     [ExecuteAlways]
+    [DefaultExecutionOrder(1000)] // Ensure this runs AFTER Cinemachine's LateUpdate
     public class CurvedWorldUpdater : MonoBehaviour
     {
         [Header("Curved World Settings")]
@@ -12,7 +13,7 @@ namespace GameDevTV.RTS.Environment
         [Tooltip("Use this transform as the top of the sphere. If null, uses the Main Camera.")]
         public Transform CurveOrigin;
 
-        private void Update()
+        private void LateUpdate()
         {
             Transform origin = CurveOrigin;
 
