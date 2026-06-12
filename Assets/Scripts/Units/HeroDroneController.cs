@@ -222,11 +222,26 @@ namespace GameDevTV.RTS.Units
             // matching the toroidal world used by MapWrapper and ProbeMovement.
             if (mapWidth > 0f && mapHeight > 0f)
             {
-                if (targetPos.x < 0f) targetPos.x += mapWidth;
-                else if (targetPos.x > mapWidth) targetPos.x -= mapWidth;
+                bool wrapped = false;
+                if (targetPos.x < 0f) { targetPos.x += mapWidth; wrapped = true; }
+                else if (targetPos.x > mapWidth) { targetPos.x -= mapWidth; wrapped = true; }
 
-                if (targetPos.z < 0f) targetPos.z += mapHeight;
-                else if (targetPos.z > mapHeight) targetPos.z -= mapHeight;
+                if (targetPos.z < 0f) { targetPos.z += mapHeight; wrapped = true; }
+                else if (targetPos.z > mapHeight) { targetPos.z -= mapHeight; wrapped = true; }
+
+                if (wrapped)
+                {
+                    Vector3 delta = targetPos - transform.position;
+                    var vcam = Object.FindAnyObjectByType<Unity.Cinemachine.CinemachineCamera>();
+                    if (vcam != null)
+                    {
+                        GameObject camTargetObj = GameObject.Find("Camera Target");
+                        if (camTargetObj != null)
+                        {
+                            vcam.OnTargetObjectWarped(camTargetObj.transform, delta);
+                        }
+                    }
+                }
             }
 
             transform.position = targetPos;
