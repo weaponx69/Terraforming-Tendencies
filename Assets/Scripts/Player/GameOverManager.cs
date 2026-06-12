@@ -43,6 +43,14 @@ namespace GameDevTV.RTS.Player
         // ── State ──────────────────────────────────────────────────────────────────
         private bool gameOverTriggered;
         private bool isPlanetGenerated;
+        private static bool isQuitting;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void InitQuitTracking()
+        {
+            isQuitting = false;
+            Application.quitting += () => isQuitting = true;
+        }
 
         // ── Lifecycle ──────────────────────────────────────────────────────────────
         private void Awake()
@@ -77,7 +85,7 @@ namespace GameDevTV.RTS.Player
 
         private void HandleIntegrityChanged(Owner owner, float value)
         {
-            if (gameOverTriggered || !isPlanetGenerated) return;
+            if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             if (owner != monitoredOwner) return;
             if (value > 0f) return;
             if (Time.timeSinceLevelLoad < 30f) return;
@@ -87,7 +95,7 @@ namespace GameDevTV.RTS.Player
 
         private void Update()
         {
-            if (gameOverTriggered || !isPlanetGenerated) return;
+            if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             
             // Wait for colony to bootstrap
             if (Time.timeSinceLevelLoad < 30f) return;
@@ -169,7 +177,7 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
 
         private void HandleBiomassChanged(Owner owner, int newValue)
         {
-            if (gameOverTriggered || !isPlanetGenerated) return;
+            if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             if (owner != monitoredOwner) return;
 
             // Immediate loss if biomass hits 0, but only after bootstrapping.
@@ -181,13 +189,13 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
 
         private void HandleSupplyDepleted(SupplyDepletedEvent evt)
         {
-            if (gameOverTriggered || !isPlanetGenerated) return;
+            if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             CheckNoRecovery();
         }
 
         private void CheckNoRecovery()
         {
-            if (gameOverTriggered || !isPlanetGenerated) return;
+            if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
 
             if (Supplies.Biomass == null)
             {

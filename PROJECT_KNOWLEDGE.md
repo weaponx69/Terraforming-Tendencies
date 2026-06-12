@@ -22,6 +22,8 @@ This document serves as a persistent memory bank for AI context, detailing the c
 ## 4. Game Over Logic (GameOverManager)
 - **Depletion Checks:** The game continuously checks if there are valid ways to recover. If Biomass is low and all `GatherableSupply` nodes on the map are destroyed, it triggers Game Over.
 - **Pipeline Protection:** To prevent false Game Overs when a drone fully depletes a fuel node, the `GameOverManager` explicitly checks if there is an active `EnergyPipelineManager` still expanding. If a pipeline is still building, it assumes more resources will be spawned shortly and aborts the Game Over.
+- **Hero Drone Check:** Integrates `heroDroneAlive` into the recovery calculation so that a "no resources" game over is not triggered if standard mining units are dead but the player's Hero Drone is still active and capable of harvesting.
+- **Quit & Scene Unload Safety:** Employs static `isQuitting` tracking via `Application.quitting` to automatically suppress any loss-checking or GameOver events during scene teardown, editor playmode transition, or application exit. This prevents false Game Over prompts during destruction of scene objects on shutdown.
 
 ## 5. UI & Selection Indicators
 - **Standardized Outlines:** The `FoundryCrawler` uses C# Reflection to look inside the `constructionDronePrefab` and perfectly clone its standard selection indicator ring. This ensures the Crawler matches the stylistic visual outlines of all other units in the game, scaled perfectly to 1.5x to fit the Crawler's chassis without distorting into a dome.
@@ -91,6 +93,10 @@ This section is a flat, copy-paste-friendly list of fixes applied during the Her
 - `HeroDroneController.cs`: Fixed a missing namespace by using `GameDevTV.RTS.Units.Owner`.
 - `PlayerInput.cs`: Removed an invalid cast warning (`evt.Unit is FoundryCrawler`); `FoundryCrawler` inherits from `AbstractCommandable`, not `AbstractUnit`.
 - `FoundryCrawler.cs`: Removed the unused `isProducing` field and deleted old `ExposeForgeDeposits()` pipeline spawning logic.
+
+### Game Over Robustness & Safety
+- **Hero Drone Exemption:** Added `heroDroneAlive` verification during `CheckNoRecovery` to prevent premature Game Over triggers if the Hero Drone is still alive and capable of collecting scattered materials, even with 0 workers and < 400 Biomass.
+- **Application Quit/Scene Unload False Triggers:** Solved a critical issue where `OnDestroy` callbacks on `GatherableSupply` nodes during editor playmode exit/scene unloads triggered a cascade of `SupplyDepletedEvent`s, resulting in a false "Resources depleted" Game Over screen being drawn right as the game shut down. Added static `isQuitting` tracking linked to `Application.quitting` to abort checks when exiting.
 
 ## 9. Errors Encountered & Resolutions
 
