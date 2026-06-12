@@ -223,7 +223,7 @@ namespace GameDevTV.RTS.Environment
 
             // Only show name if we're close to the camera
             float dist = Vector3.Distance(transform.position, Camera.main.transform.position);
-            if (dist > 15f) return;
+            if (dist > 45f) return;
 
             Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2f);
             

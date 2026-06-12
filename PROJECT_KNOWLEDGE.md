@@ -173,4 +173,19 @@ These appeared transiently while code was mid-refactor. They are no longer prese
 - **Color Coding:** Color-coded resources to match the game's theme (Yellow for Regolith, Gray for Iron, and Cyan for Pipes).
 - **Lowered Close Positioning:** Adjusted the local position of the `World UI` child on the `Foundry` prefab from `(0, 5, 0)` down to `(0, 0.55, 0)`. Because the root prefab has a scale of `8.0`, the original offset placed the status text `40.0` meters in the air. Lowering it to `0.55` places it exactly `0.64` world meters above the top of the `3.76` meter high forge roof, creating a tight, snug, and highly readable look.
 
+## 15. Recent Visual and Economy Polish
+
+### Map Wrapping & Visual Smoothing
+- **Camera Swoop Fix:** When the Hero Drone teleports across the map edge, `PlayerInput.cs` now detects if the distance between the camera target and the drone exceeds `10000 sqrMagnitude`. If true, it instantly snaps the camera target position instead of smoothly interpolating (`Lerp`), preventing a violent cross-map swoop.
+- **1-Frame Shader Glitch Fix:** The `CurvedWorldUpdater.cs` was running in `Update()`, meaning it sent the camera position to the shader *before* Cinemachine updated the camera position. It has been moved to `LateUpdate()` with a `[DefaultExecutionOrder(1000)]` to ensure it only queries the camera's final position, fixing a massive 1-frame backwards bend during teleports.
+
+### Environment & Gatherable Polish
+- **Dynamic Proximity Labels:** Added a highly-performant `OnGUI` overlay to `GatherableSupply.cs` that dynamically draws the resource's name (with a drop shadow) above the node when the camera is within 15 units.
+- **Visual Shrinking:** `GatherableSupply.cs` now records its initial scale on `Start()`. When `EndGather()` depletes resources, the transform visually shrinks proportional to the remaining amount (clamped to a minimum of 30% scale) so players can visually see a node being strip-mined before it pops.
+- **Geography Camouflage for Fuel:** Iron and Regolith nodes no longer use explicit prefabs. `PlanetGenerator.ScatterFuelResources()` now randomly selects models from the planet's `SurfaceFeaturePrefabs` (explicitly filtering out "crystal" or "mineral" models to ensure they look like normal rocks). It then applies the dynamically generated ground color to these rocks and injects the `GatherableSupply` component, effectively hiding fuel resources as natural planetary geography.
+- **Selection Indicator Sizing:** Modified `BaseBuilding.Start()` to explicitly intercept the `selectionIndicator` of the Command Post and shrink it by a factor of `0.6f` so it closely hugs the perimeter of the building instead of extending far outward.
+
+### Drone Mining Loop Restraint
+- **Drop-off Enforcement:** Changed the auto-gather condition in `HeroDroneController.cs` from `CarriedAmount < MaxCapacity` to `CarriedAmount == 0`. The drone will now collect a single batch of resources and immediately halt all vacuuming until it drops them off at the Crawler or Command Post, enforcing a deliberate transport loop.
+
 
