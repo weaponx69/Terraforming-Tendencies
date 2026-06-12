@@ -40,8 +40,12 @@ namespace GameDevTV.RTS.Environment
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
             }
 
-            if (MineralsSupplySO == null) MineralsSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
-            if (GasSupplySO == null) GasSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
+            if (MineralsSupplySO == null) MineralsSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Minerals");
+            if (GasSupplySO == null) GasSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Gas");
+            
+            // For Iron and Regolith we use the same fallback SO structure
+            SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
+            SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
             
             if (MineralsSupplySO == null || GasSupplySO == null)
             {
@@ -577,6 +581,8 @@ namespace GameDevTV.RTS.Environment
 
                 private void ScatterFuelResources()
                 {
+                    if (Config == null || Config.SurfaceFeaturePrefabs == null || Config.SurfaceFeaturePrefabs.Length == 0) return;
+
                     int width = Config.MapWidth;
                     int height = Config.MapHeight;
                     float mapWidthWorld = width * CellSize;
@@ -585,15 +591,28 @@ namespace GameDevTV.RTS.Environment
                     float exclusionRadius = 15f; 
                     Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-                    GameObject ironPrefab = Resources.Load<GameObject>("Gatherable Supplies 1/Iron");
-                    GameObject regolithPrefab = Resources.Load<GameObject>("Gatherable Supplies 1/Regolith");
-                    GameObject[] specificPrefabs = new GameObject[] { ironPrefab, regolithPrefab };
+                    SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
+                    SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
+                    SupplySO[] specificSOs = new SupplySO[] { ironSO, regolithSO };
+
+                    // Filter out crystals from SurfaceFeaturePrefabs so Iron/Regolith just look like normal rocks
+                    System.Collections.Generic.List<GameObject> rockPrefabs = new System.Collections.Generic.List<GameObject>();
+                    foreach (var p in Config.SurfaceFeaturePrefabs)
+                    {
+                        if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
+                        {
+                            rockPrefabs.Add(p);
+                        }
+                    }
+                    if (rockPrefabs.Count == 0) return;
 
                     int count = 250;
                     int maxAttempts = count * 20;
                     int spawnedCount = 0;
                     float minSpacing = 5f;
                     System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                    Color groundColor = new Color(0.65f, 0.35f, 0.20f);
 
                     for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
                     {
@@ -615,17 +634,35 @@ namespace GameDevTV.RTS.Environment
                         if (tooClose) continue;
                         spawnedPositions.Add(spawnPos);
 
-                        GameObject prefab = specificPrefabs[Random.Range(0, specificPrefabs.Length)];
-                        if (prefab == null) continue;
-
+                        GameObject prefab = rockPrefabs[Random.Range(0, rockPrefabs.Count)];
                         Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
                         GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
                         
+                        float scaleVar = Random.Range(0.8f, 1.3f);
+                        instance.transform.localScale *= scaleVar;
+
                         spawnedCount++;
+
+                        SupplySO so = specificSOs[Random.Range(0, specificSOs.Length)];
+                        if (so != null)
+                        {
+                            EnsureGatherableSupply(instance, so);
+                        }
 
                         if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
                         {
                             instance.AddComponent<HiddenResource>();
+                        }
+
+                        Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+                        foreach (var r in renderers)
+                        {
+                            Material[] sharedMaterials = r.sharedMaterials;
+                            foreach (var m in sharedMaterials)
+                            {
+                                if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                                else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                            }
                         }
                         
                         // Handle wraparound ghosts
@@ -644,8 +681,20 @@ namespace GameDevTV.RTS.Environment
                                 Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
                                 GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
                                 ghost.name = "Ghost";
-                                ghost.transform.localScale = Vector3.one;
+                                ghost.transform.localScale = Vector3.one * scaleVar;
                                 SetLayerRecursive(ghost, LayerMask.NameToLayer("TransparentFX"));
+                                
+                                // Color the ghost too
+                                Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
+                                foreach (var gr in ghostRenderers)
+                                {
+                                    Material[] gShared = gr.sharedMaterials;
+                                    foreach (var gm in gShared)
+                                    {
+                                        if (gm.HasProperty("_BaseColor")) gm.SetColor("_BaseColor", groundColor);
+                                        else if (gm.HasProperty("_Color")) gm.SetColor("_Color", groundColor);
+                                    }
+                                }
                             }
                         }
                     }
