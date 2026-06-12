@@ -913,7 +913,24 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                     Vector3 targetPos = heroDrone.transform.position;
                     targetPos.y = camT.position.y; // preserve current zoom height
 
-                    camT.position = Vector3.Lerp(camT.position, targetPos, Time.deltaTime * 15f);
+                    Vector3 delta = targetPos - camT.position;
+                    delta.y = 0;
+
+                    // If the drone moved an impossibly large distance in one frame (e.g. map wrap),
+                    // snap the camera instantly and notify Cinemachine to bypass damping.
+                    if (delta.sqrMagnitude > 10000f)
+                    {
+                        camT.position = targetPos;
+                        var vcam = UnityEngine.Object.FindAnyObjectByType<Unity.Cinemachine.CinemachineCamera>();
+                        if (vcam != null)
+                        {
+                            vcam.OnTargetObjectWarped(camT, delta);
+                        }
+                    }
+                    else
+                    {
+                        camT.position = Vector3.Lerp(camT.position, targetPos, Time.deltaTime * 15f);
+                    }
                 }
             }
         }
