@@ -372,7 +372,18 @@ namespace GameDevTV.RTS.Environment
                         {
                             if (sharedMaterials[i] != null && sharedMaterials[i].shader != null && sharedMaterials[i].shader.name != "Custom/URP_CurvedWorld")
                             {
+                                // Save texture and color before swapping
+                                Texture mainTex = sharedMaterials[i].mainTexture;
+                                Color mainColor = Color.white;
+                                if (sharedMaterials[i].HasProperty("_Color")) mainColor = sharedMaterials[i].GetColor("_Color");
+                                if (sharedMaterials[i].HasProperty("_BaseColor")) mainColor = sharedMaterials[i].GetColor("_BaseColor");
+
                                 sharedMaterials[i].shader = curvedShader;
+                                
+                                // Re-apply to the new shader's properties
+                                if (mainTex != null) sharedMaterials[i].SetTexture("_BaseMap", mainTex);
+                                sharedMaterials[i].SetColor("_BaseColor", mainColor);
+
                                 changed = true;
                             }
                         }

@@ -2,8 +2,10 @@ Shader "Custom/URP_CurvedWorld"
 {
     Properties
     {
-        _BaseMap("Base Map", 2D) = "white" {}
-        _BaseColor("Base Color", Color) = (1, 1, 1, 1)
+        [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
+        [MainColor] _BaseColor("Base Color", Color) = (1, 1, 1, 1)
+        [HideInInspector] _MainTex("Fallback Texture", 2D) = "white" {}
+        [HideInInspector] _Color("Fallback Color", Color) = (1, 1, 1, 1)
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
         _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
     }
@@ -90,7 +92,9 @@ Shader "Custom/URP_CurvedWorld"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
 
-                half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv) * _BaseColor;
+                // Sample either _BaseMap or _MainTex as fallback
+                half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                albedo *= _BaseColor;
                 
                 InputData inputData = (InputData)0;
                 inputData.positionWS = input.positionWS;
