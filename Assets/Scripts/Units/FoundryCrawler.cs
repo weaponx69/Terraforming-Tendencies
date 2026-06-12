@@ -161,19 +161,7 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
             HandleThermalDynamics();
             HandleStructuralIntegrity();
             HandleProduction();
-            CheckAndSpawnResources();
             HandleStarvation();
-        }
-
-        private void CheckAndSpawnResources()
-        {
-            if (PipelineManager == null || PipelineManager.IsCompleted) return;
-
-            if (Vector3.Distance(transform.position, lastSpawnPosition) >= SPAWN_DISTANCE_THRESHOLD)
-            {
-                PipelineManager.ExposeForgeDeposits();
-                lastSpawnPosition = transform.position;
-            }
         }
 
         private void HandleStarvation()

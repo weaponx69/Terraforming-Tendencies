@@ -345,24 +345,254 @@ namespace GameDevTV.RTS.Environment
                 ScatterResources();
                 ScatterFuelResources();
 
+                BakeAllNavMeshes();
                 if (OnPlanetGenerated != null)
                 {
                     OnPlanetGenerated?.Invoke();
                 }
                 }
 
+                private void ScatterFlora()
+                {
+                    if (Config == null || Config.FloraPrefabs == null || Config.FloraPrefabs.Length == 0) return;
+
+                    int width = Config.MapWidth;
+                    int height = Config.MapHeight;
+                    float mapWidthWorld = width * CellSize;
+                    float mapHeightWorld = height * CellSize;
+                
+                    float exclusionRadius = 15f; 
+                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+
+                    int count = Config.SurfaceFeatureDensity; // fallback density
+                    int maxAttempts = count * 20;
+                    int spawnedCount = 0;
+                    float minSpacing = 5f;
+                    System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                    for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
+                    {
+                        float randomX = Random.Range(0f, mapWidthWorld);
+                        float randomZ = Random.Range(0f, mapHeightWorld);
+                        Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                        
+                        if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+
+                        bool tooClose = false;
+                        foreach (Vector3 pos in spawnedPositions)
+                        {
+                            if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                            {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (tooClose) continue;
+                        spawnedPositions.Add(spawnPos);
+
+                        GameObject prefab = Config.FloraPrefabs[Random.Range(0, Config.FloraPrefabs.Length)];
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                        
+                        float scaleVar = Random.Range(0.8f, 1.3f);
+                        instance.transform.localScale *= scaleVar;
+                        
+                        spawnedCount++;
+                    }
+                }
+
+                private void FixPreplacedGatherables()
+                {
+                    foreach (GatherableSupply gs in GetComponentsInChildren<GatherableSupply>(true))
+                    {
+                        string nameLower = gs.name.ToLower();
+                        bool isGas = nameLower.Contains("gas") || nameLower.Contains("regolith");
+                        bool isMinerals = nameLower.Contains("crystal") || nameLower.Contains("mineral") || nameLower.Contains("rock") || nameLower.Contains("iron");
+
+                        if (isGas && (gs.Supply == null || gs.Supply.name != "Regolith"))
+                        {
+                            gs.Supply = GasSupplySO;
+                        }
+                        else if (isMinerals && (gs.Supply == null || gs.Supply.name != "Iron"))
+                        {
+                            gs.Supply = MineralsSupplySO;
+                        }
+                    
+                        if (gs.Supply != null && gs.Amount <= 0)
+                        {
+                            gs.Amount = gs.Supply.MaxAmount;
+                        }
+                    }
+                }
+
+                private void EnsureGatherableSupply(GameObject go, SupplySO so)
+                {
+                    if (!go.TryGetComponent<GatherableSupply>(out var gs))
+                    {
+                        gs = go.AddComponent<GatherableSupply>();
+                    }
+
+                    if (go.GetComponent<Collider>() == null)
+                    {
+                        var col = go.AddComponent<BoxCollider>();
+                        col.size = new Vector3(2f, 2f, 2f);
+                    }
+
+                    if (so != null)
+                    {
+                        gs.Supply = so;
+                        gs.Amount = so.MaxAmount;
+                    }
+                }
+
                 private void ScatterResources()
                 {
-                    if (Config.ResourcePrefabs == null) return;
-                    foreach (var prefab in Config.ResourcePrefabs)
+                    if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
+
+                    int width = Config.MapWidth;
+                    int height = Config.MapHeight;
+                    float mapWidthWorld = width * CellSize;
+                    float mapHeightWorld = height * CellSize;
+                
+                    float exclusionRadius = 15f; 
+                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+
+                    int count = Config.ResourceCount;
+                    int maxAttempts = count * 20;
+                    int spawnedCount = 0;
+                    float minSpacing = 5f;
+                    System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                    for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
                     {
-                        // Logic to scatter resources...
+                        float randomX = Random.Range(0f, mapWidthWorld);
+                        float randomZ = Random.Range(0f, mapHeightWorld);
+                        Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                        
+                        if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+
+                        bool tooClose = false;
+                        foreach (Vector3 pos in spawnedPositions)
+                        {
+                            if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                            {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (tooClose) continue;
+                        spawnedPositions.Add(spawnPos);
+
+                        GameObject prefab = Config.ResourcePrefabs[Random.Range(0, Config.ResourcePrefabs.Length)];
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                        
+                        SupplySO so = instance.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
+                        EnsureGatherableSupply(instance, so);
+
+                        if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
+                        {
+                            instance.AddComponent<HiddenResource>();
+                        }
+                        
+                        spawnedCount++;
+
+                        float margin = 20f;
+                        for (int gx = -1; gx <= 1; gx++)
+                        {
+                            for (int gz = -1; gz <= 1; gz++)
+                            {
+                                if (gx == 0 && gz == 0) continue; 
+
+                                bool xNeeded = (gx == 0) || (gx == -1 && spawnPos.x > mapWidthWorld - margin) || (gx == 1 && spawnPos.x < margin);
+                                bool zNeeded = (gz == 0) || (gz == -1 && spawnPos.z > mapHeightWorld - margin) || (gz == 1 && spawnPos.z < margin);
+                                
+                                if (!xNeeded || !zNeeded) continue;
+                                
+                                Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
+                                GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
+                                ghost.name = "Ghost";
+                                ghost.transform.localScale = Vector3.one;
+                                SetLayerRecursive(ghost, LayerMask.NameToLayer("TransparentFX"));
+                            }
+                        }
                     }
                 }
 
                 private void ScatterFuelResources()
                 {
-                    // Logic to scatter Iron and Regolith...
+                    int width = Config.MapWidth;
+                    int height = Config.MapHeight;
+                    float mapWidthWorld = width * CellSize;
+                    float mapHeightWorld = height * CellSize;
+                
+                    float exclusionRadius = 15f; 
+                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+
+                    GameObject ironPrefab = Resources.Load<GameObject>("Gatherable Supplies/Iron");
+                    GameObject regolithPrefab = Resources.Load<GameObject>("Gatherable Supplies/Regolith");
+                    GameObject[] specificPrefabs = new GameObject[] { ironPrefab, regolithPrefab };
+
+                    int count = 250;
+                    int maxAttempts = count * 20;
+                    int spawnedCount = 0;
+                    float minSpacing = 5f;
+                    System.Collections.Generic.List<Vector3> spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                    for (int i = 0; i < maxAttempts && spawnedCount < count; i++)
+                    {
+                        float randomX = Random.Range(0f, mapWidthWorld);
+                        float randomZ = Random.Range(0f, mapHeightWorld);
+                        Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                        
+                        if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+
+                        bool tooClose = false;
+                        foreach (Vector3 pos in spawnedPositions)
+                        {
+                            if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                            {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (tooClose) continue;
+                        spawnedPositions.Add(spawnPos);
+
+                        GameObject prefab = specificPrefabs[Random.Range(0, specificPrefabs.Length)];
+                        if (prefab == null) continue;
+
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                        
+                        spawnedCount++;
+
+                        if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
+                        {
+                            instance.AddComponent<HiddenResource>();
+                        }
+                        
+                        // Handle wraparound ghosts
+                        float margin = 20f;
+                        for (int gx = -1; gx <= 1; gx++)
+                        {
+                            for (int gz = -1; gz <= 1; gz++)
+                            {
+                                if (gx == 0 && gz == 0) continue; 
+
+                                bool xNeeded = (gx == 0) || (gx == -1 && spawnPos.x > mapWidthWorld - margin) || (gx == 1 && spawnPos.x < margin);
+                                bool zNeeded = (gz == 0) || (gz == -1 && spawnPos.z > mapHeightWorld - margin) || (gz == 1 && spawnPos.z < margin);
+                                
+                                if (!xNeeded || !zNeeded) continue;
+                                
+                                Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
+                                GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
+                                ghost.name = "Ghost";
+                                ghost.transform.localScale = Vector3.one;
+                                SetLayerRecursive(ghost, LayerMask.NameToLayer("TransparentFX"));
+                            }
+                        }
+                    }
                 }
 
                 private void SetLayerRecursive(GameObject obj, int layer)

@@ -288,7 +288,7 @@ namespace GameDevTV.RTS.Units
 
                     // Deposit at BaseBuilding (Command Post) for Biomass
                     BaseBuilding baseBuilding = hit.GetComponentInParent<BaseBuilding>();
-                    if (baseBuilding != null && baseBuilding.Owner == GameDevTV.RTS.Player.Owner.Player1 && baseBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (baseBuilding != null && baseBuilding.Owner == GameDevTV.RTS.Units.Owner.Player1 && baseBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         if (gatherEventChannel == null) gatherEventChannel = Resources.Load<GameDevTV.RTS.Behavior.GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
                         

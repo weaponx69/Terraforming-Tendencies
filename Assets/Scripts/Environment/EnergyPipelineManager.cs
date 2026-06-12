@@ -19,6 +19,7 @@ namespace GameDevTV.RTS.Environment
         private float segmentLength = 2.0f;
         private int segmentBiomassCost = 2; // Cost per section
 
+        private int neededSegments = 0;
         private int builtSegments = 0;
         private bool isAssemblyPhase = false;
 
