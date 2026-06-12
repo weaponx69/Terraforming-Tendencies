@@ -296,8 +296,8 @@ namespace GameDevTV.RTS.Environment
                 GetComponent<MeshCollider>().sharedMesh = mesh;
 
                 MeshRenderer renderer = GetComponent<MeshRenderer>();
-                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-                if (shader == null) shader = Shader.Find("Standard");
+                Shader shader = Shader.Find("Custom/URP_CurvedWorld");
+                if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
                 if (shader != null)
                 {
                 Material mat = new Material(shader);
@@ -346,10 +346,38 @@ namespace GameDevTV.RTS.Environment
                 ScatterFuelResources();
 
                 BakeAllNavMeshes();
+                ApplyCurvedWorldShader(gameObject);
+
+                GameObject updater = new GameObject("CurvedWorldUpdater");
+                updater.transform.parent = transform;
+                updater.AddComponent<CurvedWorldUpdater>();
+
                 if (OnPlanetGenerated != null)
                 {
                     OnPlanetGenerated?.Invoke();
                 }
+                }
+
+                private void ApplyCurvedWorldShader(GameObject root)
+                {
+                    Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
+                    if (curvedShader == null) return;
+
+                    Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+                    foreach (var r in renderers)
+                    {
+                        Material[] sharedMaterials = r.sharedMaterials;
+                        bool changed = false;
+                        for (int i = 0; i < sharedMaterials.Length; i++)
+                        {
+                            if (sharedMaterials[i] != null && sharedMaterials[i].shader != null && sharedMaterials[i].shader.name != "Custom/URP_CurvedWorld")
+                            {
+                                sharedMaterials[i].shader = curvedShader;
+                                changed = true;
+                            }
+                        }
+                        if (changed) r.sharedMaterials = sharedMaterials;
+                    }
                 }
 
                 private void ScatterFlora()
