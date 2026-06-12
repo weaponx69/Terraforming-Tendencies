@@ -41,3 +41,53 @@ This document serves as a persistent memory bank for AI context, detailing the c
 - **Smooth Movement (no rubber-banding):** The Hero Drone is moved by direct transform.position writes each frame and the camera hard-snaps to it. Its kinematic Rigidbody Interpolation MUST be None — Interpolate makes the rendered mesh lag behind the actual transform while the camera tracks the real position, producing a 'move forward then snap back' jitter. Do not enable Rigidbody interpolation on transform-driven units that a hard-follow camera tracks.
 
 - **Hero Drone Camera Smoothness:** The CinemachineBrain UpdateMethod MUST be Late Update (not Smart Update). The camera follow target (cameraTarget) is a kinematic Rigidbody; Smart Update resolves the camera in FixedUpdate for Rigidbody targets, but the Hero Drone moves in Update and cameraTarget is repositioned in PlayerInput.LateUpdate. That timing mismatch causes camera stutter at framerates above the physics step. Late Update makes the camera resolve every rendered frame after the target is positioned.
+
+## 8. Recent Fixes Changelog
+
+This section is a flat, copy-paste-friendly list of fixes applied during the Hero Drone work and related cleanup.
+
+### Probe Build Order (race condition)
+- Symptom: New Command Posts did not build the starter Probe first; the AI queue-jumped.
+- Cause: `GreedyAIController` filled a newly completed Command Post's queue before the expansion's priority Probe was registered.
+- Fix: Added `BaseBuilding.IsFirstInQueueProbe()`. `GreedyAIController` and `AIController` now skip buildings whose first queued item is the Probe. Added regression test `ColonyExpansionTests.ColonyExpansion_BuildsProbeDroneFirst`.
+
+### Hero Drone Feature (mobile command center)
+- `HeroDroneController.cs`: WASD piloting; receives a camera-relative world vector via `SetMoveInput`.
+- `PlayerInput.cs`: added `useHeroControlMode` flag + `heroDrone` slot + `AssignHeroDrone()`; WASD is rerouted from camera panning to the drone; mouse (edge-pan, click, drag-select) stays free.
+- `HeroDroneSpawner.cs`: auto-spawns `Resources/Units/Hero Drone.prefab` on `PlanetGenerator.OnPlanetGenerated`, sets Owner=Player1, links it into `PlayerInput`. No manual scene wiring needed.
+- `Hero Drone.prefab`: duplicate of the Mining Drone (AIR unit, flight height ~4) with `HeroDroneController` + the Command Post's full `AvailableCommands`.
+- AI exemption: `GreedyAIController` ignores any Worker with a `HeroDroneController` so the economy never hijacks it.
+
+### Hero Drone Movement (air-unit pinning)
+- Symptom: Drone responded to input but did not actually move.
+- Cause: Air units sit on a small elevated NavMesh patch; snapping XZ to the nearest NavMesh point pinned the drone. Also `AbstractUnit.Update` re-enables a disabled agent every frame.
+- Fix: Move the transform freely in XZ; sample the NavMesh ONLY for hover height. Leave the agent enabled but decoupled (`updatePosition`/`updateRotation = false`) instead of disabling it.
+
+### Hero Drone Camera Stutter (the real fix)
+- Symptom: Camera moved forward then snapped back while piloting.
+- Root cause: The camera follow target (`cameraTarget`) is a kinematic Rigidbody. The hero follow wrote `cameraTarget.position` (Rigidbody API), which DEFERS the transform sync to the next physics step (`Physics.autoSyncTransforms` is off by default). The `CinemachineBrain` (LateUpdate) reads the transform, so it saw a stale position on non-physics frames.
+- Fix: Move the follow target via `cameraTarget.transform.position` (immediate), not `Rigidbody.position` (deferred). Also confirmed `CinemachineBrain.UpdateMethod = Late Update` and Rigidbody Interpolation = None for transform-driven units tracked by a hard-follow camera.
+- Note: This SUPERSEDES the earlier interpolation/Smart-Update theories — the decisive cause was Rigidbody.position vs transform.position timing.
+
+### Compile Error: duplicate ScatterResources (CS0111)
+- `PlanetGenerator.cs` had two `ScatterResources()` methods (an empty stub + the real implementation). Removed the empty stub; kept the full implementation.
+
+### Shader Error: CurvedWorld ShadowCaster (_LightDirection undeclared)
+- `Assets/Shaders/CurvedWorld.shader` ShadowCaster pass used `_LightDirection` without declaring it (its custom vertex program does not include URP's `ShadowCasterPass.hlsl`).
+- Fix: Declared `_LightDirection` and `_LightPosition` globals; select direction for directional vs punctual (`_CASTING_PUNCTUAL_LIGHT_SHADOW`) shadows; added the near-plane clamp from URP's standard pass.
+
+### Hero Drone Resource Mechanic & Global Scattering
+- **Frenzy Economy**: The `FoundryCrawler` pipeline no longer auto-spawns resources next to the crawler. Instead, 250 instances of Iron and Regolith are scattered globally in `PlanetGenerator.cs` (`ScatterFuelResources()`).
+- **Hero Hauler**: `HeroDrone.cs` now has inventory capacity (max 25), and `HeroDroneController.cs` automatically vacuums nearby resources via an `OverlapSphere` in `HandleAutoInteraction()`. The Hero Drone can manually drop these off at the Crawler or Command Post.
+
+### Curved World Visuals
+- Added an "Animal Crossing" style spherical planet illusion without breaking the flat NavMesh.
+- Created `CurvedWorld.shader` (a custom URP Lit shader that offsets Y-vertices downward based on squared distance from camera).
+- Created `CurvedWorldUpdater.cs` to globally track the camera's position.
+- Updated `PlanetGenerator.cs` to automatically sweep the entire scene and replace default URP shaders with the curved shader upon generation.
+
+### Assorted Compiler Fixes
+- `PlanetGenerator.cs`: Removed duplicate method definitions (`FixPreplacedGatherables`, `EnsureGatherableSupply`, `ScatterResources`) and fixed missing variable assignments. Fixed a missing property reference by changing `FloraPrefabs` to `EnvironmentPrefabs`.
+- `HeroDroneController.cs`: Fixed a missing namespace by using `GameDevTV.RTS.Units.Owner`.
+- `PlayerInput.cs`: Removed an invalid cast warning (`evt.Unit is FoundryCrawler`); `FoundryCrawler` inherits from `AbstractCommandable`, not `AbstractUnit`.
+- `FoundryCrawler.cs`: Removed the unused `isProducing` field and deleted old `ExposeForgeDeposits()` pipeline spawning logic.

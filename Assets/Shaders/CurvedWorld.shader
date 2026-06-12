@@ -143,6 +143,12 @@ Shader "Custom/URP_CurvedWorld"
             float3 _CurveOrigin;
             float _CurveStrength;
 
+            // These globals are set by URP when rendering the shadow map. They are normally
+            // declared inside URP's ShadowCasterPass.hlsl, but since this shader supplies its
+            // own vertex program we must declare them ourselves.
+            float3 _LightDirection;
+            float3 _LightPosition;
+
             Varyings vert(Attributes input)
             {
                 Varyings output = (Varyings)0;
@@ -155,15 +161,24 @@ Shader "Custom/URP_CurvedWorld"
                 positionWS.y -= pow(dist, 2.0) * _CurveStrength;
 
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
-                
-                // URP specific shadow bias function uses _LightDirection from global cbuffer
-                #if UNITY_VERSION >= 202110
-                float3 lightDir = _LightDirection;
+
+                // Select the light direction: punctual (point/spot) shadows point from the
+                // surface toward the light position; directional shadows use _LightDirection.
+                #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                    float3 lightDir = normalize(_LightPosition - positionWS);
                 #else
-                float3 lightDir = normalize(GetMainLight().direction);
+                    float3 lightDir = _LightDirection;
                 #endif
-                
+
                 output.positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDir));
+
+                // Clamp to near plane to avoid shadow artifacts (matches URP's standard pass).
+                #if UNITY_REVERSED_Z
+                    output.positionCS.z = min(output.positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #else
+                    output.positionCS.z = max(output.positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #endif
+
                 return output;
             }
 
