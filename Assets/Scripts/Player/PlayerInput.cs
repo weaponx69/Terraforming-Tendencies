@@ -907,9 +907,17 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 Vector2 wasd = GetRawWasd();
                 if (wasd.sqrMagnitude > 0.0001f)
                 {
+                    // IMPORTANT: drive the camera target via its TRANSFORM, not Rigidbody.position.
+                    // cameraTarget is a kinematic Rigidbody; assigning Rigidbody.position defers the
+                    // transform sync to the next physics step (Physics.autoSyncTransforms is off by
+                    // default), so the CinemachineBrain (LateUpdate) reads a stale transform on
+                    // non-physics frames — producing the "move forward then snap back" stutter.
+                    // Writing transform.position is immediate and consistent with the Brain's read.
+                    Transform camT = cameraTarget.transform;
                     Vector3 targetPos = heroDrone.transform.position;
-                    targetPos.y = cameraTarget.position.y; // preserve current zoom height
-                    cameraTarget.position = targetPos;
+                    targetPos.y = camT.position.y; // preserve current zoom height
+
+                    camT.position = Vector3.Lerp(camT.position, targetPos, Time.deltaTime * 15f);
                 }
             }
         }
