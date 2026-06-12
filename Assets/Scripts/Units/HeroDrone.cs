@@ -10,6 +10,30 @@ namespace GameDevTV.RTS.Units
     /// </summary>
     public class HeroDrone : AbstractCommandable
     {
+        [Header("Cargo Capacity")]
+        [SerializeField] private int maxCapacity = 25;
+        
+        public GameDevTV.RTS.Environment.SupplySO CarriedSupply { get; private set; }
+        public int CarriedAmount { get; private set; }
+        
+        public int MaxCapacity => maxCapacity;
+
+        public void AddCargo(GameDevTV.RTS.Environment.SupplySO supply, int amount)
+        {
+            if (CarriedSupply == null || CarriedSupply != supply)
+            {
+                CarriedSupply = supply;
+                CarriedAmount = 0;
+            }
+            CarriedAmount += amount;
+        }
+
+        public void ClearCargo()
+        {
+            CarriedSupply = null;
+            CarriedAmount = 0;
+        }
+
         protected override void Awake()
         {
             base.Awake();

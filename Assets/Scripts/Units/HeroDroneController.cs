@@ -28,6 +28,13 @@ namespace GameDevTV.RTS.Units
         [Tooltip("Fallback hover height above Y=0 when no air NavMesh is found at the sampled position.")]
         [SerializeField] private float fallbackHoverHeight = 4f;
 
+        [Header("Cargo & Interaction")]
+        [Tooltip("How often the drone auto-vacuums or auto-deposits (seconds).")]
+        [SerializeField] private float interactionCooldown = 0.5f;
+        [Tooltip("Radius around the drone to search for resources or drop-off points.")]
+        [SerializeField] private float interactionRadius = 4f;
+        [SerializeField] private GameDevTV.RTS.Behavior.GatherSuppliesEventChannel gatherEventChannel;
+
         private NavMeshAgent agent;
         private HeroDrone heroDrone;
 
@@ -35,6 +42,7 @@ namespace GameDevTV.RTS.Units
         private bool isManuallyControlled;
         private float mapWidth;
         private float mapHeight;
+        private float interactionTimer;
 
         /// <summary>True while the player is actively piloting this drone with WASD.</summary>
         public bool IsBeingManuallyControlled => isManuallyControlled;
@@ -129,6 +137,13 @@ namespace GameDevTV.RTS.Units
                 EndManualControl();
             }
 
+            // Auto-gather and deposit logic (Vacuum effect)
+            interactionTimer += Time.deltaTime;
+            if (interactionTimer >= interactionCooldown)
+            {
+                interactionTimer = 0f;
+                HandleAutoInteraction();
+            }
         }
 
 
@@ -236,6 +251,78 @@ namespace GameDevTV.RTS.Units
 
             // Intentionally keep the agent decoupled; the drone simply hovers where the player
             // left it. Re-coupling would teleport the transform back to the agent's internal position.
+        }
+
+        private void HandleAutoInteraction()
+        {
+            if (heroDrone == null) return;
+
+            Collider[] hits = Physics.OverlapSphere(transform.position, interactionRadius);
+
+            // 1. Try to DEPOSIT if we have cargo
+            if (heroDrone.CarriedAmount > 0)
+            {
+                foreach (Collider hit in hits)
+                {
+                    // Deposit at Forge (FoundryCrawler)
+                    FoundryCrawler crawler = hit.GetComponentInParent<FoundryCrawler>();
+                    if (crawler != null)
+                    {
+                        string soName = heroDrone.CarriedSupply != null ? heroDrone.CarriedSupply.name.ToLower() : "";
+                        bool isIron = soName.Contains("iron");
+                        bool isRegolith = soName.Contains("regolith");
+
+                        if (isIron && crawler.CurrentIron < crawler.maxIron)
+                        {
+                            crawler.AddIron(heroDrone.CarriedAmount);
+                            heroDrone.ClearCargo();
+                            return;
+                        }
+                        else if (isRegolith && crawler.CurrentRegolith < crawler.maxRegolith)
+                        {
+                            crawler.AddRegolith(heroDrone.CarriedAmount);
+                            heroDrone.ClearCargo();
+                            return;
+                        }
+                    }
+
+                    // Deposit at BaseBuilding (Command Post) for Biomass
+                    BaseBuilding baseBuilding = hit.GetComponentInParent<BaseBuilding>();
+                    if (baseBuilding != null && baseBuilding.Owner == GameDevTV.RTS.Player.Owner.Player1 && baseBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        if (gatherEventChannel == null) gatherEventChannel = Resources.Load<GameDevTV.RTS.Behavior.GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
+                        
+                        if (gatherEventChannel != null)
+                        {
+                            gatherEventChannel.SendEventMessage(gameObject, heroDrone.CarriedAmount, heroDrone.CarriedSupply);
+                            heroDrone.ClearCargo();
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // 2. Try to GATHER if we have space
+            if (heroDrone.CarriedAmount < heroDrone.MaxCapacity)
+            {
+                foreach (Collider hit in hits)
+                {
+                    if (hit.TryGetComponent<GatherableSupply>(out var supply) && supply.Amount > 0 && !supply.IsBusy)
+                    {
+                        // Ensure we only mix the same supply type, or if we are empty
+                        if (heroDrone.CarriedSupply == null || heroDrone.CarriedSupply == supply.Supply)
+                        {
+                            // Safely lock it from other drones while we extract
+                            if (supply.BeginGather())
+                            {
+                                int gathered = supply.EndGather();
+                                heroDrone.AddCargo(supply.Supply, gathered);
+                                return; // Only gather from one node per tick
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
