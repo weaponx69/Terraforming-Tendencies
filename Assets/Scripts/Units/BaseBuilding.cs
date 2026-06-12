@@ -140,6 +140,15 @@ namespace GameDevTV.RTS.Units
                     }
                 }
             }
+
+            if (BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (selectionIndicator != null)
+                {
+                    // Shrink it down to be closer to the outer perimeter
+                    selectionIndicator.transform.localScale *= 0.6f; 
+                }
+            }
         }
 
         public void CompleteConstruction()
