@@ -152,6 +152,11 @@ These appeared transiently while code was mid-refactor. They are no longer prese
 - **Sectors Metric Restore:** Restored the colony expansion progress metric back to its original integrated display inside the "Sectors" label (e.g., `0/4 (Exp: 50%)`).
 - **Layout Width Adjustments:** Increased the width of the Sectors HUD container to **220** to ensure the integrated text has sufficient space and never clips. Deactivated the redundant separate Expansion container in the scene.
 
+### UI Cleanup & De-clutter
+- **AI Auto-Spend Toggle Removal:** Removed the `AI Spending Toggle` element from the top Supplies Bar HUD, reducing clutter and leaving more spacing for resource counters.
+- **Script Deletion:** Cleanly deleted `AISpendingToggleUI.cs` from the project since its corresponding UI trigger is no longer part of the scene layout.
+
+
 ## 13. Persistent Audio System (AudioManager)
 
 ### Soundtrack Integration
