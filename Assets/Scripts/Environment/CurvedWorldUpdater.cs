@@ -7,7 +7,7 @@ namespace GameDevTV.RTS.Environment
     {
         [Header("Curved World Settings")]
         [Tooltip("How strongly the world bends downwards. Recommended: 0.001 - 0.005")]
-        public float CurveStrength = 0.0005f;
+        public float CurveStrength = 0.003f;
         
         [Tooltip("Use this transform as the top of the sphere. If null, uses the Main Camera.")]
         public Transform CurveOrigin;

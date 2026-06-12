@@ -126,10 +126,38 @@ These appeared transiently while code was mid-refactor. They are no longer prese
 - **Logic:** `RuntimeUI.cs` now auto-links these containers by name and subscribes to `HeroDrone.OnCargoChanged` to provide real-time updates.
 - **Visuals:** Added `Hero Cargo Container` and `Probe Progress Container` to the `Supplies Bar` in the scene, styled to match existing resource containers.
 
-## 11. Hero Drone Delayed Harvesting
+## 11. Hero Drone Delayed Harvesting & Feedback Juice
 
-### Harvesting Juice & Feedback
-- **Delayed Collection:** Vacuuming resources is no longer instant. It now requires the drone to remain stationary (within a 0.5 unit tolerance) for **5 seconds** over a resource.
-- **Progress Bar:** A world-space progress bar (cloned from the Probe prefab) appears above the Hero Drone during the harvesting process.
-- **Auto-Reset:** Moving the drone significantly or flying away from the resource will reset the harvesting progress.
-- **Logic:** The `HeroDroneController` tracks `currentHarvestTarget` and `harvestTimer` in `Update`. `HandleAutoInteraction` (every 0.5s) initiates the harvest but the precise timing and UI updates happen frame-by-frame.
+### Harvesting Refinements
+- **Delayed Collection:** Vacuuming resources is no longer instant. It now requires the drone to remain stationary (within a **1.0 unit tolerance** to accommodate hovering drift) for **5 seconds** over a resource.
+- **Progress Bar:** A world-space progress bar (cloned from the Probe prefab) appears above the Hero Drone during the harvesting process. It is dynamically configured as a horizontal filled image and linked directly to the controller.
+- **Dynamic Cargo Text:** A custom billboarding text (`Cargo Text`) displays directly beneath the Hero Drone, updating in real-time when resources are carried (e.g., `12/25 Iron`). It automatically hides when empty.
+- **Robust Vacuum Logic:** Handled a potential `InvalidOperationException` by copying the `GatherableSupply.ActiveSupplies` collection before discovery scanning, preventing collection modification errors during runtime.
+- **Popup Feedback:** Fixed an issue where the floating popups spawned inside the drone's collision mesh. Popups are now assigned a standard fallback font asset and offset **4 units upward**, rendering cleanly above the unit.
+
+## 12. HUD Standardization & Colony Expansion Integration
+
+### Category Re-Alignment
+- **Centered Layout:** Changed all top-bar HUD containers to use a vertically-stacked layout where the **Header Label** (e.g., OXYGEN) is centered at the top and the **Metric** (Icon + Value) is horizontally aligned and centered directly beneath it.
+- **Fixed Stretched Icons:** Locked all HUD icons to a standard **24x24** pixel size via `LayoutElement` components, preventing layout groups from stretching them.
+- **Auto-Wiring:** Implemented self-wiring in `RuntimeUI.Awake()` to automatically detect, link, and subscribe to UI containers in the scene hierarchy upon initialization.
+
+### Expansion Progress Integration
+- **Sectors Metric Restore:** Restored the colony expansion progress metric back to its original integrated display inside the "Sectors" label (e.g., `0/4 (Exp: 50%)`).
+- **Layout Width Adjustments:** Increased the width of the Sectors HUD container to **220** to ensure the integrated text has sufficient space and never clips. Deactivated the redundant separate Expansion container in the scene.
+
+## 13. Persistent Audio System (AudioManager)
+
+### Soundtrack Integration
+- **Soundtrack:** Generated a 2-minute-56-second high-quality Stereo WAV space ambient soundtrack at `Assets/Resources/Audio/Music/AtmosphericSoundtrack.wav`.
+- **Persistent BGM:** Created `AudioManager.cs` as a persistent Singleton (`DontDestroyOnLoad`) that handles the soundtrack.
+- **Zero-Setup Startup:** Uses `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]` to automatically spawn and play the BGM immediately upon launching the game, regardless of whether starting from the Main Menu or Gameplay scenes.
+- **Smooth Volume Fading:** Features a built-in volume fader that smoothly transitions the audio from 0 to 0.5 volume over **3.0 seconds** for a professional, cinematic entrance. Includes pause and resume capabilities.
+
+## 14. World-Space Foundry Crawler Metrics
+
+### Production Display
+- **FoundryWorldUI:** Added a custom billboarding world-space canvas (`FoundryWorldUI.cs`) to the side of the `Foundry` crawler prefab.
+- **Real-Time Display:** Displays live stats for **Regolith**, **Iron**, and **Pipes Buffer** in the game world, allowing players to monitor production status at a glance without selecting the unit.
+- **Color Coding:** Color-coded resources to match the game's theme (Yellow for Regolith, Gray for Iron, and Cyan for Pipes).
+

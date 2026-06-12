@@ -373,16 +373,33 @@ namespace GameDevTV.RTS.Environment
                             if (sharedMaterials[i] != null && sharedMaterials[i].shader != null && sharedMaterials[i].shader.name != "Custom/URP_CurvedWorld")
                             {
                                 // Save texture and color before swapping
-                                Texture mainTex = sharedMaterials[i].mainTexture;
+                                Texture mainTex = null;
+                                if (sharedMaterials[i].HasProperty("_BaseMap")) mainTex = sharedMaterials[i].GetTexture("_BaseMap");
+                                if (mainTex == null && sharedMaterials[i].HasProperty("_MainTex")) mainTex = sharedMaterials[i].GetTexture("_MainTex");
+                                if (mainTex == null) mainTex = sharedMaterials[i].mainTexture;
+
                                 Color mainColor = Color.white;
-                                if (sharedMaterials[i].HasProperty("_Color")) mainColor = sharedMaterials[i].GetColor("_Color");
                                 if (sharedMaterials[i].HasProperty("_BaseColor")) mainColor = sharedMaterials[i].GetColor("_BaseColor");
+                                else if (sharedMaterials[i].HasProperty("_Color")) mainColor = sharedMaterials[i].GetColor("_Color");
+
+                                Color emissionColor = Color.black;
+                                bool hasEmission = false;
+                                if (sharedMaterials[i].HasProperty("_EmissionColor"))
+                                {
+                                    emissionColor = sharedMaterials[i].GetColor("_EmissionColor");
+                                    hasEmission = sharedMaterials[i].IsKeywordEnabled("_EMISSION") || (emissionColor.r > 0f || emissionColor.g > 0f || emissionColor.b > 0f);
+                                }
 
                                 sharedMaterials[i].shader = curvedShader;
                                 
                                 // Re-apply to the new shader's properties
                                 if (mainTex != null) sharedMaterials[i].SetTexture("_BaseMap", mainTex);
                                 sharedMaterials[i].SetColor("_BaseColor", mainColor);
+                                if (hasEmission)
+                                {
+                                    sharedMaterials[i].SetColor("_EmissionColor", emissionColor);
+                                    sharedMaterials[i].EnableKeyword("_EMISSION");
+                                }
 
                                 changed = true;
                             }

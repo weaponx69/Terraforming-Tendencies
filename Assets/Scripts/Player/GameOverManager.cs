@@ -196,15 +196,29 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
             }
 
             int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int b) ? b : 0;
-bool supplyNodesExist = AnySupplyNodesRemain();
+            bool supplyNodesExist = AnySupplyNodesRemain();
             bool miningUnitsExist = AnyMiningUnitsAlive();
 
-            // Logic Fix: Even if minerals exist on the map, if you have 0 workers and cannot afford to build a base (400 biomass), you lose.
-            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || biomass >= 400);
+            // Hero Drone count can also recover
+            bool heroDroneAlive = Object.FindAnyObjectByType<HeroDrone>() != null;
+
+            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || heroDroneAlive || biomass >= 400);
 
             if (!recoveryPossible)
             {
-                Debug.Log($"[GameOverManager] Recovery check failed. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Biomass: {biomass}");
+                Debug.Log($"[GameOverManager] Recovery check failed. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Hero Alive: {heroDroneAlive}, Biomass: {biomass}");
+                
+                // Print active supply nodes detail to find out why it thinks none exist
+                var allNodes = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
+                Debug.Log($"[GameOverManager DIAGNOSTIC] FindObjectsByType(Exclude) returned {allNodes.Length} nodes.");
+                foreach (var node in allNodes)
+                {
+                    if (node != null && node.Amount > 0)
+                    {
+                        Debug.Log($"[GameOverManager DIAGNOSTIC] Found valid node: {node.name} with amount {node.Amount}");
+                    }
+                }
+
                 TriggerGameOver(GameOverReason.Resources);
             }
         }

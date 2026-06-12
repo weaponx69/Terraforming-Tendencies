@@ -8,6 +8,7 @@ Shader "Custom/URP_CurvedWorld"
         [HideInInspector] _Color("Fallback Color", Color) = (1, 1, 1, 1)
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
         _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
+        [HDR] _EmissionColor("Emission Color", Color) = (0, 0, 0, 1)
     }
 
     SubShader
@@ -22,6 +23,7 @@ Shader "Custom/URP_CurvedWorld"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma shader_feature _EMISSION
             
             // URP keywords
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
@@ -46,7 +48,7 @@ Shader "Custom/URP_CurvedWorld"
             {
                 float4 positionCS   : SV_POSITION;
                 float3 positionWS   : TEXCOORD1;
-                float3 normalWS     : NORMAL;
+                float3 normalWS     : TEXCOORD4;
                 float2 uv           : TEXCOORD0;
                 float fogCoord      : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -55,6 +57,7 @@ Shader "Custom/URP_CurvedWorld"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
+                float4 _EmissionColor;
                 float _Smoothness;
                 float _Metallic;
             CBUFFER_END
@@ -102,6 +105,7 @@ Shader "Custom/URP_CurvedWorld"
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 inputData.fogCoord = input.fogCoord;
+                inputData.bakedGI = SampleSH(inputData.normalWS);
 
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo.rgb;
@@ -109,6 +113,12 @@ Shader "Custom/URP_CurvedWorld"
                 surfaceData.smoothness = _Smoothness;
                 surfaceData.occlusion = 1.0;
                 surfaceData.alpha = albedo.a;
+                
+                #if defined(_EMISSION)
+                surfaceData.emission = _EmissionColor.rgb * albedo.rgb;
+                #else
+                surfaceData.emission = half3(0, 0, 0);
+                #endif
 
                 half4 color = UniversalFragmentPBR(inputData, surfaceData);
                 color.rgb = MixFog(color.rgb, inputData.fogCoord);

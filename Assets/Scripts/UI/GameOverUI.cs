@@ -37,12 +37,14 @@ namespace GameDevTV.RTS.UI
         // ── Lifecycle ──────────────────────────────────────────────────────────────
         private void OnEnable()
         {
+            Debug.Log("[GameOverUI] OnEnable called. Subscribing to GameOverManager events.");
             GameOverManager.OnGameOver += HandleGameOver;
             GameOverManager.OnVictory += HandleVictory;
         }
 
         private void OnDisable()
         {
+            Debug.Log("[GameOverUI] OnDisable called. Stack trace:\n" + System.Environment.StackTrace);
             GameOverManager.OnGameOver -= HandleGameOver;
             GameOverManager.OnVictory -= HandleVictory;
         }

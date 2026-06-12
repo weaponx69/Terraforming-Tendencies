@@ -23,9 +23,29 @@ namespace GameDevTV.RTS.Environment
 
         public void ApplyColorTint(Color color)
         {
+            Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
             foreach (var r in GetComponentsInChildren<MeshRenderer>(true))
             {
                 Material mat = r.material; // Instance
+                
+                // Swap to curved shader so newly spawned vegetation curves with the planet
+                if (curvedShader != null && mat.shader != curvedShader)
+                {
+                    Texture mainTex = null;
+                    if (mat.HasProperty("_BaseMap")) mainTex = mat.GetTexture("_BaseMap");
+                    if (mainTex == null && mat.HasProperty("_MainTex")) mainTex = mat.GetTexture("_MainTex");
+                    if (mainTex == null) mainTex = mat.mainTexture;
+
+                    Color mainColor = Color.white;
+                    if (mat.HasProperty("_BaseColor")) mainColor = mat.GetColor("_BaseColor");
+                    else if (mat.HasProperty("_Color")) mainColor = mat.GetColor("_Color");
+
+                    mat.shader = curvedShader;
+
+                    if (mainTex != null) mat.SetTexture("_BaseMap", mainTex);
+                    mat.SetColor("_BaseColor", mainColor);
+                }
+
                 if (mat.HasProperty("_EmissionColor"))
                 {
                     mat.EnableKeyword("_EMISSION");
