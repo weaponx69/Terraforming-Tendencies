@@ -382,7 +382,7 @@ namespace GameDevTV.RTS.Environment
 
                 private void ScatterFlora()
                 {
-                    if (Config == null || Config.FloraPrefabs == null || Config.FloraPrefabs.Length == 0) return;
+                    if (Config == null || Config.EnvironmentPrefabs == null || Config.EnvironmentPrefabs.Length == 0) return;
 
                     int width = Config.MapWidth;
                     int height = Config.MapHeight;
@@ -392,7 +392,7 @@ namespace GameDevTV.RTS.Environment
                     float exclusionRadius = 15f; 
                     Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
 
-                    int count = Config.SurfaceFeatureDensity; // fallback density
+                    int count = Config.EnvironmentDensity;
                     int maxAttempts = count * 20;
                     int spawnedCount = 0;
                     float minSpacing = 5f;
@@ -418,7 +418,7 @@ namespace GameDevTV.RTS.Environment
                         if (tooClose) continue;
                         spawnedPositions.Add(spawnPos);
 
-                        GameObject prefab = Config.FloraPrefabs[Random.Range(0, Config.FloraPrefabs.Length)];
+                        GameObject prefab = Config.EnvironmentPrefabs[Random.Range(0, Config.EnvironmentPrefabs.Length)];
                         Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
                         GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
                         

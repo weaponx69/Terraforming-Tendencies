@@ -197,10 +197,6 @@ namespace GameDevTV.RTS.Player
         {
             aliveUnits.Remove(evt.Unit);
             selectedUnits.Remove(evt.Unit);
-            if (evt.Unit is FoundryCrawler)
-            {
-                isFollowingSelectedCrawler = false;
-            }
         }
 
         private void HandleActionSelected(CommandSelectedEvent evt)

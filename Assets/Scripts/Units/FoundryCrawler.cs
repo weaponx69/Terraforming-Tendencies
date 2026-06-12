@@ -63,7 +63,6 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
         private const float PRODUCTION_CYCLE_TIME = 3.0f;
         
         private float productionTimer = 0f;
-        private bool isProducing = false;
 
         [Header("Starvation Settings")]
         [SerializeField] private float maxStarvationDuration = 120f;
@@ -274,12 +273,11 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
 
         private void HandleProduction()
         {
-            if (PipelineManager == null || PipelineManager.IsCompleted) { isProducing = false; return; }
+            if (PipelineManager == null || PipelineManager.IsCompleted) return;
 
             bool hasResources = currentRegolith >= REGOLITH_COST && currentIron >= IRON_COST;
             if (hasResources)
             {
-                isProducing = true;
                 productionTimer += Time.deltaTime;
 
                 if (productionTimer >= PRODUCTION_CYCLE_TIME)
@@ -293,7 +291,6 @@ private const float DRY_ICE_COOLING_FACTOR = 10.0f; // -10% heat per unit of dry
             }
             else
             {
-                isProducing = false;
                 productionTimer = 0f;
             }
         }
