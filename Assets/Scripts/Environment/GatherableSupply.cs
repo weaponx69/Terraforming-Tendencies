@@ -204,5 +204,31 @@ namespace GameDevTV.RTS.Environment
                 culledVisuals.gameObject.SetActive(true);
             }
         }
+        private void OnGUI()
+        {
+            if (Camera.main == null || Supply == null || !IsVisible) return;
+
+            // Only show name if we're close to the camera
+            float dist = Vector3.Distance(transform.position, Camera.main.transform.position);
+            if (dist > 15f) return;
+
+            Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2f);
+            
+            // If behind the camera, ignore
+            if (screenPos.z < 0) return;
+
+            GUIStyle style = new GUIStyle();
+            style.fontSize = 16;
+            style.fontStyle = FontStyle.Bold;
+            style.alignment = TextAnchor.MiddleCenter;
+
+            // Draw a tiny black drop shadow for readability
+            style.normal.textColor = Color.black;
+            GUI.Label(new Rect(screenPos.x - 50 + 1, Screen.height - screenPos.y - 20 + 1, 100, 40), Supply.name, style);
+            
+            style.normal.textColor = Color.cyan;
+            GUI.Label(new Rect(screenPos.x - 50, Screen.height - screenPos.y - 20, 100, 40), Supply.name, style);
+        }
+
     }
 }

@@ -166,4 +166,6 @@ These appeared transiently while code was mid-refactor. They are no longer prese
 - **FoundryWorldUI:** Added a custom billboarding world-space canvas (`FoundryWorldUI.cs`) to the side of the `Foundry` crawler prefab.
 - **Real-Time Display:** Displays live stats for **Regolith**, **Iron**, and **Pipes Buffer** in the game world, allowing players to monitor production status at a glance without selecting the unit.
 - **Color Coding:** Color-coded resources to match the game's theme (Yellow for Regolith, Gray for Iron, and Cyan for Pipes).
+- **Lowered Close Positioning:** Adjusted the local position of the `World UI` child on the `Foundry` prefab from `(0, 5, 0)` down to `(0, 0.55, 0)`. Because the root prefab has a scale of `8.0`, the original offset placed the status text `40.0` meters in the air. Lowering it to `0.55` places it exactly `0.64` world meters above the top of the `3.76` meter high forge roof, creating a tight, snug, and highly readable look.
+
 
