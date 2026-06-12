@@ -32,7 +32,7 @@ namespace GameDevTV.RTS.Units
         [Tooltip("How often the drone auto-vacuums or auto-deposits (seconds).")]
         [SerializeField] private float interactionCooldown = 0.5f;
         [Tooltip("Radius around the drone to search for resources or drop-off points.")]
-        [SerializeField] private float interactionRadius = 4f;
+        [SerializeField] private float interactionRadius = 5f;
         [SerializeField] private GameDevTV.RTS.Behavior.GatherSuppliesEventChannel gatherEventChannel;
 
         private NavMeshAgent agent;
@@ -256,6 +256,19 @@ namespace GameDevTV.RTS.Units
         private void HandleAutoInteraction()
         {
             if (heroDrone == null) return;
+
+            // 0. Auto-Discover nearby hidden resources so their colliders enable for the vacuum
+            foreach (var supply in GameDevTV.RTS.Environment.GatherableSupply.ActiveSupplies)
+            {
+                if (supply == null || supply.Transform == null) continue;
+                if (Vector3.Distance(transform.position, supply.Transform.position) <= interactionRadius)
+                {
+                    if (supply.TryGetComponent<GameDevTV.RTS.Environment.HiddenResource>(out var hr))
+                    {
+                        hr.Discover();
+                    }
+                }
+            }
 
             Collider[] hits = Physics.OverlapSphere(transform.position, interactionRadius);
 
