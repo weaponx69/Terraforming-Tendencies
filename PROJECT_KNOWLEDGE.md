@@ -91,3 +91,24 @@ This section is a flat, copy-paste-friendly list of fixes applied during the Her
 - `HeroDroneController.cs`: Fixed a missing namespace by using `GameDevTV.RTS.Units.Owner`.
 - `PlayerInput.cs`: Removed an invalid cast warning (`evt.Unit is FoundryCrawler`); `FoundryCrawler` inherits from `AbstractCommandable`, not `AbstractUnit`.
 - `FoundryCrawler.cs`: Removed the unused `isProducing` field and deleted old `ExposeForgeDeposits()` pipeline spawning logic.
+
+## 9. Errors Encountered & Resolutions
+
+Verbatim compile/shader errors seen during the Hero Drone work and cleanup, with their fix or current status. Console is currently clean (0 errors).
+
+### Fixed by us
+- `PlanetGenerator.cs(569,30): error CS0111: Type 'PlanetGenerator' already defines a member called 'ScatterResources' with the same parameter types`
+  - Cause: an empty `ScatterResources()` stub duplicated the real implementation.
+  - Resolution: removed the empty stub, kept the full implementation.
+
+- `Shader error in 'Custom/URP_CurvedWorld': undeclared identifier '_LightDirection' at Assets/Shaders/CurvedWorld.shader(161) (on glcore)` (Pass: ShadowCaster)
+  - Cause: custom ShadowCaster vertex program used `_LightDirection` without declaring it (does not include URP's `ShadowCasterPass.hlsl`).
+  - Resolution: declared `_LightDirection` and `_LightPosition`; selected direction for directional vs punctual shadows (`_CASTING_PUNCTUAL_LIGHT_SHADOW`); added the near-plane clamp.
+
+### Previously flagged, since resolved (console now clean)
+These appeared transiently while code was mid-refactor. They are no longer present; re-investigate only if they reappear.
+- `PlanetGenerator.cs(342,21): error CS0103: The name 'ScatterFlora' does not exist in the current context`
+- `EnergyPipelineManager.cs (multiple lines): error CS0103: The name 'neededSegments' does not exist in the current context`
+- `FoundryCrawler.cs(174,33): error CS1061: 'EnergyPipelineManager' does not contain a definition for 'ExposeForgeDeposits'`
+- `HeroDroneController.cs(291,71): error CS0234: The type or namespace name 'Owner' does not exist in the namespace 'GameDevTV.RTS.Player'`
+  - Note if this recurs: `Owner` lives in a different namespace (e.g. `GameDevTV.RTS.Units`); reference it with the correct namespace rather than `GameDevTV.RTS.Player.Owner`.
