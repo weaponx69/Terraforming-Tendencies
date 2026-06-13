@@ -67,6 +67,11 @@ namespace GameDevTV.RTS.Units
 
         protected virtual void Start()
         {
+            if (GameDevTV.RTS.Environment.PlanetGenerator.Instance != null)
+            {
+                GameDevTV.RTS.Environment.PlanetGenerator.Instance.ApplyCurvedWorldShader(gameObject);
+            }
+
             if (UnitSO != null && UnitSO.SightConfig != null && VisionTransform != null)
             {
                 float size = UnitSO.SightConfig.SightRadius * 2;

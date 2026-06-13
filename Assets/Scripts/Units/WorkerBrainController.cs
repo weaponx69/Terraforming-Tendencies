@@ -203,7 +203,8 @@ namespace GameDevTV.RTS.Units
                 bool isGas = supplyName.Contains("gas");
                 bool isMineral = supplyName.Contains("mineral");
                 
-                bool isCrawlerResource = isIron || isRegolith || isGas || isMineral;
+                // Only Iron and Regolith belong at the crawler. Gas and Minerals must go to the Command Post.
+                bool isCrawlerResource = isIron || isRegolith;
 
                 FoundryCrawler nearestCrawler = null;
                 if (isCrawlerResource)
@@ -245,11 +246,6 @@ namespace GameDevTV.RTS.Units
                     {
                         if (isIron) nearestCrawler.AddIron(gathered);
                         else if (isRegolith) nearestCrawler.AddRegolith(gathered);
-                        else if ((isGas || isMineral) && eventChannel != null && gathered > 0)
-                        {
-                            // Gas and Minerals deposited at the Forge are immediately converted to Biomass
-                            eventChannel.SendEventMessage(gameObject, gathered, gatheredSupplySO);
-                        }
                     }
                     else if (eventChannel != null && gathered > 0)
                     {

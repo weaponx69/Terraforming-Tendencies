@@ -362,7 +362,7 @@ namespace GameDevTV.RTS.Environment
                 }
                 }
 
-                private void ApplyCurvedWorldShader(GameObject root)
+                public void ApplyCurvedWorldShader(GameObject root)
                 {
                     Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
                     if (curvedShader == null) return;
