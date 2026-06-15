@@ -19,6 +19,7 @@ namespace GameDevTV.RTS.Player
 
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
+        public static event Action<int> OnTerraCoinsChanged; // newTC
 
         private void Awake()
         {
@@ -109,6 +110,7 @@ namespace GameDevTV.RTS.Player
             // Liquidate current materials to Terra-Coins
             int earnedTC = LiquidateMaterials();
             TotalTerraCoins += earnedTC;
+            OnTerraCoinsChanged?.Invoke(TotalTerraCoins);
 
             // Pause the game
             Time.timeScale = 0f;
@@ -161,6 +163,17 @@ namespace GameDevTV.RTS.Player
 
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
+        }
+
+        public bool SpendTerraCoins(int amount)
+        {
+            if (TotalTerraCoins >= amount)
+            {
+                TotalTerraCoins -= amount;
+                OnTerraCoinsChanged?.Invoke(TotalTerraCoins);
+                return true;
+            }
+            return false;
         }
     }
 }

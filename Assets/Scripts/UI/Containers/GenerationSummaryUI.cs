@@ -11,6 +11,8 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private TextMeshProUGUI titleText;
         [SerializeField] private TextMeshProUGUI resultsText;
         [SerializeField] private Button nextGenerationButton;
+        [SerializeField] private Button viewTechTreeButton;
+        [SerializeField] private TechTreeUI techTreeUI;
 
         private void OnEnable()
         {
@@ -18,6 +20,10 @@ namespace GameDevTV.RTS.UI.Containers
             if (nextGenerationButton != null)
             {
                 nextGenerationButton.onClick.AddListener(OnNextClicked);
+            }
+            if (viewTechTreeButton != null)
+            {
+                viewTechTreeButton.onClick.AddListener(OnViewTechTreeClicked);
             }
         }
 
@@ -27,6 +33,10 @@ namespace GameDevTV.RTS.UI.Containers
             if (nextGenerationButton != null)
             {
                 nextGenerationButton.onClick.RemoveListener(OnNextClicked);
+            }
+            if (viewTechTreeButton != null)
+            {
+                viewTechTreeButton.onClick.RemoveListener(OnViewTechTreeClicked);
             }
         }
 
@@ -62,6 +72,19 @@ namespace GameDevTV.RTS.UI.Containers
             if (GenerationManager.Instance != null)
             {
                 GenerationManager.Instance.StartNextGeneration();
+            }
+        }
+
+        private void OnViewTechTreeClicked()
+        {
+            if (techTreeUI != null)
+            {
+                if (panel != null) panel.SetActive(false);
+                techTreeUI.Open(panel);
+            }
+            else
+            {
+                Debug.LogWarning("[GenerationSummaryUI] TechTreeUI reference is missing!");
             }
         }
     }
