@@ -376,6 +376,9 @@ namespace GameDevTV.RTS.Environment
                         {
                             if (sharedMaterials[i] != null && sharedMaterials[i].shader != null && sharedMaterials[i].shader.name != "Custom/URP_CurvedWorld")
                             {
+                                string shaderName = sharedMaterials[i].shader.name;
+                                if (shaderName.Contains("TextMeshPro") || shaderName.Contains("UI") || shaderName.Contains("Particles")) continue;
+
                                 // Save texture and color before swapping
                                 Texture mainTex = null;
                                 if (sharedMaterials[i].HasProperty("_BaseMap")) mainTex = sharedMaterials[i].GetTexture("_BaseMap");
