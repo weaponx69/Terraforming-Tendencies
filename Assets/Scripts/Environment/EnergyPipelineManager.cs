@@ -23,6 +23,9 @@ namespace GameDevTV.RTS.Environment
         private int builtSegments = 0;
         private bool isAssemblyPhase = false;
 
+        private float autoBuildTimer = 0f;
+        private float autoBuildInterval = 1.0f; // Seconds per segment
+
         // Right-click cycle: 0 = growing (never interacted), 1 = paused, 2 = resumed (next click cancels)
         private int cycleStep = 0;
 
@@ -191,10 +194,25 @@ namespace GameDevTV.RTS.Environment
 
         private void Update()
         {
-            if (!IsCompleted && !isAssemblyPhase && builtSegments >= neededSegments)
+            if (!IsCompleted && !isAssemblyPhase)
             {
-                Debug.Log($"[Expansion] Growth complete. Starting boot-up sequence for {sector.Center}");
-                StartCoroutine(BootUpSequence());
+                if (builtSegments < neededSegments)
+                {
+                    if (!IsPaused && CanAffordNextSegment())
+                    {
+                        autoBuildTimer += Time.deltaTime;
+                        if (autoBuildTimer >= autoBuildInterval)
+                        {
+                            autoBuildTimer = 0f;
+                            BuildNextSegment();
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.Log($"[Expansion] Growth complete. Starting boot-up sequence for {sector.Center}");
+                    StartCoroutine(BootUpSequence());
+                }
             }
         }
 
