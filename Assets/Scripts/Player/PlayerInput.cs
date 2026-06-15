@@ -24,7 +24,7 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private LayerMask floorLayers;
         [Header("Hero Drone (Mobile Command Center)")]
         [Tooltip("When enabled, WASD pilots the assigned Hero Drone instead of panning the camera. The mouse (edge-pan, click, drag-select) stays fully free.")]
-        [SerializeField] private bool useHeroControlMode = true;
+        [SerializeField] private bool useHeroControlMode = false;
         [Tooltip("The Hero Drone piloted with WASD. Drag the Hero Drone from the hierarchy here.")]
         [SerializeField] private GameDevTV.RTS.Units.HeroDroneController heroDrone;
         [SerializeField] private RectTransform selectionBox;

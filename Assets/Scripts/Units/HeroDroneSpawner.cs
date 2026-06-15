@@ -42,6 +42,8 @@ namespace GameDevTV.RTS.Units
 
         private void HandlePlanetGenerated()
         {
+            return; // Soft-disable the hero drone by preventing it from ever spawning
+            
             if (hasSpawned) return;
             hasSpawned = true; // Prevent duplicate coroutine starts
             StartCoroutine(WaitForBaseAndSpawn());
