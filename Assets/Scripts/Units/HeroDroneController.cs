@@ -340,34 +340,6 @@ namespace GameDevTV.RTS.Units
             {
                 foreach (Collider hit in hits)
                 {
-                    // Deposit at Forge (FoundryCrawler)
-                    FoundryCrawler crawler = hit.GetComponentInParent<FoundryCrawler>();
-                    if (crawler != null)
-                    {
-                        string soName = heroDrone.CarriedSupply != null ? heroDrone.CarriedSupply.name.ToLower() : "";
-                        bool isIron = soName.Contains("iron");
-                        bool isRegolith = soName.Contains("regolith");
-
-                        if (isIron && crawler.CurrentIron < crawler.maxIron)
-                        {
-                            int amount = heroDrone.CarriedAmount;
-                            crawler.AddIron(amount);
-                            heroDrone.ClearCargo();
-                            FloatingPopup.Create(crawler.transform.position + Vector3.up * 6f, $"+{amount} Iron", new Color(0.7f, 0.7f, 0.7f));
-                            Debug.Log($"[HeroDrone] Deposited {amount} Iron at {crawler.name}");
-                            return;
-                        }
-                        else if (isRegolith && crawler.CurrentRegolith < crawler.maxRegolith)
-                        {
-                            int amount = heroDrone.CarriedAmount;
-                            crawler.AddRegolith(amount);
-                            heroDrone.ClearCargo();
-                            FloatingPopup.Create(crawler.transform.position + Vector3.up * 6f, $"+{amount} Regolith", new Color(0.6f, 0.4f, 0.2f));
-                            Debug.Log($"[HeroDrone] Deposited {amount} Regolith at {crawler.name}");
-                            return;
-                        }
-                    }
-
                     // Deposit at BaseBuilding (Command Post) for Biomass
                     BaseBuilding baseBuilding = hit.GetComponentInParent<BaseBuilding>();
                     if (baseBuilding != null && baseBuilding.Owner == GameDevTV.RTS.Units.Owner.Player1 && baseBuilding.Progress.State == BuildingProgress.BuildingState.Completed)

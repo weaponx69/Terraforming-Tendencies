@@ -17,7 +17,6 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private UIActionButton[] actionButtons;
 
         private HashSet<BaseBuilding> selectedBuildings = new();
-        private HashSet<FoundryCrawler> selectedCrawlers = new();
 
         public void EnableFor(HashSet<AbstractCommandable> selectedUnits)
         {
@@ -28,30 +27,21 @@ namespace GameDevTV.RTS.UI.Containers
                 building.OnQueueUpdated -= OnBuildingQueueUpdated;
             }
             
-            foreach(FoundryCrawler crawler in selectedCrawlers)
-            {
-                crawler.OnStatusUpdated -= OnCrawlerStatusUpdated;
-            }
+
 
             selectedBuildings = selectedUnits
                 .Where(selectedUnit => selectedUnit is BaseBuilding)
                 .Cast<BaseBuilding>()
                 .ToHashSet();
             
-            selectedCrawlers = selectedUnits
-                .Where(selectedUnit => selectedUnit is FoundryCrawler)
-                .Cast<FoundryCrawler>()
-                .ToHashSet();
+
             
             foreach(BaseBuilding building in selectedBuildings)
             {
                 building.OnQueueUpdated += OnBuildingQueueUpdated;
             }
 
-            foreach(FoundryCrawler crawler in selectedCrawlers)
-            {
-                crawler.OnStatusUpdated += OnCrawlerStatusUpdated;
-            }
+
         }
 
         public void Disable()
@@ -69,24 +59,15 @@ namespace GameDevTV.RTS.UI.Containers
                 if (building != null) building.OnQueueUpdated -= OnBuildingQueueUpdated;
             }
 
-            foreach (FoundryCrawler crawler in selectedCrawlers)
-            {
-                if (crawler != null) crawler.OnStatusUpdated -= OnCrawlerStatusUpdated;
-            }
+
 
             selectedBuildings.Clear();
-            selectedCrawlers.Clear();
             gameObject.SetActive(false);
         }
 
         private void OnBuildingQueueUpdated(UnlockableSO[] unitsInQueue)
         {
-            RefreshButtons(selectedBuildings.Cast<AbstractCommandable>().Union(selectedCrawlers.Cast<AbstractCommandable>()).ToHashSet());
-        }
-
-        private void OnCrawlerStatusUpdated()
-        {
-            RefreshButtons(selectedBuildings.Cast<AbstractCommandable>().Union(selectedCrawlers.Cast<AbstractCommandable>()).ToHashSet());
+            RefreshButtons(selectedBuildings.Cast<AbstractCommandable>().ToHashSet());
         }
 
         private void RefreshButtons(HashSet<AbstractCommandable> selectedUnits)

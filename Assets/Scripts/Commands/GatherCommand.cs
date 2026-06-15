@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Commands
             {
                 if (context.Hit.collider != null)
                 {
-                    if (IsGatherableSupplyOrCommandPost(context.Hit.collider) || context.Hit.collider.GetComponentInParent<FoundryCrawler>() != null)
+                    if (IsGatherableSupplyOrCommandPost(context.Hit.collider))
                     {
                         return true;
                     }
@@ -37,10 +37,7 @@ namespace GameDevTV.RTS.Commands
             {
                 worker.Gather(supply);
             }
-            else if (context.Hit.collider.GetComponentInParent<FoundryCrawler>() is FoundryCrawler crawler && worker.HasSupplies)
-            {
-                worker.ReturnSupplies(crawler.gameObject);
-            }
+
             else if (IsCommandPost(context.Hit.collider) && worker.HasSupplies)
             {
                 worker.ReturnSupplies(context.Hit.collider.gameObject);

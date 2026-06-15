@@ -23,8 +23,6 @@ namespace GameDevTV.RTS.Environment
         private int builtSegments = 0;
         private bool isAssemblyPhase = false;
 
-        private GameObject spawnedForge;
-
         // Right-click cycle: 0 = growing (never interacted), 1 = paused, 2 = resumed (next click cancels)
         private int cycleStep = 0;
 
@@ -105,8 +103,6 @@ namespace GameDevTV.RTS.Environment
             {
                 SpawnSegmentPhysically(true); // true = free
             }
-
-            SpawnForge();
         }
 
         private void SpawnSegmentPhysically(bool isFree)
@@ -157,48 +153,8 @@ namespace GameDevTV.RTS.Environment
 
 
 
-        private void SpawnForge()
-        {
-            GameObject foundryPrefab = null;
-#if UNITY_EDITOR
-            foundryPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Buildings/Foundry/Foundry.prefab");
-#endif
-            if (foundryPrefab == null) foundryPrefab = Resources.Load<GameObject>("Buildings/Foundry");
-
-            if (foundryPrefab != null)
-            {
-                Vector3 toTarget = targetPosition - startPosition;
-                Vector3 spawnDir = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : Vector3.forward;
-                Vector3 forgeSpawnPos = startPosition + spawnDir * 8f;
-
-                Ray forgeGroundRay = new Ray(forgeSpawnPos + Vector3.up * 50f, Vector3.down);
-                if (Physics.Raycast(forgeGroundRay, out RaycastHit forgeGroundHit, 100f, LayerMask.GetMask("Default", "Terrain")))
-                {
-                    forgeSpawnPos.y = forgeGroundHit.point.y;
-                }
-
-                spawnedForge = Instantiate(foundryPrefab, forgeSpawnPos, Quaternion.identity);
-                spawnedForge.name = "FoundryCrawler";
-                
-                var crawler = spawnedForge.GetComponent<FoundryCrawler>();
-                if (crawler == null) crawler = spawnedForge.AddComponent<FoundryCrawler>();
-                
-                crawler.PipelineManager = this;
-                crawler.targetPosition = targetPosition;
-                crawler.isOnPipeline = true;
-
-                // Ensure the crawler is properly initialized and not permanently stuffed full
-                crawler.ResetHoppers();
-            }
-            else
-            {
-                Debug.LogWarning("[Pipeline] Could not load Foundry prefab to spawn forge!");
-            }
-        }
-
         private void OnDestroy()
         {
-            if (!IsCompleted && spawnedForge != null) Destroy(spawnedForge);
         }
 
         private Vector3 FindNearestCompletedCommandCenter()
@@ -237,12 +193,8 @@ namespace GameDevTV.RTS.Environment
         {
             if (!IsCompleted && !isAssemblyPhase && builtSegments >= neededSegments)
             {
-                var crawler = spawnedForge != null ? spawnedForge.GetComponent<FoundryCrawler>() : null;
-                if (crawler == null || crawler.HasReachedTarget)
-                {
-                    Debug.Log($"[Expansion] Growth complete and crawler arrived at target. Starting boot-up sequence for {sector.Center}");
-                    StartCoroutine(BootUpSequence());
-                }
+                Debug.Log($"[Expansion] Growth complete. Starting boot-up sequence for {sector.Center}");
+                StartCoroutine(BootUpSequence());
             }
         }
 

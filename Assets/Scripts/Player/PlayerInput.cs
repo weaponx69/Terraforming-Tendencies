@@ -155,27 +155,16 @@ namespace GameDevTV.RTS.Player
             GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated -= CenterCameraOnMap;
         }
 
-        private bool isFollowingSelectedCrawler = false;
-
         private void HandleUnitSelected(UnitSelectedEvent evt)
         {
             if (!selectedUnits.Contains(evt.Unit))
             {
                 selectedUnits.Add(evt.Unit);
             }
-            
-            if (evt.Unit is FoundryCrawler)
-            {
-                isFollowingSelectedCrawler = true;
-            }
         }
         private void HandleUnitDeselected(UnitDeselectedEvent evt)
         {
             selectedUnits.Remove(evt.Unit);
-            if (evt.Unit is FoundryCrawler)
-            {
-                isFollowingSelectedCrawler = false;
-            }
         }
         private void HandleUnitSpawn(UnitSpawnEvent evt) => aliveUnits.Add(evt.Unit);
         private void HandleBuildingSpawn(BuildingSpawnEvent evt)
@@ -317,31 +306,10 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
 
         private void LateUpdate()
         {
-            HandleCameraFollow();
             HandleHeroCameraFollow();
         }
 
-        private void HandleCameraFollow()
-        {
-            if (!isFollowingSelectedCrawler || cameraTarget == null) return;
-            
-            if (selectedUnits.Count == 1 && selectedUnits[0] is FoundryCrawler crawler)
-            {
-                // If the player tries to manually move the camera, break the lock so they aren't trapped!
-                Vector2 keyboardMove = GetKeyboardMoveAmount();
-                Vector2 mouseMove = GetMouseMoveAmount();
-                if (keyboardMove.sqrMagnitude > 0.001f || mouseMove.sqrMagnitude > 0.001f)
-                {
-                    isFollowingSelectedCrawler = false;
-                    return;
-                }
 
-                // Snap the camera target to the crawler's position, preserving current zoom height
-                Vector3 targetPos = crawler.transform.position;
-                targetPos.y = cameraTarget.position.y;
-                cameraTarget.position = targetPos;
-            }
-        }
 
         private void HandleBasePaging()
         {
@@ -372,14 +340,7 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 commandPosts.Add(commander);
             }
 
-            var crawlers = Object.FindObjectsByType<FoundryCrawler>(FindObjectsInactive.Exclude);
-            foreach (var crawler in crawlers)
-            {
-                if (crawler != null && crawler.Owner == Owner.Player1)
-                {
-                    commandPosts.Add(crawler);
-                }
-            }
+
 
             commandPosts = commandPosts.OrderBy(b => b.transform.position.x)
                 .ThenBy(b => b.transform.position.z)

@@ -32,7 +32,7 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private SingleUnitSelectedUI singleUnitSelectedUI;
         [SerializeField] private UnitTransportUI unitTransportUI;
         [SerializeField] private GlobalCommanderUI globalCommanderUI;
-        [SerializeField] private FoundryCrawlerUI foundryCrawlerUI;
+
         [SerializeField] private Image iconImage;
 
         [SerializeField] private AbstractCommandable globalCommander;
@@ -399,7 +399,6 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
             TryDisable(singleUnitSelectedUI);
             TryDisable(unitTransportUI);
             TryDisable(globalCommanderUI);
-            TryDisable(foundryCrawlerUI);
         }
 
         // Safely call Disable on UI container objects that may have partially-destroyed child components.
@@ -416,7 +415,7 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
                     case GameDevTV.RTS.UI.Containers.SingleUnitSelectedUI s: s.Disable(); return;
                     case GameDevTV.RTS.UI.Containers.UnitTransportUI t: t.Disable(); return;
                     case GameDevTV.RTS.UI.Containers.GlobalCommanderUI g: g.Disable(); return;
-                    case GameDevTV.RTS.UI.Containers.FoundryCrawlerUI f: f.Disable(); return;
+
                 }
 
                 // Fallback: try to invoke a Disable method via reflection (covers unexpected types)
@@ -448,28 +447,16 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
             {
                 singleUnitSelectedUI.Disable();
                 unitTransportUI.Disable();
-                foundryCrawlerUI.Disable();
-                buildingSelectedUI.EnableFor(building);
-            }
-            else if (commandable is FoundryCrawler crawler)
-            {
-                buildingSelectedUI.Disable();
-                unitTransportUI.Disable();
-                singleUnitSelectedUI.EnableFor(commandable);
-                foundryCrawlerUI.EnableFor(crawler);
-            }
             else if (commandable is ITransporter transporter && transporter.UsedCapacity > 0)
             {
                 unitTransportUI.EnableFor(transporter);
                 buildingSelectedUI.Disable();
                 singleUnitSelectedUI.Disable();
-                foundryCrawlerUI.Disable();
             }
             else
             {
                 buildingSelectedUI.Disable();
                 unitTransportUI.Disable();
-                foundryCrawlerUI.Disable();
                 singleUnitSelectedUI.EnableFor(commandable);
             }
         }
