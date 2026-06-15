@@ -362,6 +362,24 @@ namespace GameDevTV.RTS.Environment
                 }
                 }
 
+                public void ReplenishResources()
+                {
+                    // Destroy all existing resources
+                    var existingSupplies = GetComponentsInChildren<GatherableSupply>(true);
+                    foreach (var gs in existingSupplies)
+                    {
+                        if (gs != null && gs.gameObject != null)
+                        {
+                            Destroy(gs.gameObject);
+                        }
+                    }
+
+                    ScatterResources();
+                    ScatterFuelResources();
+
+                    Debug.Log("[PlanetGenerator] Resources replenished for new generation.");
+                }
+
                 public void ApplyCurvedWorldShader(GameObject root)
                 {
                     Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");

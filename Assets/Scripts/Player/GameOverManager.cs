@@ -45,6 +45,8 @@ namespace GameDevTV.RTS.Player
         private bool isPlanetGenerated;
         private static bool isQuitting;
 
+        public static GameOverManager Instance { get; private set; }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void InitQuitTracking()
         {
@@ -55,7 +57,13 @@ namespace GameDevTV.RTS.Player
         // ── Lifecycle ──────────────────────────────────────────────────────────────
         private void Awake()
         {
+            if (Instance == null) Instance = this;
             MonitoredOwner = monitoredOwner;
+            
+            if (GenerationManager.Instance == null)
+            {
+                new GameObject("GenerationManager").AddComponent<GenerationManager>();
+            }
         }
 
         private void OnEnable()
@@ -214,20 +222,18 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
 
             if (!recoveryPossible)
             {
-                Debug.Log($"[GameOverManager] Recovery check failed. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Hero Alive: {heroDroneAlive}, Biomass: {biomass}");
+                Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Hero Alive: {heroDroneAlive}, Biomass: {biomass}");
                 
-                // Print active supply nodes detail to find out why it thinks none exist
-                var allNodes = Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
-                Debug.Log($"[GameOverManager DIAGNOSTIC] FindObjectsByType(Exclude) returned {allNodes.Length} nodes.");
-                foreach (var node in allNodes)
+                // Instead of game over, end the generation!
+                if (GenerationManager.Instance != null)
                 {
-                    if (node != null && node.Amount > 0)
-                    {
-                        Debug.Log($"[GameOverManager DIAGNOSTIC] Found valid node: {node.name} with amount {node.Amount}");
-                    }
+                    GenerationManager.Instance.TriggerGenerationEnd();
                 }
-
-                TriggerGameOver(GameOverReason.Resources);
+                else
+                {
+                    Debug.LogWarning("[GameOverManager] GenerationManager not found. Falling back to Game Over.");
+                    TriggerGameOver(GameOverReason.Resources);
+                }
             }
         }
 
@@ -306,7 +312,7 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
             }
         }
 
-        private void TriggerVictory()
+        public void TriggerVictory()
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
