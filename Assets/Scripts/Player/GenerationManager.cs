@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Units;
 using System;
 
 namespace GameDevTV.RTS.Player
@@ -122,20 +123,15 @@ namespace GameDevTV.RTS.Player
         private int LiquidateMaterials()
         {
             int tc = 0;
-            // E.g., 100 Biomass = 10 TC, 100 Minerals = 5 TC... 
-            // Simplified for now: 10 Materials of any type = 1 TC
+            
             if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int b)) tc += b;
-            if (Supplies.Minerals != null && Supplies.Minerals.TryGetValue(Owner.Player1, out float m)) tc += Mathf.FloorToInt(m);
-            if (Supplies.Gas != null && Supplies.Gas.TryGetValue(Owner.Player1, out float g)) tc += Mathf.FloorToInt(g);
-            if (Supplies.Iron != null && Supplies.Iron.TryGetValue(Owner.Player1, out float i)) tc += Mathf.FloorToInt(i);
-            if (Supplies.Regolith != null && Supplies.Regolith.TryGetValue(Owner.Player1, out float r)) tc += Mathf.FloorToInt(r);
 
             // Wipe resources after liquidating so the player starts the next generation at 0 (or a baseline)
+            if (Supplies.Biomass != null && Supplies.Biomass.ContainsKey(Owner.Player1))
+            {
+                Supplies.Biomass[Owner.Player1] = 0;
+            }
             Supplies.RaiseBiomassChanged(Owner.Player1, 0);
-            Supplies.RaiseMineralsChanged(Owner.Player1, 0);
-            Supplies.RaiseGasChanged(Owner.Player1, 0);
-            Supplies.RaiseIronChanged(Owner.Player1, 0);
-            Supplies.RaiseRegolithChanged(Owner.Player1, 0);
 
             return tc / 10;
         }
