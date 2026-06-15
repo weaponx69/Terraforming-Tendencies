@@ -63,7 +63,7 @@ namespace GameDevTV.RTS.UI.Containers
             if (GenerationManager.Instance != null && GenerationManager.Instance.SpendTerraCoins(tcCost))
             {
                 // Fire the event to unlock the tech
-                Bus<UpgradeResearchedEvent>.Raise(new UpgradeResearchedEvent(Owner.Player1, currentUpgrade));
+                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, currentUpgrade));
                 Debug.Log($"[TechTreeUI] Purchased upgrade: {currentUpgrade.Name} for {tcCost} TC");
                 
                 // Hide or disable the button once bought
