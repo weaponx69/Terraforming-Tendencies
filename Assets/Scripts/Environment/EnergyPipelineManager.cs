@@ -281,6 +281,11 @@ namespace GameDevTV.RTS.Environment
                 building.CompleteConstruction();
                 building.ClearQueue(); // Wipe any default queue state
 
+                if (SectorManager.Instance != null)
+                {
+                    SectorManager.Instance.ActiveSector = sector;
+                }
+
                 // A freshly established command center builds a Probe drone first.
                 AbstractUnitSO probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
                 if (probeSO != null)
