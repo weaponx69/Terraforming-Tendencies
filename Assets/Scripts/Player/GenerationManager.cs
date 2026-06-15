@@ -15,6 +15,8 @@ namespace GameDevTV.RTS.Player
         public int TotalTerraCoins { get; private set; } = 0;
         public bool IsBetweenRounds { get; private set; } = false;
 
+        private int initialNodesInSector = 0;
+
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
 
@@ -49,7 +51,54 @@ namespace GameDevTV.RTS.Player
             }
             CurrentGeneration = 1;
             IsBetweenRounds = false;
+            initialNodesInSector = 0;
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
+        }
+
+        private void Update()
+        {
+            if (IsBetweenRounds) return;
+            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
+
+            // Give the colony 30 seconds to bootstrap on the very first start
+            if (Time.timeSinceLevelLoad < 30f && CurrentGeneration == 1) return;
+
+            if (initialNodesInSector <= 0)
+            {
+                CalculateInitialNodes();
+                if (initialNodesInSector <= 0) return; // Still no nodes found? Keep waiting.
+            }
+
+            var allNodes = UnityEngine.Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
+            int currentNodes = 0;
+            foreach (var node in allNodes)
+            {
+                if (node != null && node.Amount > 0 && SectorManager.Instance.GetNearestSector(node.transform.position) == SectorManager.Instance.ActiveSector)
+                {
+                    currentNodes++;
+                }
+            }
+
+            // End generation if 1/5th (20%) of the sector has been mined
+            if (currentNodes <= initialNodesInSector * 0.8f)
+            {
+                TriggerGenerationEnd();
+            }
+        }
+
+        private void CalculateInitialNodes()
+        {
+            var allNodes = UnityEngine.Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
+            int count = 0;
+            foreach (var node in allNodes)
+            {
+                if (node != null && node.Amount > 0 && SectorManager.Instance.GetNearestSector(node.transform.position) == SectorManager.Instance.ActiveSector)
+                {
+                    count++;
+                }
+            }
+            initialNodesInSector = count;
+            Debug.Log($"[GenerationManager] Active Sector initialized with {initialNodesInSector} nodes. Round will end when {initialNodesInSector * 0.8f} remain.");
         }
 
         public void TriggerGenerationEnd()
@@ -108,6 +157,7 @@ namespace GameDevTV.RTS.Player
 
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
+            initialNodesInSector = 0; // Recalculate next frame
 
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);

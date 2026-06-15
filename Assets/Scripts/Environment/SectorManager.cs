@@ -18,6 +18,7 @@ namespace GameDevTV.RTS.Environment
         }
 
         public List<Sector> Sectors = new List<Sector>();
+        public Sector ActiveSector { get; set; }
 
         private void Awake()
         {
@@ -114,6 +115,7 @@ namespace GameDevTV.RTS.Environment
                     {
                         found = true;
                         sector.OccupyingBuilding = building;
+                        if (ActiveSector == null) ActiveSector = sector;
                         break;
                     }
                 }
