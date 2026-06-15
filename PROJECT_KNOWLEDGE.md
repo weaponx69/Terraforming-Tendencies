@@ -1,191 +1,329 @@
-# Terraforming Tendencies - Project Knowledge & Architecture Notes
 
+### Terraforming Tendencies - Project Knowledge & Architecture Notes
 This document serves as a persistent memory bank for AI context, detailing the core systems, recent architectural decisions, and current state of the game's economy.
 
-## 1. Automated Economy & AI (GreedyAIController)
-- **Logarithmic Spending:** The AI limits its spending mathematically so it doesn't instantly bankrupt the player's treasury. 
-- **Strict Start Priority:** To prevent the AI from deadlocking itself, it bypasses the spending limit specifically for the *very first* Probe drone. It uses an `ignoreReserve` flag to forcefully queue the probe. Once the probe is queued, the AI unlocks and interleaves Construction and Mining drones normally.
-- **Unit Assignment:** The AI dynamically scans for GatherableSupplies and automatically assigns idle Mining Drones. It explicitly targets supplies that are children of the `PlanetGenerator` to avoid mining invalid debris.
+#### [DEPRECATED] Hero Drone & Hybrid Control System
+*Note: The Hero Drone system has been completely removed to support the new "Terraforming Mars" roguelite pivot, which requires macro-level map awareness.*
+* **Architecture Changes:** `HeroDroneSpawner.cs` and `HeroDroneController.cs` have been deleted. The `useHeroControlMode` flag and camera-tethering logic in `PlayerInput.cs` have been removed.
+* **Restored RTS Camera:** The game now uses a traditional Starcraft-style isometric perspective. WASD inputs once again control free-roaming camera panning across the map instead of piloting a specific unit.
+* **System Cleanup:** All Hero Drone dependencies have been stripped. The `GreedyAIController` no longer needs exemptions for the drone, the `GameOverManager` no longer checks `heroDroneAlive` for recovery, and all custom UI/mechanics for manual drone vacuuming and cargo have been removed.
+* **Design Goal:** This standard point-and-click RTS setup frees the player's camera to focus entirely on the new Terra-Coins engine-building economy and strategically planning the adjacency placement of Cities and Greenery.
 
+#### 1. Automated Economy & AI (GreedyAIController)
+* **Logarithmic Spending:** The AI limits its spending mathematically so it doesn't instantly bankrupt the player's treasury.
+* **Strict Start Priority:** To prevent the AI from deadlocking itself, it bypasses the spending limit specifically for the *very first* Probe drone. It uses an ignoreReserve flag to forcefully queue the probe. Once the probe is queued, the AI unlocks and interleaves Construction and Mining drones normally.
+* **Unit Assignment:** The AI dynamically scans for GatherableSupplies and automatically assigns idle Mining Drones. It explicitly targets supplies that are children of the PlanetGenerator to avoid mining invalid debris.
+* **Expansion Priority:** When a new Command Post is established via the EnergyPipelineManager, it uses BuildPriorityUnlockable to queue a starter Probe. Both GreedyAIController and AIController explicitly check BaseBuilding.IsFirstInQueueProbe() to avoid filling the queue before this starter unit is registered.
 
-- **Expansion Priority:** When a new Command Post is established via the `EnergyPipelineManager`, it uses `BuildPriorityUnlockable` to queue a starter Probe. Both `GreedyAIController` and `AIController` explicitly check `BaseBuilding.IsFirstInQueueProbe()` to avoid filling the queue before this starter unit is registered.
-## 2. Colony Expansion & Mobile Forge (FoundryCrawler & EnergyPipelineManager)
-- **Pipeline Logistics:** The `EnergyPipelineManager` drives the expansion of the colony. It spawns the `FoundryCrawler` which slowly crawls along the pipeline path (`movementSpeed = 0.05f`).
-- **Crawler Fuel Hoppers:** The crawler requires Regolith and Iron to move. It has internal hoppers (default reset: 500 Regolith, 200 Iron, with a max of 1000). The `maxRegolith` and `maxIron` capacities are forcefully overridden in `FoundryCrawler.Awake()` to guarantee the Unity Inspector doesn't accidentally load old, smaller prefab capacities.
-- **Resource Spawning:** As the crawler moves, the Pipeline Manager exposes Regolith and Iron deposits along the path. These deposits are explicitly parented to the `PlanetGenerator` so the GreedyAI recognizes them.
+#### 2. Colony Expansion & Mobile Forge (FoundryCrawler & EnergyPipelineManager)
+* **Pipeline Logistics:** The EnergyPipelineManager drives the expansion of the colony. It spawns the FoundryCrawler which slowly crawls along the pipeline path (movementSpeed = 0.05f).
+* **Crawler Fuel Hoppers:** The crawler requires Regolith and Iron to move. It has internal hoppers (default reset: 500 Regolith, 200 Iron, with a max of 1000). The maxRegolith and maxIron capacities are forcefully overridden in FoundryCrawler.Awake() to guarantee the Unity Inspector doesn't accidentally load old, smaller prefab capacities.
+* **Resource Spawning:** As the crawler moves, the Pipeline Manager exposes Regolith and Iron deposits along the path. These deposits are explicitly parented to the PlanetGenerator so the GreedyAI recognizes them.
 
-## 3. Drone Routing & Economy (WorkerBrainController & Supplies)
-- **Identification:** Drones perfectly identify what they are holding by checking both the `SupplySO.name` and the physical `GameObject.name` (fallback). 
-- **Iron & Regolith:** Routed directly into the active Foundry Crawler's hoppers to fuel the pipeline expansion. Drones will actively avoid the crawler if its hoppers reach maximum capacity (1000).
-- **Gas & Minerals:** Routed to the active Foundry Crawler as a centralized drop-off point, but bypass the physical hoppers. Instead, they instantly liquidate into the global **Biomass** economy by triggering the `GatherEventChannelSO`.
+#### 3. Drone Routing & Economy (WorkerBrainController & Supplies)
+* **Identification:** Drones perfectly identify what they are holding by checking both the SupplySO.name and the physical GameObject.name (fallback).
+* **Iron & Regolith:** Routed directly into the active Foundry Crawler's hoppers to fuel the pipeline expansion. Drones will actively avoid the crawler if its hoppers reach maximum capacity (1000).
+* **Gas & Minerals:** Routed to the active Foundry Crawler as a centralized drop-off point, but bypass the physical hoppers. Instead, they instantly liquidate into the global **Materials** economy by triggering the GatherEventChannelSO.
 
-## 4. Game Over Logic (GameOverManager)
-- **Depletion Checks:** The game continuously checks if there are valid ways to recover. If Biomass is low and all `GatherableSupply` nodes on the map are destroyed, it triggers Game Over.
-- **Pipeline Protection:** To prevent false Game Overs when a drone fully depletes a fuel node, the `GameOverManager` explicitly checks if there is an active `EnergyPipelineManager` still expanding. If a pipeline is still building, it assumes more resources will be spawned shortly and aborts the Game Over.
-- **Hero Drone Check:** Integrates `heroDroneAlive` into the recovery calculation so that a "no resources" game over is not triggered if standard mining units are dead but the player's Hero Drone is still active and capable of harvesting.
-- **Quit & Scene Unload Safety:** Employs static `isQuitting` tracking via `Application.quitting` to automatically suppress any loss-checking or GameOver events during scene teardown, editor playmode transition, or application exit. This prevents false Game Over prompts during destruction of scene objects on shutdown.
+#### 4. Game Over Logic (GameOverManager)
+* **Depletion Checks:** The game continuously checks if there are valid ways to recover. If Materials is low and all GatherableSupply nodes on the map are destroyed, it triggers Game Over. *(Note: This logic is being repurposed for the new Micro-Round Depletion Trigger).*
+* **Pipeline Protection:** To prevent false Game Overs when a drone fully depletes a fuel node, the GameOverManager explicitly checks if there is an active EnergyPipelineManager still expanding. If a pipeline is still building, it assumes more resources will be spawned shortly and aborts the Game Over.
+* **Quit & Scene Unload Safety:** Employs static isQuitting tracking via Application.quitting to automatically suppress any loss-checking or GameOver events during scene teardown, editor playmode transition, or application exit. This prevents false Game Over prompts during destruction of scene objects on shutdown.
 
-## 5. UI & Selection Indicators
-- **Standardized Outlines:** The `FoundryCrawler` uses C# Reflection to look inside the `constructionDronePrefab` and perfectly clone its standard selection indicator ring. This ensures the Crawler matches the stylistic visual outlines of all other units in the game, scaled perfectly to 1.5x to fit the Crawler's chassis without distorting into a dome.
+#### 5. UI & Selection Indicators
+* **Standardized Outlines:** The FoundryCrawler uses C# Reflection to look inside the constructionDronePrefab and perfectly clone its standard selection indicator ring. This ensures the Crawler matches the stylistic visual outlines of all other units in the game, scaled perfectly to 1.5x to fit the Crawler's chassis without distorting into a dome.
 
-## 6. Hero Drone (Mobile Command Center)
-- **Hybrid Control:** `HeroDroneController` (on a duplicated drone prefab) lets the player pilot a "Hero" command drone with WASD (Riftbreaker style) while the mouse stays fully free for RTS edge-pan, click, and drag-select.
-- **Input Routing:** `PlayerInput` exposes `useHeroControlMode` and a `heroDrone` slot. When enabled, WASD is suppressed from camera panning (`HandlePanning`) and instead converted to a **camera-relative** world direction fed to `HeroDroneController.SetMoveInput`. Pressing any movement key snaps the camera back onto the drone.
-- **NavMesh Override:** On taking manual control the controller calls `WorkerBrainController.Halt()` and `AbstractUnit.Stop()`, then disables the `NavMeshAgent` so transform-driven movement does not fight pathfinding. On release it re-enables the agent and `Warp`s it back onto the NavMesh. If no NavMesh is nearby, movement falls back to free transform motion.
-- **Commands:** The Hero Drone carries the base-building commands in its `AvailableCommands` array, so it issues Build commands like a Command Center via the existing command/selection pipeline.
+#### 6. Recent Fixes Changelog
+* **Probe Build Order (race condition):** Added BaseBuilding.IsFirstInQueueProbe(). GreedyAIController and AIController now skip buildings whose first queued item is the Probe. Added regression test ColonyExpansionTests.ColonyExpansion_BuildsProbeDroneFirst.
+* **Curved World Visuals:** Added an "Animal Crossing" style spherical planet illusion without breaking the flat NavMesh. Created CurvedWorld.shader and CurvedWorldUpdater.cs. 
+* **Assorted Compiler Fixes:** Removed duplicate method definitions in PlanetGenerator.cs. Fixed an invalid cast warning by treating FoundryCrawler as an AbstractCommandable. Removed unused isProducing field from FoundryCrawler.cs.
+* **Application Quit False Triggers:** Solved a critical issue where OnDestroy callbacks on GatherableSupply nodes during scene unloads triggered a cascade of SupplyDepletedEvents, resulting in a false "Resources depleted" screen. 
 
-## 7. Hero Drone Spawning & AI Exemption
-- **Auto-Spawn:** `HeroDroneSpawner` (in the scene) listens for `PlanetGenerator.OnPlanetGenerated` and instantiates `Resources/Units/Hero Drone.prefab` at the first Player1 base (or map centre), sets Owner=Player1, and calls `PlayerInput.AssignHeroDrone()` so no manual scene wiring is needed.
-- **Prefab:** `Hero Drone.prefab` is a duplicate of the Mining Drone (an AIR unit at flight height ~4) with `HeroDroneController` plus the Command Post's full `AvailableCommands` set.
-- **Air-Unit Movement:** `HeroDroneController` moves the transform freely in XZ and samples the NavMesh ONLY to adopt hover height. It must NOT snap XZ to the nearest NavMesh point — air units sit on a small elevated NavMesh patch and a full snap pins them in place (zero movement).
-- **AI Exemption:** `GreedyAIController` skips any Worker with a `HeroDroneController` in `AssignIdleWorkers`, `FindAvailableWorker`, `FindWorkerForExpansion`, and `HasAvailableBuilder`, so the automated economy never hijacks the player's Hero Drone for mining/building.
+#### 7. Errors Encountered & Resolutions
+* Fixed CS0111: Type 'PlanetGenerator' already defines a member called 'ScatterResources' by removing the empty stub.
+* Fixed Shader error in 'Custom/URP_CurvedWorld' for the ShadowCaster pass by declaring _LightDirection and _LightPosition globals.
 
-- **Smooth Movement (no rubber-banding):** The Hero Drone is moved by direct transform.position writes each frame and the camera hard-snaps to it. Its kinematic Rigidbody Interpolation MUST be None — Interpolate makes the rendered mesh lag behind the actual transform while the camera tracks the real position, producing a 'move forward then snap back' jitter. Do not enable Rigidbody interpolation on transform-driven units that a hard-follow camera tracks.
+#### 8. HUD Standardization & Colony Expansion Integration
+* **Category Re-Alignment:** Changed all top-bar HUD containers to use a vertically-stacked layout where the Header Label is centered at the top and the Metric is directly beneath it.
+* **Fixed Stretched Icons:** Locked all HUD icons to a standard 24x24 pixel size via LayoutElement components.
+* **Auto-Wiring:** Implemented self-wiring in RuntimeUI.Awake() to automatically link and subscribe to UI containers.
+* **Expansion Progress Integration:** Restored the colony expansion progress metric back to its original integrated display inside the "Sectors" label. Increased the width of the Sectors HUD container to 220 to prevent clipping.
+* **AI Auto-Spend Toggle Removal:** Removed the AI Spending Toggle element from the HUD and cleanly deleted AISpendingToggleUI.cs from the project.
 
-- **Hero Drone Camera Smoothness:** The CinemachineBrain UpdateMethod MUST be Late Update (not Smart Update). The camera follow target (cameraTarget) is a kinematic Rigidbody; Smart Update resolves the camera in FixedUpdate for Rigidbody targets, but the Hero Drone moves in Update and cameraTarget is repositioned in PlayerInput.LateUpdate. That timing mismatch causes camera stutter at framerates above the physics step. Late Update makes the camera resolve every rendered frame after the target is positioned.
+#### 9. Persistent Audio System (AudioManager)
+* **Soundtrack Integration:** Generated a 2-minute-56-second high-quality Stereo WAV space ambient soundtrack.
+* **Persistent BGM:** Created AudioManager.cs as a persistent DontDestroyOnLoad Singleton that automatically spawns and plays the BGM using a RuntimeInitializeOnLoadMethod tag.
+* **Smooth Volume Fading:** Features a built-in volume fader that smoothly transitions the audio from 0 to 0.5 volume over 3.0 seconds.
 
-## 8. Recent Fixes Changelog
+#### 10. World-Space Foundry Crawler Metrics
+* **FoundryWorldUI:** Added a custom billboarding world-space canvas to the side of the Foundry crawler prefab displaying live stats for Regolith (Yellow), Iron (Gray), and Pipes Buffer (Cyan).
+* **Lowered Close Positioning:** Adjusted the local Y position down to 0.55 so the status text sits exactly 0.64 world meters above the top of the forge roof.
 
-This section is a flat, copy-paste-friendly list of fixes applied during the Hero Drone work and related cleanup.
+#### 11. Recent Visual and Economy Polish
+* **Map Wrapping Visual Fix:** The CurvedWorldUpdater.cs has been moved to LateUpdate() to ensure it only queries the camera's final position, fixing a massive 1-frame backwards bend during teleports.
+* **Dynamic Proximity Labels:** Added an OnGUI overlay to GatherableSupply.cs that dynamically draws the resource's name above the node when the camera is within 15 units.
+* **Visual Shrinking:** GatherableSupply.cs now visually shrinks the node's transform proportional to the remaining amount (clamped to 30%) when resources are depleted.
+* **Geography Camouflage for Fuel:** PlanetGenerator.ScatterFuelResources() now randomly selects non-crystal rock models, applies the dynamically generated ground color, and hides fuel resources as natural planetary geography.
+* **Selection Indicator Sizing:** Modified BaseBuilding.Start() to intercept the selectionIndicator of the Command Post and shrink it by a factor of 0.6f.
+* **Gas/Minerals Efficiency Routing:** Updated WorkerBrainController.cs so that Gas and Minerals route directly back to the Command Center instead of the expanding Crawler, boosting Materials income.
+* **Runtime Shader Injection:** Hooked ApplyCurvedWorldShader into AbstractCommandable.Start() to ensure all dynamically spawned units perfectly hug the bent terrain.
 
-### Probe Build Order (race condition)
-- Symptom: New Command Posts did not build the starter Probe first; the AI queue-jumped.
-- Cause: `GreedyAIController` filled a newly completed Command Post's queue before the expansion's priority Probe was registered.
-- Fix: Added `BaseBuilding.IsFirstInQueueProbe()`. `GreedyAIController` and `AIController` now skip buildings whose first queued item is the Probe. Added regression test `ColonyExpansionTests.ColonyExpansion_BuildsProbeDroneFirst`.
+#### 12. Hybrid Construction & Auto-Supply Crawler
+* **Hybrid Building Construction:** Drones will withdraw from the global bank if the Command Center is physically closer, otherwise they will manually mine Map Resources.
+* **Auto-Supply Crawler Mechanics:** Drones can enter an autonomous SupplyMissionLoop to fetch missing Iron/Regolith for the Crawler. Changed the assignment command to the standard Build command to prevent Unity behavior cancellation.
+* **Parallax Sinking Fix:** Prevented the Crawler from snapping its Y-pivot to the flat NavMesh, stopping it from visually "sinking" underground.
+* **UI & UX Changes:** ProbeLogic no longer automatically calls TriggerExpansion; players place Command Centers directly again via their drone's Build UI. Added a persistent Volume Control Slider to the PauseMenuUI.
 
-### Hero Drone Feature (mobile command center)
-- `HeroDroneController.cs`: WASD piloting; receives a camera-relative world vector via `SetMoveInput`.
-- `PlayerInput.cs`: added `useHeroControlMode` flag + `heroDrone` slot + `AssignHeroDrone()`; WASD is rerouted from camera panning to the drone; mouse (edge-pan, click, drag-select) stays free.
-- `HeroDroneSpawner.cs`: auto-spawns `Resources/Units/Hero Drone.prefab` on `PlanetGenerator.OnPlanetGenerated`, sets Owner=Player1, links it into `PlayerInput`. No manual scene wiring needed.
-- `Hero Drone.prefab`: duplicate of the Mining Drone (AIR unit, flight height ~4) with `HeroDroneController` + the Command Post's full `AvailableCommands`.
-- AI exemption: `GreedyAIController` ignores any Worker with a `HeroDroneController` so the economy never hijacks it.
+#### 13. Architecture Pivot: "Terraforming Mars" meets Roguelite Strategy
+To align the game's core loop with the terraforming mechanics of *Terraforming Mars*, the game will pivot toward a **Roguelite / Micro-Round Survival** structure.
 
-### Hero Drone Movement (air-unit pinning)
-- Symptom: Drone responded to input but did not actually move.
-- Cause: Air units sit on a small elevated NavMesh patch; snapping XZ to the nearest NavMesh point pinned the drone. Also `AbstractUnit.Update` re-enables a disabled agent every frame.
-- Fix: Move the transform freely in XZ; sample the NavMesh ONLY for hover height. Leave the agent enabled but decoupled (`updatePosition`/`updateRotation = false`) instead of disabling it.
+##### 1. The Core Loop (Micro-Rounds & The Depletion Trigger)
+Instead of an endless game, gameplay is broken into a pre-determined, fixed number of discrete "micro-rounds" or "generations":
+* **Timeline Pre-determination:** Before the game begins, the total number of generations is calculated based on the planetoid's size (number of sectors) generated by `PlanetGenerator`. The player receives **5 generations per sector** (e.g., a 4-sector map grants 20 generations total).
+* **The Depletion Trigger:** A single micro-round ends organically the exact moment the automated drones strip-mine and destroy the final `GatherableSupply` node on the map.
+* **Round Progression:** When the final node pops, the game pauses (`Time.timeScale = 0`). The player automatically advances to the next generation, showing a summary screen with their performance/efficiency grade for that round. The player always moves to the next generation once the map is clear.
 
-### Hero Drone Camera Stutter (the real fix)
-- Symptom: Camera moved forward then snapped back while piloting.
-- Root cause: The camera follow target (`cameraTarget`) is a kinematic Rigidbody. The hero follow wrote `cameraTarget.position` (Rigidbody API), which DEFERS the transform sync to the next physics step (`Physics.autoSyncTransforms` is off by default). The `CinemachineBrain` (LateUpdate) reads the transform, so it saw a stale position on non-physics frames.
-- Fix: Move the follow target via `cameraTarget.transform.position` (immediate), not `Rigidbody.position` (deferred). Also confirmed `CinemachineBrain.UpdateMethod = Late Update` and Rigidbody Interpolation = None for transform-driven units tracked by a hard-follow camera.
-- Note: This SUPERSEDES the earlier interpolation/Smart-Update theories — the decisive cause was Rigidbody.position vs transform.position timing.
+##### 2. Tech Tree Progression & Upgrades
+At the end of each generation, the player spends their earnings.
+* **Terra-Coins (TC):** The overarching meta-currency. Surplus physical Materials gathered during the real-time micro-round are liquidated into Terra-Coins.
+* **The Tech Tree:** While the game is paused between rounds, players spend their earned Terra-Coins (TC) on the 20-Level Tech Tree to unlock permanent Upgrades (e.g., advanced Bio-domes, increased drone carrying capacity) to prepare for the next generation.
 
-### Compile Error: duplicate ScatterResources (CS0111)
-- `PlanetGenerator.cs` had two `ScatterResources()` methods (an empty stub + the real implementation). Removed the empty stub; kept the full implementation.
+##### 3. The Ultimate Win Condition (Planetary Vegetation Coverage)
+The game ends when the player completes their final allotted Generation (determined by the number of Sectors at start).
+* **Life Support Zones:** Vegetation (grass/plants) only grows inside the radius of active `LifeSupportNodes`. Command Posts and specialized structures like **Oxygen Processors** generate these life support zones.
+* **Surface Coverage Goal:** To successfully win/habituate the planet, players must build Oxygen Processors "every so often" across the map to expand life support zones, allowing vegetation to spread and cover the entire planetary surface.
+* **The Habitability Check:** At the end of the final generation, the game evaluates the percentage of the planet's surface covered by vegetation. The final victory grade is awarded based on how close the player got to 100% surface greening.
 
-### Shader Error: CurvedWorld ShadowCaster (_LightDirection undeclared)
-- `Assets/Shaders/CurvedWorld.shader` ShadowCaster pass used `_LightDirection` without declaring it (its custom vertex program does not include URP's `ShadowCasterPass.hlsl`).
-- Fix: Declared `_LightDirection` and `_LightPosition` globals; select direction for directional vs punctual (`_CASTING_PUNCTUAL_LIGHT_SHADOW`) shadows; added the near-plane clamp from URP's standard pass.
+##### 4. Game Startup Sequence
+The initial bootstrap phase of a match flows as follows:
+* **Procedural Generation:** The `PlanetGenerator` generates the planetoid terrain and scatters minerals, gas, iron, and regolith nodes.
+* **Initial Setup:** The player starts with 1,000 Materials and control of the **Universal Command Center** (`GlobalCommander` prefab). The total generation count is fixed based on map size (**5 generations per sector**).
+* **Base Bootstrap:** The player selects the Universal Command Center to build their first **Command Post**. The game's auto-place logic locates the nearest unoccupied sector and snaps building placement there.
+* **Camera Snap & Drone Queue:** Once completed, the camera snaps to the new Command Post, and a starter **Probe** drone is automatically queued, bypassing spending reserves to prevent startup deadlocks.
 
-### Hero Drone Resource Mechanic & Global Scattering
-- **Frenzy Economy**: The `FoundryCrawler` pipeline no longer auto-spawns resources next to the crawler. Instead, 250 instances of Iron and Regolith are scattered globally in `PlanetGenerator.cs` (`ScatterFuelResources()`).
-- **Hero Hauler**: `HeroDrone.cs` now has inventory capacity (max 25), and `HeroDroneController.cs` automatically vacuums nearby resources via an `OverlapSphere` in `HandleAutoInteraction()`. The Hero Drone can manually drop these off at the Crawler or Command Post.
+##### 5. Resource Economy Overhaul (Engine-Building)
+The real-time economy is shifting to a specialized engine-building system:
+* **Steel & Titanium:** Mined physically on the map by drones; used to subsidize the physical construction of your base.
+* **Plants & Energy:** Generated passively by constructed bio-domes and power plants.
+* **Heat:** A physical byproduct of the colony, stockpiled and released to raise the global Temperature.
+* **Anomalies & Caches:** `PlanetGenerator.ScatterFuelResources()` will randomly scatter rare Anomalies alongside standard resources. Drones manually assigned to these will route them to the Command Center, granting one-time bonus Tech Points or special items for the between-round draft.
 
-### Curved World Visuals
-- Added an "Animal Crossing" style spherical planet illusion without breaking the flat NavMesh.
-- Created `CurvedWorld.shader` (a custom URP Lit shader that offsets Y-vertices downward based on squared distance from camera).
-- Created `CurvedWorldUpdater.cs` to globally track the camera's position.
-- Updated `PlanetGenerator.cs` to automatically sweep the entire scene and replace default URP shaders with the curved shader upon generation.
+##### 6. Strategic Map Placement (City & Greenery Adjacency)
+Where players place buildings on the NavMesh matters immensely:
+* **Cities (Command Centers):** Generate income and serve as routing drop-offs, but must be placed strategically.
+* **Greenery:** Must be placed next to tiles. They raise Oxygen and grant massive terraforming points when placed adjacent to Cities.
+* **Oceans:** Reserved for specific low-elevation sectors, providing global bonuses to anyone building next to them.
 
-### Assorted Compiler Fixes
-- `PlanetGenerator.cs`: Removed duplicate method definitions (`FixPreplacedGatherables`, `EnsureGatherableSupply`, `ScatterResources`) and fixed missing variable assignments. Fixed a missing property reference by changing `FloraPrefabs` to `EnvironmentPrefabs`.
-- `HeroDroneController.cs`: Fixed a missing namespace by using `GameDevTV.RTS.Units.Owner`.
-- `PlayerInput.cs`: Removed an invalid cast warning (`evt.Unit is FoundryCrawler`); `FoundryCrawler` inherits from `AbstractCommandable`, not `AbstractUnit`.
-- `FoundryCrawler.cs`: Removed the unused `isProducing` field and deleted old `ExposeForgeDeposits()` pipeline spawning logic.
+#### 14. Current Tech Tree & Upgrade Paths
+The following represents the current state of the upgrade system defined in the game's scriptable objects (`Assets/Units/Upgrades/`):
 
-### Game Over Robustness & Safety
-- **Hero Drone Exemption:** Added `heroDroneAlive` verification during `CheckNoRecovery` to prevent premature Game Over triggers if the Hero Drone is still alive and capable of collecting scattered materials, even with 0 workers and < 400 Biomass.
-- **Application Quit/Scene Unload False Triggers:** Solved a critical issue where `OnDestroy` callbacks on `GatherableSupply` nodes during editor playmode exit/scene unloads triggered a cascade of `SupplyDepletedEvent`s, resulting in a false "Resources depleted" Game Over screen being drawn right as the game shut down. Added static `isQuitting` tracking linked to `Application.quitting` to abort checks when exiting.
+##### Infantry Weapons Upgrade Path (Damage)
+* **Level 1 (Infantry Weapons 1):** Increases unit attack damage by +1. *(No prerequisites)*
+* **Level 2 (Infantry Weapons 2):** Increases unit attack damage by +1. *(Requires Level 1)*
+* **Level 3 (Infantry Weapons 3):** Increases unit attack damage by +1. *(Requires Level 2)*
 
-## 9. Errors Encountered & Resolutions
+##### Attack Speed Upgrades
+* **Rapid Fire (Rifleman Attack Speed):** Decreases unit attack delay by 0.25 seconds, significantly increasing the rate of fire. *(No prerequisites)*
 
-Verbatim compile/shader errors seen during the Hero Drone work and cleanup, with their fix or current status. Console is currently clean (0 errors).
+#### 15. The 20-Level Engine Deck (Per-Unit Progression)
+To support a massive roguelite Tech Tree, the game features a deep 20-level tech progression for every single unit. Upgrades alternate through 3 core stats per unit, scaling from Mk I all the way to Omega-tier power.
 
-### Fixed by us
-- `PlanetGenerator.cs(569,30): error CS0111: Type 'PlanetGenerator' already defines a member called 'ScatterResources' with the same parameter types`
-  - Cause: an empty `ScatterResources()` stub duplicated the real implementation.
-  - Resolution: removed the empty stub, kept the full implementation.
+<details>
+<summary><b>Mining Drone (Levels 1-20)</b></summary>
 
-- `Shader error in 'Custom/URP_CurvedWorld': undeclared identifier '_LightDirection' at Assets/Shaders/CurvedWorld.shader(161) (on glcore)` (Pass: ShadowCaster)
-  - Cause: custom ShadowCaster vertex program used `_LightDirection` without declaring it (does not include URP's `ShadowCasterPass.hlsl`).
-  - Resolution: declared `_LightDirection` and `_LightPosition`; selected direction for directional vs punctual shadows (`_CASTING_PUNCTUAL_LIGHT_SHADOW`); added the near-plane clamp.
+1. **Thrusters Mk I** (+Speed)
+2. **Cargo Bins Mk I** (+Capacity)
+3. **Drill Bits Mk I** (+GatherRate)
+4. **Thrusters Mk II** (+Speed)
+5. **Cargo Bins Mk II** (+Capacity)
+6. **Drill Bits Mk II** (+GatherRate)
+7. **Thrusters Mk III** (+Speed)
+8. **Cargo Bins Mk III** (+Capacity)
+9. **Drill Bits Mk III** (+GatherRate)
+10. **Thrusters Mk IV** (+Speed)
+11. **Cargo Bins Mk IV** (+Capacity)
+12. **Drill Bits Mk IV** (+GatherRate)
+13. **Thrusters Mk V** (+Speed)
+14. **Cargo Bins Mk V** (+Capacity)
+15. **Drill Bits Mk V** (+GatherRate)
+16. **Advanced Thrusters** (+Speed)
+17. **Advanced Cargo Bins** (+Capacity)
+18. **Elite Drill Bits** (+GatherRate)
+19. **Elite Thrusters** (+Speed)
+20. **Omega Cargo Bins** (+Capacity)
+</details>
 
-### Previously flagged, since resolved (console now clean)
-These appeared transiently while code was mid-refactor. They are no longer present; re-investigate only if they reappear.
-- `PlanetGenerator.cs(342,21): error CS0103: The name 'ScatterFlora' does not exist in the current context`
-- `EnergyPipelineManager.cs (multiple lines): error CS0103: The name 'neededSegments' does not exist in the current context`
-- `FoundryCrawler.cs(174,33): error CS1061: 'EnergyPipelineManager' does not contain a definition for 'ExposeForgeDeposits'`
-- `HeroDroneController.cs(291,71): error CS0234: The type or namespace name 'Owner' does not exist in the namespace 'GameDevTV.RTS.Player'`
-  - Note if this recurs: `Owner` lives in a different namespace (e.g. `GameDevTV.RTS.Units`); reference it with the correct namespace rather than `GameDevTV.RTS.Player.Owner`.
+<details>
+<summary><b>Construction Drone (Levels 1-20)</b></summary>
 
-## 10. Hero Drone Harvesting & HUD Updates
+1. **Thrusters Mk I** (+Speed)
+2. **Alloy Plating Mk I** (+Health)
+3. **Welding Torch Mk I** (+BuildSpeed)
+4. **Thrusters Mk II** (+Speed)
+5. **Alloy Plating Mk II** (+Health)
+6. **Welding Torch Mk II** (+BuildSpeed)
+7. **Thrusters Mk III** (+Speed)
+8. **Alloy Plating Mk III** (+Health)
+9. **Welding Torch Mk III** (+BuildSpeed)
+10. **Thrusters Mk IV** (+Speed)
+11. **Alloy Plating Mk IV** (+Health)
+12. **Welding Torch Mk IV** (+BuildSpeed)
+13. **Thrusters Mk V** (+Speed)
+14. **Alloy Plating Mk V** (+Health)
+15. **Welding Torch Mk V** (+BuildSpeed)
+16. **Advanced Thrusters** (+Speed)
+17. **Advanced Alloy Plating** (+Health)
+18. **Elite Welding Torch** (+BuildSpeed)
+19. **Elite Thrusters** (+Speed)
+20. **Omega Alloy Plating** (+Health)
+</details>
 
-### Harvesting Fixes
-- **Interaction Radius:** Increased `interactionRadius` in `HeroDroneController.cs` from 5f to 6f to reliably reach ground resources while hovering.
-- **Auto-Discovery:** Added logic to `HeroDroneController.HandleAutoInteraction` to call `HiddenResource.Discover()` on nearby resources. This enables their colliders, allowing the drone's physics-based vacuum to detect them.
-- **Resource Spawning:** Fixed `PlanetGenerator.ScatterFuelResources` loading paths. It now correctly looks in `Gatherable Supplies 1/Iron` and `Gatherable Supplies 1/Regolith` to match the project's prefab folder structure.
+<details>
+<summary><b>Probe (Levels 1-20)</b></summary>
 
-### HUD Updates
-- **Hero Cargo Category:** Displays current cargo held by the Hero Drone (e.g., "12/25 Iron"). Only visible when carrying resources.
-- **Probe Progress Category:** Displays the analysis percentage of the most advanced active Probe (e.g., "Scanning: 85%").
-- **Logic:** `RuntimeUI.cs` now auto-links these containers by name and subscribes to `HeroDrone.OnCargoChanged` to provide real-time updates.
-- **Visuals:** Added `Hero Cargo Container` and `Probe Progress Container` to the `Supplies Bar` in the scene, styled to match existing resource containers.
+1. **Thrusters Mk I** (+Speed)
+2. **Optics Mk I** (+ScanRadius)
+3. **Processor Mk I** (-AnalysisTime)
+4. **Thrusters Mk II** (+Speed)
+5. **Optics Mk II** (+ScanRadius)
+6. **Processor Mk II** (-AnalysisTime)
+7. **Thrusters Mk III** (+Speed)
+8. **Optics Mk III** (+ScanRadius)
+9. **Processor Mk III** (-AnalysisTime)
+10. **Thrusters Mk IV** (+Speed)
+11. **Optics Mk IV** (+ScanRadius)
+12. **Processor Mk IV** (-AnalysisTime)
+13. **Thrusters Mk V** (+Speed)
+14. **Optics Mk V** (+ScanRadius)
+15. **Processor Mk V** (-AnalysisTime)
+16. **Advanced Thrusters** (+Speed)
+17. **Advanced Optics** (+ScanRadius)
+18. **Elite Processor** (-AnalysisTime)
+19. **Elite Thrusters** (+Speed)
+20. **Omega Optics** (+ScanRadius)
+</details>
 
-## 11. Hero Drone Delayed Harvesting & Feedback Juice
+<details>
+<summary><b>Foundry Crawler (Levels 1-20)</b></summary>
 
-### Harvesting Refinements
-- **Delayed Collection:** Vacuuming resources is no longer instant. It now requires the drone to remain stationary (within a **1.0 unit tolerance** to accommodate hovering drift) for **5 seconds** over a resource.
-- **Progress Bar:** A world-space progress bar (cloned from the Probe prefab) appears above the Hero Drone during the harvesting process. It is dynamically configured as a horizontal filled image and linked directly to the controller.
-- **Dynamic Cargo Text:** A custom billboarding text (`Cargo Text`) displays directly beneath the Hero Drone, updating in real-time when resources are carried (e.g., `12/25 Iron`). It automatically hides when empty.
-- **Robust Vacuum Logic:** Handled a potential `InvalidOperationException` by copying the `GatherableSupply.ActiveSupplies` collection before discovery scanning, preventing collection modification errors during runtime.
-- **Popup Feedback:** Fixed an issue where the floating popups spawned inside the drone's collision mesh. Popups are now assigned a standard fallback font asset and offset **4 units upward**, rendering cleanly above the unit.
+1. **Treads Mk I** (+MovementSpeed)
+2. **Iron Hopper Mk I** (+MaxIron)
+3. **Regolith Hopper Mk I** (+MaxRegolith)
+4. **Treads Mk II** (+MovementSpeed)
+5. **Iron Hopper Mk II** (+MaxIron)
+6. **Regolith Hopper Mk II** (+MaxRegolith)
+7. **Treads Mk III** (+MovementSpeed)
+8. **Iron Hopper Mk III** (+MaxIron)
+9. **Regolith Hopper Mk III** (+MaxRegolith)
+10. **Treads Mk IV** (+MovementSpeed)
+11. **Iron Hopper Mk IV** (+MaxIron)
+12. **Regolith Hopper Mk IV** (+MaxRegolith)
+13. **Treads Mk V** (+MovementSpeed)
+14. **Iron Hopper Mk V** (+MaxIron)
+15. **Regolith Hopper Mk V** (+MaxRegolith)
+16. **Advanced Treads** (+MovementSpeed)
+17. **Advanced Iron Hopper** (+MaxIron)
+18. **Elite Regolith Hopper** (+MaxRegolith)
+19. **Elite Treads** (+MovementSpeed)
+20. **Omega Iron Hopper** (+MaxIron)
+</details>
 
-## 12. HUD Standardization & Colony Expansion Integration
+<details>
+<summary><b>Command Post (Levels 1-20)</b></summary>
 
-### Category Re-Alignment
-- **Centered Layout:** Changed all top-bar HUD containers to use a vertically-stacked layout where the **Header Label** (e.g., OXYGEN) is centered at the top and the **Metric** (Icon + Value) is horizontally aligned and centered directly beneath it.
-- **Fixed Stretched Icons:** Locked all HUD icons to a standard **24x24** pixel size via `LayoutElement` components, preventing layout groups from stretching them.
-- **Auto-Wiring:** Implemented self-wiring in `RuntimeUI.Awake()` to automatically detect, link, and subscribe to UI containers in the scene hierarchy upon initialization.
+1. **Scaffolding Mk I** (-BuildTime)
+2. **Bio-Dome Mk I** (+LifeSupportRadius)
+3. **AI Schedulers Mk I** (+QueueSize)
+4. **Scaffolding Mk II** (-BuildTime)
+5. **Bio-Dome Mk II** (+LifeSupportRadius)
+6. **AI Schedulers Mk II** (+QueueSize)
+7. **Scaffolding Mk III** (-BuildTime)
+8. **Bio-Dome Mk III** (+LifeSupportRadius)
+9. **AI Schedulers Mk III** (+QueueSize)
+10. **Scaffolding Mk IV** (-BuildTime)
+11. **Bio-Dome Mk IV** (+LifeSupportRadius)
+12. **AI Schedulers Mk IV** (+QueueSize)
+13. **Scaffolding Mk V** (-BuildTime)
+14. **Bio-Dome Mk V** (+LifeSupportRadius)
+15. **AI Schedulers Mk V** (+QueueSize)
+16. **Advanced Scaffolding** (-BuildTime)
+17. **Advanced Bio-Dome** (+LifeSupportRadius)
+18. **Elite AI Schedulers** (+QueueSize)
+19. **Elite Scaffolding** (-BuildTime)
+20. **Omega Bio-Dome** (+LifeSupportRadius)
+</details>
 
-### Expansion Progress Integration
-- **Sectors Metric Restore:** Restored the colony expansion progress metric back to its original integrated display inside the "Sectors" label (e.g., `0/4 (Exp: 50%)`).
-- **Layout Width Adjustments:** Increased the width of the Sectors HUD container to **220** to ensure the integrated text has sufficient space and never clips. Deactivated the redundant separate Expansion container in the scene.
+<details>
+<summary><b>Rifleman (Levels 1-20)</b></summary>
 
-### UI Cleanup & De-clutter
-- **AI Auto-Spend Toggle Removal:** Removed the `AI Spending Toggle` element from the top Supplies Bar HUD, reducing clutter and leaving more spacing for resource counters.
-- **Script Deletion:** Cleanly deleted `AISpendingToggleUI.cs` from the project since its corresponding UI trigger is no longer part of the scene layout.
+1. **Iron Sights Mk I** (+Damage)
+2. **Auto-Loader Mk I** (-AttackDelay)
+3. **Kevlar Mk I** (+Health)
+4. **Iron Sights Mk II** (+Damage)
+5. **Auto-Loader Mk II** (-AttackDelay)
+6. **Kevlar Mk II** (+Health)
+7. **Iron Sights Mk III** (+Damage)
+8. **Auto-Loader Mk III** (-AttackDelay)
+9. **Kevlar Mk III** (+Health)
+10. **Iron Sights Mk IV** (+Damage)
+11. **Auto-Loader Mk IV** (-AttackDelay)
+12. **Kevlar Mk IV** (+Health)
+13. **Iron Sights Mk V** (+Damage)
+14. **Auto-Loader Mk V** (-AttackDelay)
+15. **Kevlar Mk V** (+Health)
+16. **Advanced Iron Sights** (+Damage)
+17. **Advanced Auto-Loader** (-AttackDelay)
+18. **Elite Kevlar** (+Health)
+19. **Elite Iron Sights** (+Damage)
+20. **Omega Auto-Loader** (-AttackDelay)
+</details>
 
+<details>
+<summary><b>Grenadier (Levels 1-20)</b></summary>
 
-## 13. Persistent Audio System (AudioManager)
+1. **Powder Mk I** (+AoE Radius)
+2. **Shrapnel Mk I** (+MaxHits)
+3. **Armor Mk I** (+Health)
+4. **Powder Mk II** (+AoE Radius)
+5. **Shrapnel Mk II** (+MaxHits)
+6. **Armor Mk II** (+Health)
+7. **Powder Mk III** (+AoE Radius)
+8. **Shrapnel Mk III** (+MaxHits)
+9. **Armor Mk III** (+Health)
+10. **Powder Mk IV** (+AoE Radius)
+11. **Shrapnel Mk IV** (+MaxHits)
+12. **Armor Mk IV** (+Health)
+13. **Powder Mk V** (+AoE Radius)
+14. **Shrapnel Mk V** (+MaxHits)
+15. **Armor Mk V** (+Health)
+16. **Advanced Powder** (+AoE Radius)
+17. **Advanced Shrapnel** (+MaxHits)
+18. **Elite Armor** (+Health)
+19. **Elite Powder** (+AoE Radius)
+20. **Omega Shrapnel** (+MaxHits)
+</details>
 
-### Soundtrack Integration
-- **Soundtrack:** Generated a 2-minute-56-second high-quality Stereo WAV space ambient soundtrack at `Assets/Resources/Audio/Music/AtmosphericSoundtrack.wav`.
-- **Persistent BGM:** Created `AudioManager.cs` as a persistent Singleton (`DontDestroyOnLoad`) that handles the soundtrack.
-- **Zero-Setup Startup:** Uses `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]` to automatically spawn and play the BGM immediately upon launching the game, regardless of whether starting from the Main Menu or Gameplay scenes.
-- **Smooth Volume Fading:** Features a built-in volume fader that smoothly transitions the audio from 0 to 0.5 volume over **3.0 seconds** for a professional, cinematic entrance. Includes pause and resume capabilities.
+<details>
+<summary><b>Warrior (Levels 1-20)</b></summary>
 
-## 14. World-Space Foundry Crawler Metrics
-
-### Production Display
-- **FoundryWorldUI:** Added a custom billboarding world-space canvas (`FoundryWorldUI.cs`) to the side of the `Foundry` crawler prefab.
-- **Real-Time Display:** Displays live stats for **Regolith**, **Iron**, and **Pipes Buffer** in the game world, allowing players to monitor production status at a glance without selecting the unit.
-- **Color Coding:** Color-coded resources to match the game's theme (Yellow for Regolith, Gray for Iron, and Cyan for Pipes).
-- **Lowered Close Positioning:** Adjusted the local position of the `World UI` child on the `Foundry` prefab from `(0, 5, 0)` down to `(0, 0.55, 0)`. Because the root prefab has a scale of `8.0`, the original offset placed the status text `40.0` meters in the air. Lowering it to `0.55` places it exactly `0.64` world meters above the top of the `3.76` meter high forge roof, creating a tight, snug, and highly readable look.
-
-## 15. Recent Visual and Economy Polish
-
-### Map Wrapping & Visual Smoothing
-- **Camera Swoop Fix:** When the Hero Drone teleports across the map edge, `PlayerInput.cs` now detects if the distance between the camera target and the drone exceeds `10000 sqrMagnitude`. If true, it instantly snaps the camera target position instead of smoothly interpolating (`Lerp`), preventing a violent cross-map swoop.
-- **1-Frame Shader Glitch Fix:** The `CurvedWorldUpdater.cs` was running in `Update()`, meaning it sent the camera position to the shader *before* Cinemachine updated the camera position. It has been moved to `LateUpdate()` with a `[DefaultExecutionOrder(1000)]` to ensure it only queries the camera's final position, fixing a massive 1-frame backwards bend during teleports.
-
-### Environment & Gatherable Polish
-- **Dynamic Proximity Labels:** Added a highly-performant `OnGUI` overlay to `GatherableSupply.cs` that dynamically draws the resource's name (with a drop shadow) above the node when the camera is within 15 units.
-- **Visual Shrinking:** `GatherableSupply.cs` now records its initial scale on `Start()`. When `EndGather()` depletes resources, the transform visually shrinks proportional to the remaining amount (clamped to a minimum of 30% scale) so players can visually see a node being strip-mined before it pops.
-- **Geography Camouflage for Fuel:** Iron and Regolith nodes no longer use explicit prefabs. `PlanetGenerator.ScatterFuelResources()` now randomly selects models from the planet's `SurfaceFeaturePrefabs` (explicitly filtering out "crystal" or "mineral" models to ensure they look like normal rocks). It then applies the dynamically generated ground color to these rocks and injects the `GatherableSupply` component, effectively hiding fuel resources as natural planetary geography.
-- **Selection Indicator Sizing:** Modified `BaseBuilding.Start()` to explicitly intercept the `selectionIndicator` of the Command Post and shrink it by a factor of `0.6f` so it closely hugs the perimeter of the building instead of extending far outward.
-
-### Drone Mining Loop Restraint
-- **Drop-off Enforcement:** Changed the auto-gather condition in `HeroDroneController.cs` from `CarriedAmount < MaxCapacity` to `CarriedAmount == 0`. The drone will now collect a single batch of resources and immediately halt all vacuuming until it drops them off at the Crawler or Command Post, enforcing a deliberate transport loop.
-
-
+1. **Sharpened Blade Mk I** (+Damage)
+2. **Adrenaline Mk I** (+Speed)
+3. **Shielding Mk I** (+Health)
+4. **Sharpened Blade Mk II** (+Damage)
+5. **Adrenaline Mk II** (+Speed)
+6. **Shielding Mk II** (+Health)
+7. **Sharpened Blade Mk III** (+Damage)
+8. **Adrenaline Mk III** (+Speed)
+9. **Shielding Mk III** (+Health)
+10. **Sharpened Blade Mk IV** (+Damage)
+11. **Adrenaline Mk IV** (+Speed)
+12. **Shielding Mk IV** (+Health)
+13. **Sharpened Blade Mk V** (+Damage)
+14. **Adrenaline Mk V** (+Speed)
+15. **Shielding Mk V** (+Health)
+16. **Advanced Sharpened Blade** (+Damage)
+17. **Advanced Adrenaline** (+Speed)
+18. **Elite Shielding** (+Health)
+19. **Elite Sharpened Blade** (+Damage)
+20. **Omega Adrenaline** (+Speed)
+</details>
