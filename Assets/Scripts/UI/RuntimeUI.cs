@@ -447,6 +447,8 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
             {
                 singleUnitSelectedUI.Disable();
                 unitTransportUI.Disable();
+                buildingSelectedUI.EnableFor(building);
+            }
             else if (commandable is ITransporter transporter && transporter.UsedCapacity > 0)
             {
                 unitTransportUI.EnableFor(transporter);
