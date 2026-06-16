@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ccd25207726c4fe459f60ef3cb237aa3, type: 3}
   m_Name: Gas
   m_EditorClassIdentifier: 
-  <MaxAmount>k__BackingField: 500
-  <AmountPerGather>k__BackingField: 50
-  <BaseGatherTime>k__BackingField: 2
+  <MaxAmount>k__BackingField: 250
+  <AmountPerGather>k__BackingField: 100
+  <BaseGatherTime>k__BackingField: 1.5
