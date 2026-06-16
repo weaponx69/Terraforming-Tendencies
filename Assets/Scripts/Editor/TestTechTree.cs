@@ -23,10 +23,10 @@ public static class TestTechTree
             return;
         }
 
-        // Give the player some testing money
+        // Give the player some testing money using reflection since it's private set
         if (GenerationManager.Instance != null)
         {
-            GenerationManager.Instance.TotalTerraCoins += 5000;
+            typeof(GenerationManager).GetProperty("TotalTerraCoins").SetValue(GenerationManager.Instance, 5000);
             Debug.Log("Granted 5000 Terra Coins for testing!");
         }
         else

@@ -23,7 +23,14 @@ namespace GameDevTV.RTS.UI.Containers
         {
             currentUpgrade = upgrade;
             
-            if (nameText != null) nameText.text = upgrade.Name;
+            if (nameText != null) 
+            {
+                nameText.text = upgrade.Name;
+                nameText.enableWordWrapping = false;
+                nameText.enableAutoSizing = true;
+                nameText.fontSizeMin = 10f;
+                nameText.fontSizeMax = 24f;
+            }
             if (iconImage != null && upgrade.Icon != null) iconImage.sprite = upgrade.Icon;
 
             // Use Minerals cost as the TC cost. Fallback to 1 if not set.
