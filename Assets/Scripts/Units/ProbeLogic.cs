@@ -57,10 +57,10 @@ private float nextSectorCheckTime = 0f;
                 {
                     var sector = SectorManager.Instance.GetNearestSector(transform.position);
                     
-                    bool limitReached = Player.GenerationManager.Instance != null && Player.GenerationManager.Instance.HasExpandedThisGeneration;
+                    bool isExpansionPhase = Player.GenerationManager.Instance != null && Player.GenerationManager.Instance.IsExpansionPhase;
 
                     // If we are in a valid sector for expansion
-                    if (sector != null && !sector.IsOccupied && !ColonyExpansionManager.Instance.IsExpandingToSector(sector) && !ColonyExpansionManager.Instance.IsSectorVetoed(sector) && !limitReached)
+                    if (sector != null && !sector.IsOccupied && !ColonyExpansionManager.Instance.IsExpandingToSector(sector) && !ColonyExpansionManager.Instance.IsSectorVetoed(sector) && isExpansionPhase)
                     {
                         if (currentTargetSector != sector)
                         {

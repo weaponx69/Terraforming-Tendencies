@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Player
         public int MaxGenerations { get; private set; } = 5; // Default fallback
         public int TotalTerraCoins { get; private set; } = 0;
         public bool IsBetweenRounds { get; private set; } = false;
-        public bool HasExpandedThisGeneration { get; set; } = false;
+        public bool IsExpansionPhase { get; private set; } = false;
 
         private int initialAmountInSector = 0;
 
@@ -55,7 +55,7 @@ namespace GameDevTV.RTS.Player
             }
             CurrentGeneration = 1;
             IsBetweenRounds = false;
-            HasExpandedThisGeneration = false;
+            IsExpansionPhase = false;
             initialAmountInSector = 0;
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
@@ -63,10 +63,8 @@ namespace GameDevTV.RTS.Player
         private void Update()
         {
             if (IsBetweenRounds) return;
+            if (IsExpansionPhase) return; // Wait for expansion to complete before tracking resources
             if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
-
-            // Give the colony 30 seconds to bootstrap on the very first start
-            if (Time.timeSinceLevelLoad < 30f && CurrentGeneration == 1) return;
 
             if (initialAmountInSector <= 0)
             {
@@ -151,12 +149,13 @@ namespace GameDevTV.RTS.Player
             if (!IsBetweenRounds) return;
             
             CurrentGeneration++;
+
             if (CurrentGeneration > MaxGenerations)
             {
-                // Trigger actual Win/Game Over evaluation here based on vegetation
-                Debug.Log("[GenerationManager] Final Generation Completed. Triggering End Game Evaluation.");
-                // For now, we will just call a victory
-                GameOverManager.Instance?.TriggerVictory(); // We need to expose this safely
+                Debug.Log("[GenerationManager] Sector Completed. Entering Expansion Phase.");
+                IsExpansionPhase = true;
+                IsBetweenRounds = false;
+                Time.timeScale = 1f; // Unpause the game so the probe can explore
                 return;
             }
 
@@ -166,9 +165,20 @@ namespace GameDevTV.RTS.Player
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
             initialAmountInSector = 0; // Recalculate next frame
-            HasExpandedThisGeneration = false;
 
             // Fire event
+            OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
+        }
+
+        public void CompleteExpansion()
+        {
+            Debug.Log("[GenerationManager] Expansion Completed. Starting new sector lifecycle.");
+            IsExpansionPhase = false;
+            CurrentGeneration = 1;
+            
+            PlanetGenerator.Instance?.ReplenishResources();
+            initialAmountInSector = 0; // Recalculate next frame
+
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 

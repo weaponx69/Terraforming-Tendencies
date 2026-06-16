@@ -286,9 +286,9 @@ namespace GameDevTV.RTS.Environment
                     SectorManager.Instance.ActiveSector = sector;
                 }
                 
-                if (GenerationManager.Instance != null)
+                if (GenerationManager.Instance != null && GenerationManager.Instance.IsExpansionPhase)
                 {
-                    GenerationManager.Instance.HasExpandedThisGeneration = true;
+                    GenerationManager.Instance.CompleteExpansion();
                 }
 
                 // A freshly established command center builds a Probe drone first.

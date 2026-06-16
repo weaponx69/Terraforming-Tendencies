@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ccd25207726c4fe459f60ef3cb237aa3, type: 3}
   m_Name: Iron
   m_EditorClassIdentifier: 
-  <MaxAmount>k__BackingField: 1500
-  <AmountPerGather>k__BackingField: 20
-  <BaseGatherTime>k__BackingField: 4
+  <MaxAmount>k__BackingField: 500
+  <AmountPerGather>k__BackingField: 50
+  <BaseGatherTime>k__BackingField: 2

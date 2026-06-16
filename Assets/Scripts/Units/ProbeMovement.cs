@@ -147,10 +147,12 @@ namespace GameDevTV.RTS.Environment
             // 1. Ensure we have a valid target sector to explore
             if (SectorManager.Instance == null || ColonyExpansionManager.Instance == null) return;
 
+            bool isExpansionPhase = Player.GenerationManager.Instance != null && Player.GenerationManager.Instance.IsExpansionPhase;
+
             bool IsValid(SectorManager.Sector s) => s != null && !s.IsOccupied && 
                 !ColonyExpansionManager.Instance.IsExpandingToSector(s) && 
                 !ColonyExpansionManager.Instance.IsSectorVetoed(s) &&
-                !(Player.GenerationManager.Instance != null && Player.GenerationManager.Instance.HasExpandedThisGeneration);
+                isExpansionPhase;
 
             if (targetExplorationSector == null || !IsValid(targetExplorationSector))
             {
