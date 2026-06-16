@@ -121,13 +121,7 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // 2. Authoritative immediate check: Biomass at 0 is a hard loss.
-            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(monitoredOwner, out int b) && b <= 0)
-            {
-                Debug.Log($"[GameOverManager] Hard biomass check triggered. Biomass: {b}");
-                TriggerGameOver(GameOverReason.Resources);
-                return;
-            }
+            // Hard biomass check removed because GenerationManager liquidates biomass to 0 at the end of every round.
 
             // 3. Check recovery potential BEFORE triggering life support failure.
             // If the player has 400 biomass, they can orbital drop a new Command Center even if everything else is gone.
@@ -185,14 +179,7 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
 
         private void HandleBiomassChanged(Owner owner, int newValue)
         {
-            if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
-            if (owner != monitoredOwner) return;
-
-            // Immediate loss if biomass hits 0, but only after bootstrapping.
-            if (newValue <= 0 && Time.timeSinceLevelLoad > 30f)
-            {
-                TriggerGameOver(GameOverReason.Resources);
-            }
+            // Hard biomass check removed because GenerationManager liquidates biomass to 0 at the end of every round.
         }
 
         private void HandleSupplyDepleted(SupplyDepletedEvent evt)
