@@ -22,6 +22,7 @@ namespace GameDevTV.RTS.Player
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
         public static event Action<int> OnTerraCoinsChanged; // newTC
+        public static event Action<float> OnGenerationProgressChanged; // 0f to 1f
 
         private void Awake()
         {
@@ -83,8 +84,15 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            float thresholdNodes = initialNodesInSector * 0.8f;
+            float nodesToMine = initialNodesInSector - thresholdNodes;
+            float nodesMined = initialNodesInSector - currentNodes;
+            
+            float progress = nodesToMine > 0 ? Mathf.Clamp01(nodesMined / nodesToMine) : 0f;
+            OnGenerationProgressChanged?.Invoke(progress);
+
             // End generation if 1/5th (20%) of the sector has been mined
-            if (currentNodes <= initialNodesInSector * 0.8f)
+            if (currentNodes <= thresholdNodes)
             {
                 TriggerGenerationEnd();
             }
