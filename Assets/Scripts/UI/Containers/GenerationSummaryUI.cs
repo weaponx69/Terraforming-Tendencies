@@ -16,6 +16,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void OnEnable()
         {
+            Debug.Log("[GenerationSummaryUI] OnEnable called. Subscribing to OnGenerationEnded.");
             GenerationManager.OnGenerationEnded += ShowSummary;
             if (nextGenerationButton != null)
             {
@@ -47,7 +48,16 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void ShowSummary(int earnedTC, int totalTC)
         {
-            if (panel != null) panel.SetActive(true);
+            Debug.Log($"[GenerationSummaryUI] ShowSummary called! Earned TC: {earnedTC}, Total: {totalTC}");
+            if (panel != null) 
+            {
+                panel.SetActive(true);
+                Debug.Log("[GenerationSummaryUI] Panel set to active.");
+            }
+            else
+            {
+                Debug.LogError("[GenerationSummaryUI] Panel reference is NULL! Please assign it in the Inspector.");
+            }
 
             if (GenerationManager.Instance != null)
             {
