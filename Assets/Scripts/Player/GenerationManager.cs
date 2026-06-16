@@ -15,6 +15,7 @@ namespace GameDevTV.RTS.Player
         public int MaxGenerations { get; private set; } = 5; // Default fallback
         public int TotalTerraCoins { get; private set; } = 0;
         public bool IsBetweenRounds { get; private set; } = false;
+        public bool HasExpandedThisGeneration { get; set; } = false;
 
         private int initialNodesInSector = 0;
 
@@ -53,6 +54,7 @@ namespace GameDevTV.RTS.Player
             }
             CurrentGeneration = 1;
             IsBetweenRounds = false;
+            HasExpandedThisGeneration = false;
             initialNodesInSector = 0;
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
@@ -156,6 +158,7 @@ namespace GameDevTV.RTS.Player
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
             initialNodesInSector = 0; // Recalculate next frame
+            HasExpandedThisGeneration = false;
 
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);

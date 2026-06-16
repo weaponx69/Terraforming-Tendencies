@@ -21,9 +21,12 @@ namespace GameDevTV.RTS.Environment
         private NavMeshAgent agent;
         private float mapWidth;
         private float mapHeight;
+        private float secW;
+        private float secH;
         private float repathTimer;
         private bool colorApplied;
         private bool loggedStart;
+        private SectorManager.Sector targetExplorationSector;
 
         private void Awake()
         {
@@ -48,6 +51,8 @@ namespace GameDevTV.RTS.Environment
             {
                 mapWidth = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
                 mapHeight = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
+                secW = mapWidth / PlanetGenerator.Instance.Config.SectorsX;
+                secH = mapHeight / PlanetGenerator.Instance.Config.SectorsY;
             }
         }
 
@@ -139,16 +144,63 @@ namespace GameDevTV.RTS.Environment
                 areaMask = NavMesh.AllAreas
             };
 
+            // 1. Ensure we have a valid target sector to explore
+            if (SectorManager.Instance == null || ColonyExpansionManager.Instance == null) return;
+
+            bool IsValid(SectorManager.Sector s) => s != null && !s.IsOccupied && 
+                !ColonyExpansionManager.Instance.IsExpandingToSector(s) && 
+                !ColonyExpansionManager.Instance.IsSectorVetoed(s) &&
+                !(Player.GenerationManager.Instance != null && Player.GenerationManager.Instance.HasExpandedThisGeneration);
+
+            if (targetExplorationSector == null || !IsValid(targetExplorationSector))
+            {
+                // Find nearest valid sector
+                SectorManager.Sector nearestValid = null;
+                float minD = float.MaxValue;
+                foreach (var s in SectorManager.Instance.Sectors)
+                {
+                    if (IsValid(s))
+                    {
+                        float d = Vector3.Distance(transform.position, s.Center);
+                        if (d < minD)
+                        {
+                            minD = d;
+                            nearestValid = s;
+                        }
+                    }
+                }
+                targetExplorationSector = nearestValid;
+            }
+
+            if (targetExplorationSector == null)
+            {
+                // All sectors occupied or invalid, fallback to random map movement
+                for (int i = 0; i < 20; i++)
+                {
+                    Vector3 candidate = new Vector3(
+                        Random.Range(2f, mapWidth - 2f),
+                        transform.position.y,
+                        Random.Range(2f, mapHeight - 2f));
+
+                    if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, 25f, filter))
+                    {
+                        agent.SetDestination(hit.position);
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // 2. Pick a random point INSIDE the target sector
             for (int i = 0; i < 20; i++)
             {
-                Vector3 candidate = new Vector3(
-                    Random.Range(2f, mapWidth - 2f),
-                    transform.position.y,
-                    Random.Range(2f, mapHeight - 2f));
+                Vector2 randomOffset = Random.insideUnitCircle * (Mathf.Min(secW, secH) * 0.4f);
+                Vector3 candidate = targetExplorationSector.Center + new Vector3(randomOffset.x, 0, randomOffset.y);
+                candidate.y = transform.position.y; // Keep roughly at flight height for sampling
 
                 if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, 25f, filter))
                 {
-                    agent.SetDestination(hit.position); // direct control — no BehaviorGraph
+                    agent.SetDestination(hit.position);
                     return;
                 }
             }

@@ -285,6 +285,11 @@ namespace GameDevTV.RTS.Environment
                 {
                     SectorManager.Instance.ActiveSector = sector;
                 }
+                
+                if (GenerationManager.Instance != null)
+                {
+                    GenerationManager.Instance.HasExpandedThisGeneration = true;
+                }
 
                 // A freshly established command center builds a Probe drone first.
                 AbstractUnitSO probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
