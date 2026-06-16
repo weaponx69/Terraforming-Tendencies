@@ -17,7 +17,7 @@ namespace GameDevTV.RTS.Player
         public bool IsBetweenRounds { get; private set; } = false;
         public bool HasExpandedThisGeneration { get; set; } = false;
 
-        private int initialNodesInSector = 0;
+        private int initialAmountInSector = 0;
 
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
@@ -56,7 +56,7 @@ namespace GameDevTV.RTS.Player
             CurrentGeneration = 1;
             IsBetweenRounds = false;
             HasExpandedThisGeneration = false;
-            initialNodesInSector = 0;
+            initialAmountInSector = 0;
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 
@@ -68,49 +68,49 @@ namespace GameDevTV.RTS.Player
             // Give the colony 30 seconds to bootstrap on the very first start
             if (Time.timeSinceLevelLoad < 30f && CurrentGeneration == 1) return;
 
-            if (initialNodesInSector <= 0)
+            if (initialAmountInSector <= 0)
             {
-                CalculateInitialNodes();
-                if (initialNodesInSector <= 0) return; // Still no nodes found? Keep waiting.
+                CalculateInitialAmount();
+                if (initialAmountInSector <= 0) return; // Still no resources found? Keep waiting.
             }
 
             var allNodes = UnityEngine.Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
-            int currentNodes = 0;
+            int currentAmount = 0;
             foreach (var node in allNodes)
             {
                 if (node != null && node.Amount > 0 && SectorManager.Instance.GetNearestSector(node.transform.position) == SectorManager.Instance.ActiveSector)
                 {
-                    currentNodes++;
+                    currentAmount += node.Amount;
                 }
             }
 
-            float thresholdNodes = initialNodesInSector * 0.8f;
-            float nodesToMine = initialNodesInSector - thresholdNodes;
-            float nodesMined = initialNodesInSector - currentNodes;
+            float thresholdAmount = initialAmountInSector * 0.8f;
+            float amountToMine = initialAmountInSector - thresholdAmount;
+            float amountMined = initialAmountInSector - currentAmount;
             
-            float progress = nodesToMine > 0 ? Mathf.Clamp01(nodesMined / nodesToMine) : 0f;
+            float progress = amountToMine > 0 ? Mathf.Clamp01(amountMined / amountToMine) : 0f;
             OnGenerationProgressChanged?.Invoke(progress);
 
-            // End generation if 1/5th (20%) of the sector has been mined
-            if (currentNodes <= thresholdNodes)
+            // End generation if 1/5th (20%) of the sector's total resources have been mined
+            if (currentAmount <= thresholdAmount)
             {
                 TriggerGenerationEnd();
             }
         }
 
-        private void CalculateInitialNodes()
+        private void CalculateInitialAmount()
         {
             var allNodes = UnityEngine.Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
-            int count = 0;
+            int totalAmount = 0;
             foreach (var node in allNodes)
             {
                 if (node != null && node.Amount > 0 && SectorManager.Instance.GetNearestSector(node.transform.position) == SectorManager.Instance.ActiveSector)
                 {
-                    count++;
+                    totalAmount += node.Amount;
                 }
             }
-            initialNodesInSector = count;
-            Debug.Log($"[GenerationManager] Active Sector initialized with {initialNodesInSector} nodes. Round will end when {initialNodesInSector * 0.8f} remain.");
+            initialAmountInSector = totalAmount;
+            Debug.Log($"[GenerationManager] Active Sector initialized with {initialAmountInSector} total resources. Round will end when {initialAmountInSector * 0.8f} remain.");
         }
 
         public void TriggerGenerationEnd()
@@ -165,7 +165,7 @@ namespace GameDevTV.RTS.Player
 
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
-            initialNodesInSector = 0; // Recalculate next frame
+            initialAmountInSector = 0; // Recalculate next frame
             HasExpandedThisGeneration = false;
 
             // Fire event
