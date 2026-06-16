@@ -84,13 +84,6 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (techTreeSO == null || contentContainer == null || techTreeItemPrefab == null) return;
 
-            // Expand the grid cells if they are too small
-            if (contentContainer.TryGetComponent<GridLayoutGroup>(out var grid))
-            {
-                grid.cellSize = new Vector2(Mathf.Max(grid.cellSize.x, 350f), Mathf.Max(grid.cellSize.y, 140f));
-                grid.spacing = new Vector2(20f, 20f); // Force a gap between items so they never touch
-            }
-
             // Clear existing items
             foreach (Transform child in contentContainer)
             {

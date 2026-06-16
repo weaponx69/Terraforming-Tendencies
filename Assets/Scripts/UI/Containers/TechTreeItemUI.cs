@@ -31,12 +31,6 @@ namespace GameDevTV.RTS.UI.Containers
                 nameText.fontSizeMin = 14f; 
                 nameText.fontSizeMax = 28f;
                 nameText.overflowMode = TextOverflowModes.Truncate; // Prevents spilling out of the box
-                
-                // Force the UI box to expand to fit the text if it's in an auto-layout
-                var le = GetComponent<UnityEngine.UI.LayoutElement>();
-                if (le == null) le = gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
-                le.minHeight = 120f; // Big height to accommodate wrapped text
-                le.minWidth = 350f;
             }
             if (iconImage != null && upgrade.Icon != null) iconImage.sprite = upgrade.Icon;
 
