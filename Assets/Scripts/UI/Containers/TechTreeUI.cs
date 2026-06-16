@@ -87,10 +87,8 @@ namespace GameDevTV.RTS.UI.Containers
             // Expand the grid cells if they are too small
             if (contentContainer.TryGetComponent<GridLayoutGroup>(out var grid))
             {
-                if (grid.cellSize.x < 300f) // If the box is narrower than 300 pixels
-                {
-                    grid.cellSize = new Vector2(350f, Mathf.Max(grid.cellSize.y, 80f));
-                }
+                grid.cellSize = new Vector2(Mathf.Max(grid.cellSize.x, 350f), Mathf.Max(grid.cellSize.y, 140f));
+                grid.spacing = new Vector2(20f, 20f); // Force a gap between items so they never touch
             }
 
             // Clear existing items
