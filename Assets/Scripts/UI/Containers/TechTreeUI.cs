@@ -92,10 +92,17 @@ namespace GameDevTV.RTS.UI.Containers
             if (techTreeSO == null || contentContainer == null || techTreeItemPrefab == null) return;
 
             // Apply manual sizing overrides if requested
-            if (overrideGridCellSize && contentContainer.TryGetComponent<GridLayoutGroup>(out var grid))
+            if (overrideGridCellSize)
             {
-                grid.cellSize = gridCellSize;
-                grid.spacing = gridSpacing;
+                if (contentContainer.TryGetComponent<GridLayoutGroup>(out var grid))
+                {
+                    grid.cellSize = gridCellSize;
+                    grid.spacing = gridSpacing;
+                }
+                else if (contentContainer.TryGetComponent<VerticalLayoutGroup>(out var vlg))
+                {
+                    vlg.spacing = gridSpacing.y;
+                }
             }
 
             // Clear existing items
@@ -115,6 +122,17 @@ namespace GameDevTV.RTS.UI.Containers
                     if (isUnlocked && !isResearched)
                     {
                         GameObject itemObj = Instantiate(techTreeItemPrefab, contentContainer);
+                        
+                        if (overrideGridCellSize)
+                        {
+                            var le = itemObj.GetComponent<UnityEngine.UI.LayoutElement>();
+                            if (le == null) le = itemObj.AddComponent<UnityEngine.UI.LayoutElement>();
+                            le.minWidth = gridCellSize.x;
+                            le.minHeight = gridCellSize.y;
+                            le.preferredWidth = gridCellSize.x;
+                            le.preferredHeight = gridCellSize.y;
+                        }
+
                         if (itemObj.TryGetComponent<TechTreeItemUI>(out var itemUI))
                         {
                             itemUI.Setup(upgrade);
