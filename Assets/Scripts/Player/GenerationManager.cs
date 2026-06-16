@@ -18,6 +18,7 @@ namespace GameDevTV.RTS.Player
         public bool IsExpansionPhase { get; private set; } = false;
 
         private int initialAmountInSector = 0;
+        private float roundStartTime = 0f;
 
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
@@ -64,6 +65,11 @@ namespace GameDevTV.RTS.Player
         {
             if (IsBetweenRounds) return;
             if (IsExpansionPhase) return; // Wait for expansion to complete before tracking resources
+            
+            // Give Unity 2 seconds to cleanly destroy old resources and spawn new ones before we start counting!
+            // Otherwise, it counts 0 resources and immediately ends the round again.
+            if (Time.time < roundStartTime + 2f) return;
+
             if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
 
             if (initialAmountInSector <= 0)
@@ -179,6 +185,7 @@ namespace GameDevTV.RTS.Player
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
             initialAmountInSector = 0; // Recalculate next frame
+            roundStartTime = Time.time; // Start the grace period
 
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
