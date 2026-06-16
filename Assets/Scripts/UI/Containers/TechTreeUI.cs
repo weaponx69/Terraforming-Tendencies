@@ -16,6 +16,13 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private GameObject techTreeItemPrefab;
         [SerializeField] private Button closeButton;
         [SerializeField] private TextMeshProUGUI tcBalanceText;
+        
+        [Header("Grid Layout Overrides")]
+        [Tooltip("If true, the script will forcefully resize the grid cells to match the values below.")]
+        [SerializeField] private bool overrideGridCellSize = true;
+        [SerializeField] private Vector2 gridCellSize = new Vector2(350f, 140f);
+        [SerializeField] private Vector2 gridSpacing = new Vector2(20f, 20f);
+
         private GameObject summaryPanel;
 
         private void OnEnable()
@@ -83,6 +90,13 @@ namespace GameDevTV.RTS.UI.Containers
         private void PopulateUpgrades()
         {
             if (techTreeSO == null || contentContainer == null || techTreeItemPrefab == null) return;
+
+            // Apply manual sizing overrides if requested
+            if (overrideGridCellSize && contentContainer.TryGetComponent<GridLayoutGroup>(out var grid))
+            {
+                grid.cellSize = gridCellSize;
+                grid.spacing = gridSpacing;
+            }
 
             // Clear existing items
             foreach (Transform child in contentContainer)
