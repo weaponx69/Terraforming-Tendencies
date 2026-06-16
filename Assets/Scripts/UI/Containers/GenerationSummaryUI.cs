@@ -30,6 +30,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void OnDisable()
         {
+            Debug.Log("[GenerationSummaryUI] OnDisable called. Unsubscribing from OnGenerationEnded.\nStackTrace: " + System.Environment.StackTrace);
             GenerationManager.OnGenerationEnded -= ShowSummary;
             if (nextGenerationButton != null)
             {

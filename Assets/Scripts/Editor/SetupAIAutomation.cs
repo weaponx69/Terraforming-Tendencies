@@ -27,7 +27,7 @@ public static class SetupAIAutomation
     private const string CMD_POST_SO     = "Assets/Units/Buildings/Command Post/Command Post.asset";
     private const string AIR_TRANSPORT_SO= "Assets/Units/Air Transport/Air Transport.asset";
 
-    [MenuItem("Terraforming/Setup AI Automation")]
+    // [MenuItem("Terraforming/Setup AI Automation")]
     public static void Setup()
     {
         // ── 1. Load assets ─────────────────────────────────────────────────────

@@ -125,6 +125,20 @@ namespace GameDevTV.RTS.Player
             Time.timeScale = 0f;
 
             Debug.Log($"[GenerationManager] Generation {CurrentGeneration} ended. Earned {earnedTC} TC. Total TC: {TotalTerraCoins}");
+            
+            if (OnGenerationEnded == null)
+            {
+                Debug.LogError("[GenerationManager] CRITICAL: OnGenerationEnded is NULL! No one is subscribed! GenerationSummaryUI must have unsubscribed or never subscribed!");
+            }
+            else
+            {
+                Debug.Log($"[GenerationManager] Invoking OnGenerationEnded. Subscribers count: {OnGenerationEnded.GetInvocationList().Length}");
+                foreach (var d in OnGenerationEnded.GetInvocationList())
+                {
+                    Debug.Log($"[GenerationManager] Subscriber: {d.Target?.GetType().Name}.{d.Method.Name}");
+                }
+            }
+
             OnGenerationEnded?.Invoke(earnedTC, TotalTerraCoins);
         }
 

@@ -7,7 +7,7 @@ using GameDevTV.RTS.Environment;
 
 public class SetupMVPScene
 {
-    [MenuItem("Terraforming/1-Click Setup MVP Scene")]
+    // [MenuItem("Terraforming/1-Click Setup MVP Scene")]
     public static void SetupScene()
     {
         // 1. Create or find PlanetManager
