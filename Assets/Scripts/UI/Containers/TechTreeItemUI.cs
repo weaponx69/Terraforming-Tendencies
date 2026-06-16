@@ -28,8 +28,14 @@ namespace GameDevTV.RTS.UI.Containers
                 nameText.text = upgrade.Name;
                 nameText.enableWordWrapping = false;
                 nameText.enableAutoSizing = true;
-                nameText.fontSizeMin = 10f;
-                nameText.fontSizeMax = 24f;
+                nameText.fontSizeMin = 14f; // Increased from 10 to ensure readability
+                nameText.fontSizeMax = 28f;
+                
+                // Force the UI box to expand to fit the text if it's in an auto-layout
+                var le = GetComponent<UnityEngine.UI.LayoutElement>();
+                if (le == null) le = gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                le.minHeight = 60f;
+                le.minWidth = 300f;
             }
             if (iconImage != null && upgrade.Icon != null) iconImage.sprite = upgrade.Icon;
 
