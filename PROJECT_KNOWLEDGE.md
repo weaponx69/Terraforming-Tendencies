@@ -38,6 +38,7 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Curved World Visuals:** Added an "Animal Crossing" style spherical planet illusion without breaking the flat NavMesh. Created CurvedWorld.shader and CurvedWorldUpdater.cs. 
 * **Assorted Compiler Fixes:** Removed duplicate method definitions in PlanetGenerator.cs. Fixed an invalid cast warning by treating FoundryCrawler as an AbstractCommandable. Removed unused isProducing field from FoundryCrawler.cs.
 * **Application Quit False Triggers:** Solved a critical issue where OnDestroy callbacks on GatherableSupply nodes during scene unloads triggered a cascade of SupplyDepletedEvents, resulting in a false "Resources depleted" screen. 
+* **End-of-Generation UI Fixes:** Resolved an issue where the `GenerationSummaryUI` and `TechTreeUI` would fail to appear upon generation completion. Both UIs now aggressively check and re-enable their root GameObjects if they were disabled in the Inspector, ensuring the `panel.SetActive(true)` calls correctly display the UI. Also added detailed reference validation logs to `TechTreeUI` to prevent silent failures if Inspector variables are unassigned.
 
 #### 7. Errors Encountered & Resolutions
 * Fixed CS0111: Type 'PlanetGenerator' already defines a member called 'ScatterResources' by removing the empty stub.

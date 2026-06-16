@@ -38,8 +38,30 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void Open(GameObject parentPanel)
         {
+            Debug.Log("[TechTreeUI] Open called.");
             summaryPanel = parentPanel;
-            if (panel != null) panel.SetActive(true);
+
+            // Ensure the root GameObject is active, otherwise setting the child panel to active does nothing!
+            if (!gameObject.activeSelf)
+            {
+                Debug.LogWarning("[TechTreeUI] Root GameObject was disabled! Enabling it now...");
+                gameObject.SetActive(true);
+            }
+
+            if (panel != null) 
+            {
+                panel.SetActive(true);
+            }
+            else
+            {
+                Debug.LogError("[TechTreeUI] 'panel' reference is NULL! Please assign it in the Inspector.");
+            }
+
+            if (techTreeSO == null || contentContainer == null || techTreeItemPrefab == null)
+            {
+                Debug.LogError($"[TechTreeUI] Missing references! techTreeSO: {techTreeSO != null}, container: {contentContainer != null}, prefab: {techTreeItemPrefab != null}");
+            }
+
             PopulateUpgrades();
             UpdateBalanceText(GenerationManager.Instance != null ? GenerationManager.Instance.TotalTerraCoins : 0);
         }
