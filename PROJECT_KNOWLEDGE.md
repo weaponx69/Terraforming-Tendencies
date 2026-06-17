@@ -346,11 +346,11 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
   * Enhanced **`BaseBuilding.cs`** to calculate unit production/research queue build times based on the building's localized `BuildingConfig.BuildTimeMultiplier`.
   * Updated **`AbstractCommandable.cs`**'s `HandleUpgradeResearched()` method to support retroactive structural scaling: researching a max health upgrade instantly adds the HP difference and heals the structure, and researching a life support radius upgrade instantly scales the radius of the active `LifeSupportNode` component.
 * **Default Configurations & Baselines:**
-  * Discovered that all `BuildingSO` assets (`Command Post`, `Supply Hut`, `Airport`, `Infantry School`, `Barracks`, and `Oxygen Processor`) lacked physical config files, which would trigger a null reference crash upon any upgrade applications.
+  * Discovered that all `BuildingSO` assets (`Command Post`, `Supply Hut`, `Spaceport`, `Infantry School`, `Barracks`, and `Oxygen Processor`) lacked physical config files, which would trigger a null reference crash upon any upgrade applications.
   * Created **`Default Building Config.asset`** (defaulting to Queue Size 5, Life Support Radius 25, and Build Time Multiplier 1.0) and auto-populated these to all buildings.
 * **Custom Modifiers & Tech Tree Integration:**
   * Created 4 brand new physical modifier upgrades in `Assets/Units/Upgrades/BuildingUpgrades/`:
-    * **`Airport Efficiency.asset`**: Reduces unit training times by 35% (`BuildingConfig/BuildTimeMultiplier = -0.35`).
+    * **`Spaceport Efficiency.asset`**: Reduces unit training times by 35% (`BuildingConfig/BuildTimeMultiplier = -0.35`).
     * **`Supply Node Range.asset`**: Expands decay-protection LifeSupportRadius of Supply Huts by 15 meters (`LifeSupportRadius = +15`).
     * **`Command Post Reinforcement.asset`**: Increases max Command Post health by 300 HP (`Health = +300`).
     * **`Tactical Processing.asset`**: Speeds up Infantry School research queues by 40% (`BuildingConfig/BuildTimeMultiplier = -0.40`).

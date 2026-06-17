@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0eef7dcb35dcdc54091cba8fca578602, type: 3}
-  m_Name: Airport Efficiency
+  m_Name: Spaceport Efficiency
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.TechTree.AdditiveFloatModifierSO
-  <Name>k__BackingField: Airport Efficiency
+  <Name>k__BackingField: Spaceport Efficiency
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
   <Icon>k__BackingField: {fileID: 21300000, guid: ce0fc3a46b548b046a45c56ca84b6c1a, type: 3}

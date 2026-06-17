@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using GameDevTV.RTS.Units;
 
 [CreateAssetMenu(menuName = "Terraforming/Game Configuration", fileName = "GameConfiguration")]
@@ -23,6 +24,7 @@ public class GameConfiguration : ScriptableObject
     [Header("Unit & Building Data")]
     public BuildingSO CommandPostSO;
     public AbstractUnitSO WorkerUnitSO;
-    public BuildingSO AirportSO;
+    [FormerlySerializedAs("AirportSO")]
+    public BuildingSO SpaceportSO;
     public AbstractUnitSO MiningDroneUnitSO;
 }
