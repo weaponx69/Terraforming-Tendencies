@@ -76,21 +76,28 @@ namespace GameDevTV.RTS.Environment
             
             Material mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
             if (mat == null) mat = new Material(Shader.Find("Unlit/Color"));
-            mat.color = new Color(1f, 0.8f, 0f, 1f); // Yellow cord
+            mat.color = Color.black; // Black cord
             lr.material = mat;
             
-            // Generate sagging curve
-            Vector3 startPoint = transform.position + Vector3.up * 8f; // Top of building
-            Vector3 endPoint = other.transform.position + Vector3.up * 8f;
-            Vector3 midPoint = (startPoint + endPoint) / 2f;
-            float distance = Vector3.Distance(startPoint, endPoint);
-            midPoint.y -= distance * 0.1f; // Sag amount proportional to distance
+            // Generate cord laying on the ground
+            Vector3 startPoint = transform.position + Vector3.up * 0.2f; // Barely above ground
+            Vector3 endPoint = other.transform.position + Vector3.up * 0.2f;
             
+            // Add a little bit of noise to make it look like a wire tossed on the ground
             for(int i = 0; i < 10; i++)
             {
                 float t = i / 9f;
-                // Quadratic bezier
-                Vector3 p = Vector3.Lerp(Vector3.Lerp(startPoint, midPoint, t), Vector3.Lerp(midPoint, endPoint, t), t);
+                Vector3 p = Vector3.Lerp(startPoint, endPoint, t);
+                
+                // Add horizontal jitter to inner points to make it look slightly snakey
+                if (i > 0 && i < 9)
+                {
+                    Vector3 direction = (endPoint - startPoint).normalized;
+                    Vector3 right = Vector3.Cross(direction, Vector3.up).normalized;
+                    float jitter = Mathf.Sin(t * Mathf.PI * 3f) * 0.3f; // Slight wave
+                    p += right * jitter;
+                }
+                
                 lr.SetPosition(i, p);
             }
         }
