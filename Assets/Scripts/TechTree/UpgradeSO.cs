@@ -76,10 +76,15 @@ namespace GameDevTV.RTS.TechTree
                 };
 
                 FieldInfo fieldInfo = null;
-                foreach (var fn in fieldNames)
+                Type currentType = type;
+                while (currentType != null && fieldInfo == null)
                 {
-                    fieldInfo = type.GetField(fn, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (fieldInfo != null) break;
+                    foreach (var fn in fieldNames)
+                    {
+                        fieldInfo = currentType.GetField(fn, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (fieldInfo != null) break;
+                    }
+                    currentType = currentType.BaseType;
                 }
 
                 if (fieldInfo != null)
