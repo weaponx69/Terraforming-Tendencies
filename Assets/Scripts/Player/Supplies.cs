@@ -290,7 +290,7 @@ namespace GameDevTV.RTS.Player
             }
 
             string sName = evt.Supply.name.ToLower();
-            bool isMinerals = (mineralsSO != null && evt.Supply == mineralsSO) || sName.Contains("minerals");
+            bool isMinerals = (mineralsSO != null && evt.Supply == mineralsSO) || sName.Contains("minerals") || sName.Contains("iron") || sName.Contains("regolith");
             bool isGas = (gasSO != null && evt.Supply == gasSO) || sName.Contains("gas");
             bool isOxygen = (oxygenSO != null && evt.Supply == oxygenSO) || sName.Contains("oxygen");
             bool isBiomass = sName.Contains("biomass") || sName.Contains("food");
