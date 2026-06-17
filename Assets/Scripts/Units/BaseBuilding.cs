@@ -79,6 +79,12 @@ namespace GameDevTV.RTS.Units
             {
                 navMeshObstacle = GetComponentInChildren<UnityEngine.AI.NavMeshObstacle>();
             }
+
+            if (gameObject.GetComponent<GameDevTV.RTS.Environment.PowerNode>() == null)
+            {
+                gameObject.AddComponent<GameDevTV.RTS.Environment.PowerNode>();
+            }
+
             isBuildingInitialized = true;
         }
 
@@ -145,6 +151,15 @@ namespace GameDevTV.RTS.Units
                 {
                     CompleteConstruction();
                 }
+
+                // Add the dynamic Connect Power command
+                var connectCommand = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ConnectPowerCommand>();
+                var nameField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Name>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (nameField != null) nameField.SetValue(connectCommand, "Connect Power");
+
+                var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
+                commandList.Add(connectCommand);
+                AvailableCommands = commandList.ToArray();
                 
                 RaiseSpawnEvent();
             }
@@ -225,36 +240,55 @@ namespace GameDevTV.RTS.Units
             {
                 yield return new WaitForSeconds(1f);
 
+                if (TryGetComponent(out GameDevTV.RTS.Environment.PowerNode powerNode))
+                {
+                    if (config.PowerUpkeep > 0 && !powerNode.IsPowered)
+                    {
+                        // Needs power but is unpowered, so it stalls.
+                        // Wait, it still generates its own power if it has PowerGeneration > 0!
+                        // Let's do Generation first before skipping.
+                    }
+                }
+
                 // Generation
                 if (config.PowerGeneration > 0)
                 {
                     float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
                     Supplies.UpdatePower(Owner, curPower + config.PowerGeneration);
                 }
-                
-                if (config.BiomassGeneration > 0)
+
+                bool isOperating = true;
+                if (config.PowerUpkeep > 0 && TryGetComponent(out GameDevTV.RTS.Environment.PowerNode pNode) && !pNode.IsPowered)
                 {
-                    int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
-                    Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+                    isOperating = false;
                 }
 
-                // Upkeep
-                if (config.PowerUpkeep > 0)
+                if (isOperating)
                 {
-                    float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
-                    Supplies.UpdatePower(Owner, Mathf.Max(0, curPower - config.PowerUpkeep));
-                }
-                
-                if (config.BiomassUpkeep > 0)
-                {
-                    int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
-                    Supplies.UpdateBiomass(Owner, Mathf.Max(0, curBiomass - Mathf.CeilToInt(config.BiomassUpkeep)));
-                }
+                    if (config.BiomassGeneration > 0)
+                    {
+                        int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
+                        Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+                    }
 
-                if (config.OxygenUpkeep > 0)
-                {
-                    float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
-                    Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
+                    // Upkeep
+                    if (config.PowerUpkeep > 0)
+                    {
+                        float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
+                        Supplies.UpdatePower(Owner, Mathf.Max(0, curPower - config.PowerUpkeep));
+                    }
+                    
+                    if (config.BiomassUpkeep > 0)
+                    {
+                        int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
+                        Supplies.UpdateBiomass(Owner, Mathf.Max(0, curBiomass - Mathf.CeilToInt(config.BiomassUpkeep)));
+                    }
+
+                    if (config.OxygenUpkeep > 0)
+                    {
+                        float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
+                        Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
+                    }
                 }
             }
         }
