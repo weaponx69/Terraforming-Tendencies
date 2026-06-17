@@ -1,0 +1,92 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using GameDevTV.RTS.Units;
+using GameDevTV.RTS.UI;
+using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.EventBus;
+
+namespace GameDevTV.RTS.Player
+{
+    public class ColonistManager : MonoBehaviour
+    {
+        [Header("Settings")]
+        [SerializeField] private float initialDelay = 300f; // 5 minutes until first arrival warning
+        [SerializeField] private float arrivalIntervalMin = 300f; // 5 mins
+        [SerializeField] private float arrivalIntervalMax = 600f; // 10 mins
+        [SerializeField] private float warningDuration = 300f; // 5 minute warning
+
+        private float nextArrivalTime;
+        private bool isWarningActive = false;
+        private int currentWaveSize = 2; // Starts at 2, scales up
+
+        private void Start()
+        {
+            nextArrivalTime = Time.time + initialDelay + warningDuration;
+            PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
+        }
+
+        private void OnDestroy()
+        {
+            PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
+        }
+
+        private void HandlePlanetGenerated()
+        {
+            // Reset timers when planet is generated
+            nextArrivalTime = Time.time + initialDelay + warningDuration;
+            isWarningActive = false;
+        }
+
+        private void Update()
+        {
+            if (GameOverManager.Instance != null && GameOverManager.Instance.gameObject.activeInHierarchy)
+            {
+                // Don't run logic if game over UI is showing
+            }
+
+            if (!isWarningActive && Time.time >= nextArrivalTime - warningDuration)
+            {
+                StartWarning();
+            }
+
+            if (isWarningActive && Time.time >= nextArrivalTime)
+            {
+                Arrive();
+            }
+        }
+
+        private void StartWarning()
+        {
+            isWarningActive = true;
+            RuntimeUI ui = Object.FindAnyObjectByType<RuntimeUI>();
+            if (ui != null)
+            {
+                ui.ShowWarningBanner("WARNING: COLONISTS INCOMING");
+            }
+            Debug.Log($"[ColonistManager] Warning started. Colonists arriving in {warningDuration}s");
+        }
+
+        private void Arrive()
+        {
+            isWarningActive = false;
+            RuntimeUI ui = Object.FindAnyObjectByType<RuntimeUI>();
+            if (ui != null)
+            {
+                ui.HideWarningBanner();
+            }
+
+            // Grant colonists
+            int currentPop = Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int p) ? p : 0;
+            Supplies.UpdatePopulation(Owner.Player1, currentPop + currentWaveSize);
+
+            Debug.Log($"[ColonistManager] {currentWaveSize} Colonists arrived!");
+
+            // Scale up next wave
+            currentWaveSize += Random.Range(1, 4);
+
+            // Schedule next
+            nextArrivalTime = Time.time + Random.Range(arrivalIntervalMin, arrivalIntervalMax) + warningDuration;
+        }
+    }
+}

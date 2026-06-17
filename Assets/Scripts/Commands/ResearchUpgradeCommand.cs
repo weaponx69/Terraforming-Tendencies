@@ -78,9 +78,9 @@ namespace GameDevTV.RTS.Commands
         {
             if (Upgrade == null || Upgrade.Cost == null) return true;
 
-            int biomassCost = Mathf.FloorToInt(Upgrade.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
-                + Upgrade.Cost.Gas * Supplies.GasToBiomassRateStatic);
-            return biomassCost <= Supplies.Biomass[context.Owner];
+            int materialsCost = Mathf.FloorToInt(Upgrade.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
+                + Upgrade.Cost.Gas * Supplies.GasToMaterialsRateStatic);
+            return materialsCost <= Supplies.Materials[context.Owner];
         }
     }
 }

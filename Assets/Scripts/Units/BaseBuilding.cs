@@ -105,6 +105,15 @@ namespace GameDevTV.RTS.Units
             base.OnDisable();
             ActiveBuildings.Remove(this);
             productionCoroutine = null;
+
+            if (Progress.State == BuildingProgress.BuildingState.Completed && BuildingSO != null && BuildingSO.BuildingConfig != null)
+            {
+                if (BuildingSO.BuildingConfig.HousingCapacity > 0)
+                {
+                    int currentPopLimit = Supplies.PopulationLimit != null && Supplies.PopulationLimit.TryGetValue(Owner, out int l) ? l : 0;
+                    Supplies.UpdatePopulationLimit(Owner, Mathf.Max(0, currentPopLimit - BuildingSO.BuildingConfig.HousingCapacity));
+                }
+            }
         }
 
         private void RaiseSpawnEvent()
@@ -193,7 +202,61 @@ namespace GameDevTV.RTS.Units
             // Activate any procedural visual effects (e.g. SmokestackVisuals).
             GetComponent<SmokestackVisuals>()?.ActivateSmoke();
 
+            if (BuildingSO != null && BuildingSO.BuildingConfig != null)
+            {
+                if (BuildingSO.BuildingConfig.HousingCapacity > 0)
+                {
+                    int currentPopLimit = Supplies.PopulationLimit != null && Supplies.PopulationLimit.TryGetValue(Owner, out int l) ? l : 0;
+                    Supplies.UpdatePopulationLimit(Owner, currentPopLimit + BuildingSO.BuildingConfig.HousingCapacity);
+                }
+
+                StartCoroutine(UpkeepRoutine());
+            }
+
             RaiseSpawnEvent();
+        }
+
+        private IEnumerator UpkeepRoutine()
+        {
+            var config = BuildingSO.BuildingConfig;
+            if (config == null) yield break;
+
+            while (gameObject.activeInHierarchy && Progress.State == BuildingProgress.BuildingState.Completed)
+            {
+                yield return new WaitForSeconds(1f);
+
+                // Generation
+                if (config.PowerGeneration > 0)
+                {
+                    float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
+                    Supplies.UpdatePower(Owner, curPower + config.PowerGeneration);
+                }
+                
+                if (config.BiomassGeneration > 0)
+                {
+                    int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
+                    Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+                }
+
+                // Upkeep
+                if (config.PowerUpkeep > 0)
+                {
+                    float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
+                    Supplies.UpdatePower(Owner, Mathf.Max(0, curPower - config.PowerUpkeep));
+                }
+                
+                if (config.BiomassUpkeep > 0)
+                {
+                    int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
+                    Supplies.UpdateBiomass(Owner, Mathf.Max(0, curBiomass - Mathf.CeilToInt(config.BiomassUpkeep)));
+                }
+
+                if (config.OxygenUpkeep > 0)
+                {
+                    float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
+                    Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
+                }
+            }
         }
 
         private void AssignUniqueName()

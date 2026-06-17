@@ -33,7 +33,7 @@ namespace GameDevTV.RTS.Player
         #pragma warning restore 0414
 
         // ── Public event ───────────────────────────────────────────────────────────
-        public enum GameOverReason { LifeSupport, Resources, MachineryFailure }
+        public enum GameOverReason { LifeSupport, Resources, MachineryFailure, HousingShortage }
 
         public static event System.Action<GameOverReason> OnGameOver;
         public static event System.Action OnVictory;
@@ -62,13 +62,15 @@ namespace GameDevTV.RTS.Player
             
             if (GenerationManager.Instance == null)
             {
-                new GameObject("GenerationManager").AddComponent<GenerationManager>();
+                var mgr = new GameObject("Managers");
+                mgr.AddComponent<GenerationManager>();
+                mgr.AddComponent<ColonistManager>();
             }
         }
 
         private void OnEnable()
         {
-            Supplies.OnBiomassChanged += HandleBiomassChanged;
+            Supplies.OnMaterialsChanged += HandleMaterialsChanged;
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
             Bus<SupplyDepletedEvent>.RegisterForAll(HandleSupplyDepleted);
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
@@ -76,7 +78,7 @@ namespace GameDevTV.RTS.Player
 
         private void OnDisable()
         {
-            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnMaterialsChanged -= HandleMaterialsChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
             Bus<SupplyDepletedEvent>.UnregisterForAll(HandleSupplyDepleted);
             PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
@@ -148,6 +150,20 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
             {
                 Debug.Log("[GameOverManager] Integrity depleted to 0 and cannot rebuild.");
                 TriggerGameOver(GameOverReason.LifeSupport);
+                return;
+            }
+
+            // Loss Condition 3: Housing Shortage
+            if (Supplies.Population != null && Supplies.PopulationLimit != null)
+            {
+                int pop = Supplies.Population.TryGetValue(monitoredOwner, out int p) ? p : 0;
+                int limit = Supplies.PopulationLimit.TryGetValue(monitoredOwner, out int l) ? l : 0;
+                if (pop > limit)
+                {
+                    Debug.Log($"[GameOverManager] Housing Shortage! Population: {pop}, Limit: {limit}");
+                    TriggerGameOver(GameOverReason.HousingShortage);
+                    return;
+                }
             }
         }
 
@@ -177,9 +193,9 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
             TriggerVictory();
         }
 
-        private void HandleBiomassChanged(Owner owner, int newValue)
+        private void HandleMaterialsChanged(Owner owner, int newValue)
         {
-            // Hard biomass check removed because GenerationManager liquidates biomass to 0 at the end of every round.
+            // Hard materials check removed because GenerationManager liquidates materials to 0 at the end of every round.
         }
 
         private void HandleSupplyDepleted(SupplyDepletedEvent evt)
@@ -192,20 +208,20 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
 
-            if (Supplies.Biomass == null)
+            if (Supplies.Materials == null)
             {
-                Debug.LogWarning("[GameOverManager] Supplies.Biomass is null during recovery check.");
+                Debug.LogWarning("[GameOverManager] Supplies.Materials is null during recovery check.");
                 return;
             }
 
-            int biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int b) ? b : 0;
+            int materials = Supplies.Materials.TryGetValue(monitoredOwner, out int b) ? b : 0;
             bool supplyNodesExist = AnySupplyNodesRemain();
             bool miningUnitsExist = AnyMiningUnitsAlive();
 
             // Hero Drone count can also recover
             bool heroDroneAlive = Object.FindAnyObjectByType<HeroDrone>() != null;
 
-            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || heroDroneAlive || biomass >= 400);
+            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || heroDroneAlive || materials >= 400);
 
             if (!recoveryPossible)
             {

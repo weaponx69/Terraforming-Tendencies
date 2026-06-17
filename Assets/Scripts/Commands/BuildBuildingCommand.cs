@@ -238,13 +238,13 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null || Building.Cost == null) return true;
 
-            // Biomass replaces minerals/gas. Compute biomass-equivalent cost.
-            int biomassCost = Mathf.FloorToInt(Building.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
-                + Building.Cost.Gas * Supplies.GasToBiomassRateStatic);
+            // Materials replaces minerals/gas. Compute materials-equivalent cost.
+            int materialsCost = Mathf.FloorToInt(Building.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
+                + Building.Cost.Gas * Supplies.GasToMaterialsRateStatic);
             
-            if (Supplies.Biomass == null) return false;
-            
-            return biomassCost <= Supplies.Biomass[context.Owner];
+            if (Supplies.Materials == null) return false;
+
+            return materialsCost <= Supplies.Materials[context.Owner];
         }
     }
 }

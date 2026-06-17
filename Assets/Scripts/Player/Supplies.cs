@@ -10,11 +10,22 @@ namespace GameDevTV.RTS.Player
 {
     public class Supplies : MonoBehaviour
     {
-        [SerializeField] private float mineralsToBiomassRate = 1f;
-        [SerializeField] private float gasToBiomassRate = 1f;
-        [SerializeField] private int startingBiomass = 1000;
+        [SerializeField] private float mineralsToMaterialsRate = 1f;
+        [SerializeField] private float gasToMaterialsRate = 1f;
+        [SerializeField] private int startingMaterials = 1000;
 
         [SerializeField] private SupplySO oxygenSO;
+        private static Dictionary<Owner, int> _materials;
+        public static Dictionary<Owner, int> Materials 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _materials;
+            }
+            private set => _materials = value;
+        }
+
         private static Dictionary<Owner, int> _biomass;
         public static Dictionary<Owner, int> Biomass 
         { 
@@ -24,6 +35,17 @@ namespace GameDevTV.RTS.Player
                 return _biomass;
             }
             private set => _biomass = value;
+        }
+
+        private static Dictionary<Owner, float> _power;
+        public static Dictionary<Owner, float> Power 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _power;
+            }
+            private set => _power = value;
         }
 
         private static Dictionary<Owner, int> _population;
@@ -72,27 +94,70 @@ namespace GameDevTV.RTS.Player
 
         public static event Action<Owner, float> OnOxygenChanged;
         public static event Action<Owner, float> OnIntegrityChanged;
+        public static event Action<Owner, float> OnPowerChanged;
+        public static event Action<Owner, int> OnBiomassChanged;
 
-        public static float MineralsToBiomassRateStatic { get; private set; } = 1f;
-        public static float GasToBiomassRateStatic { get; private set; } = 1f;
+        public static float MineralsToMaterialsRateStatic { get; private set; } = 1f;
+        public static float GasToMaterialsRateStatic { get; private set; } = 1f;
 
         [SerializeField] private SupplySO mineralsSO;
         [SerializeField] private SupplySO gasSO;
 
-        public static event System.Action<Owner, int> OnBiomassChanged;
+        public static event System.Action<Owner, int> OnMaterialsChanged;
 
-        public static void RaiseBiomassChanged(Owner owner, int value)
+        public static void RaiseMaterialsChanged(Owner owner, int value)
         {
-            OnBiomassChanged?.Invoke(owner, value);
+            OnMaterialsChanged?.Invoke(owner, value);
+        }
+
+        public static event Action<Owner, int> OnPopulationChanged;
+        public static event Action<Owner, int> OnPopulationLimitChanged;
+
+        public static void UpdatePower(Owner owner, float value)
+        {
+            if (Power != null && Power.ContainsKey(owner))
+            {
+                Power[owner] = Mathf.Max(0, value);
+                OnPowerChanged?.Invoke(owner, Power[owner]);
+            }
+        }
+
+        public static void UpdateBiomass(Owner owner, int value)
+        {
+            if (Biomass != null && Biomass.ContainsKey(owner))
+            {
+                Biomass[owner] = Mathf.Max(0, value);
+                OnBiomassChanged?.Invoke(owner, Biomass[owner]);
+            }
+        }
+
+        public static void UpdatePopulation(Owner owner, int value)
+        {
+            if (Population != null && Population.ContainsKey(owner))
+            {
+                Population[owner] = Mathf.Max(0, value);
+                OnPopulationChanged?.Invoke(owner, Population[owner]);
+            }
+        }
+
+        public static void UpdatePopulationLimit(Owner owner, int value)
+        {
+            if (PopulationLimit != null && PopulationLimit.ContainsKey(owner))
+            {
+                PopulationLimit[owner] = Mathf.Max(0, value);
+                OnPopulationLimitChanged?.Invoke(owner, PopulationLimit[owner]);
+            }
         }
 
         public static Supplies Instance { get; private set; }
 
         private static void EnsureInitialized()
         {
-            if (_biomass != null) return;
+            if (_materials != null) return;
 
+            _materials = new Dictionary<Owner, int>();
             _biomass = new Dictionary<Owner, int>();
+            _power = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
             _oxygen = new Dictionary<Owner, float>();
@@ -100,7 +165,9 @@ namespace GameDevTV.RTS.Player
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _biomass[owner] = 1000;
+                _materials[owner] = 1000;
+                _biomass[owner] = 0;
+                _power[owner] = 0f;
                 _population[owner] = 0;
                 _populationLimit[owner] = 0;
                 _oxygen[owner] = 0f;
@@ -118,8 +185,10 @@ namespace GameDevTV.RTS.Player
             }
             Instance = this;
 
-            // Re-initialize to ensure instance settings (startingBiomass) are applied
+            // Re-initialize to ensure instance settings (startingMaterials) are applied
+            _materials = new Dictionary<Owner, int>();
             _biomass = new Dictionary<Owner, int>();
+            _power = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
             _oxygen = new Dictionary<Owner, float>();
@@ -127,21 +196,23 @@ namespace GameDevTV.RTS.Player
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _biomass.Add(owner, startingBiomass);
+                _materials.Add(owner, startingMaterials);
+                _biomass.Add(owner, 0);
+                _power.Add(owner, 0f);
                 _population.Add(owner, 0);
                 _populationLimit.Add(owner, 0);
                 _oxygen.Add(owner, 0f);
                 _integrity.Add(owner, 100f);
             }
 
-            MineralsToBiomassRateStatic = mineralsToBiomassRate;
-            GasToBiomassRateStatic = gasToBiomassRate;
+            MineralsToMaterialsRateStatic = mineralsToMaterialsRate;
+            GasToMaterialsRateStatic = gasToMaterialsRate;
 
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent); 
             Bus<SupplyEvent>.RegisterForAll(HandleSupplyEvent);
             
             Owner displayOwner = GameOverManager.MonitoredOwner;
-            RaiseBiomassChanged(displayOwner, Biomass[displayOwner]);
+            RaiseMaterialsChanged(displayOwner, Materials[displayOwner]);
         }
 
         private void Start()
@@ -154,7 +225,7 @@ namespace GameDevTV.RTS.Player
         }
 
         private void OnDestroy()
-{
+        {
             if (Instance == this) Instance = null;
             Bus<SupplyEvent>.UnregisterForAll(HandleSupplyEvent);
         }
@@ -212,9 +283,8 @@ namespace GameDevTV.RTS.Player
         {
             if (evt.Supply == null) 
             {
-                Biomass[evt.Owner] += evt.Amount;
-                // // Debug.Log($"[Supplies] {evt.Owner} received direct grant of {evt.Amount} Biomass. Total: {Biomass[evt.Owner]}");
-                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]);
+                Materials[evt.Owner] += evt.Amount;
+                RaiseMaterialsChanged(evt.Owner, Materials[evt.Owner]);
                 return;
             }
 
@@ -225,18 +295,16 @@ namespace GameDevTV.RTS.Player
             
             if (isMinerals)
             {
-                int biomassAmount = Mathf.FloorToInt(evt.Amount * mineralsToBiomassRate);
-                Biomass[evt.Owner] += biomassAmount;
-                // // Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} minerals -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
-                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
+                int matsAmount = Mathf.FloorToInt(evt.Amount * mineralsToMaterialsRate);
+                Materials[evt.Owner] += matsAmount;
+                RaiseMaterialsChanged(evt.Owner, Materials[evt.Owner]); 
                 return;
             }
             else if (isGas)
             {
-                int biomassAmount = Mathf.FloorToInt(evt.Amount * gasToBiomassRate);
-                Biomass[evt.Owner] += biomassAmount;
-                // // Debug.Log($"[Supplies] {evt.Owner} gathered {evt.Amount} gas -> {(biomassAmount >= 0 ? "+" : "")}{biomassAmount} Biomass. Total: {Biomass[evt.Owner]}");
-                RaiseBiomassChanged(evt.Owner, Biomass[evt.Owner]); 
+                int matsAmount = Mathf.FloorToInt(evt.Amount * gasToMaterialsRate);
+                Materials[evt.Owner] += matsAmount;
+                RaiseMaterialsChanged(evt.Owner, Materials[evt.Owner]); 
                 return;
             }
             else if (isOxygen)

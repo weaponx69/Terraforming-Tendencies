@@ -88,6 +88,9 @@ namespace GameDevTV.RTS.UI
                     case GameOverManager.GameOverReason.MachineryFailure:
                         reasonText.SetText("Critical machinery has failed.\nExpansion and terraforming are no longer possible.");
                         break;
+                    case GameOverManager.GameOverReason.HousingShortage:
+                        reasonText.SetText("Housing capacity exceeded!\nNew colonists arrived with nowhere to stay. The colony has rebelled.");
+                        break;
                     case GameOverManager.GameOverReason.Resources:
                     default:
                         reasonText.SetText("The planet's resources are gone.\nTerraforming has ceased.");

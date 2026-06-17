@@ -2,32 +2,38 @@ using UnityEngine;
 using GameDevTV.RTS.Units;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace GameDevTV.RTS.Player
 {
     [System.Serializable]
-    public class SaveData
+    public class GameData
     {
-        public int biomass;
+        public int materials;
         public float oxygen;
+        public float integrity;
+        public float generationProgress;
+        public int generationRoundCount;
+        public float colonyExpansionProgress;
+        public int mapSeed;
     }
 
     public static class SaveSystem
     {
         private static string SavePath => Path.Combine(Application.persistentDataPath, "Saves");
 
-        public static void SaveGame(int slot)
+        public static void SaveGame(int slotIndex)
         {
             if (!Directory.Exists(SavePath))
             {
                 Directory.CreateDirectory(SavePath);
             }
 
-            SaveData data = new SaveData();
+            GameData data = new GameData();
 
-            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int biomass))
+            if (Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int materials))
             {
-                data.biomass = biomass;
+                data.materials = materials;
             }
 
             if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float oxygen))
@@ -35,10 +41,26 @@ namespace GameDevTV.RTS.Player
                 data.oxygen = oxygen;
             }
 
+            if (Supplies.Integrity != null && Supplies.Integrity.TryGetValue(Owner.Player1, out float integrity))
+            {
+                data.integrity = integrity;
+            }
+
+            if (GenerationManager.Instance != null)
+            {
+                data.generationProgress = GenerationManager.Instance.Progress;
+                data.generationRoundCount = GenerationManager.Instance.RoundCount;
+            }
+
+            if (ColonyExpansionManager.Instance != null && ColonyExpansionManager.Instance.ActiveExpansions.Any())
+            {
+                data.colonyExpansionProgress = ColonyExpansionManager.Instance.ActiveExpansions.First().GetProgress();
+            }
+
             string json = JsonUtility.ToJson(data, true);
-            string filePath = GetFilePath(slot);
+            string filePath = GetFilePath(slotIndex);
             File.WriteAllText(filePath, json);
-            Debug.Log($"Game Saved to Slot {slot} at {filePath}");
+            Debug.Log($"[SaveSystem] Game saved to slot {slotIndex}");
         }
 
         public static bool HasSave(int slot)
@@ -46,25 +68,27 @@ namespace GameDevTV.RTS.Player
             return File.Exists(GetFilePath(slot));
         }
 
-        public static void LoadGame(int slot)
+        public static void LoadGame(int slotIndex)
         {
-            if (!HasSave(slot)) return;
+            string path = GetFilePath(slotIndex);
+            if (!File.Exists(path)) return;
 
-            string filePath = GetFilePath(slot);
-            string json = File.ReadAllText(filePath);
-            SaveData data = JsonUtility.FromJson<SaveData>(json);
+            string json = File.ReadAllText(path);
+            GameData data = JsonUtility.FromJson<GameData>(json);
 
             if (Supplies.Instance != null)
             {
-                if (Supplies.Biomass.ContainsKey(Owner.Player1))
-                    Supplies.Biomass[Owner.Player1] = data.biomass;
+                if (Supplies.Materials.ContainsKey(Owner.Player1))
+                    Supplies.Materials[Owner.Player1] = data.materials;
+                else
+                    Supplies.Materials.Add(Owner.Player1, data.materials);
                 
                 Supplies.UpdateOxygen(Owner.Player1, data.oxygen);
                 
                 // Refresh UI
-                Supplies.RaiseBiomassChanged(Owner.Player1, data.biomass);
+                Supplies.RaiseMaterialsChanged(Owner.Player1, data.materials);
             }
-            Debug.Log($"Game Loaded from Slot {slot}");
+            Debug.Log($"Game Loaded from Slot {slotIndex}");
         }
 
         private static string GetFilePath(int slot)

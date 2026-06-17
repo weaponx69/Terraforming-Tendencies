@@ -176,14 +176,14 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        private void GrantStartingBiomass()
+        private void GrantStartingMaterials()
         {
-            if (Supplies.Biomass == null) return;
-            int current = Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            if (Supplies.Materials == null) return;
+            int current = Supplies.Materials.TryGetValue(aiOwner, out int materials) ? materials : 0;
             if (current < 1000)
             {
-                Supplies.Biomass[aiOwner] = 1000;
-                Supplies.RaiseBiomassChanged(aiOwner, 1000);
+                Supplies.Materials[aiOwner] = 1000;
+                Supplies.RaiseMaterialsChanged(aiOwner, 1000);
             }
         }
 
@@ -249,7 +249,7 @@ namespace GameDevTV.RTS.Units
 
             if (activeCommandPosts.Count == 0) return packages;
 
-            int biomass = CurrentBiomass();
+            int materials = CurrentMaterials();
 
             // Candidate expansion directions
             var sites = new List<ExpansionProposal>();
@@ -312,7 +312,7 @@ if (SectorManager.Instance != null)
                 }
                 
                 // Only add if affordable
-                if (s.Items.Sum(i => i.Cost) <= biomass)
+                if (s.Items.Sum(i => i.Cost) <= materials)
                 {
                     packages.Add(s);
                 }
@@ -411,7 +411,7 @@ if (SectorManager.Instance != null)
             }
 
             // 2. Command center (priority) — the sequence secures a builder (retrying /
-            //    pulling a miner off its job). If it can't, the decision is re-opened (no biomass lost).
+            //    pulling a miner off its job). If it can't, the decision is re-opened (no materials lost).
             if (pkg.IsExpansion && enabled.Any(i => i.Type == PackageItemType.CommandCenter))
             {
                 yield return StartCoroutine(BuildCommandPostSequence(pkg.Position));
@@ -445,7 +445,7 @@ if (SectorManager.Instance != null)
                     Debug.Log("[GreedyAI] Dispatching worker " + builder.name + " to build Oxygen Processor at " + spot);
                     builder.Build(oxygenProcessorSO, spot);
                     
-                    // Brief yield to ensure biomass updates before the next iteration's CanAfford check
+                    // Brief yield to ensure materials update before the next iteration's CanAfford check
                     yield return new WaitForSeconds(0.1f);
                 }
                 else
@@ -459,19 +459,19 @@ if (SectorManager.Instance != null)
             isExecutingPackage = false;
         }
 
-        private int CurrentBiomass()
+        private int CurrentMaterials()
         {
-            return Supplies.Biomass != null && Supplies.Biomass.TryGetValue(aiOwner, out int b) ? b : 0;
+            return Supplies.Materials != null && Supplies.Materials.TryGetValue(aiOwner, out int m) ? m : 0;
         }
 
-        /// <summary>Current spendable biomass for the colony — used by the UI for live affordability.</summary>
-        public int AvailableBiomass => CurrentBiomass();
+        /// <summary>Current spendable materials for the colony — used by the UI for live affordability.</summary>
+        public int AvailableMaterials => CurrentMaterials();
 
         private int CostOf(UnlockableSO so)
         {
             if (so == null || so.Cost == null) return 0;
-            return Mathf.FloorToInt(so.Cost.Minerals * Supplies.MineralsToBiomassRateStatic
-                                  + so.Cost.Gas * Supplies.GasToBiomassRateStatic);
+            return Mathf.FloorToInt(so.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
+                                  + so.Cost.Gas * Supplies.GasToMaterialsRateStatic);
         }
 
         private event System.Action<ExpansionProposal> OnProposalAccepted;

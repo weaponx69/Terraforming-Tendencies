@@ -14,8 +14,8 @@ namespace GameDevTV.RTS.UI
 {
     public class RuntimeUI : MonoBehaviour
     {
-        [SerializeField] private TextMeshProUGUI biomassLabelText;
-        [SerializeField] private TextMeshProUGUI biomassValueText;
+        [SerializeField] private TextMeshProUGUI materialsLabelText;
+        [SerializeField] private TextMeshProUGUI materialsValueText;
 
         // Oxygen & Sector UI
         [SerializeField] private TextMeshProUGUI oxygenLabelText;
@@ -62,7 +62,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Bus<BuildingDeathEvent>.OnEvent[displayedOwner] += HandleBuildingDeath;
 
             Supplies.OnOxygenChanged += HandleOxygenChanged;
-            Supplies.OnBiomassChanged += HandleBiomassChanged;
+            Supplies.OnMaterialsChanged += HandleMaterialsChanged;
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
 
             InitializeUI();
@@ -81,7 +81,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Bus<BuildingDeathEvent>.OnEvent[displayedOwner] -= HandleBuildingDeath;
 
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
-            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnMaterialsChanged -= HandleMaterialsChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
 
             if (heroDroneReference != null)
@@ -90,17 +90,116 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             }
         }
 
+        [SerializeField] private TextMeshProUGUI biomassLabelText;
+        [SerializeField] private TextMeshProUGUI biomassValueText;
+        [SerializeField] private TextMeshProUGUI powerLabelText;
+        [SerializeField] private TextMeshProUGUI powerValueText;
+        
+        [Header("Warning UI")]
+        [SerializeField] private GameObject warningBanner;
+        [SerializeField] private TextMeshProUGUI warningText;
+
         private void Awake()
         {
             // Auto-hookup missing UI references by searching the hierarchy
-            FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
+            FindAndLinkUI("Biomass Container", ref materialsLabelText, ref materialsValueText, "Materials Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
             FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
             FindAndLinkUI("Probe Progress Container", ref probeProgressLabelText, ref probeProgressValueText, "Probe Progress Header");
             
+            // Clone the Materials Container for Biomass (Food) and Power if they aren't assigned
+            if (materialsLabelText != null && (biomassValueText == null || powerValueText == null))
+            {
+                Transform containerParent = materialsLabelText.transform.parent.parent;
+                GameObject template = materialsLabelText.transform.parent.gameObject;
+
+                if (biomassValueText == null)
+                {
+                    GameObject clone = Instantiate(template, containerParent);
+                    clone.name = "Food Container";
+                    FindAndLinkUI("Food Container", ref biomassLabelText, ref biomassValueText, "Food Header");
+                }
+                
+                if (powerValueText == null)
+                {
+                    GameObject clone = Instantiate(template, containerParent);
+                    clone.name = "Power Container";
+                    FindAndLinkUI("Power Container", ref powerLabelText, ref powerValueText, "Power Header");
+                }
+            }
+
+            // Setup Warning Banner
+            if (warningBanner == null)
+            {
+                // Create a huge red flashing warning banner dynamically
+                Canvas canvas = FindAnyObjectByType<Canvas>();
+                if (canvas != null)
+                {
+                    warningBanner = new GameObject("Warning Banner");
+                    warningBanner.transform.SetParent(canvas.transform, false);
+                    RectTransform rt = warningBanner.AddComponent<RectTransform>();
+                    rt.anchorMin = new Vector2(0, 1);
+                    rt.anchorMax = new Vector2(1, 1);
+                    rt.pivot = new Vector2(0.5f, 1);
+                    rt.offsetMin = new Vector2(0, -100);
+                    rt.offsetMax = new Vector2(0, 0);
+
+                    Image bg = warningBanner.AddComponent<Image>();
+                    bg.color = new Color(1f, 0f, 0f, 0.8f);
+
+                    GameObject textObj = new GameObject("Warning Text");
+                    textObj.transform.SetParent(warningBanner.transform, false);
+                    RectTransform trt = textObj.AddComponent<RectTransform>();
+                    trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one;
+                    trt.offsetMin = Vector2.zero; trt.offsetMax = Vector2.zero;
+
+                    warningText = textObj.AddComponent<TextMeshProUGUI>();
+                    warningText.alignment = TextAlignmentOptions.Center;
+                    warningText.fontSize = 48;
+                    warningText.color = Color.white;
+                    warningText.fontStyle = FontStyles.Bold;
+
+                    warningBanner.SetActive(false);
+                }
+            }
+            
             // Special case for the duplicate population text if it exists
-if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
+            if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
+        }
+
+        public void ShowWarningBanner(string message)
+        {
+            if (warningBanner != null && warningText != null)
+            {
+                warningText.text = message;
+                warningBanner.SetActive(true);
+                StopCoroutine(nameof(FlashWarningRoutine));
+                StartCoroutine(nameof(FlashWarningRoutine));
+            }
+        }
+
+        public void HideWarningBanner()
+        {
+            if (warningBanner != null)
+            {
+                warningBanner.SetActive(false);
+                StopCoroutine(nameof(FlashWarningRoutine));
+            }
+        }
+
+        private System.Collections.IEnumerator FlashWarningRoutine()
+        {
+            Image bg = warningBanner.GetComponent<Image>();
+            if (bg == null) yield break;
+
+            while (true)
+            {
+                bg.color = new Color(1f, 0f, 0f, 0.8f);
+                yield return new WaitForSeconds(0.5f);
+                bg.color = new Color(1f, 0f, 0f, 0.3f);
+                yield return new WaitForSeconds(0.5f);
+            }
         }
 
         private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, string headerName)
@@ -230,9 +329,17 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
         {
             displayedOwner = GameOverManager.MonitoredOwner;
 
+            if (materialsLabelText != null) materialsLabelText.SetText("Materials");
+            if (materialsValueText != null && Supplies.Materials != null && Supplies.Materials.TryGetValue(displayedOwner, out int initial))
+                materialsValueText.SetText(initial.ToString());
+
             if (biomassLabelText != null) biomassLabelText.SetText("Biomass");
-            if (biomassValueText != null && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(displayedOwner, out int initial))
-                biomassValueText.SetText(initial.ToString());
+            if (biomassValueText != null && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(displayedOwner, out int bInitial))
+                biomassValueText.SetText(bInitial.ToString());
+
+            if (powerLabelText != null) powerLabelText.SetText("Power");
+            if (powerValueText != null && Supplies.Power != null && Supplies.Power.TryGetValue(displayedOwner, out float pInitial))
+                powerValueText.SetText($"{pInitial:F0}");
 
             if (oxygenLabelText != null) oxygenLabelText.SetText("Oxygen");
             if (oxygenValueText != null && Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(displayedOwner, out float oxyInitial))
@@ -248,13 +355,43 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
             {
                 integrityValueText.SetText(integrityInitial.ToString("F1"));
             }
+
+            Supplies.OnPopulationChanged += HandlePopulationChanged;
+            Supplies.OnPopulationLimitChanged += HandlePopulationLimitChanged;
+            UpdatePopulationText();
         }
 
         private void OnDestroy()
         {
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
-            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnMaterialsChanged -= HandleMaterialsChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
+            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnPowerChanged -= HandlePowerChanged;
+            Supplies.OnPopulationChanged -= HandlePopulationChanged;
+            Supplies.OnPopulationLimitChanged -= HandlePopulationLimitChanged;
+        }
+
+        private void HandlePopulationChanged(Owner owner, int newValue)
+        {
+            if (owner != displayedOwner) return;
+            UpdatePopulationText();
+        }
+
+        private void HandlePopulationLimitChanged(Owner owner, int newValue)
+        {
+            if (owner != displayedOwner) return;
+            UpdatePopulationText();
+        }
+
+        private void UpdatePopulationText()
+        {
+            if (populationText != null && Supplies.Population != null && Supplies.PopulationLimit != null)
+            {
+                int pop = Supplies.Population.TryGetValue(displayedOwner, out int p) ? p : 0;
+                int limit = Supplies.PopulationLimit.TryGetValue(displayedOwner, out int l) ? l : 0;
+                populationText.SetText($"{pop} / {limit}");
+            }
         }
 
         private void HandleOxygenChanged(Owner owner, float newValue)
@@ -262,8 +399,6 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
             if (owner != displayedOwner) return;
             if (oxygenValueText != null)
                 oxygenValueText.SetText($"{newValue:F1}%");
-            if (populationText != null)
-                populationText.SetText($"{newValue:F1}%");
         }
 
         private void HandleIntegrityChanged(Owner owner, float newValue)
@@ -273,22 +408,31 @@ if (populationText == null && oxygenValueText != null) populationText = oxygenVa
                 integrityValueText.SetText(newValue.ToString("F1"));
         }
 
-        private void HandleBiomassChanged(Owner owner, int newValue)
+        private void HandleMaterialsChanged(Owner owner, int newValue)
         {
             if (owner != displayedOwner) 
             {
-                // // // Debug.Log($"[RuntimeUI] Biomass changed for {owner} to {newValue}, but HUD is showing {displayedOwner}. Ignoring.");
                 return;
             }
 
-            if (biomassValueText == null) 
+            if (materialsValueText == null) 
             {
-                // // Debug.LogWarning("[RuntimeUI] HandleBiomassChanged: biomassValueText is NULL!");
                 return;
             }
 
-            // // // Debug.Log($"[RuntimeUI] Updating HUD biomass text to {newValue}");
-            biomassValueText.SetText(newValue.ToString());
+            materialsValueText.SetText(newValue.ToString());
+        }
+
+        private void HandleBiomassChanged(Owner owner, int newValue)
+        {
+            if (owner != displayedOwner) return;
+            if (biomassValueText != null) biomassValueText.SetText(newValue.ToString());
+        }
+
+        private void HandlePowerChanged(Owner owner, float newValue)
+        {
+            if (owner != displayedOwner) return;
+            if (powerValueText != null) powerValueText.SetText($"{newValue:F0}");
         }
 
         private void HandleUnitSelected(UnitSelectedEvent evt)

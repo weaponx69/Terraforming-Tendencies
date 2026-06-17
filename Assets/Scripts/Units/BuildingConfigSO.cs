@@ -21,8 +21,26 @@ namespace GameDevTV.RTS.Units
         [FormerlySerializedAs("<BuildTimeMultiplier>k__BackingField")]
         [SerializeField] private float buildTimeMultiplier = 1f;
 
+        [Header("Upkeep & Generation (Per Second)")]
+        [SerializeField] private float biomassUpkeep = 0f;
+        [SerializeField] private float powerUpkeep = 0f;
+        [SerializeField] private float oxygenUpkeep = 0f;
+
+        [SerializeField] private int biomassGeneration = 0;
+        [SerializeField] private float powerGeneration = 0f;
+
+        [Header("Colony Housing")]
+        [SerializeField] private int housingCapacity = 0;
+
         public int QueueSize => queueSize;
         public float LifeSupportRadius => lifeSupportRadius;
         public float BuildTimeMultiplier => buildTimeMultiplier;
+
+        public float BiomassUpkeep => biomassUpkeep;
+        public float PowerUpkeep => powerUpkeep;
+        public float OxygenUpkeep => oxygenUpkeep;
+        public int BiomassGeneration => biomassGeneration;
+        public float PowerGeneration => powerGeneration;
+        public int HousingCapacity => housingCapacity;
     }
 }
