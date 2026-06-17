@@ -54,8 +54,7 @@ namespace GameDevTV.RTS.Editor
                 BuildingSO solarSO = CreateInstance<BuildingSO>();
                 SerializedObject soSolarSO = new SerializedObject(solarSO);
                 soSolarSO.FindProperty("<Name>k__BackingField").stringValue = "Solar Panel";
-                soSolarSO.FindProperty("<Description>k__BackingField").stringValue = "Generates power for the colony.";
-                soSolarSO.FindProperty("<Health>k__BackingField").intValue = 300;
+                soSolarSO.FindProperty("health").intValue = 300;
                 soSolarSO.FindProperty("<BuildTime>k__BackingField").floatValue = 10f;
                 soSolarSO.FindProperty("buildingConfig").objectReferenceValue = solarConfig;
                 AssetDatabase.CreateAsset(solarSO, "Assets/Units/Buildings/SolarPanel.asset");
@@ -78,12 +77,14 @@ namespace GameDevTV.RTS.Editor
                 PrefabUtility.SaveAsPrefabAsset(solarObj, solarPrefabPath);
                 PrefabUtility.UnloadPrefabContents(solarObj);
 
+                soSolarSO.FindProperty("prefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(solarPrefabPath);
+                soSolarSO.ApplyModifiedProperties();
+
                 // Generate Habitat
                 BuildingSO habitatSO = CreateInstance<BuildingSO>();
                 SerializedObject soHabitatSO = new SerializedObject(habitatSO);
                 soHabitatSO.FindProperty("<Name>k__BackingField").stringValue = "Habitat";
-                soHabitatSO.FindProperty("<Description>k__BackingField").stringValue = "Houses colonists and consumes power and oxygen.";
-                soHabitatSO.FindProperty("<Health>k__BackingField").intValue = 500;
+                soHabitatSO.FindProperty("health").intValue = 500;
                 soHabitatSO.FindProperty("<BuildTime>k__BackingField").floatValue = 15f;
                 soHabitatSO.FindProperty("buildingConfig").objectReferenceValue = habitatConfig;
                 AssetDatabase.CreateAsset(habitatSO, "Assets/Units/Buildings/Habitat.asset");
@@ -104,6 +105,9 @@ namespace GameDevTV.RTS.Editor
                 habitatObj.name = "Habitat";
                 PrefabUtility.SaveAsPrefabAsset(habitatObj, habitatPrefabPath);
                 PrefabUtility.UnloadPrefabContents(habitatObj);
+
+                soHabitatSO.FindProperty("prefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(habitatPrefabPath);
+                soHabitatSO.ApplyModifiedProperties();
 
                 Debug.Log("[EconomyBuildingGenerator] Successfully generated Habitat and Solar Panel configurations and prefabs based on " + basePrefab.name);
             }

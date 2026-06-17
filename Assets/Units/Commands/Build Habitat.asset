@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32194d70ac3bc0647b55685549f2c196, type: 3}
+  m_Name: Build Habitat
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Commands.BuildBuildingCommand
+  <Name>k__BackingField: Habitat
+  <Icon>k__BackingField: {fileID: 21300000, guid: 722bb5e635d66aa4eb800775fb6cdbf1, type: 3}
+  <Slot>k__BackingField: 4
+  <RequiresClickToActivate>k__BackingField: 1
+  <IsSingleUnitCommand>k__BackingField: 1
+  <GhostPrefab>k__BackingField: {fileID: 5827066523746683823, guid: 81612135668f15586844a2be2a03f2dc, type: 3}
+  <Restrictions>k__BackingField:
+  - {fileID: 11400000, guid: ce5f6d260e8d6d54fbb96a434adb7bc2, type: 2}
+  <Building>k__BackingField: {fileID: 11400000, guid: 3597e650a85c28864ab06f1a87974659, type: 2}
