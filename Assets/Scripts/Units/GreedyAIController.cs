@@ -982,7 +982,7 @@ else
         private bool CanAfford(UnlockableSO unlockable, bool ignoreReserve = false)
         {
             if (unlockable?.Cost == null) return true;
-            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToBiomassRateStatic + unlockable.Cost.Gas * Supplies.GasToBiomassRateStatic);
+            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic + unlockable.Cost.Gas * Supplies.GasToMaterialsRateStatic);
             int available = Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
             
             if (ignoreReserve)

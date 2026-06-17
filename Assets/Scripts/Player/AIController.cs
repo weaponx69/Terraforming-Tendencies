@@ -92,7 +92,7 @@ namespace GameDevTV.RTS.Units
         {
             // // // Debug.Log($"[AI] {aiOwner} starting DelayedStart. delay={startDelay}");
             yield return new WaitForSeconds(startDelay);
-            GrantStartingBiomass();
+            GrantStartingMaterials();
             // // // Debug.Log($"[AI] {aiOwner} biomass granted. startingBiomass={startingAIBiomass}");
             
             // Only spawn if nothing exists and we aren't the player (player builds their own)
@@ -106,7 +106,7 @@ namespace GameDevTV.RTS.Units
             InvokeRepeating(nameof(Tick), tickRate, tickRate);
         }
 
-        private void GrantStartingBiomass()
+        private void GrantStartingMaterials()
         {
             if (Player.Supplies.Biomass == null) return;
 

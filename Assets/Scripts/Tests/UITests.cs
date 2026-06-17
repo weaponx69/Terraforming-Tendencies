@@ -74,7 +74,7 @@ namespace GameDevTV.RTS.Tests
         public IEnumerator BiomassUI_Updates_WhenBiomassChanges()
         {
             biomassText.text = "0";
-            Supplies.RaiseBiomassChanged(Owner.Player1, 500);
+            Supplies.RaiseMaterialsChanged(Owner.Player1, 500);
             yield return null; 
             Assert.AreEqual("500", biomassText.text, "Biomass UI text should update to match the new biomass value.");
             Debug.Log("[UITest] BiomassUI_Updates_WhenBiomassChanges Passed");
