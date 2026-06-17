@@ -18,6 +18,10 @@ namespace GameDevTV.RTS.Units
             BuildingSO copy = base.Clone() as BuildingSO;
 
             copy.SightConfig = SightConfig == null ? null : Instantiate(SightConfig);
+            if (BuildingConfig != null)
+            {
+                copy.BuildingConfig = Instantiate(BuildingConfig);
+            }
 
             return copy;
         }

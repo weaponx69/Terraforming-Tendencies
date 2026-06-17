@@ -19,8 +19,16 @@ MonoBehaviour:
   <Cost>k__BackingField: {fileID: 11400000, guid: f8fef7237b7177a4f8683bfa15d740b8, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField: []
-  <Health>k__BackingField: 400
-  <Prefab>k__BackingField: {fileID: 1589499662120937400, guid: 43943267dde60fe4a88cf5bd885c00e3, type: 3}
-  <Upgrades>k__BackingField: []
-  <SightConfig>k__BackingField: {fileID: 11400000, guid: f72837298f54f6540bf60aa3b317c6f8, type: 2}
+  health: 400
+  prefab: {fileID: 1589499662120937400, guid: 43943267dde60fe4a88cf5bd885c00e3, type: 3}
+  upgrades:
+  - {fileID: 11400000, guid: 36ff1e486d0f958c9a77311bb9410ea0, type: 2}
+  sightConfig: {fileID: 11400000, guid: f72837298f54f6540bf60aa3b317c6f8, type: 2}
+  movementConfig: {fileID: 0}
+  gatherConfig: {fileID: 0}
+  builderConfig: {fileID: 0}
+  probeConfig: {fileID: 0}
+  buildingConfig: {fileID: 11400000, guid: b84b196914c3170f3b53844518079015, type: 2}
   <PlacementMaterial>k__BackingField: {fileID: 2100000, guid: b1ef2fa16faec654da7102aa095d466e, type: 2}
+  <IsLifeSupport>k__BackingField: 0
+  <LifeSupportRadius>k__BackingField: 25

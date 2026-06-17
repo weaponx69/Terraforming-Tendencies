@@ -431,7 +431,13 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                 CurrentQueueStartTime = Time.time;
                 OnQueueUpdated?.Invoke(buildingQueue.ToArray());
 
-                yield return new WaitForSeconds(SOBeingBuilt.BuildTime);
+                float buildTime = SOBeingBuilt.BuildTime;
+                if (BuildingSO != null && BuildingSO.BuildingConfig != null)
+                {
+                    buildTime *= BuildingSO.BuildingConfig.BuildTimeMultiplier;
+                }
+
+                yield return new WaitForSeconds(buildTime);
 
                 if (SOBeingBuilt is AbstractUnitSO unitSO)
                 {

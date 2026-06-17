@@ -330,3 +330,29 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 19. **Elite Sharpened Blade** (+Damage)
 20. **Omega Adrenaline** (+Speed)
 </details>
+
+#### 16. End-of-Generation Summary UI Hierarchy Restructure (UI Controller Pattern)
+* **The Core Bug:** The `GenerationSummaryUI` component was attached directly to the visual panel (`'Generation Summary Panel'`). In `Start()`, the visual panel deactivated itself, thereby disabling the component and preventing its `OnEnable()` from ever subscribing to `GenerationManager.OnGenerationEnded`. 
+* **The Architecture Fix (UI Controller Pattern):** 
+  * Separated the **logic (event listener)** from the **visual panel (rendering)**.
+  * Created an always-active parent GameObject named **`Generation Summary UI Controller`** to host the `GenerationSummaryUI` component.
+  * Placed the actual visual panel (`Generation Summary Panel`) as a child of the controller and **disabled it in Edit Mode** (cleanly hiding it from view).
+  * Wired the disabled visual panel into the script's `panel` slot. Now, when the event fires, the active controller cleanly sets the visual panel child to active.
+* **Diagnostics Tool:** Created a custom editor diagnostic utility accessible via **`Tools > Diagnostics > Check Generation Summary UI`** to automatically identify, report, and correct any disabled parent structures or unassigned inspector fields.
+
+#### 17. Building Upgrades Architecture & Baseline Configurations
+* **Decay Coverage & Build Time Scaling:** 
+  * Upgraded **`BuildingSO.cs`** to cleanly clone its specialized `BuildingConfig` upon spawning to guarantee runtime upgrades remain isolated from persistent editor assets.
+  * Enhanced **`BaseBuilding.cs`** to calculate unit production/research queue build times based on the building's localized `BuildingConfig.BuildTimeMultiplier`.
+  * Updated **`AbstractCommandable.cs`**'s `HandleUpgradeResearched()` method to support retroactive structural scaling: researching a max health upgrade instantly adds the HP difference and heals the structure, and researching a life support radius upgrade instantly scales the radius of the active `LifeSupportNode` component.
+* **Default Configurations & Baselines:**
+  * Discovered that all `BuildingSO` assets (`Command Post`, `Supply Hut`, `Airport`, `Infantry School`, `Barracks`, and `Oxygen Processor`) lacked physical config files, which would trigger a null reference crash upon any upgrade applications.
+  * Created **`Default Building Config.asset`** (defaulting to Queue Size 5, Life Support Radius 25, and Build Time Multiplier 1.0) and auto-populated these to all buildings.
+* **Custom Modifiers & Tech Tree Integration:**
+  * Created 4 brand new physical modifier upgrades in `Assets/Units/Upgrades/BuildingUpgrades/`:
+    * **`Airport Efficiency.asset`**: Reduces unit training times by 35% (`BuildingConfig/BuildTimeMultiplier = -0.35`).
+    * **`Supply Node Range.asset`**: Expands decay-protection LifeSupportRadius of Supply Huts by 15 meters (`LifeSupportRadius = +15`).
+    * **`Command Post Reinforcement.asset`**: Increases max Command Post health by 300 HP (`Health = +300`).
+    * **`Tactical Processing.asset`**: Speeds up Infantry School research queues by 40% (`BuildingConfig/BuildTimeMultiplier = -0.40`).
+  * Registered these modifiers to their respective building assets and successfully appended them to the global **`Human Tech Tree.asset`** to populate automatically in the player's Tech Tree GUI between generations.
+

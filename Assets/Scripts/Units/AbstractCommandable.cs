@@ -222,6 +222,18 @@ namespace GameDevTV.RTS.Units
                     VisionTransform.localScale = new Vector3(size, size, size);
                 }
 
+                // If life support radius was upgraded, adjust the active LifeSupportNode component's radius
+                if (UnitSO is BuildingSO buildingSO && TryGetComponent<GameDevTV.RTS.Environment.LifeSupportNode>(out var node))
+                {
+                    bool isCommandPost = buildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    float targetRadius = buildingSO.LifeSupportRadius;
+                    if (buildingSO.BuildingConfig != null && buildingSO.BuildingConfig.LifeSupportRadius != 0)
+                    {
+                        targetRadius = buildingSO.BuildingConfig.LifeSupportRadius;
+                    }
+                    node.Radius = isCommandPost ? Mathf.Max(targetRadius, 30f) : targetRadius;
+                }
+
                 if (this is AbstractUnit unit && UnitSO.MovementConfig != null && unit.Agent != null)
                 {
                     unit.Agent.speed = UnitSO.MovementConfig.Speed;
