@@ -387,9 +387,18 @@ namespace GameDevTV.RTS.Units
             while (elapsed < timeout)
             {
                 if (target == null) yield break;
-                float dx = transform.position.x - target.position.x;
-                float dz = transform.position.z - target.position.z;
-                if (dx * dx + dz * dz <= stopDist * stopDist) yield break;
+
+                if (agent != null && agent.isOnNavMesh && !agent.pathPending)
+                {
+                    if (agent.remainingDistance <= agent.stoppingDistance + 0.5f) yield break;
+                }
+                else
+                {
+                    float dx = transform.position.x - target.position.x;
+                    float dz = transform.position.z - target.position.z;
+                    if (dx * dx + dz * dz <= stopDist * stopDist) yield break;
+                }
+                
                 elapsed += Time.deltaTime;
                 yield return null;
             }
@@ -400,9 +409,17 @@ namespace GameDevTV.RTS.Units
             float elapsed = 0f;
             while (elapsed < timeout)
             {
-                float dx = transform.position.x - targetPos.x;
-                float dz = transform.position.z - targetPos.z;
-                if (dx * dx + dz * dz <= stopDist * stopDist) yield break;
+                if (agent != null && agent.isOnNavMesh && !agent.pathPending)
+                {
+                    if (agent.remainingDistance <= agent.stoppingDistance + 0.5f) yield break;
+                }
+                else
+                {
+                    float dx = transform.position.x - targetPos.x;
+                    float dz = transform.position.z - targetPos.z;
+                    if (dx * dx + dz * dz <= stopDist * stopDist) yield break;
+                }
+
                 elapsed += Time.deltaTime;
                 yield return null;
             }
