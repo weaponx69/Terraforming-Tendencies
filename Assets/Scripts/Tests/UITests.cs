@@ -23,6 +23,7 @@ namespace GameDevTV.RTS.Tests
         private TextMeshProUGUI biomassText;
         private GameObject suppliesObj;
         private GameObject gameOverManagerObj;
+        private TextMeshProUGUI materialsText;
 
         [SetUp]
         public void SetUp()
@@ -48,6 +49,11 @@ namespace GameDevTV.RTS.Tests
             textObj.transform.SetParent(uiObj.transform);
             biomassText = textObj.AddComponent<TextMeshProUGUI>();
             SetField(runtimeUI, "biomassValueText", biomassText);
+
+            GameObject matTextObj = new GameObject("MaterialsText");
+            matTextObj.transform.SetParent(uiObj.transform);
+            materialsText = matTextObj.AddComponent<TextMeshProUGUI>();
+            SetField(runtimeUI, "materialsValueText", materialsText);
 
             SetField(runtimeUI, "displayedOwner", Owner.Player1);
 
@@ -96,26 +102,26 @@ namespace GameDevTV.RTS.Tests
         }
 
         [UnityTest]
-        public IEnumerator BiomassUI_Updates_WhenDroneGathersMinerals()
+        public IEnumerator MaterialsUI_Updates_WhenDroneGathersMinerals()
         {
-            biomassText.text = "0";
-            Supplies.Biomass[Owner.Player1] = 0;
+            materialsText.text = "0";
+            Supplies.Materials[Owner.Player1] = 0;
             
             var mineralsSO = ScriptableObject.CreateInstance<SupplySO>();
             mineralsSO.name = "Minerals";
             
             var supplies = Object.FindAnyObjectByType<Supplies>();
             SetField(supplies, "mineralsSO", mineralsSO);
-            SetField(supplies, "mineralsToBiomassRate", 1.0f);
+            SetField(supplies, "mineralsToMaterialsRate", 1.0f);
             
             Bus<SupplyEvent>.Raise(Owner.Player1, new SupplyEvent(Owner.Player1, 10, mineralsSO));
             
             yield return null; 
             
-            Assert.AreEqual(10, Supplies.Biomass[Owner.Player1], "Biomass dictionary should increase.");
-            Assert.AreEqual("10", biomassText.text, "Biomass UI text should update after gathering.");
+            Assert.AreEqual(10, Supplies.Materials[Owner.Player1], "Materials dictionary should increase.");
+            Assert.AreEqual("10", materialsText.text, "Materials UI text should update after gathering.");
             
-            Debug.Log("[UITest] BiomassUI_Updates_WhenDroneGathersMinerals Passed");
+            Debug.Log("[UITest] MaterialsUI_Updates_WhenDroneGathersMinerals Passed");
         }
 
         [UnityTest]

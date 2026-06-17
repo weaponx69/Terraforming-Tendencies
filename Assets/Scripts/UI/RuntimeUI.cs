@@ -101,7 +101,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 
         private void Awake()
         {
-            FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header");
+            FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
             FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
@@ -137,7 +137,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 {
                     // Fallback to manual offset if parent is the Canvas (to prevent destroying overall UI layout)
                     RectTransform rtClone = clone.GetComponent<RectTransform>();
-                    RectTransform rtMat = materialsLabelText.transform.parent.GetComponent<RectTransform>();
+                    RectTransform rtMat = materialsLabelText != null ? materialsLabelText.transform.parent.GetComponent<RectTransform>() : null;
                     RectTransform rtInt = template.GetComponent<RectTransform>();
                     
                     if (rtClone != null && rtMat != null && rtInt != null)
