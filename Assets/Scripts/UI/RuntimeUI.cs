@@ -101,9 +101,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 
         private void Awake()
         {
-            // Auto-hookup missing UI references by searching the hierarchy
-            FindAndLinkUI("Materials Container", ref materialsLabelText, ref materialsValueText, "Materials Header");
-            FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
+            FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
             FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
