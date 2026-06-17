@@ -177,6 +177,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5711e626ee3260d4388aaac5e505ab47, type: 2}
   - {fileID: 11400000, guid: cc4c6cbe12074ef4381e6e573f4503b5, type: 2}
   - {fileID: 11400000, guid: f12bc54a5802518ffb764693a0511a51, type: 2}
+  - {fileID: 11400000, guid: 0b4379f3fe195c69ca93b3839360f506, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: f6b38bef630bb884195c6d3f702eefb9, type: 2}
   selectionIndicator: {fileID: 5837632262276192177}
   VisionTransform: {fileID: 4999257484100946669}
