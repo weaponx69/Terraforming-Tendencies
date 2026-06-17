@@ -123,17 +123,30 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 if (powerLabelText != null) powerLabelText.gameObject.name = "Power Header";
                 clone.SetActive(true);
 
-                // Position it dynamically based on the distance between Materials and Integrity
-                RectTransform rtClone = clone.GetComponent<RectTransform>();
-                RectTransform rtMat = materialsLabelText.transform.parent.GetComponent<RectTransform>();
-                RectTransform rtInt = template.GetComponent<RectTransform>();
-                
-                if (rtClone != null && rtMat != null && rtInt != null)
+                // Attempt to add a HorizontalLayoutGroup for clean automatic layout
+                if (containerParent.GetComponent<Canvas>() == null && containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
-                    // Calculate direction from Materials to Integrity
-                    float stepX = (rtInt.anchoredPosition.x - rtMat.anchoredPosition.x) / 3f; // 3 gaps between 4 items
-                    if (stepX == 0) stepX = 150f; // fallback
-                    rtClone.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX, 0f);
+                    HorizontalLayoutGroup hlg = containerParent.gameObject.AddComponent<HorizontalLayoutGroup>();
+                    hlg.childControlWidth = false;
+                    hlg.childControlHeight = false;
+                    hlg.childForceExpandWidth = false;
+                    hlg.childForceExpandHeight = false;
+                    hlg.spacing = 20f;
+                    hlg.childAlignment = TextAnchor.UpperLeft;
+                }
+                else if (containerParent.GetComponent<HorizontalLayoutGroup>() == null)
+                {
+                    // Fallback to manual offset if parent is the Canvas (to prevent destroying overall UI layout)
+                    RectTransform rtClone = clone.GetComponent<RectTransform>();
+                    RectTransform rtMat = materialsLabelText.transform.parent.GetComponent<RectTransform>();
+                    RectTransform rtInt = template.GetComponent<RectTransform>();
+                    
+                    if (rtClone != null && rtMat != null && rtInt != null)
+                    {
+                        float stepX = (rtInt.anchoredPosition.x - rtMat.anchoredPosition.x) / 3f; 
+                        if (stepX == 0) stepX = 150f; 
+                        rtClone.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX, 0f);
+                    }
                 }
             }
 
