@@ -21,7 +21,9 @@ MonoBehaviour:
   <unlockRequirements>k__BackingField: []
   health: 200
   prefab: {fileID: 1076983579694789324, guid: a5f9436dffed4ff42a0e84878aef6c82, type: 3}
-  upgrades: []
+  upgrades:
+  - {fileID: 11400000, guid: d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9, type: 2}
+  - {fileID: 11400000, guid: e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0, type: 2}
   sightConfig: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
   attackConfig: {fileID: 0}
   transportConfig: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}

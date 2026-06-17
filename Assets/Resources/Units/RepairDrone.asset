@@ -21,7 +21,9 @@ MonoBehaviour:
   <unlockRequirements>k__BackingField: []
   <Health>k__BackingField: 200
   <Prefab>k__BackingField: {fileID: 1076983579694789324, guid: 8a3388c5412e7cba0afc5935cf4ea3b8, type: 3}
-  <Upgrades>k__BackingField: []
+  <Upgrades>k__BackingField:
+  - {fileID: 11400000, guid: d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9, type: 2}
+  - {fileID: 11400000, guid: e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0, type: 2}
   <SightConfig>k__BackingField: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
   <AttackConfig>k__BackingField: {fileID: 0}
   <TransportConfig>k__BackingField: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}
