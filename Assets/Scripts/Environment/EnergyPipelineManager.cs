@@ -117,7 +117,7 @@ namespace GameDevTV.RTS.Environment
             {
                 int nextVal = Mathf.Max(0, b - segmentBiomassCost);
                 Supplies.Biomass[Owner.Player1] = nextVal;
-                Supplies.RaiseBiomassChanged(Owner.Player1, nextVal);
+                Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
             }
 
             Vector3 spawnPos = GetNextSegmentPosition();

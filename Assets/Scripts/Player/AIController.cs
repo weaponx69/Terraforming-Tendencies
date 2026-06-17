@@ -113,10 +113,10 @@ namespace GameDevTV.RTS.Units
             int amountToGrant = aiOwner == Owner.Player1 ? 1000 : startingAIBiomass;
             if (amountToGrant <= 0) return;
 
-            int current = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            int current = Player.Supplies.Materials.TryGetValue(aiOwner, out int materials) ? materials : 0;
             int total   = current + amountToGrant;
-            Player.Supplies.Biomass[aiOwner] = total;
-            Player.Supplies.RaiseBiomassChanged(aiOwner, total);
+            Player.Supplies.Materials[aiOwner] = total;
+            Player.Supplies.RaiseMaterialsChanged(aiOwner, total);
         }
 
         // ── Event handlers ─────────────────────────────────────────────────────
@@ -635,7 +635,7 @@ namespace GameDevTV.RTS.Units
         private bool CanAfford(UnlockableSO unlockable)
         {
             if (unlockable?.Cost == null) return true;
-            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Player.Supplies.MineralsToBiomassRateStatic + unlockable.Cost.Gas * Player.Supplies.GasToBiomassRateStatic);
+            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic + unlockable.Cost.Gas * Supplies.GasToMaterialsRateStatic);
             int available = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
 
             // Logarithmic spending limit: starts at 50% (half the max) and drops off over time

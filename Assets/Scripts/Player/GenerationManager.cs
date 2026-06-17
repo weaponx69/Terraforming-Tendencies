@@ -152,14 +152,14 @@ namespace GameDevTV.RTS.Player
         {
             int tc = 0;
             
-            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int b)) tc += b;
+            if (Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int b)) tc += b;
 
             // Wipe resources after liquidating so the player starts the next generation at 0 (or a baseline)
-            if (Supplies.Biomass != null && Supplies.Biomass.ContainsKey(Owner.Player1))
+            if (Supplies.Materials != null && Supplies.Materials.ContainsKey(Owner.Player1))
             {
-                Supplies.Biomass[Owner.Player1] = 0;
+                Supplies.Materials[Owner.Player1] = 0;
             }
-            Supplies.RaiseBiomassChanged(Owner.Player1, 0);
+            Supplies.RaiseMaterialsChanged(Owner.Player1, 0);
 
             return tc / 10;
         }

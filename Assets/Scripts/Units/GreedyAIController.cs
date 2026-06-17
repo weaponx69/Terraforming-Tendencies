@@ -160,7 +160,7 @@ namespace GameDevTV.RTS.Units
 
         private void Start()
         {
-            GrantStartingBiomass();
+            GrantStartingMaterials();
             InvokeRepeating(nameof(Tick), 2f, tickRate);
             
             // Re-scan already discovered resources in scene

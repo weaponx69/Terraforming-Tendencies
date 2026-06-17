@@ -48,13 +48,7 @@ namespace GameDevTV.RTS.Player
 
             if (GenerationManager.Instance != null)
             {
-                data.generationProgress = GenerationManager.Instance.Progress;
-                data.generationRoundCount = GenerationManager.Instance.RoundCount;
-            }
-
-            if (ColonyExpansionManager.Instance != null && ColonyExpansionManager.Instance.ActiveExpansions.Any())
-            {
-                data.colonyExpansionProgress = ColonyExpansionManager.Instance.ActiveExpansions.First().GetProgress();
+                data.generationRoundCount = GenerationManager.Instance.CurrentGeneration;
             }
 
             string json = JsonUtility.ToJson(data, true);

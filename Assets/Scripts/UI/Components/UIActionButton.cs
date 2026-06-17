@@ -113,11 +113,11 @@ namespace GameDevTV.RTS.UI.Components
 
             if (supplyCost != null)
             {
-                int biomassCost = Mathf.FloorToInt(supplyCost.Minerals * Supplies.MineralsToBiomassRateStatic
-                    + supplyCost.Gas * Supplies.GasToBiomassRateStatic);
-                if (biomassCost > 0)
+                int cost = Mathf.FloorToInt(supplyCost.Minerals * Supplies.MineralsToMaterialsRateStatic 
+                                      + supplyCost.Gas * Supplies.GasToMaterialsRateStatic);
+                if (cost > 0)
                 {
-                    tooltipText += string.Format(BIOMASS_FORMAT, biomassCost);
+                    tooltipText += string.Format(BIOMASS_FORMAT, cost);
                 }
             }
 

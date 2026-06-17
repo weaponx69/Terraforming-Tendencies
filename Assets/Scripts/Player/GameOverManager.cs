@@ -225,7 +225,7 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
 
             if (!recoveryPossible)
             {
-                Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Hero Alive: {heroDroneAlive}, Biomass: {biomass}");
+                Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Hero Alive: {heroDroneAlive}, Biomass: {materials}");
                 
                 // Instead of game over, end the generation!
                 if (GenerationManager.Instance != null)
