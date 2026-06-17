@@ -19,9 +19,20 @@ namespace GameDevTV.RTS.Units
         [FormerlySerializedAs("<SafeDropLayers>k__BackingField")]
         [SerializeField] private LayerMask safeDropLayers;
 
+        [Header("Resource Cargo (Crawlers)")]
+        [Tooltip("The maximum amount of Iron this unit can transport.")]
+        [FormerlySerializedAs("<MaxIron>k__BackingField")]
+        [SerializeField] private int maxIron;
+
+        [Tooltip("The maximum amount of Regolith this unit can transport.")]
+        [FormerlySerializedAs("<MaxRegolith>k__BackingField")]
+        [SerializeField] private int maxRegolith;
+
         public int Capacity => capacity;
         public TransportSize Size => size;
         public LayerMask SafeDropLayers => safeDropLayers;
+        public int MaxIron => maxIron;
+        public int MaxRegolith => maxRegolith;
 
         public int GetTransportCapacityUsage() => size switch
         {

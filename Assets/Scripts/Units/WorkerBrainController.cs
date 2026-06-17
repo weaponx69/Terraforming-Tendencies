@@ -186,6 +186,11 @@ namespace GameDevTV.RTS.Units
                 }
 
                 float gatherTime = targetSupply.Supply != null ? targetSupply.Supply.BaseGatherTime : 1.5f;
+                
+                if (worker != null && worker.UnitSO != null && worker.UnitSO.GatherConfig != null)
+                {
+                    gatherTime /= Mathf.Max(0.1f, worker.UnitSO.GatherConfig.GatherRateMultiplier);
+                }
                 yield return new WaitForSeconds(gatherTime);
 
                 if (targetSupply == null) break;
@@ -237,7 +242,13 @@ namespace GameDevTV.RTS.Units
                 float repairTimer = 0f;
                 while (target != null && target.CurrentHealth < target.MaxHealth)
                 {
-                    repairTimer += Time.deltaTime;
+                    float buildSpeedMultiplier = 1f;
+                    if (worker != null && worker.UnitSO != null && worker.UnitSO.BuilderConfig != null)
+                    {
+                        buildSpeedMultiplier = worker.UnitSO.BuilderConfig.BuildSpeedMultiplier;
+                    }
+                
+                    repairTimer += Time.deltaTime * buildSpeedMultiplier;
                     if (repairTimer >= 0.5f) // Repair tick rate
                     {
                         target.Heal(10); // Heal per tick (20 health per second)
@@ -309,12 +320,20 @@ namespace GameDevTV.RTS.Units
 
             float startTime = building.Progress.StartTime;
             float targetHealth = 0f;
+            float elapsedTime = 0f;
+
+            float buildSpeedMultiplier = 1f;
+            if (worker != null && worker.UnitSO != null && worker.UnitSO.BuilderConfig != null)
+            {
+                buildSpeedMultiplier = worker.UnitSO.BuilderConfig.BuildSpeedMultiplier;
+            }
 
             while (building != null)
             {
-                float normalizedTime = (Time.time - startTime) / buildingSO.BuildTime;
+                elapsedTime += Time.deltaTime * buildSpeedMultiplier;
+                float normalizedTime = elapsedTime / buildingSO.BuildTime;
 
-                targetHealth += Time.deltaTime * (buildingSO.Health / buildingSO.BuildTime);
+                targetHealth += (Time.deltaTime * buildSpeedMultiplier) * (buildingSO.Health / buildingSO.BuildTime);
                 if (targetHealth >= 1)
                 {
                     int healAmount = Mathf.FloorToInt(targetHealth);

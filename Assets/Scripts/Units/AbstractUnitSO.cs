@@ -26,14 +26,66 @@ namespace GameDevTV.RTS.Units
         [FormerlySerializedAs("<SightConfig>k__BackingField")]
         [SerializeField] private SightConfigSO sightConfig;
 
+        [Header("Specialized Logic Configurations")]
+        [Tooltip("Configuration for the unit's movement speed.")]
+        [FormerlySerializedAs("<MovementConfig>k__BackingField")]
+        [SerializeField] private MovementConfigSO movementConfig;
+
+        [Tooltip("Configuration for the unit's gathering rates.")]
+        [FormerlySerializedAs("<GatherConfig>k__BackingField")]
+        [SerializeField] private GatherConfigSO gatherConfig;
+
+        [Tooltip("Configuration for the unit's building and repair rates.")]
+        [FormerlySerializedAs("<BuilderConfig>k__BackingField")]
+        [SerializeField] private BuilderConfigSO builderConfig;
+
+        [Tooltip("Configuration for Probe scanning and analysis.")]
+        [FormerlySerializedAs("<ProbeConfig>k__BackingField")]
+        [SerializeField] private ProbeConfigSO probeConfig;
+
+        [Tooltip("Configuration for Buildings (queue, life support, etc).")]
+        [FormerlySerializedAs("<BuildingConfig>k__BackingField")]
+        [SerializeField] private BuildingConfigSO buildingConfig;
+
         // Public accessors
         public int Health => health;
         public GameObject Prefab => prefab;
         public UpgradeSO[] Upgrades => upgrades;
+        
         public SightConfigSO SightConfig 
         { 
             get => sightConfig;
             protected set => sightConfig = value; // Protected setter for cloning
+        }
+
+        public MovementConfigSO MovementConfig
+        {
+            get => movementConfig;
+            protected set => movementConfig = value;
+        }
+
+        public GatherConfigSO GatherConfig
+        {
+            get => gatherConfig;
+            protected set => gatherConfig = value;
+        }
+
+        public BuilderConfigSO BuilderConfig
+        {
+            get => builderConfig;
+            protected set => builderConfig = value;
+        }
+
+        public ProbeConfigSO ProbeConfig
+        {
+            get => probeConfig;
+            protected set => probeConfig = value;
+        }
+
+        public BuildingConfigSO BuildingConfig
+        {
+            get => buildingConfig;
+            protected set => buildingConfig = value;
         }
     }
 }

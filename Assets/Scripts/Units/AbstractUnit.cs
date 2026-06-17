@@ -222,6 +222,11 @@ protected UnitSO unitSO;
                     upgrade.Apply(unitSO);
                 }
             }
+
+            if (unitSO.MovementConfig != null && Agent != null)
+            {
+                Agent.speed = unitSO.MovementConfig.Speed;
+            }
 }
 
         private float lastNavMeshSampleTime = 0f;

@@ -204,6 +204,11 @@ namespace GameDevTV.RTS.Units
             if (evt.Owner == Owner && UnitSO.Upgrades.Contains(evt.Upgrade))
             {
                 evt.Upgrade.Apply(UnitSO);
+                
+                if (this is AbstractUnit unit && UnitSO.MovementConfig != null && unit.Agent != null)
+                {
+                    unit.Agent.speed = UnitSO.MovementConfig.Speed;
+                }
             }
         }
     }
