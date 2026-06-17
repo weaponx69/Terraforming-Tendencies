@@ -29,7 +29,7 @@ namespace GameDevTV.RTS.Units
         [field: SerializeField] public Owner Owner { get; set; }
         [field: SerializeField] public bool IsVisible { get; private set; } = true;
         public Transform Transform => this == null ? null : transform;
-        [field: SerializeField] public BaseCommand[] AvailableCommands { get; private set; }
+        [field: SerializeField] public BaseCommand[] AvailableCommands { get; protected set; }
         [field: SerializeField] public AbstractUnitSO UnitSO { get; private set; }
         [SerializeField] protected GameObject selectionIndicator;
         [SerializeField] protected Transform VisionTransform;
