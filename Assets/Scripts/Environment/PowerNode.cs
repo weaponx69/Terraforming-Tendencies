@@ -11,18 +11,29 @@ namespace GameDevTV.RTS.Environment
         public List<PowerNode> ConnectedNodes = new List<PowerNode>();
         public BaseBuilding Building { get; private set; }
         
-        [SerializeField] private bool isPowered = false;
-        public bool IsPowered 
+        [SerializeField] private bool isGridPowered = false;
+        public bool IsGridPowered 
         { 
-            get => isPowered; 
+            get => isGridPowered; 
             set 
             {
-                if (isPowered != value)
+                bool wasPowered = IsPowered;
+                isGridPowered = value;
+                if (IsPowered != wasPowered)
                 {
-                    isPowered = value;
-                    OnPowerStateChanged?.Invoke(isPowered);
+                    OnPowerStateChanged?.Invoke(IsPowered);
                 }
             } 
+        }
+
+        public bool IsPowered 
+        {
+            get 
+            {
+                if (isGridPowered) return true;
+                if (TryGetComponent(out BatteryNode battery) && battery.HasCharge) return true;
+                return false;
+            }
         }
 
         public event System.Action<bool> OnPowerStateChanged;

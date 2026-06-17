@@ -118,14 +118,24 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 {
                     GameObject clone = Instantiate(template, containerParent);
                     clone.name = "Food Container";
-                    FindAndLinkUI("Food Container", ref biomassLabelText, ref biomassValueText, "Food Header");
+                    biomassValueText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
+                        .FirstOrDefault(t => t.gameObject.name == "Resource Label");
+                    biomassLabelText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
+                        .FirstOrDefault(t => t.gameObject.name == "Materials Header" || t.gameObject.name == "Food Header");
+                    if (biomassLabelText != null) biomassLabelText.gameObject.name = "Food Header";
+                    clone.SetActive(true);
                 }
                 
                 if (powerValueText == null)
                 {
                     GameObject clone = Instantiate(template, containerParent);
                     clone.name = "Power Container";
-                    FindAndLinkUI("Power Container", ref powerLabelText, ref powerValueText, "Power Header");
+                    powerValueText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
+                        .FirstOrDefault(t => t.gameObject.name == "Resource Label");
+                    powerLabelText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
+                        .FirstOrDefault(t => t.gameObject.name == "Materials Header" || t.gameObject.name == "Power Header");
+                    if (powerLabelText != null) powerLabelText.gameObject.name = "Power Header";
+                    clone.SetActive(true);
                 }
             }
 

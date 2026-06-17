@@ -85,6 +85,12 @@ namespace GameDevTV.RTS.Units
                 gameObject.AddComponent<GameDevTV.RTS.Environment.PowerNode>();
             }
 
+            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+            if (isCommandPost && gameObject.GetComponent<GameDevTV.RTS.Environment.BatteryNode>() == null)
+            {
+                gameObject.AddComponent<GameDevTV.RTS.Environment.BatteryNode>();
+            }
+
             isBuildingInitialized = true;
         }
 
@@ -243,13 +249,24 @@ namespace GameDevTV.RTS.Units
             {
                 yield return new WaitForSeconds(1f);
 
+                bool isOperating = true;
+
                 if (TryGetComponent(out GameDevTV.RTS.Environment.PowerNode powerNode))
                 {
-                    if (config.PowerUpkeep > 0 && !powerNode.IsPowered)
+                    if (config.PowerUpkeep > 0)
                     {
-                        // Needs power but is unpowered, so it stalls.
-                        // Wait, it still generates its own power if it has PowerGeneration > 0!
-                        // Let's do Generation first before skipping.
+                        if (!powerNode.IsGridPowered)
+                        {
+                            if (TryGetComponent(out GameDevTV.RTS.Environment.BatteryNode battery) && battery.HasCharge)
+                            {
+                                battery.Drain(1f);
+                            }
+                        }
+
+                        if (!powerNode.IsPowered)
+                        {
+                            isOperating = false;
+                        }
                     }
                 }
 
@@ -258,12 +275,6 @@ namespace GameDevTV.RTS.Units
                 {
                     float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
                     Supplies.UpdatePower(Owner, curPower + config.PowerGeneration);
-                }
-
-                bool isOperating = true;
-                if (config.PowerUpkeep > 0 && TryGetComponent(out GameDevTV.RTS.Environment.PowerNode pNode) && !pNode.IsPowered)
-                {
-                    isOperating = false;
                 }
 
                 if (isOperating)
@@ -549,7 +560,31 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                     buildTime *= BuildingSO.BuildingConfig.BuildTimeMultiplier;
                 }
 
-                yield return new WaitForSeconds(buildTime);
+                float elapsed = 0f;
+                bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
+                GameDevTV.RTS.Environment.PowerNode pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+
+                while (elapsed < buildTime)
+                {
+                    bool isPowered = true;
+                    if (needsPower && pNode != null && !pNode.IsPowered)
+                    {
+                        isPowered = false;
+                    }
+
+                    if (isPowered)
+                    {
+                        elapsed += Time.deltaTime;
+                    }
+
+                    // Update UI timer (which is based on CurrentQueueStartTime). We shift the start time forward when stalled so the UI doesn't think it's done.
+                    if (!isPowered)
+                    {
+                        CurrentQueueStartTime += Time.deltaTime;
+                    }
+
+                    yield return null;
+                }
 
                 if (SOBeingBuilt is AbstractUnitSO unitSO)
                 {

@@ -80,7 +80,7 @@ namespace GameDevTV.RTS.Environment
                 
                 foreach(var gridNode in currentGrid)
                 {
-                    gridNode.IsPowered = isPowered;
+                    gridNode.IsGridPowered = isPowered;
                 }
 
                 powerGrids.Add(currentGrid);
