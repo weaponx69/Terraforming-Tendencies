@@ -157,6 +157,9 @@ namespace GameDevTV.RTS.Units
                 var nameField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Name>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                 if (nameField != null) nameField.SetValue(connectCommand, "Connect Power");
 
+                var iconField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Icon>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (iconField != null) iconField.SetValue(connectCommand, UnityEngine.Resources.Load<UnityEngine.Sprite>("PlugIcon"));
+
                 var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
                 commandList.Add(connectCommand);
                 AvailableCommands = commandList.ToArray();

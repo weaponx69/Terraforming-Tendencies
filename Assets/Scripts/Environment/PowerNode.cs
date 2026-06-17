@@ -63,7 +63,10 @@ namespace GameDevTV.RTS.Environment
             
             // Create Visual Cord
             GameObject cordGO = new GameObject($"PowerCord_{this.name}_{other.name}");
-            cordGO.transform.SetParent(PowerGridManager.Instance.transform);
+            if (PowerGridManager.Instance != null)
+            {
+                cordGO.transform.SetParent(PowerGridManager.Instance.transform);
+            }
             var lr = cordGO.AddComponent<LineRenderer>();
             
             // Set up LineRenderer
