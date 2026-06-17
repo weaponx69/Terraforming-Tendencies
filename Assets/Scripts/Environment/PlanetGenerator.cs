@@ -383,7 +383,8 @@ namespace GameDevTV.RTS.Environment
                 public void ApplyCurvedWorldShader(GameObject root)
                 {
                     Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
-                    if (curvedShader == null) return;
+                    Shader curvedShaderTransparent = Shader.Find("Custom/URP_CurvedWorld_Transparent");
+                    if (curvedShader == null || curvedShaderTransparent == null) return;
 
                     Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
                     foreach (var r in renderers)
@@ -415,7 +416,8 @@ namespace GameDevTV.RTS.Environment
                                     hasEmission = sharedMaterials[i].IsKeywordEnabled("_EMISSION") || (emissionColor.r > 0f || emissionColor.g > 0f || emissionColor.b > 0f);
                                 }
 
-                                sharedMaterials[i].shader = curvedShader;
+                                bool isTransparent = sharedMaterials[i].renderQueue >= 3000 || shaderName.Contains("Transparent") || shaderName.Contains("Unlit");
+                                sharedMaterials[i].shader = isTransparent ? curvedShaderTransparent : curvedShader;
                                 
                                 // Re-apply to the new shader's properties
                                 if (mainTex != null) sharedMaterials[i].SetTexture("_BaseMap", mainTex);
