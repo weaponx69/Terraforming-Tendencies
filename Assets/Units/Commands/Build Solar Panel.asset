@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Build Solar Panel
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Commands.BuildBuildingCommand
   <Name>k__BackingField: Solar Panel
-  <Icon>k__BackingField: {fileID: 21300000, guid: e7c49208e47e57c47b55c30f3f47b29d, type: 3}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 4e3a62bcd54c17cb98dbb981b6264947, type: 3}
   <Slot>k__BackingField: 5
   <RequiresClickToActivate>k__BackingField: 1
   <IsSingleUnitCommand>k__BackingField: 1
