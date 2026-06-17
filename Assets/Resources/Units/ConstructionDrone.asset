@@ -25,5 +25,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9, type: 2}
   - {fileID: 11400000, guid: e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0, type: 2}
   sightConfig: {fileID: 11400000, guid: a7390548f4c02a84c87441c82c5f8996, type: 2}
+  movementConfig: {fileID: 11400000, guid: 3782cf2b76f59dd7c80a6e973a483865, type: 2}
+  gatherConfig: {fileID: 0}
+  builderConfig: {fileID: 11400000, guid: a72611bb0277c3d6aa8ee9afe13c231a, type: 2}
+  probeConfig: {fileID: 0}
+  buildingConfig: {fileID: 0}
   attackConfig: {fileID: 0}
   transportConfig: {fileID: 11400000, guid: 5481d5881195ee749a885e9530a56b7d, type: 2}
