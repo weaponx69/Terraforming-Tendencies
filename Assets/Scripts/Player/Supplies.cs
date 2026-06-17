@@ -292,6 +292,7 @@ namespace GameDevTV.RTS.Player
             bool isMinerals = (mineralsSO != null && evt.Supply == mineralsSO) || sName.Contains("minerals");
             bool isGas = (gasSO != null && evt.Supply == gasSO) || sName.Contains("gas");
             bool isOxygen = (oxygenSO != null && evt.Supply == oxygenSO) || sName.Contains("oxygen");
+            bool isBiomass = sName.Contains("biomass") || sName.Contains("food");
             
             if (isMinerals)
             {
@@ -311,6 +312,12 @@ namespace GameDevTV.RTS.Player
             {
                 Oxygen[evt.Owner] += evt.Amount;
                 OnOxygenChanged?.Invoke(evt.Owner, Oxygen[evt.Owner]);
+                return;
+            }
+            else if (isBiomass)
+            {
+                int curBiomass = Biomass != null && Biomass.TryGetValue(evt.Owner, out int b) ? b : 0;
+                UpdateBiomass(evt.Owner, curBiomass + evt.Amount);
                 return;
             }
         }

@@ -24,7 +24,7 @@ namespace GameDevTV.RTS.Units
         }
 
         [field: SerializeField] public bool IsSelected { get; protected set; }
-[field: SerializeField] public int CurrentHealth { get; protected set; }
+        [field: SerializeField] public int CurrentHealth { get; protected set; }
         [field: SerializeField] public int MaxHealth { get; protected set; }
         [field: SerializeField] public Owner Owner { get; set; }
         [field: SerializeField] public bool IsVisible { get; private set; } = true;

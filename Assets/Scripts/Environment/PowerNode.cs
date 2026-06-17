@@ -104,7 +104,9 @@ namespace GameDevTV.RTS.Environment
                 if (i > 0 && i < 9)
                 {
                     Vector3 direction = (endPoint - startPoint).normalized;
+                    if (direction == Vector3.zero) direction = Vector3.forward;
                     Vector3 right = Vector3.Cross(direction, Vector3.up).normalized;
+                    if (right == Vector3.zero) right = Vector3.right;
                     float jitter = Mathf.Sin(t * Mathf.PI * 3f) * 0.3f; // Slight wave
                     p += right * jitter;
                 }

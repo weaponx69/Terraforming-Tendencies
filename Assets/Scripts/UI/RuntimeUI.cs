@@ -102,40 +102,38 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
         private void Awake()
         {
             // Auto-hookup missing UI references by searching the hierarchy
-            FindAndLinkUI("Biomass Container", ref materialsLabelText, ref materialsValueText, "Materials Header");
+            FindAndLinkUI("Biomass Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
             FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
             FindAndLinkUI("Probe Progress Container", ref probeProgressLabelText, ref probeProgressValueText, "Probe Progress Header");
             
-            // Clone the Materials Container for Biomass (Food) and Power if they aren't assigned
-            if (materialsLabelText != null && (biomassValueText == null || powerValueText == null))
+            // We only need the Power Container cloned now
+            if (powerValueText == null && integrityLabelText != null)
             {
-                Transform containerParent = materialsLabelText.transform.parent.parent;
-                GameObject template = materialsLabelText.transform.parent.gameObject;
+                Transform containerParent = integrityLabelText.transform.parent.parent;
+                GameObject template = integrityLabelText.transform.parent.gameObject;
 
-                if (biomassValueText == null)
-                {
-                    GameObject clone = Instantiate(template, containerParent);
-                    clone.name = "Food Container";
-                    biomassValueText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
-                        .FirstOrDefault(t => t.gameObject.name == "Resource Label");
-                    biomassLabelText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
-                        .FirstOrDefault(t => t.gameObject.name == "Materials Header" || t.gameObject.name == "Food Header");
-                    if (biomassLabelText != null) biomassLabelText.gameObject.name = "Food Header";
-                    clone.SetActive(true);
-                }
+                GameObject clone = Instantiate(template, containerParent);
+                clone.name = "Power Container";
+                powerValueText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
+                    .FirstOrDefault(t => t.gameObject.name == "Resource Label");
+                powerLabelText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
+                    .FirstOrDefault(t => t.gameObject.name == "Integrity Header" || t.gameObject.name == "Power Header");
+                if (powerLabelText != null) powerLabelText.gameObject.name = "Power Header";
+                clone.SetActive(true);
+
+                // Position it dynamically based on the distance between Materials and Integrity
+                RectTransform rtClone = clone.GetComponent<RectTransform>();
+                RectTransform rtMat = materialsLabelText.transform.parent.GetComponent<RectTransform>();
+                RectTransform rtInt = template.GetComponent<RectTransform>();
                 
-                if (powerValueText == null)
+                if (rtClone != null && rtMat != null && rtInt != null)
                 {
-                    GameObject clone = Instantiate(template, containerParent);
-                    clone.name = "Power Container";
-                    powerValueText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
-                        .FirstOrDefault(t => t.gameObject.name == "Resource Label");
-                    powerLabelText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
-                        .FirstOrDefault(t => t.gameObject.name == "Materials Header" || t.gameObject.name == "Power Header");
-                    if (powerLabelText != null) powerLabelText.gameObject.name = "Power Header";
-                    clone.SetActive(true);
+                    // Calculate direction from Materials to Integrity
+                    float stepX = (rtInt.anchoredPosition.x - rtMat.anchoredPosition.x) / 3f; // 3 gaps between 4 items
+                    if (stepX == 0) stepX = 150f; // fallback
+                    rtClone.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX, 0f);
                 }
             }
 
@@ -212,7 +210,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             }
         }
 
-        private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, string headerName)
+        private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, params string[] headerNames)
         {
             GameObject container = GameObject.Find(containerName);
             if (container == null) return;
@@ -228,7 +226,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             {
                 // Look for header anywhere in children
                 labelField = container.GetComponentsInChildren<TextMeshProUGUI>(true)
-                    .FirstOrDefault(t => t.gameObject.name == headerName);
+                    .FirstOrDefault(t => headerNames.Contains(t.gameObject.name));
             }
         }
 
