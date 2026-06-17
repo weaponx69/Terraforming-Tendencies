@@ -200,6 +200,27 @@ namespace GameDevTV.RTS.Units
 
                 // Combine both names to bulletproof the check (in case the SupplySO is named something weird like "Rocks")
                 Transform returnTarget = homeBase;
+                if (returnTarget == null && worker != null)
+                {
+                    float nearestDist = float.MaxValue;
+                    BaseBuilding nearestBldg = null;
+                    foreach (var bldg in BaseBuilding.ActiveBuildings)
+                    {
+                        if (bldg != null && bldg.Owner == worker.Owner && bldg.Progress.State == BuildingProgress.BuildingState.Completed)
+                        {
+                            float dist = Vector3.Distance(transform.position, bldg.transform.position);
+                            if (dist < nearestDist)
+                            {
+                                nearestDist = dist;
+                                nearestBldg = bldg;
+                            }
+                        }
+                    }
+                    if (nearestBldg != null)
+                    {
+                        returnTarget = nearestBldg.transform;
+                    }
+                }
 
                 // ── State: Return to base ──────────────────────────────
                 if (returnTarget != null && agent.isOnNavMesh)
