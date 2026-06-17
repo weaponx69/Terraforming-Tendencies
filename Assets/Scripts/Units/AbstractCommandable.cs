@@ -203,8 +203,25 @@ namespace GameDevTV.RTS.Units
         {
             if (evt.Owner == Owner && UnitSO.Upgrades.Contains(evt.Upgrade))
             {
+                int oldHealth = UnitSO.Health;
+                
                 evt.Upgrade.Apply(UnitSO);
                 
+                // If health was upgraded, adjust MaxHealth and heal by the difference
+                if (UnitSO.Health != oldHealth)
+                {
+                    int diff = UnitSO.Health - oldHealth;
+                    MaxHealth = UnitSO.Health;
+                    Heal(diff);
+                }
+
+                // If sight was upgraded, adjust VisionTransform scale
+                if (UnitSO.SightConfig != null && VisionTransform != null)
+                {
+                    float size = UnitSO.SightConfig.SightRadius * 2;
+                    VisionTransform.localScale = new Vector3(size, size, size);
+                }
+
                 if (this is AbstractUnit unit && UnitSO.MovementConfig != null && unit.Agent != null)
                 {
                     unit.Agent.speed = UnitSO.MovementConfig.Speed;
