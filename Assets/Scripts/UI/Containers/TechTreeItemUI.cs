@@ -26,7 +26,7 @@ namespace GameDevTV.RTS.UI.Containers
             if (nameText != null) 
             {
                 nameText.text = upgrade.Name;
-                nameText.enableWordWrapping = true;
+                nameText.textWrappingMode = TextWrappingModes.Normal;
                 nameText.enableAutoSizing = true;
                 nameText.fontSizeMin = 14f; 
                 nameText.fontSizeMax = 28f;

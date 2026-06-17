@@ -108,7 +108,7 @@ namespace GameDevTV.RTS.Units
 
         private void GrantStartingMaterials()
         {
-            if (Player.Supplies.Biomass == null) return;
+            if (Player.Supplies.Materials == null) return;
 
             int amountToGrant = aiOwner == Owner.Player1 ? 1000 : startingAIBiomass;
             if (amountToGrant <= 0) return;
@@ -301,7 +301,7 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
-            int availableBiomass = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            int availableMaterials = Player.Supplies.Materials.TryGetValue(aiOwner, out int materials) ? materials : 0;
             bool allNodesMaxed = true;
 
             foreach (var node in activeNodes.ToList())
@@ -635,8 +635,8 @@ namespace GameDevTV.RTS.Units
         private bool CanAfford(UnlockableSO unlockable)
         {
             if (unlockable?.Cost == null) return true;
-            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic + unlockable.Cost.Gas * Supplies.GasToMaterialsRateStatic);
-            int available = Player.Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Player.Supplies.MineralsToMaterialsRateStatic + unlockable.Cost.Gas * Player.Supplies.GasToMaterialsRateStatic);
+            int available = Player.Supplies.Materials.TryGetValue(aiOwner, out int materials) ? materials : 0;
 
             // Logarithmic spending limit: starts at 50% (half the max) and drops off over time
             float logarithmicFraction = 0.5f - 0.05f * Mathf.Log(Time.time + 1f);

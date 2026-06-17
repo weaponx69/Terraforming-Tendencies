@@ -113,10 +113,10 @@ namespace GameDevTV.RTS.Environment
             if (builtSegments >= neededSegments) return;
 
             // Drain cost if not free
-            if (!isFree && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int b))
+            if (!isFree && Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int b))
             {
                 int nextVal = Mathf.Max(0, b - segmentBiomassCost);
-                Supplies.Biomass[Owner.Player1] = nextVal;
+                Supplies.Materials[Owner.Player1] = nextVal;
                 Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
             }
 
@@ -241,8 +241,8 @@ namespace GameDevTV.RTS.Environment
 
         public bool CanAffordNextSegment()
         {
-            if (Supplies.Biomass == null) return false;
-            return Supplies.Biomass.TryGetValue(Owner.Player1, out int b) && b >= segmentBiomassCost;
+            if (Supplies.Materials == null) return false;
+            return Supplies.Materials.TryGetValue(Owner.Player1, out int b) && b >= segmentBiomassCost;
         }
 
 
