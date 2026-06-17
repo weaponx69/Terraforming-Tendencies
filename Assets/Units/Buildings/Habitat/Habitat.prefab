@@ -75,10 +75,7 @@ MonoBehaviour:
   <MaxHealth>k__BackingField: 0
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
-  <AvailableCommands>k__BackingField:
-  - {fileID: 11400000, guid: 2e1eb4965418920b8a032e3883db6b3c, type: 2}
-  - {fileID: 11400000, guid: 2ebe41fb690ef785d99032c25551defa, type: 2}
-  - {fileID: 11400000, guid: 3ef62f1f947fc5df5a509360e9c4e637, type: 2}
+  <AvailableCommands>k__BackingField: []
   <UnitSO>k__BackingField: {fileID: 11400000, guid: 3597e650a85c28864ab06f1a87974659, type: 2}
   selectionIndicator: {fileID: 6878043107005118419}
   VisionTransform: {fileID: 7812053062812452437}
