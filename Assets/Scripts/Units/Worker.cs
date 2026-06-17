@@ -80,12 +80,8 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
 
-            // Fix: Set every possible name the BT might use for the local unit
-            if (graphAgent != null)
-            {
-                // Ensure event channels are loaded into the blackboard
-                LoadEventChannels();
-            }
+            // Ensure event channels are loaded (even if graphAgent is null for purely script-driven drones)
+            LoadEventChannels();
         }
 
         protected override void OnDestroy()
@@ -104,8 +100,10 @@ namespace GameDevTV.RTS.Units
         }
 
         private void LoadEventChannels()
-{
-            if (graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> gatherEvt))
+        {
+            // Gather Supplies Event Channel
+            bool gatherLoadedFromGraph = false;
+            if (graphAgent != null && graphAgent.GetVariable("GatherSuppliesEvent", out BlackboardVariable<GatherSuppliesEventChannel> gatherEvt))
             {
                 if (gatherEvt.Value == null) gatherEvt.Value = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
                 if (gatherEvt.Value != null)
@@ -113,15 +111,39 @@ namespace GameDevTV.RTS.Units
                     gatherEventChannel = gatherEvt.Value;
                     gatherEvt.Value.Event += HandleGatherSupplies;
                     Brain.SetEventChannel(gatherEventChannel);
+                    gatherLoadedFromGraph = true;
                 }
             }
-            if (graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
+
+            if (!gatherLoadedFromGraph)
+            {
+                gatherEventChannel = Resources.Load<GatherSuppliesEventChannel>("Events/GatherSuppliesEventChannel");
+                if (gatherEventChannel != null)
+                {
+                    gatherEventChannel.Event += HandleGatherSupplies;
+                    Brain.SetEventChannel(gatherEventChannel);
+                }
+            }
+
+            // Building Event Channel
+            bool buildingLoadedFromGraph = false;
+            if (graphAgent != null && graphAgent.GetVariable("BuildingEventChannel", out BlackboardVariable<BuildingEventChannel> buildEvt))
             {
                 if (buildEvt.Value == null) buildEvt.Value = Resources.Load<BuildingEventChannel>("Events/BuildingEventChannel");
                 if (buildEvt.Value != null)
                 {
                     buildingEventChannel = buildEvt.Value;
                     buildEvt.Value.Event += HandleBuildingEvent;
+                    buildingLoadedFromGraph = true;
+                }
+            }
+
+            if (!buildingLoadedFromGraph)
+            {
+                buildingEventChannel = Resources.Load<BuildingEventChannel>("Events/BuildingEventChannel");
+                if (buildingEventChannel != null)
+                {
+                    buildingEventChannel.Event += HandleBuildingEvent;
                 }
             }
         }
@@ -345,11 +367,11 @@ namespace GameDevTV.RTS.Units
 
             if (supply == null)
             {
-                // // Debug.LogWarning($"HandleGatherSupplies called with null supply. Owner={Owner}, Self={(self != null ? self.name : "null")}, Amount={amount}");
+                Debug.LogWarning($"HandleGatherSupplies called with null supply. Owner={Owner}, Self={(self != null ? self.name : "null")}, Amount={amount}");
                 return;
             }
 
-            // // // Debug.Log($"[Worker] {name} received gather event: amount={amount}, biomassDictExists={GameDevTV.RTS.Player.Supplies.Biomass != null}");
+            Debug.Log($"[Worker] {name} received gather event: amount={amount}, biomassDictExists={GameDevTV.RTS.Player.Supplies.Biomass != null}");
             Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, amount, supply));
         }
 

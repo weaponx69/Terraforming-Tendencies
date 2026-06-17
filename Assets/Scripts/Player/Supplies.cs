@@ -283,6 +283,7 @@ namespace GameDevTV.RTS.Player
         {
             if (evt.Supply == null) 
             {
+                Debug.LogWarning($"[Supplies] HandleSupplyEvent received null supply! Amount: {evt.Amount}");
                 Materials[evt.Owner] += evt.Amount;
                 RaiseMaterialsChanged(evt.Owner, Materials[evt.Owner]);
                 return;
@@ -294,6 +295,8 @@ namespace GameDevTV.RTS.Player
             bool isOxygen = (oxygenSO != null && evt.Supply == oxygenSO) || sName.Contains("oxygen");
             bool isBiomass = sName.Contains("biomass") || sName.Contains("food");
             
+            Debug.Log($"[Supplies] HandleSupplyEvent for {evt.Owner}: amount={evt.Amount}, isMinerals={isMinerals}, sName={sName}");
+
             if (isMinerals)
             {
                 int matsAmount = Mathf.FloorToInt(evt.Amount * mineralsToMaterialsRate);
