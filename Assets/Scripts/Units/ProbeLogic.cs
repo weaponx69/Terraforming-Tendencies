@@ -20,7 +20,18 @@ private float nextSectorCheckTime = 0f;
         private SectorManager.Sector currentTargetSector;
         private float analysisTimer = 0f;
 
-        public float AnalysisProgress => AnalysisDuration > 0 ? Mathf.Clamp01(analysisTimer / AnalysisDuration) : 0f;
+        public float AnalysisProgress
+        {
+            get
+            {
+                float currentAnalysisDuration = AnalysisDuration;
+                if (unit != null && unit.UnitSO != null && unit.UnitSO.ProbeConfig != null)
+                {
+                    currentAnalysisDuration /= Mathf.Max(0.1f, unit.UnitSO.ProbeConfig.AnalysisTimeMultiplier);
+                }
+                return currentAnalysisDuration > 0 ? Mathf.Clamp01(analysisTimer / currentAnalysisDuration) : 0f;
+            }
+        }
         public bool IsAnalyzing => currentTargetSector != null;
 
         private void Awake()
@@ -35,6 +46,12 @@ private float nextSectorCheckTime = 0f;
 
         private void Update()
         {
+            float currentScanRadius = ScanRadius;
+            if (unit != null && unit.UnitSO != null && unit.UnitSO.SightConfig != null)
+            {
+                currentScanRadius = unit.UnitSO.SightConfig.SightRadius;
+            }
+
             // Performance note: In a larger game, we'd use a LayerMask OverlapSphere or spatial partitioning
             // For MVP, FindObjectsByType is sufficient for a low number of resources
             HiddenResource[] hiddenResources = FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude);
@@ -42,7 +59,7 @@ private float nextSectorCheckTime = 0f;
             {
                 if (!res.IsDiscovered)
                 {
-                    if (Vector3.Distance(transform.position, res.transform.position) <= ScanRadius)
+                    if (Vector3.Distance(transform.position, res.transform.position) <= currentScanRadius)
                     {
                         res.Discover();
                     }
@@ -73,7 +90,13 @@ private float nextSectorCheckTime = 0f;
                         
                         if (analysisProgressBar != null) analysisProgressBar.SetProgress(AnalysisProgress);
 
-                        if (analysisTimer >= AnalysisDuration)
+                        float currentAnalysisDuration = AnalysisDuration;
+                        if (unit != null && unit.UnitSO != null && unit.UnitSO.ProbeConfig != null)
+                        {
+                            currentAnalysisDuration /= Mathf.Max(0.1f, unit.UnitSO.ProbeConfig.AnalysisTimeMultiplier);
+                        }
+
+                        if (analysisTimer >= currentAnalysisDuration)
                         {
                             TriggerExpansion(sector);
                             analysisTimer = 0f;

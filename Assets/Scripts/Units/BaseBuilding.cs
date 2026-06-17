@@ -20,7 +20,19 @@ namespace GameDevTV.RTS.Units
             ActiveBuildings.Clear();
         }
 
-        public int QueueSize => buildingQueue.Count;
+        public int CurrentQueueCount => buildingQueue.Count;
+        public int MaxQueueSize
+        {
+            get
+            {
+                if (BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.QueueSize > 0)
+                {
+                    return BuildingSO.BuildingConfig.QueueSize;
+                }
+                return MAX_QUEUE_SIZE;
+            }
+        }
+        public int QueueSize => buildingQueue.Count; // Keep for backward compatibility with external scripts, but it represents the current count!
         public UnlockableSO[] Queue => buildingQueue.ToArray();
         [field: SerializeField] public float CurrentQueueStartTime { get; private set; }
         [field: SerializeField] public UnlockableSO SOBeingBuilt { get; private set; }
@@ -284,9 +296,9 @@ namespace GameDevTV.RTS.Units
 
         public void BuildUnlockable(UnlockableSO unlockable)
         {
-            if (buildingQueue.Count == MAX_QUEUE_SIZE)
+            if (buildingQueue.Count >= MaxQueueSize)
             {
-                Debug.LogWarning($"[BaseBuilding] Cannot build {unlockable.Name}: Queue is full ({MAX_QUEUE_SIZE}/{MAX_QUEUE_SIZE}).");
+                Debug.LogWarning($"[BaseBuilding] Cannot build {unlockable.Name}: Queue is full ({MaxQueueSize}/{MaxQueueSize}).");
                 return;
             }
 

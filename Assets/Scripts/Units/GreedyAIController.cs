@@ -404,9 +404,9 @@ if (SectorManager.Instance != null)
             //    deducts their cost itself; they need no free worker.
             foreach (var item in enabled)
             {
-                if (item.Type == PackageItemType.Worker && workerSO != null && CanAfford(workerSO) && hub != null && hub.QueueSize < 5)
+                if (item.Type == PackageItemType.Worker && workerSO != null && CanAfford(workerSO) && hub != null && hub.QueueSize < hub.MaxQueueSize)
                     hub.BuildUnlockable(workerSO);
-                else if (item.Type == PackageItemType.Probe && probeSO != null && CanAfford(probeSO) && hub != null && hub.QueueSize < 5)
+                else if (item.Type == PackageItemType.Probe && probeSO != null && CanAfford(probeSO) && hub != null && hub.QueueSize < hub.MaxQueueSize)
                     hub.BuildUnlockable(probeSO);
             }
 
@@ -512,7 +512,7 @@ if (SectorManager.Instance != null)
 
             foreach (var cp in activeCommandPosts)
             {
-                if (cp == null || cp.QueueSize >= 3) continue;
+                if (cp == null || cp.QueueSize >= cp.MaxQueueSize) continue;
 
                 // If the building is currently prioritizing a starter probe (from expansion), 
                 // don't clutter the queue yet.
@@ -539,7 +539,7 @@ if (SectorManager.Instance != null)
                 // B. Normal Priority: Build remaining probes up to the quota, but allow other units to build too
                 if (probeCount < activeCommandPosts.Count * probesPerBase)
                 {
-                    if (probeSO != null && CanAfford(probeSO) && cp.QueueSize < 3) 
+                    if (probeSO != null && CanAfford(probeSO) && cp.QueueSize < cp.MaxQueueSize) 
                     {
                         Debug.Log("[GreedyAI] Building Additional Probe at " + cp.name);
                         cp.BuildUnlockable(probeSO);
@@ -550,7 +550,7 @@ if (SectorManager.Instance != null)
                 int builderCount = allUnits.Count(u => u is Worker && u.UnitSO != null && u.UnitSO.Name == "Construction Drone");
                 if (builderCount < activeCommandPosts.Count * 1)
                 {
-                    if (constructionDroneSO != null && CanAfford(constructionDroneSO) && cp.QueueSize < 3) 
+                    if (constructionDroneSO != null && CanAfford(constructionDroneSO) && cp.QueueSize < cp.MaxQueueSize) 
                     {
                         Debug.Log("[GreedyAI] Building Construction Drone at " + cp.name);
                         cp.BuildUnlockable(constructionDroneSO);
@@ -561,7 +561,7 @@ if (SectorManager.Instance != null)
                 int workerCount = allUnits.Count(u => u is Worker && u.GetComponent<ProbeMovement>() == null && (u.UnitSO == null || u.UnitSO.Name != "Construction Drone"));
                 if (workerCount < workersPerBase)
                 {
-                    if (workerSO != null && CanAfford(workerSO) && cp.QueueSize < 3) 
+                    if (workerSO != null && CanAfford(workerSO) && cp.QueueSize < cp.MaxQueueSize) 
                     {
                         Debug.Log("[GreedyAI] Building Mining Drone at " + cp.name);
                         cp.BuildUnlockable(workerSO);

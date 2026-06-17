@@ -103,21 +103,18 @@ namespace GameDevTV.RTS.Editor
                 SerializedObject serializedObject = new SerializedObject(techTree);
                 SerializedProperty unlockablesProp = serializedObject.FindProperty("allUnlockables");
                 
-                // Don't overwrite existing units, just clear old upgrades if wanted, but for now append
-                // Actually, let's just create a completely fresh tech tree to be safe!
-                TechTreeSO newTree = ScriptableObject.CreateInstance<TechTreeSO>();
-                AssetDatabase.CreateAsset(newTree, "Assets/Tech Trees/Generated Drone Tech Tree.asset");
-                
-                SerializedObject newSO = new SerializedObject(newTree);
-                SerializedProperty newUnlockables = newSO.FindProperty("allUnlockables");
+                // Overwrite the existing Tech Tree so the UI automatically sees it!
+                SerializedObject so = new SerializedObject(techTree);
+                SerializedProperty newUnlockables = so.FindProperty("allUnlockables");
                 newUnlockables.ClearArray();
                 for (int i = 0; i < allUnlockables.Count; i++)
                 {
                     newUnlockables.InsertArrayElementAtIndex(i);
                     newUnlockables.GetArrayElementAtIndex(i).objectReferenceValue = allUnlockables[i];
                 }
-                newSO.ApplyModifiedProperties();
-                Debug.Log($"Created new 'Generated Drone Tech Tree' with {allUnlockables.Count} upgrades!");
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(techTree);
+                Debug.Log($"Overwrote existing Tech Tree with {allUnlockables.Count} upgrades!");
             }
 
             AssetDatabase.SaveAssets();

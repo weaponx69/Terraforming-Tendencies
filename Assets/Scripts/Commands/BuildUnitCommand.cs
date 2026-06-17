@@ -32,7 +32,7 @@ namespace GameDevTV.RTS.Commands
             
             if (context.Commandable is BaseBuilding building)
             {
-                if (building.QueueSize >= BaseBuilding.MAX_QUEUE_SIZE) return true;
+                if (building.QueueSize >= building.MaxQueueSize) return true;
             }
             
             return false;
