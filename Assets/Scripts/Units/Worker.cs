@@ -399,5 +399,95 @@ namespace GameDevTV.RTS.Units
                     break;
             }
         }
+
+        public override BaseCommand[] AvailableCommands
+        {
+            get
+            {
+                if (overrideCommands != null)
+                {
+                    return overrideCommands;
+                }
+
+                return GetAugmentedCommands(base.AvailableCommands);
+            }
+        }
+
+        private BaseCommand[] GetAugmentedCommands(BaseCommand[] cmds)
+        {
+            if (cmds == null) return null;
+
+            var unlockedBuildingNames = BlueprintDraftManager.GetUnlockedBuildingNames();
+            if (unlockedBuildingNames.Count == 0) return cmds;
+
+            var list = new System.Collections.Generic.List<BaseCommand>();
+            foreach (var cmd in cmds)
+            {
+                if (cmd == null) continue;
+
+                if (cmd is OverrideCommandsCommand overrideCmd && overrideCmd.name.Contains("Show Buildings"))
+                {
+                    var augmentedSub = GetAugmentedCommands(overrideCmd.Commands);
+                    var newOverrideCmd = ScriptableObject.CreateInstance<OverrideCommandsCommand>();
+                    newOverrideCmd.Name = overrideCmd.Name;
+                    newOverrideCmd.Icon = overrideCmd.Icon;
+                    newOverrideCmd.Slot = overrideCmd.Slot;
+                    
+                    var field = typeof(OverrideCommandsCommand).GetField("<Commands>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    if (field != null)
+                    {
+                        field.SetValue(newOverrideCmd, augmentedSub);
+                    }
+                    list.Add(newOverrideCmd);
+                }
+                else
+                {
+                    list.Add(cmd);
+                }
+            }
+
+            foreach (var bldName in unlockedBuildingNames)
+            {
+                var bldSO = BlueprintDraftManager.GetBuildingSOByName(bldName);
+                if (bldSO != null)
+                {
+                    bool alreadyExists = false;
+                    foreach (var c in list)
+                    {
+                        if (c is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Name == bldSO.Name)
+                        {
+                            alreadyExists = true;
+                            break;
+                        }
+                    }
+
+                    if (!alreadyExists)
+                    {
+                        var newCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
+                        newCmd.Name = "Build " + bldSO.Name;
+                        newCmd.Building = bldSO;
+                        newCmd.Icon = bldSO.Icon;
+                        newCmd.Slot = FindFreeSlot(list);
+                        list.Add(newCmd);
+                    }
+                }
+            }
+
+            return list.ToArray();
+        }
+
+        private int FindFreeSlot(System.Collections.Generic.List<BaseCommand> list)
+        {
+            var usedSlots = new System.Collections.Generic.HashSet<int>();
+            foreach (var c in list)
+            {
+                if (c != null) usedSlots.Add(c.Slot);
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                if (!usedSlots.Contains(i)) return i;
+            }
+            return -1;
+        }
     }
 }

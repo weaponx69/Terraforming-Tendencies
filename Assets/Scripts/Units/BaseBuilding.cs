@@ -262,6 +262,26 @@ namespace GameDevTV.RTS.Units
                 AvailableCommands = commandList.ToArray();
             }
 
+            if (BuildingSO != null)
+            {
+                if (BuildingSO.Name.Contains("Deep-Core Mining Laser"))
+                {
+                    AddActiveAbilityCommand("Fire Mining Laser", "Extract deep-core thermal energy.", 2f, 0f, 0f, 200, 0);
+                }
+                else if (BuildingSO.Name.Contains("Carbon Dioxide Import Laser"))
+                {
+                    AddActiveAbilityCommand("Import CO2", "Direct orbital laser to vaporize comets.", 0f, 0.05f, 0f, 0, 0);
+                }
+                else if (BuildingSO.Name.Contains("Methanogenic Microbe Spreader"))
+                {
+                    AddActiveAbilityCommand("Spread Microbes", "Release greenhouse-gas producing microbes.", 1.5f, 0f, 0f, 0, 30);
+                }
+                else if (BuildingSO.Name.Contains("Genetically Modified Algae Spreader"))
+                {
+                    AddActiveAbilityCommand("Spread Algae", "Disperse oxygen-generating algae cultures.", 0f, 0f, 2.0f, 0, 60);
+                }
+            }
+
             if (BuildingSO != null && BuildingSO.BuildingConfig != null)
             {
                 if (BuildingSO.BuildingConfig.HousingCapacity > 0)
@@ -274,6 +294,17 @@ namespace GameDevTV.RTS.Units
             }
 
             RaiseSpawnEvent();
+        }
+
+        private void AddActiveAbilityCommand(string name, string desc, float tempBonus, float atmosBonus, float oxyBonus, int matsBonus, int bioBonus)
+        {
+            var cmd = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ActiveAbilityCommand>();
+            cmd.Initialize(name, desc, tempBonus, atmosBonus, oxyBonus, matsBonus, bioBonus);
+            cmd.Slot = 0;
+
+            var list = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
+            list.Add(cmd);
+            AvailableCommands = list.ToArray();
         }
 
         private IEnumerator UpkeepRoutine()

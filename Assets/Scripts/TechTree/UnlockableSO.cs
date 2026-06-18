@@ -8,11 +8,11 @@ namespace GameDevTV.RTS.TechTree
 {
     public abstract class UnlockableSO : ScriptableObject, ICloneable
     {
-        [field: SerializeField] public string Name { get; private set; } = "Unit";
+        [field: SerializeField] public string Name { get; set; } = "Unit";
         [field: SerializeField] public bool IsOneTimeUnlock { get; private set; }
-        [field: SerializeField] public float BuildTime { get; private set; } = 5;
-        [field: SerializeField] public Sprite Icon { get; private set; }
-        [field: SerializeField] public SupplyCostSO Cost { get; private set; }
+        [field: SerializeField] public float BuildTime { get; set; } = 5;
+        [field: SerializeField] public Sprite Icon { get; set; }
+        [field: SerializeField] public SupplyCostSO Cost { get; set; }
         [field: SerializeField] public TechTreeSO TechTree { get; private set; }
         [field: SerializeField] protected List<UnlockableSO> unlockRequirements { get; private set; } = new();
 

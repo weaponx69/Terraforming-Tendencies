@@ -32,15 +32,15 @@ namespace GameDevTV.RTS.Units
         [Header("Colony Housing")]
         [SerializeField] private int housingCapacity = 0;
 
-        public int QueueSize => queueSize;
-        public float LifeSupportRadius => lifeSupportRadius;
-        public float BuildTimeMultiplier => buildTimeMultiplier;
+        public int QueueSize { get => queueSize; set => queueSize = value; }
+        public float LifeSupportRadius { get => lifeSupportRadius; set => lifeSupportRadius = value; }
+        public float BuildTimeMultiplier { get => buildTimeMultiplier; set => buildTimeMultiplier = value; }
 
-        public float BiomassUpkeep => biomassUpkeep;
-        public float PowerUpkeep => powerUpkeep;
-        public float OxygenUpkeep => oxygenUpkeep;
-        public int BiomassGeneration => biomassGeneration;
-        public float PowerGeneration => powerGeneration;
-        public int HousingCapacity => housingCapacity;
+        public float BiomassUpkeep { get => biomassUpkeep; set => biomassUpkeep = value; }
+        public float PowerUpkeep { get => powerUpkeep; set => powerUpkeep = value; }
+        public float OxygenUpkeep { get => oxygenUpkeep; set => oxygenUpkeep = value; }
+        public int BiomassGeneration { get => biomassGeneration; set => biomassGeneration = value; }
+        public float PowerGeneration { get => powerGeneration; set => powerGeneration = value; }
+        public int HousingCapacity { get => housingCapacity; set => housingCapacity = value; }
     }
 }

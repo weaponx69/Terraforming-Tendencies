@@ -347,3 +347,9 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
   * Updated `GenerationManager.cs` to check milestone completion conditions inside `Update()` rather than resource depletion.
   * Supported milestone requirements: `Biomass` levels, atmospheric `Oxygen` percentages, grid `Power` capacity, `Population` limits, and completed `CommandPosts` built inside the active sector.
   * Starting a new generation/round calls `SectorManager.Instance.UnlockNextSector()` to unlock the next adjacent sector, which automatically initiates a fresh card draft phase.
+
+#### 20. Themed Card Decks, Climate Gates, and Active Structure Abilities
+* **Procedural Card/Building Generation:** Since the 20 themed buildings did not exist as pre-defined asset files, they are instantiated as `BuildingSO` and `TerraformingCardSO` ScriptableObjects at runtime by cloning a default building asset (`SolarPanel` or `Habitat`) and overriding its cost, stats, and configurations.
+* **Climate Gates Filtering:** `TerraformingCardSO` defines environmental constraints (Temperature, Oxygen, Atmosphere) and geological requirements (`LavaTube`, `FaultLine`, `WaterDeposit`). `BlueprintDraftUI.GetRandomCards()` filters the selection pool using `IsGateMet()`.
+* **Worker Dynamic Commands Injection:** `Worker.cs` overrides `AvailableCommands` to inject dynamic `BuildBuildingCommand` instances based on drafted building blueprints registered in `BlueprintDraftManager`.
+* **Active Abilities Integration:** `ActiveAbilityCommand.cs` handles active structure actions with cooldowns. `BaseBuilding.CompleteConstruction()` automatically attaches these commands to constructed active structures (*Deep-Core Mining Laser*, *Carbon Dioxide Import Laser*, *Methanogenic Microbe Spreader*, *Genetically Modified Algae Spreader*).

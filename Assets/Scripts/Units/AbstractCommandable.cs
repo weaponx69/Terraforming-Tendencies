@@ -29,7 +29,13 @@ namespace GameDevTV.RTS.Units
         [field: SerializeField] public Owner Owner { get; set; }
         [field: SerializeField] public bool IsVisible { get; private set; } = true;
         public Transform Transform => this == null ? null : transform;
-        [field: SerializeField] public BaseCommand[] AvailableCommands { get; protected set; }
+        [SerializeField] protected BaseCommand[] _availableCommands;
+        protected BaseCommand[] overrideCommands;
+        public virtual BaseCommand[] AvailableCommands
+        {
+            get => overrideCommands ?? _availableCommands;
+            protected set => _availableCommands = value;
+        }
         [field: SerializeField] public AbstractUnitSO UnitSO { get; private set; }
         [SerializeField] protected GameObject selectionIndicator;
         [SerializeField] protected Transform VisionTransform;
@@ -118,11 +124,11 @@ namespace GameDevTV.RTS.Units
         {
             if (commands == null || commands.Length == 0)
             {
-                AvailableCommands = initialCommands;
+                overrideCommands = null;
             }
             else
             {
-                AvailableCommands = commands;
+                overrideCommands = commands;
             }
 
             if (IsSelected)

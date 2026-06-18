@@ -48,44 +48,44 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private BuildingConfigSO buildingConfig;
 
         // Public accessors
-        public int Health => health;
-        public GameObject Prefab => prefab;
-        public UpgradeSO[] Upgrades => upgrades;
+        public int Health { get => health; set => health = value; }
+        public GameObject Prefab { get => prefab; set => prefab = value; }
+        public UpgradeSO[] Upgrades { get => upgrades; set => upgrades = value; }
         
         public SightConfigSO SightConfig 
         { 
             get => sightConfig;
-            protected set => sightConfig = value; // Protected setter for cloning
+            set => sightConfig = value;
         }
 
         public MovementConfigSO MovementConfig
         {
             get => movementConfig;
-            protected set => movementConfig = value;
+            set => movementConfig = value;
         }
 
         public GatherConfigSO GatherConfig
         {
             get => gatherConfig;
-            protected set => gatherConfig = value;
+            set => gatherConfig = value;
         }
 
         public BuilderConfigSO BuilderConfig
         {
             get => builderConfig;
-            protected set => builderConfig = value;
+            set => builderConfig = value;
         }
 
         public ProbeConfigSO ProbeConfig
         {
             get => probeConfig;
-            protected set => probeConfig = value;
+            set => probeConfig = value;
         }
 
         public BuildingConfigSO BuildingConfig
         {
             get => buildingConfig;
-            protected set => buildingConfig = value;
+            set => buildingConfig = value;
         }
     }
 }

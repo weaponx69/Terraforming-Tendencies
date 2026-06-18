@@ -12,7 +12,7 @@ namespace GameDevTV.RTS.Commands
     [CreateAssetMenu(fileName = "Build Building", menuName = "Units/Commands/Build Building")]
     public class BuildBuildingCommand : BaseCommand, IUnlockableCommand
     {
-        [field: SerializeField] public BuildingSO Building { get; private set; }
+        [field: SerializeField] public BuildingSO Building { get; set; }
 
         public Vector3 SnapToNearestSector(Vector3 point)
         {
