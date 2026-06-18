@@ -77,28 +77,21 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Parallax Sinking Fix:** Prevented the Crawler from snapping its Y-pivot to the flat NavMesh, stopping it from visually "sinking" underground.
 * **UI & UX Changes:** ProbeLogic no longer automatically calls TriggerExpansion; players place Command Centers directly again via their drone's Build UI. Added a persistent Volume Control Slider to the PauseMenuUI.
 
-#### 13. Architecture Pivot: Sector-Stage Roguelite RTS
-The game remains a fully real-time strategy (RTS) game, but the core progression loop is structured as a Roguelite where each **Sector** on the planet acts as a distinct "Round" or Stage.
+#### 13. Architecture Pivot: Sector Lockdown & Milestone Progression
+To prevent unregulated expansion across the map, the game's core progression loop now restricts exploration and building to explicitly unlocked **Sectors**.
 
-##### 1. The Core Loop (Sector Stages)
-Gameplay progresses sector-by-sector across the planet map:
-* **The Blueprint Draft:** At the start of a new sector round, the game pauses and the player drafts Blueprint Cards.
-* **Procedural Impact:** The chosen cards dictate what happens in that specific sector. They determine what physical resources (minerals, gas, etc.) will spawn in that sector, what specific buildings the player is allowed to construct, and what the milestone goal is.
-* **Real-Time Execution:** The game unpauses. The player plays out the round normally in real-time—using drones to mine the freshly spawned resources and constructing the drafted buildings.
+##### 1. Sector Lockdown
+* **Restricted Action:** The map is divided into Sectors. At the start of a game, only Sector 0 (the starting location) is unlocked. All other sectors are strictly locked.
+* **Building Blocked:** The player cannot place building ghosts inside a locked sector. The auto-placement logic for Command Posts also ignores locked sectors.
+* **Exploration Blocked:** Drones and units cannot be commanded to move into locked sectors. The input system physically drops movement commands into uncharted territory.
 
-##### 2. Round Completion & Expansion
-Expanding to the next sector is no longer based on mining a flat 20% depletion trigger.
-* **Sector Milestones:** The round ends when the player successfully meets the specific milestone requirements dictated by the sector or the drafted cards (e.g., "Build 3 Bio-Domes", "Generate 50 Heat").
-* **Moving On:** Once the milestone is met, the round concludes. The player unlocks and moves into the next adjacent sector, triggering a new Draft Phase, spawning new resources in that new sector, and starting the RTS loop over again for that new territory.
+##### 2. Milestone Unlocks
+* **Progression:** The player plays out the game as a standard RTS within their active, unlocked sectors. 
+* **Sector Expansion:** To expand, the player must meet specific "Terraforming Conditions" or milestones (determined by external drafting/roguelite mechanics).
+* **Unlocking:** Once a milestone is met, a call to `SectorManager.Instance.UnlockNextSector()` dynamically peels back the lockdown on the next adjacent sector, allowing the player's colony to organically expand into the newly unlocked territory.
 
-##### 3. Resource Economy (Engine-Building)
-* Physical resources still exist on the map and are mined by autonomous drones, but *what* spawns is controlled by the draft.
-* Base-building creates a passive engine (Plants, Energy, Heat) to meet terraforming milestones.
-
-##### 4. Strategic Map Placement (City & Greenery Adjacency)
-Where players place buildings on the NavMesh matters immensely:
-* **Cities (Command Centers):** Serve as hubs for expansion and project requirements within the active sector.
-* **Greenery:** Must be placed next to tiles. They raise Oxygen and grant massive terraforming points when placed adjacent to Cities.
+##### 3. AI Constraints
+* **Fair Play:** The enemy AI (`GreedyAIController`) is fully bound to this new system. It will not attempt to analyze, scout, or build inside locked sectors, ensuring it does not cheat the progression rules.
 
 #### 14. Current Tech Tree & Upgrade Paths
 The following represents the current state of the upgrade system defined in the game's scriptable objects (`Assets/Units/Upgrades/`):
