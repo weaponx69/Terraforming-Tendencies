@@ -6,8 +6,6 @@ namespace GameDevTV.RTS.Commands
 {
     public class ActiveAbilityCommand : BaseCommand
     {
-        public override bool RequiresClickToActivate => false;
-
         private string _description;
         private float _tempBonus;
         private float _atmosBonus;
@@ -16,6 +14,11 @@ namespace GameDevTV.RTS.Commands
         private int _bioBonus;
         private float _cooldown = 10f; // 10 second cooldown
         private float _lastUsedTime = -999f;
+
+        public ActiveAbilityCommand()
+        {
+            RequiresClickToActivate = false;
+        }
 
         public void Initialize(string name, string desc, float temp, float atmos, float oxy, int mats, int bio)
         {

@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Environment;
 
 namespace GameDevTV.RTS.UI.Containers
 {

@@ -133,7 +133,6 @@ namespace GameDevTV.RTS.Player
                 BlueprintDraftManager.PowerGenMultiplier *= multiplier;
                 Debug.Log($"[Blueprint] Active power generation multiplier is now: {BlueprintDraftManager.PowerGenMultiplier}");
             }
-            }
         }
     }
 
