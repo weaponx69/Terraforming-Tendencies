@@ -196,9 +196,16 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        private bool hasCompletedConstruction = false;
+
         public void CompleteConstruction()
         {
             Debug.Log($"[BaseBuilding] CompleteConstruction called on {gameObject.name} (Owner={Owner})");
+
+            // Guard against double-completion (can be called from both WorkerBrainController and Start)
+            if (hasCompletedConstruction) return;
+            hasCompletedConstruction = true;
+
             if (CurrentHealth == 0)
             {
                 CurrentHealth = MaxHealth;
@@ -246,7 +253,7 @@ namespace GameDevTV.RTS.Units
             var config = BuildingSO.BuildingConfig;
             if (config == null) yield break;
 
-            Debug.Log($"[BaseBuilding] UpkeepRoutine started on {gameObject.name} — PowerGeneration={config.PowerGeneration}");
+            Debug.Log($"[BaseBuilding] UpkeepRoutine started on {gameObject.name} — Config='{config?.name}', BuildingSO='{BuildingSO?.name}', PowerGeneration={config.PowerGeneration}");
 
             while (gameObject.activeInHierarchy && Progress.State == BuildingProgress.BuildingState.Completed)
             {
