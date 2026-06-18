@@ -387,21 +387,7 @@ namespace GameDevTV.RTS.Units
 
         public bool IsFirstInQueueProbe()
         {
-            if (buildingQueue == null || buildingQueue.Count == 0) return false;
-            var so = buildingQueue[0];
-            if (so == null) return false;
-            
-            // Foolproof check: Does the prefab actually have a ProbeMovement component?
-            if (so is AbstractUnitSO unitSO && unitSO.Prefab != null)
-            {
-                if (unitSO.Prefab.GetComponent<ProbeMovement>() != null)
-                {
-                    return true;
-                }
-            }
-            
-            // Fallback just in case
-            return so.Name.Contains("Probe", System.StringComparison.OrdinalIgnoreCase);
+            return false;
         }
 
         public void ClearQueue()

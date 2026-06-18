@@ -261,7 +261,6 @@ namespace GameDevTV.RTS.Environment
         {
             foreach (var seg in segments) if (seg != null) Destroy(seg);
             segments.Clear();
-            if (ColonyExpansionManager.Instance != null) ColonyExpansionManager.Instance.VetoSector(sector);
             Destroy(gameObject);
         }
 
@@ -291,17 +290,7 @@ namespace GameDevTV.RTS.Environment
                     GenerationManager.Instance.CompleteExpansion();
                 }
 
-                // A freshly established command center builds a Probe drone first.
-                AbstractUnitSO probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
-                if (probeSO != null)
-                {
-                    building.BuildPriorityUnlockable(probeSO);
-                    Debug.Log("[Expansion] Queued starter probe as PRIORITY first item in the new Command Post queue.");
-                }
-                else
-                {
-                    Debug.LogWarning("[Expansion] Could not load Probe SO at Resources/Units/Probe to auto-build first probe.");
-                }
+
             }
 
             foreach (var seg in segments)
@@ -315,11 +304,6 @@ namespace GameDevTV.RTS.Environment
             segments.Clear();
 
             IsCompleted = true;
-
-            if (ColonyExpansionManager.Instance != null)
-            {
-                ColonyExpansionManager.Instance.ClearExpansion(sector);
-            }
 
             Destroy(gameObject);
         }

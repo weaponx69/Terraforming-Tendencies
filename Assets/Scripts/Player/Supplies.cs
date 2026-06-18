@@ -92,7 +92,31 @@ namespace GameDevTV.RTS.Player
             private set => _integrity = value;
         }
 
+        private static Dictionary<Owner, float> _temperature;
+        public static Dictionary<Owner, float> Temperature 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _temperature;
+            }
+            private set => _temperature = value;
+        }
+
+        private static Dictionary<Owner, float> _atmosphere;
+        public static Dictionary<Owner, float> Atmosphere 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _atmosphere;
+            }
+            private set => _atmosphere = value;
+        }
+
         public static event Action<Owner, float> OnOxygenChanged;
+        public static event Action<Owner, float> OnTemperatureChanged;
+        public static event Action<Owner, float> OnAtmosphereChanged;
         public static event Action<Owner, float> OnIntegrityChanged;
         public static event Action<Owner, float> OnPowerChanged;
         public static event Action<Owner, int> OnBiomassChanged;
@@ -162,6 +186,8 @@ namespace GameDevTV.RTS.Player
             _populationLimit = new Dictionary<Owner, int>();
             _oxygen = new Dictionary<Owner, float>();
             _integrity = new Dictionary<Owner, float>();
+            _temperature = new Dictionary<Owner, float>();
+            _atmosphere = new Dictionary<Owner, float>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
@@ -172,6 +198,8 @@ namespace GameDevTV.RTS.Player
                 _populationLimit[owner] = 0;
                 _oxygen[owner] = 0f;
                 _integrity[owner] = 100f;
+                _temperature[owner] = -60f;
+                _atmosphere[owner] = 0.01f;
             }
         }
 
@@ -193,6 +221,8 @@ namespace GameDevTV.RTS.Player
             _populationLimit = new Dictionary<Owner, int>();
             _oxygen = new Dictionary<Owner, float>();
             _integrity = new Dictionary<Owner, float>();
+            _temperature = new Dictionary<Owner, float>();
+            _atmosphere = new Dictionary<Owner, float>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
@@ -203,6 +233,8 @@ namespace GameDevTV.RTS.Player
                 _populationLimit.Add(owner, 0);
                 _oxygen.Add(owner, 0f);
                 _integrity.Add(owner, 100f);
+                _temperature.Add(owner, -60f);
+                _atmosphere.Add(owner, 0.01f);
             }
 
             MineralsToMaterialsRateStatic = mineralsToMaterialsRate;
@@ -245,6 +277,24 @@ namespace GameDevTV.RTS.Player
 
                 Oxygen[owner] = Mathf.Min(value, maxOxygen);
                 OnOxygenChanged?.Invoke(owner, Oxygen[owner]);
+            }
+        }
+
+        public static void UpdateTemperature(Owner owner, float value)
+        {
+            if (Temperature != null && Temperature.ContainsKey(owner))
+            {
+                Temperature[owner] = value;
+                OnTemperatureChanged?.Invoke(owner, Temperature[owner]);
+            }
+        }
+
+        public static void UpdateAtmosphere(Owner owner, float value)
+        {
+            if (Atmosphere != null && Atmosphere.ContainsKey(owner))
+            {
+                Atmosphere[owner] = Mathf.Max(0, value);
+                OnAtmosphereChanged?.Invoke(owner, Atmosphere[owner]);
             }
         }
 

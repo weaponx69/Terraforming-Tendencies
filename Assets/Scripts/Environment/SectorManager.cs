@@ -10,6 +10,8 @@ namespace GameDevTV.RTS.Environment
     {
         public static SectorManager Instance { get; private set; }
 
+        public enum SectorFeature { None, Volcano, FaultLine, LavaTube, WaterDeposit }
+
         [System.Serializable]
         public class Sector
         {
@@ -17,6 +19,7 @@ namespace GameDevTV.RTS.Environment
             public bool IsOccupied;
             public BaseBuilding OccupyingBuilding;
             public bool IsLocked = true;
+            public SectorFeature Feature = SectorFeature.None;
         }
 
         public List<Sector> Sectors = new List<Sector>();
@@ -88,7 +91,13 @@ namespace GameDevTV.RTS.Environment
                     }
 
                     bool isFirst = (x == 0 && y == 0);
-                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst });
+                    SectorFeature feature = SectorFeature.None;
+                    if (!isFirst)
+                    {
+                        int featureIndex = 1 + ((Sectors.Count - 1) % 4);
+                        feature = (SectorFeature)featureIndex;
+                    }
+                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst, Feature = feature });
                 }
             }
             

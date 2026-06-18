@@ -15,7 +15,7 @@ using UnityEditor;
 
 namespace GameDevTV.RTS.Units
 {
-    public enum PackageItemType { Worker, Probe, OxygenProcessor, CommandCenter }
+    public enum PackageItemType { Worker, OxygenProcessor, CommandCenter }
 
     /// <summary>One toggleable line in a package. The player can veto it before confirming.</summary>
     public class PackageItem
@@ -97,8 +97,7 @@ namespace GameDevTV.RTS.Units
         [Header("Growth Package (player-approved batch)")]
         [Tooltip("How many Workers are included in each approved package.")]
         [SerializeField] private int packageWorkers = 1;
-        [Tooltip("How many Probes are included in each approved package.")]
-        [SerializeField] private int packageProbes = 1;
+
 [Tooltip("How many Oxygen Processors are included in each approved package.")]
         [SerializeField] private int packageOxygen = 1;
         [Tooltip("Seconds to wait before offering a new package after the player decides.")]
@@ -147,13 +146,12 @@ namespace GameDevTV.RTS.Units
 #if UNITY_EDITOR
             if (commandPostSO == null) commandPostSO = AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Command Post/Command Post.asset");
             if (oxygenProcessorSO == null) oxygenProcessorSO = AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Oxygen Processor/Oxygen Processor.asset");
-            if (probeSO == null) probeSO = AssetDatabase.LoadAssetAtPath<AbstractUnitSO>("Assets/Resources/Units/Probe.asset");
+
             if (workerSO == null) workerSO = AssetDatabase.LoadAssetAtPath<AbstractUnitSO>("Assets/Resources/Units/MiningDrone.asset");
 #endif
             // Fallbacks for build
             if (commandPostSO == null) commandPostSO = Resources.Load<BuildingSO>("Buildings/CommandPost");
             if (oxygenProcessorSO == null) oxygenProcessorSO = Resources.Load<BuildingSO>("Buildings/OxygenProcessor");
-            if (probeSO == null) probeSO = Resources.Load<AbstractUnitSO>("Units/Probe");
             if (workerSO == null) workerSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
             if (constructionDroneSO == null) constructionDroneSO = Resources.Load<AbstractUnitSO>("Units/ConstructionDrone");
         }
@@ -264,7 +262,7 @@ if (SectorManager.Instance != null)
 
                 foreach (var sector in SectorManager.Instance.Sectors)
                 {
-                    if (!sector.IsOccupied && !sector.IsLocked && (ColonyExpansionManager.Instance == null || !ColonyExpansionManager.Instance.IsSectorVetoed(sector)))
+                    if (!sector.IsOccupied && !sector.IsLocked)
                     {
                         // Check if we are already proposing this site or if a base is already nearby (using occupation radius + buffer)
                         if (!CommandPostExistsNear(sector.Center, occupationRadius))
@@ -330,8 +328,7 @@ if (SectorManager.Instance != null)
                 items.Add(new PackageItem { Name = "Command Center", Type = PackageItemType.CommandCenter, Cost = CostOf(commandPostSO) });
             for (int i = 0; i < packageWorkers; i++)
                 items.Add(new PackageItem { Name = "Worker", Type = PackageItemType.Worker, Cost = CostOf(workerSO) });
-            for (int i = 0; i < packageProbes; i++)
-                items.Add(new PackageItem { Name = "Probe", Type = PackageItemType.Probe, Cost = CostOf(probeSO) });
+
             for (int i = 0; i < packageOxygen; i++)
                 items.Add(new PackageItem { Name = "Oxygen Processor", Type = PackageItemType.OxygenProcessor, Cost = CostOf(oxygenProcessorSO) });
             return items;
@@ -406,8 +403,7 @@ if (SectorManager.Instance != null)
             {
                 if (item.Type == PackageItemType.Worker && workerSO != null && CanAfford(workerSO) && hub != null && hub.QueueSize < hub.MaxQueueSize)
                     hub.BuildUnlockable(workerSO);
-                else if (item.Type == PackageItemType.Probe && probeSO != null && CanAfford(probeSO) && hub != null && hub.QueueSize < hub.MaxQueueSize)
-                    hub.BuildUnlockable(probeSO);
+
             }
 
             // 2. Command center (priority) — the sequence secures a builder (retrying /
@@ -514,56 +510,25 @@ if (SectorManager.Instance != null)
             {
                 if (cp == null || cp.QueueSize >= cp.MaxQueueSize) continue;
 
-                // If the building is currently prioritizing a starter probe (from expansion), 
-                // don't clutter the queue yet.
-                if (cp.IsFirstInQueueProbe()) continue;
-
                 var allUnits = Object.FindObjectsByType<AbstractUnit>(FindObjectsInactive.Exclude)
                     .Where(u => u.Owner == aiOwner).ToList();
 
-                // 1. Prioritize Probes
-                int probeCount = allUnits.Count(u => u.GetComponent<ProbeMovement>() != null);
-                
-                // A. Strict Priority: If we have literally 0 probes (spawned or building), we MUST save up for one.
-                if (probeCount == 0 && !cp.IsFirstInQueueProbe())
-                {
-                    if (probeSO != null && CanAfford(probeSO, ignoreReserve: true)) 
-                    {
-                        Debug.Log("[GreedyAI] Building Priority Starter Probe at " + cp.name);
-                        cp.BuildUnlockable(probeSO);
-                    }
-                    // Block all other production until that first starter probe is at least safely in the queue!
-                    continue; 
-                }
-                
-                // B. Normal Priority: Build remaining probes up to the quota, but allow other units to build too
-                if (probeCount < activeCommandPosts.Count * probesPerBase)
-                {
-                    if (probeSO != null && CanAfford(probeSO) && cp.QueueSize < cp.MaxQueueSize) 
-                    {
-                        Debug.Log("[GreedyAI] Building Additional Probe at " + cp.name);
-                        cp.BuildUnlockable(probeSO);
-                    }
-                }
-
-                // 2. Ensure exactly 1 Construction Drone per base
+                // 1. Ensure exactly 1 Construction Drone per base
                 int builderCount = allUnits.Count(u => u is Worker && u.UnitSO != null && u.UnitSO.Name == "Construction Drone");
                 if (builderCount < activeCommandPosts.Count * 1)
                 {
                     if (constructionDroneSO != null && CanAfford(constructionDroneSO) && cp.QueueSize < cp.MaxQueueSize) 
                     {
-                        Debug.Log("[GreedyAI] Building Construction Drone at " + cp.name);
                         cp.BuildUnlockable(constructionDroneSO);
                     }
                 }
 
-                // 3. Finally, build Mining Drones
-                int workerCount = allUnits.Count(u => u is Worker && u.GetComponent<ProbeMovement>() == null && (u.UnitSO == null || u.UnitSO.Name != "Construction Drone"));
+                // 2. Finally, build Mining Drones
+                int workerCount = allUnits.Count(u => u is Worker && (u.UnitSO == null || u.UnitSO.Name != "Construction Drone"));
                 if (workerCount < workersPerBase)
                 {
                     if (workerSO != null && CanAfford(workerSO) && cp.QueueSize < cp.MaxQueueSize) 
                     {
-                        Debug.Log("[GreedyAI] Building Mining Drone at " + cp.name);
                         cp.BuildUnlockable(workerSO);
                     }
                 }
@@ -708,7 +673,6 @@ if (SectorManager.Instance != null)
             var idleDrones = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .Where(w => w != null
                             && w.Owner == aiOwner
-                            && w.GetComponent<ProbeMovement>() == null            // not a Probe
                             && w.GetComponent<HeroDroneController>() == null      // not the Hero Drone
                             && (w.UnitSO == null || w.UnitSO.Name != "Construction Drone") // not a Builder
                             && w.IsIdle)
@@ -918,7 +882,7 @@ else
         {
             return Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .OrderBy(w => Vector3.Distance(w.transform.position, transform.position))
-                .FirstOrDefault(w => w.Owner == aiOwner && w.IsIdle && !w.HasSupplies && w.GetComponent<ProbeMovement>() == null && w.GetComponent<HeroDroneController>() == null);
+                .FirstOrDefault(w => w.Owner == aiOwner && w.IsIdle && !w.HasSupplies && w.GetComponent<HeroDroneController>() == null);
         }
 
         // Like FindAvailableWorker but, if no worker is idle, falls back to pulling a
@@ -928,7 +892,6 @@ else
         {
             var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .Where(w => w != null && w.Owner == aiOwner
-                            && w.GetComponent<ProbeMovement>() == null   // never a probe
                             && w.GetComponent<HeroDroneController>() == null // never the Hero Drone
                             && !w.HasSupplies)
                 .ToList();
@@ -960,7 +923,6 @@ else
             {
                 if (w == null) continue;
                 if (w.Owner != aiOwner) continue;
-                if (w.GetComponent<ProbeMovement>() != null) continue; // never a probe
                 if (w.GetComponent<HeroDroneController>() != null) continue; // never the Hero Drone
                 if (w.HasSupplies) continue;                           // busy hauling
                 if (w.IsBuilding) continue;                            // already building

@@ -263,34 +263,10 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
         }
 
         private void UpdateProbeProgressUI()
-{
+        {
             if (probeProgressValueText == null) return;
-
             GameObject container = probeProgressValueText.transform.parent?.parent?.gameObject;
-            if (container == null) return;
-
-            var probes = Object.FindObjectsByType<ProbeLogic>(FindObjectsInactive.Exclude);
-            float maxPrep = 0f;
-            bool anyAnalyzing = false;
-            foreach (var p in probes)
-            {
-                if (p.IsAnalyzing)
-                {
-                    anyAnalyzing = true;
-                    if (p.AnalysisProgress > maxPrep) maxPrep = p.AnalysisProgress;
-                }
-            }
-
-            if (anyAnalyzing)
-            {
-                probeProgressValueText.SetText($"{maxPrep * 100:F0}%");
-                if (probeProgressLabelText != null) probeProgressLabelText.SetText("Probe Analysis");
-                container.SetActive(true);
-            }
-            else
-            {
-                container.SetActive(false);
-            }
+            if (container != null) container.SetActive(false);
         }
 
         private void UpdateHeroDroneSubscription()
@@ -337,16 +313,13 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 string text = $"{occupied}/{total}";
                 
                 // Integrated expansion progress (the original "Exp" display)
-                if (ColonyExpansionManager.Instance != null)
+                var activePipelines = Object.FindObjectsByType<EnergyPipelineManager>(FindObjectsInactive.Exclude);
+                if (activePipelines.Length > 0)
                 {
-                    var expansions = ColonyExpansionManager.Instance.ActiveExpansions.ToList();
-                    if (expansions.Count > 0)
-                    {
-                        var lead = expansions.OrderByDescending(e => e.GetProgress()).First();
-                        float maxProgress = lead.GetProgress();
-                        string pausedSuffix = lead.IsPaused ? " PAUSED" : "";
-                        text += $" (Exp: {maxProgress * 100:F0}%{pausedSuffix})";
-                    }
+                    var lead = activePipelines.OrderByDescending(e => e.GetProgress()).First();
+                    float maxProgress = lead.GetProgress();
+                    string pausedSuffix = lead.IsPaused ? " PAUSED" : "";
+                    text += $" (Exp: {maxProgress * 100:F0}%{pausedSuffix})";
                 }
 
                 sectorsValueText.SetText(text);
