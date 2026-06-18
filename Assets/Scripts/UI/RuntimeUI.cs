@@ -64,6 +64,10 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnOxygenChanged += HandleOxygenChanged;
             Supplies.OnMaterialsChanged += HandleMaterialsChanged;
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
+            Supplies.OnBiomassChanged += HandleBiomassChanged;
+            Supplies.OnPowerChanged += HandlePowerChanged;
+            Supplies.OnPopulationChanged += HandlePopulationChanged;
+            Supplies.OnPopulationLimitChanged += HandlePopulationLimitChanged;
 
             InitializeUI();
         }
@@ -83,6 +87,10 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
             Supplies.OnMaterialsChanged -= HandleMaterialsChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
+            Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnPowerChanged -= HandlePowerChanged;
+            Supplies.OnPopulationChanged -= HandlePopulationChanged;
+            Supplies.OnPopulationLimitChanged -= HandlePopulationLimitChanged;
 
             if (heroDroneReference != null)
             {
