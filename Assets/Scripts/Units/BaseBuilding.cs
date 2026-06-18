@@ -144,6 +144,21 @@ namespace GameDevTV.RTS.Units
             // Ensure we are initialized before checking BuildingSO
             InitializeIfNeeded();
 
+            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+            
+            // If this is a Command Post, automatically reveal the entire sector immediately (even as a ghost)
+            if (isCommandPost && VisionTransform != null && GameDevTV.RTS.Environment.PlanetGenerator.Instance != null)
+            {
+                var config = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config;
+                if (config != null)
+                {
+                    float secW = (config.MapWidth * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize) / config.SectorsX;
+                    float secH = (config.MapHeight * GameDevTV.RTS.Environment.PlanetGenerator.Instance.CellSize) / config.SectorsY;
+                    float diagonal = Mathf.Sqrt(secW * secW + secH * secH);
+                    VisionTransform.localScale = new Vector3(diagonal, diagonal, diagonal);
+                }
+            }
+
             // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
             if (Progress.State != BuildingProgress.BuildingState.Paused)
             {
