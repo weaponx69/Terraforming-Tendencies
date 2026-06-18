@@ -1,5 +1,7 @@
 fileFormatVersion: 2
-guid: 80c5c8d85051e50fb868c585ce81e7c3
+guid: a6b20632faf8896c286abaa5b7931934
+labels:
+- UnityAI
 PrefabImporter:
   externalObjects: {}
   userData: 
