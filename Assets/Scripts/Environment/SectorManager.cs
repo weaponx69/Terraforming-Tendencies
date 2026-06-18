@@ -53,7 +53,7 @@ namespace GameDevTV.RTS.Environment
         public void InitializeSectors()
         {
             var pg = PlanetGenerator.Instance;
-            if (pg == null) pg = Object.FindAnyObjectByType<PlanetGenerator>();
+            if (pg == null) pg = UnityEngine.Object.FindAnyObjectByType<PlanetGenerator>();
             
             if (pg == null || pg.Config == null) 
             {

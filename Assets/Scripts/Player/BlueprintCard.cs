@@ -70,7 +70,7 @@ namespace GameDevTV.RTS.Player
             if (unitPrefab == null) return;
 
             // Find command post to spawn at
-            var bldgs = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var bldgs = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
             BaseBuilding spawnBase = null;
             foreach (var b in bldgs)
             {
@@ -100,7 +100,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            GameObject spawnedUnit = Object.Instantiate(unitPrefab, spawnPos, Quaternion.identity);
+            GameObject spawnedUnit = UnityEngine.Object.Instantiate(unitPrefab, spawnPos, Quaternion.identity);
             
             // Set Owner to Player1
             var abstractUnit = spawnedUnit.GetComponent<AbstractUnit>();

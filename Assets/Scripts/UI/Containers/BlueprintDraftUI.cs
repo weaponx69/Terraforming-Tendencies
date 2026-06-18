@@ -230,7 +230,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void AssembleUI()
         {
             // Find Main Canvas
-            Canvas mainCanvas = FindFirstObjectByType<Canvas>();
+            Canvas mainCanvas = FindAnyObjectByType<Canvas>();
             if (mainCanvas == null)
             {
                 Debug.LogError("[BlueprintDraftUI] Could not find any active Canvas in scene to attach self-assembled UI!");
@@ -331,7 +331,7 @@ namespace GameDevTV.RTS.UI.Containers
                 cDescTmp.fontSize = 15f;
                 cDescTmp.alignment = TextAlignmentOptions.TopLeft;
                 cDescTmp.color = Color.white;
-                cDescTmp.enableWordWrapping = true;
+                cDescTmp.textWrappingMode = TextWrappingModes.Normal;
 
                 // Spacing block before button
                 GameObject spacer = new GameObject("Spacer", typeof(RectTransform));
