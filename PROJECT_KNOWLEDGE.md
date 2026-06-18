@@ -337,3 +337,13 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 * **UI Action Menu Slot Collisions:** Fixed an issue where "Build Habitat" and "Build Oxygen Processor" were mysteriously hidden in the `ActionsUI` sub-menu. Discovered that the UI panel utilizes fixed data slots, and multiple commands were competing for Slot 1 and Slot 4, causing overwrites. Re-assigned overlapping commands to empty slots (e.g., Habitat to Slot 6, Oxygen Processor to Slot 7).
 * **Building Config Overhaul:** Discovered that almost all buildings were relying on the generic 0-upkeep `Default Building Config`. Generated and assigned dedicated `BuildingConfigSO` assets for the `Command Post`, `Spaceport`, `Supply Hut`, `Oxygen Processor`, `Infantry School`, and `Barracks` to properly assign baseline `powerUpkeep` values across the economy. Adjusted Solar Panel baseline generation to 5.
 * **Double-Construction Bug:** Fixed a logic bug where `BaseBuilding.CompleteConstruction()` was invoked twice per building (once by the `WorkerBrainController`, once by `BaseBuilding.Start()`), which caused `UpkeepRoutine` to launch multiple overlapping coroutines. Implemented a `hasCompletedConstruction` boolean guard.
+
+#### 19. Blueprint Card Deck Drafting & Milestone Progression Loop
+* **1-Sector-Per-Round Paradigm:** Shifted the gameplay loop so that one sector corresponds directly to exactly one generation (round).
+* **Card Deck Drafting System:**
+  * Created `CardDeckController.cs` (monitored by `SectorManager.OnSectorUnlocked`) which manages a player's `masterDeck` of blueprint cards (`BlueprintCardSO`), drawing, shuffling, and discarding hands (default size 3) on sector expansion.
+  * Added `DraftingUI.cs` and `CardSlotUI.cs` to handle full-screen overlay rendering, unscaled fade transitions, and hover pop-scale animations during selection.
+* **Milestone Progression Engine:**
+  * Updated `GenerationManager.cs` to check milestone completion conditions inside `Update()` rather than resource depletion.
+  * Supported milestone requirements: `Biomass` levels, atmospheric `Oxygen` percentages, grid `Power` capacity, `Population` limits, and completed `CommandPosts` built inside the active sector.
+  * Starting a new generation/round calls `SectorManager.Instance.UnlockNextSector()` to unlock the next adjacent sector, which automatically initiates a fresh card draft phase.

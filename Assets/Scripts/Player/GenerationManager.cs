@@ -7,6 +7,23 @@ using System;
 
 namespace GameDevTV.RTS.Player
 {
+    public enum MilestoneType
+    {
+        Biomass,
+        Oxygen,
+        Power,
+        Population,
+        CommandPosts
+    }
+
+    [System.Serializable]
+    public struct SectorMilestone
+    {
+        public MilestoneType Type;
+        public float TargetValue;
+        public string GoalDescription;
+    }
+
     public class GenerationManager : MonoBehaviour
     {
         public static GenerationManager Instance { get; private set; }
@@ -16,6 +33,9 @@ namespace GameDevTV.RTS.Player
         public int TotalTerraCoins { get; private set; } = 0;
         public bool IsBetweenRounds { get; private set; } = false;
         public bool IsExpansionPhase { get; private set; } = false;
+
+        [Header("Milestones Config")]
+        [SerializeField] private List<SectorMilestone> milestones = new();
 
         private int initialAmountInSector = 0;
         private float roundStartTime = 0f;
@@ -50,9 +70,10 @@ namespace GameDevTV.RTS.Player
 
         private void InitializeGenerations()
         {
+            InitializeDefaultMilestones();
             if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
             {
-                MaxGenerations = SectorManager.Instance.Sectors.Count * 5;
+                MaxGenerations = Mathf.Min(SectorManager.Instance.Sectors.Count, milestones.Count);
             }
             CurrentGeneration = 1;
             IsBetweenRounds = false;
@@ -61,60 +82,74 @@ namespace GameDevTV.RTS.Player
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 
-        private void Update()
+        private void InitializeDefaultMilestones()
         {
-            if (IsBetweenRounds) return;
-            if (IsExpansionPhase) return; // Wait for expansion to complete before tracking resources
-            
-            // Give Unity 2 seconds to cleanly destroy old resources and spawn new ones before we start counting!
-            // Otherwise, it counts 0 resources and immediately ends the round again.
-            if (Time.time < roundStartTime + 2f) return;
-
-            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
-
-            if (initialAmountInSector <= 0)
+            if (milestones == null || milestones.Count == 0)
             {
-                CalculateInitialAmount();
-                if (initialAmountInSector <= 0) return; // Still no resources found? Keep waiting.
-            }
-
-            var allNodes = UnityEngine.Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
-            int currentAmount = 0;
-            foreach (var node in allNodes)
-            {
-                if (node != null && node.Amount > 0 && SectorManager.Instance.GetNearestSector(node.transform.position) == SectorManager.Instance.ActiveSector)
+                milestones = new List<SectorMilestone>
                 {
-                    currentAmount += node.Amount;
-                }
-            }
-
-            float thresholdAmount = initialAmountInSector * 0.8f;
-            float amountToMine = initialAmountInSector - thresholdAmount;
-            float amountMined = initialAmountInSector - currentAmount;
-            
-            float progress = amountToMine > 0 ? Mathf.Clamp01(amountMined / amountToMine) : 0f;
-            OnGenerationProgressChanged?.Invoke(progress);
-
-            // End generation if 1/5th (20%) of the sector's total resources have been mined
-            if (currentAmount <= thresholdAmount)
-            {
-                TriggerGenerationEnd();
+                    new SectorMilestone { Type = MilestoneType.Biomass, TargetValue = 50f, GoalDescription = "Accumulate 50 Biomass" },
+                    new SectorMilestone { Type = MilestoneType.Power, TargetValue = 20f, GoalDescription = "Generate 20 Grid Power" },
+                    new SectorMilestone { Type = MilestoneType.Oxygen, TargetValue = 30f, GoalDescription = "Reach 30% Atmospheric Oxygen" },
+                    new SectorMilestone { Type = MilestoneType.Population, TargetValue = 10f, GoalDescription = "Establish 10 Colonists" },
+                    new SectorMilestone { Type = MilestoneType.CommandPosts, TargetValue = 1f, GoalDescription = "Establish a Command Post in the sector" }
+                };
             }
         }
 
-        private void CalculateInitialAmount()
+        private void Update()
         {
-            var allNodes = UnityEngine.Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude);
-            int totalAmount = 0;
-            foreach (var node in allNodes)
+            if (IsBetweenRounds) return;
+            if (IsExpansionPhase) return; 
+            if (Time.time < roundStartTime + 2f) return;
+
+            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
+            if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
+
+            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
+            var milestone = milestones[milestoneIndex];
+
+            float currentValue = 0f;
+            switch (milestone.Type)
             {
-                if (node != null && node.Amount > 0 && SectorManager.Instance.GetNearestSector(node.transform.position) == SectorManager.Instance.ActiveSector)
-                {
-                    totalAmount += node.Amount;
-                }
+                case MilestoneType.Biomass:
+                    if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int bio))
+                        currentValue = bio;
+                    break;
+                case MilestoneType.Oxygen:
+                    if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))
+                        currentValue = ox;
+                    break;
+                case MilestoneType.Power:
+                    if (Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow))
+                        currentValue = pow;
+                    break;
+                case MilestoneType.Population:
+                    if (Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int pop))
+                        currentValue = pop;
+                    break;
+                case MilestoneType.CommandPosts:
+                    int cpCount = 0;
+                    foreach (var building in BaseBuilding.ActiveBuildings)
+                    {
+                        if (building != null && building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) &&
+                            building.Progress != null && building.Progress.State == BuildingProgress.BuildingState.Completed &&
+                            SectorManager.Instance != null && SectorManager.Instance.GetNearestSector(building.transform.position) == SectorManager.Instance.ActiveSector)
+                        {
+                            cpCount++;
+                        }
+                    }
+                    currentValue = cpCount;
+                    break;
             }
-            initialAmountInSector = totalAmount;
-            Debug.Log($"[GenerationManager] Active Sector initialized with {initialAmountInSector} total resources. Round will end when {initialAmountInSector * 0.8f} remain.");
+
+            float progress = milestone.TargetValue > 0 ? Mathf.Clamp01(currentValue / milestone.TargetValue) : 1f;
+            OnGenerationProgressChanged?.Invoke(progress);
+
+            if (progress >= 1f)
+            {
+                TriggerGenerationEnd();
+            }
         }
 
         public void TriggerGenerationEnd()
@@ -172,15 +207,21 @@ namespace GameDevTV.RTS.Player
 
             if (CurrentGeneration > MaxGenerations)
             {
-                Debug.Log("[GenerationManager] Sector Completed. Entering Expansion Phase.");
+                Debug.Log("[GenerationManager] All Milestones Completed! Sector Completed.");
                 IsExpansionPhase = true;
                 IsBetweenRounds = false;
-                Time.timeScale = 1f; // Unpause the game so the probe can explore
+                Time.timeScale = 1f;
                 return;
             }
 
             IsBetweenRounds = false;
             Time.timeScale = 1f;
+
+            // Unlock the next sector!
+            if (SectorManager.Instance != null)
+            {
+                SectorManager.Instance.UnlockNextSector();
+            }
 
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
