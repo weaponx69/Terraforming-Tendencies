@@ -219,7 +219,7 @@ namespace GameDevTV.RTS.Player
                         }
 
                         var nearestUnoccupied = sectorManager.Sectors
-                            .Where(s => !s.IsOccupied)
+                            .Where(s => !s.IsOccupied && !s.IsLocked)
                             .OrderBy(s => Vector3.Distance(refPos, s.Center))
                             .FirstOrDefault();
 
@@ -409,6 +409,12 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
 
                 bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hitPos.Value);
 
+                var sector = SectorManager.Instance?.GetNearestSector(hitPos.Value);
+                if (sector != null && sector.IsLocked)
+                {
+                    allRestrictionsPass = false;
+                }
+
                 if (ghostRenderer != null && ghostRenderer.material != null)
                 {
                     ghostRenderer.material.SetColor(TINT, allRestrictionsPass ? availableToPlaceTintColor : errorTintColor);
@@ -570,6 +576,12 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             if (Mouse.current.rightButton.wasReleasedThisFrame
                 && Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
             {
+                var sector = SectorManager.Instance?.GetNearestSector(hit.point);
+                if (sector != null && sector.IsLocked)
+                {
+                    Debug.Log("[PlayerInput] Cannot interact with locked sectors.");
+                    return;
+                }
                 List<AbstractUnit> abstractUnits = new (selectedUnits.Count);
                 foreach(ISelectable selectable in selectedUnits)
                 {

@@ -15,6 +15,7 @@ namespace GameDevTV.RTS.Environment
             public Vector3 Center;
             public bool IsOccupied;
             public BaseBuilding OccupyingBuilding;
+            public bool IsLocked = true;
         }
 
         public List<Sector> Sectors = new List<Sector>();
@@ -82,10 +83,13 @@ namespace GameDevTV.RTS.Environment
                         center.y = hit.point.y;
                     }
 
-                    Sectors.Add(new Sector { Center = center, IsOccupied = false });
+                    bool isFirst = (x == 0 && y == 0);
+                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst });
                 }
             }
-            Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map.");
+            
+            if (Sectors.Count > 0) ActiveSector = Sectors[0];
+            Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector 0 is unlocked.");
         }
 
         private void Update()
@@ -157,6 +161,21 @@ namespace GameDevTV.RTS.Environment
                 if (!s.IsOccupied) return false;
             }
             return true;
+        }
+
+        public void UnlockNextSector()
+        {
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                if (Sectors[i].IsLocked)
+                {
+                    Sectors[i].IsLocked = false;
+                    ActiveSector = Sectors[i];
+                    Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
+                    return; // Only unlock one at a time
+                }
+            }
+            Debug.Log("[SectorManager] All sectors are already unlocked!");
         }
 
         private void OnDrawGizmos()

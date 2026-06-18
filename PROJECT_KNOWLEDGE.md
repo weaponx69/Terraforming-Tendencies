@@ -77,31 +77,28 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Parallax Sinking Fix:** Prevented the Crawler from snapping its Y-pivot to the flat NavMesh, stopping it from visually "sinking" underground.
 * **UI & UX Changes:** ProbeLogic no longer automatically calls TriggerExpansion; players place Command Centers directly again via their drone's Build UI. Added a persistent Volume Control Slider to the PauseMenuUI.
 
-#### 13. Architecture Pivot: Blueprint Drafting & Condition-Based Expansion (Terraformers Style)
-To align the game's core loop with the strategic drafting mechanics of *Terraformers*, the game is pivoting from a real-time mining depletion trigger to a **Turn-Based Draft & Condition** structure.
+#### 13. Architecture Pivot: Sector-Stage Roguelite RTS
+The game remains a fully real-time strategy (RTS) game, but the core progression loop is structured as a Roguelite where each **Sector** on the planet acts as a distinct "Round" or Stage.
 
-##### 1. The Core Loop (Drafting Rounds)
-Instead of generations driven by drones mining resources in real-time, gameplay is broken into discrete Rounds:
-* **The Blueprint Draft:** At the start of every round, the player is presented with a choice of 3 Blueprint Cards.
-* **Card Effects:** The chosen card determines what the player receives that round. A card may grant an immediate injection of resources (Steel, Titanium, Heat), unlock a specific building structure to place on the map, or provide passive terraforming progress.
-* **Round Progression:** The round ends when the player has played their drafted card and finished placing any structures. There is no longer a "20% mined" depletion trigger.
+##### 1. The Core Loop (Sector Stages)
+Gameplay progresses sector-by-sector across the planet map:
+* **The Blueprint Draft:** At the start of a new sector round, the game pauses and the player drafts Blueprint Cards.
+* **Procedural Impact:** The chosen cards dictate what happens in that specific sector. They determine what physical resources (minerals, gas, etc.) will spawn in that sector, what specific buildings the player is allowed to construct, and what the milestone goal is.
+* **Real-Time Execution:** The game unpauses. The player plays out the round normally in real-time—using drones to mine the freshly spawned resources and constructing the drafted buildings.
 
-##### 2. Condition-Based Sector Expansion
-Expanding the colony to new sectors is no longer tied to probes or surviving a set number of generations.
-* **Terraforming Conditions:** New sectors on the map are locked. To unlock a neighboring sector, the player must meet specific Terraforming Conditions (e.g., "Reach 50 Oxygen", "Build 3 Bio-Domes", or "Generate 100 Heat").
-* **Card Synergy:** Drafting cards that provide the necessary resources or buildings to meet these conditions is the primary strategic driver for expansion.
+##### 2. Round Completion & Expansion
+Expanding to the next sector is no longer based on mining a flat 20% depletion trigger.
+* **Sector Milestones:** The round ends when the player successfully meets the specific milestone requirements dictated by the sector or the drafted cards (e.g., "Build 3 Bio-Domes", "Generate 50 Heat").
+* **Moving On:** Once the milestone is met, the round concludes. The player unlocks and moves into the next adjacent sector, triggering a new Draft Phase, spawning new resources in that new sector, and starting the RTS loop over again for that new territory.
 
-##### 3. Resource Economy Overhaul (Engine-Building)
-The economy is shifting to a specialized engine-building system heavily influenced by card plays:
-* **Drafted Income:** Resources are primarily gained through drafting cards rather than relying entirely on autonomous drones strip-mining the map.
-* **Plants & Energy:** Generated passively by constructed bio-domes and power plants.
-* **Heat:** A physical byproduct of the colony, stockpiled and released to raise the global Temperature.
+##### 3. Resource Economy (Engine-Building)
+* Physical resources still exist on the map and are mined by autonomous drones, but *what* spawns is controlled by the draft.
+* Base-building creates a passive engine (Plants, Energy, Heat) to meet terraforming milestones.
 
 ##### 4. Strategic Map Placement (City & Greenery Adjacency)
 Where players place buildings on the NavMesh matters immensely:
-* **Cities (Command Centers):** Serve as hubs for expansion and project requirements.
+* **Cities (Command Centers):** Serve as hubs for expansion and project requirements within the active sector.
 * **Greenery:** Must be placed next to tiles. They raise Oxygen and grant massive terraforming points when placed adjacent to Cities.
-* **Oceans:** Reserved for specific low-elevation sectors, providing global bonuses to anyone building next to them.
 
 #### 14. Current Tech Tree & Upgrade Paths
 The following represents the current state of the upgrade system defined in the game's scriptable objects (`Assets/Units/Upgrades/`):
