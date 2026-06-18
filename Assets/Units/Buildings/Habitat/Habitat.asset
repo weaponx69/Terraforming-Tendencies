@@ -27,7 +27,7 @@ MonoBehaviour:
   gatherConfig: {fileID: 0}
   builderConfig: {fileID: 0}
   probeConfig: {fileID: 0}
-  buildingConfig: {fileID: 11400000, guid: b84b196914c3170f3b53844518079015, type: 2}
+  buildingConfig: {fileID: 11400000, guid: 2053c24207449ff40a40914ae7af90db, type: 2}
   <PlacementMaterial>k__BackingField: {fileID: 0}
   <IsLifeSupport>k__BackingField: 0
   <LifeSupportRadius>k__BackingField: 25
