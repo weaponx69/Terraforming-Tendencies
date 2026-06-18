@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace GameDevTV.RTS.Commands
 {
+    [CreateAssetMenu(fileName = "Connect Power Command", menuName = "RTS/Commands/Connect Power")]
     public class ConnectPowerCommand : BaseCommand
     {
         public override bool RequiresClickToActivate => true;
