@@ -19,5 +19,5 @@ MonoBehaviour:
   powerUpkeep: 0
   oxygenUpkeep: 0
   biomassGeneration: 0
-  powerGeneration: 5
+  powerGeneration: 50
   housingCapacity: 0
