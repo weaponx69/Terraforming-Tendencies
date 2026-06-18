@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
@@ -20,6 +21,9 @@ namespace GameDevTV.RTS.Environment
 
         public List<Sector> Sectors = new List<Sector>();
         public Sector ActiveSector { get; set; }
+
+        /// <summary>Fired whenever a previously locked sector becomes unlocked.</summary>
+        public static event Action OnSectorUnlocked;
 
         private void Awake()
         {
@@ -88,7 +92,11 @@ namespace GameDevTV.RTS.Environment
                 }
             }
             
-            if (Sectors.Count > 0) ActiveSector = Sectors[0];
+            if (Sectors.Count > 0)
+            {
+                ActiveSector = Sectors[0];
+                OnSectorUnlocked?.Invoke();
+            }
             Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector 0 is unlocked.");
         }
 
@@ -172,6 +180,7 @@ namespace GameDevTV.RTS.Environment
                     Sectors[i].IsLocked = false;
                     ActiveSector = Sectors[i];
                     Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
+                    OnSectorUnlocked?.Invoke();
                     return; // Only unlock one at a time
                 }
             }
