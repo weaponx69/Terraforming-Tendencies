@@ -132,8 +132,8 @@ namespace GameDevTV.RTS.Player
                     int cpCount = 0;
                     foreach (var building in BaseBuilding.ActiveBuildings)
                     {
-                        if (building != null && building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) &&
-                            building.Progress != null && building.Progress.State == BuildingProgress.BuildingState.Completed &&
+                        if (building != null && building.BuildingSO != null && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) &&
+                            building.Progress.State == BuildingProgress.BuildingState.Completed &&
                             SectorManager.Instance != null && SectorManager.Instance.GetNearestSector(building.transform.position) == SectorManager.Instance.ActiveSector)
                         {
                             cpCount++;

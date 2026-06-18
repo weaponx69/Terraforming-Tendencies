@@ -5,7 +5,7 @@ namespace GameDevTV.RTS.Units
     [CreateAssetMenu(fileName = "Building", menuName = "Buildings/Building")]
     public class BuildingSO : AbstractUnitSO
     {
-        [field: SerializeField] public Material PlacementMaterial { get; private set; }
+        [field: SerializeField] public Material PlacementMaterial { get; set; }
 
         [Tooltip("If true, this building acts as a Life Support node and protects nearby buildings from decay.")]
         [field: SerializeField] public bool IsLifeSupport { get; private set; } = false;

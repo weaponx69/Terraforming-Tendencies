@@ -5,6 +5,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.Player;
 using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
