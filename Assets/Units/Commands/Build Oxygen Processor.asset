@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   <Name>k__BackingField: Oxygen Processor
   <Icon>k__BackingField: {fileID: 21300000, guid: ca66bc91edfb9b988b60086bc688a759, type: 3}
-  <Slot>k__BackingField: 1
+  <Slot>k__BackingField: 7
   <RequiresClickToActivate>k__BackingField: 1
   <IsSingleUnitCommand>k__BackingField: 1
   <GhostPrefab>k__BackingField: {fileID: 6863950657232117088, guid: c60b206b950e2df33a7a6da0d9039fa9, type: 3}
