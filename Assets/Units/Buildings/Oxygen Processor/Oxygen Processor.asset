@@ -21,7 +21,7 @@ MonoBehaviour:
   <unlockRequirements>k__BackingField:
   - {fileID: 11400000, guid: f6b38bef630bb884195c6d3f702eefb9, type: 2}
   health: 100
-  prefab: {fileID: 6964012305514025925, guid: aed8648aaef462bb1b9f8f2fd0147ba2, type: 3}
+  prefab: {fileID: 8169634835248405596, guid: aed8648aaef462bb1b9f8f2fd0147ba2, type: 3}
   upgrades: []
   sightConfig: {fileID: 11400000, guid: f72837298f54f6540bf60aa3b317c6f8, type: 2}
   movementConfig: {fileID: 0}

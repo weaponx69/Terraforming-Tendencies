@@ -157,18 +157,6 @@ namespace GameDevTV.RTS.Units
                 {
                     CompleteConstruction();
                 }
-
-                // Add the dynamic Connect Power command
-                var connectCommand = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ConnectPowerCommand>();
-                var nameField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Name>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                if (nameField != null) nameField.SetValue(connectCommand, "Connect Power");
-
-                var iconField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Icon>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                if (iconField != null) iconField.SetValue(connectCommand, UnityEngine.Resources.Load<UnityEngine.Sprite>("PlugIcon"));
-
-                var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
-                commandList.Add(connectCommand);
-                AvailableCommands = commandList.ToArray();
                 
                 RaiseSpawnEvent();
             }
@@ -233,6 +221,31 @@ namespace GameDevTV.RTS.Units
 
             // Activate any procedural visual effects (e.g. SmokestackVisuals).
             GetComponent<SmokestackVisuals>()?.ActivateSmoke();
+
+            // Add the dynamic Connect Power command if it doesn't already have one
+            bool hasConnectCommand = false;
+            foreach (var cmd in AvailableCommands)
+            {
+                if (cmd is GameDevTV.RTS.Commands.ConnectPowerCommand)
+                {
+                    hasConnectCommand = true;
+                    break;
+                }
+            }
+
+            if (!hasConnectCommand)
+            {
+                var connectCommand = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ConnectPowerCommand>();
+                var nameField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Name>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (nameField != null) nameField.SetValue(connectCommand, "Connect Power");
+
+                var iconField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Icon>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (iconField != null) iconField.SetValue(connectCommand, UnityEngine.Resources.Load<UnityEngine.Sprite>("PlugIcon"));
+
+                var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
+                commandList.Add(connectCommand);
+                AvailableCommands = commandList.ToArray();
+            }
 
             if (BuildingSO != null && BuildingSO.BuildingConfig != null)
             {

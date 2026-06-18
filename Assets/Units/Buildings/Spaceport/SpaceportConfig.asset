@@ -15,8 +15,9 @@ MonoBehaviour:
   queueSize: 5
   lifeSupportRadius: 0
   buildTimeMultiplier: 1
+  biomassUpkeep: 0
   powerUpkeep: 30
-  oxygenUpkeep: 0
+  oxygenUpkeep: 5
   biomassGeneration: 0
   powerGeneration: 0
   housingCapacity: 0
