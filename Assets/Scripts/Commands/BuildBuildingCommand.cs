@@ -225,6 +225,7 @@ namespace GameDevTV.RTS.Commands
         public override bool IsLocked(CommandContext context)
         {
             if (Building == null) return false;
+            if (!BlueprintDraftManager.IsBuildingUnlocked(Building)) return true;
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
 

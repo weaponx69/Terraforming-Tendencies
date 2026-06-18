@@ -312,7 +312,8 @@ namespace GameDevTV.RTS.Units
                 if (config.PowerGeneration > 0)
                 {
                     float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
-                    Supplies.UpdatePower(Owner, curPower + config.PowerGeneration);
+                    float effectivePowerGen = config.PowerGeneration * BlueprintDraftManager.PowerGenMultiplier;
+                    Supplies.UpdatePower(Owner, curPower + effectivePowerGen);
                 }
 
                 if (isOperating)

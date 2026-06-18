@@ -3,6 +3,7 @@ using GameDevTV.RTS.Behavior;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Player;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -191,6 +192,8 @@ namespace GameDevTV.RTS.Units
                 {
                     gatherTime /= Mathf.Max(0.1f, worker.UnitSO.GatherConfig.GatherRateMultiplier);
                 }
+                // Apply passive buff from blueprint cards
+                gatherTime /= Mathf.Max(0.1f, BlueprintDraftManager.GatherSpeedMultiplier);
                 yield return new WaitForSeconds(gatherTime);
 
                 if (targetSupply == null) break;

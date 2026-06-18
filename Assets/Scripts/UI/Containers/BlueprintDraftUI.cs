@@ -1,0 +1,382 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Units;
+
+namespace GameDevTV.RTS.UI.Containers
+{
+    public class BlueprintDraftUI : MonoBehaviour
+    {
+        public static BlueprintDraftUI Instance { get; private set; }
+
+        [Header("Draft Setup")]
+        [SerializeField] private List<BlueprintCardSO> poolOfCards = new();
+        [SerializeField] private GameObject draftPanel;
+
+        private List<BlueprintCardSO> runtimePool = new();
+        private List<CardUIElements> cardSlots = new();
+
+        private struct CardUIElements
+        {
+            public GameObject cardObj;
+            public TextMeshProUGUI titleText;
+            public TextMeshProUGUI descText;
+            public Image iconImage;
+            public Button selectButton;
+        }
+
+        private void Awake()
+        {
+            if (Instance == null)
+            {
+                Instance = this;
+            }
+            else
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            // Create default card assets at runtime if none are loaded in Inspector
+            InitializeDefaultPool();
+
+            // Self-assemble UI if draftPanel isn't assigned
+            if (draftPanel == null)
+            {
+                AssembleUI();
+            }
+
+            if (draftPanel != null)
+            {
+                draftPanel.SetActive(false);
+            }
+        }
+
+        private void OnEnable()
+        {
+            GenerationManager.OnGenerationStarted += OnGenerationStarted;
+        }
+
+        private void OnDisable()
+        {
+            GenerationManager.OnGenerationStarted -= OnGenerationStarted;
+        }
+
+        private void OnGenerationStarted(int currentGen, int maxGen)
+        {
+            // First generation usually starts with standard setup.
+            // In Terraformers, drafting occurs at the start of EVERY generation (starting from Gen 1 or 2).
+            // Let's trigger it for all rounds to give the player an early strategy boost!
+            Debug.Log($"[BlueprintDraftUI] Generation {currentGen} started! Triggering blueprint draft selection.");
+            ShowDraftSelection();
+        }
+
+        public void ShowDraftSelection()
+        {
+            if (draftPanel == null) return;
+
+            // Pause the game
+            Time.timeScale = 0f;
+            draftPanel.SetActive(true);
+
+            // Select 3 random unique cards from the pool
+            List<BlueprintCardSO> selectedCards = GetRandomCards(3);
+
+            // Populate slots
+            for (int i = 0; i < cardSlots.Count; i++)
+            {
+                if (i < selectedCards.Count)
+                {
+                    cardSlots[i].cardObj.SetActive(true);
+                    var card = selectedCards[i];
+                    
+                    cardSlots[i].titleText.text = card.cardName.ToUpper();
+                    cardSlots[i].descText.text = card.cardDescription;
+                    if (cardSlots[i].iconImage != null && card.icon != null)
+                    {
+                        cardSlots[i].iconImage.sprite = card.icon;
+                        cardSlots[i].iconImage.gameObject.SetActive(true);
+                    }
+                    else if (cardSlots[i].iconImage != null)
+                    {
+                        cardSlots[i].iconImage.gameObject.SetActive(false);
+                    }
+
+                    // Setup button
+                    cardSlots[i].selectButton.onClick.RemoveAllListeners();
+                    cardSlots[i].selectButton.onClick.AddListener(() => OnCardSelected(card));
+                }
+                else
+                {
+                    cardSlots[i].cardObj.SetActive(false);
+                }
+            }
+        }
+
+        private void OnCardSelected(BlueprintCardSO card)
+        {
+            Debug.Log($"[BlueprintDraftUI] Player drafted card: {card.cardName}");
+            BlueprintDraftManager.CompleteDraft(card);
+            
+            if (draftPanel != null)
+            {
+                draftPanel.SetActive(false);
+            }
+        }
+
+        private List<BlueprintCardSO> GetRandomCards(int count)
+        {
+            List<BlueprintCardSO> tempPool = new List<BlueprintCardSO>(runtimePool);
+            List<BlueprintCardSO> results = new List<BlueprintCardSO>();
+
+            int iterations = Mathf.Min(count, tempPool.Count);
+            for (int i = 0; i < iterations; i++)
+            {
+                int index = Random.Range(0, tempPool.Count);
+                results.Add(tempPool[index]);
+                tempPool.RemoveAt(index);
+            }
+
+            return results;
+        }
+
+        private void InitializeDefaultPool()
+        {
+            runtimePool.Clear();
+            runtimePool.AddRange(poolOfCards);
+
+            // Add rich default cards procedurally so the system works perfectly right out of the box!
+            // 1. Solar Panel Blueprint
+            var cardSolar = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardSolar.cardName = "Solar Array Project";
+            cardSolar.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
+            cardSolar.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/SolarPanel/SolarPanel");
+#if UNITY_EDITOR
+            if (cardSolar.buildingToUnlock == null) cardSolar.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/SolarPanel/SolarPanel.asset");
+#endif
+            runtimePool.Add(cardSolar);
+
+            // 2. Oxygen Processor Blueprint
+            var cardOxygen = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardOxygen.cardName = "Atmosphere Processor";
+            cardOxygen.cardDescription = "Unlocks the Oxygen Processor to extract carbon dioxide and enrich colony atmosphere.";
+            cardOxygen.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Oxygen Processor/Oxygen Processor");
+#if UNITY_EDITOR
+            if (cardOxygen.buildingToUnlock == null) cardOxygen.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Oxygen Processor/Oxygen Processor.asset");
+#endif
+            runtimePool.Add(cardOxygen);
+
+            // 3. Colonist Habitat Blueprint
+            var cardHabitat = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardHabitat.cardName = "Modular Habitat Dome";
+            cardHabitat.cardDescription = "Unlocks the Colonist Habitat building, increasing your maximum colony housing capacity.";
+            cardHabitat.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Habitat/Habitat");
+#if UNITY_EDITOR
+            if (cardHabitat.buildingToUnlock == null) cardHabitat.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Habitat/Habitat.asset");
+#endif
+            runtimePool.Add(cardHabitat);
+
+            // 4. Heavy Materials Drop
+            var cardMats = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardMats.cardName = "Heavy Alloys Shipment";
+            cardMats.cardDescription = "Receive an immediate cargo supply shipment of +400 Materials for base construction.";
+            cardMats.materialsAmount = 400;
+            runtimePool.Add(cardMats);
+
+            // 5. Bio-Matter Drop
+            var cardBio = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardBio.cardName = "Bio-Dome Culture Serum";
+            cardBio.cardDescription = "Deploy advanced fertilizer cultures to instantly receive +150 Biomass.";
+            cardBio.biomassAmount = 150;
+            runtimePool.Add(cardBio);
+
+            // 6. Drone Assembly
+            var cardDrone = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
+            cardDrone.cardName = "Mining Drone";
+            cardDrone.cardDescription = "Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.";
+#if UNITY_EDITOR
+            cardDrone.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Mining Drone/Mining Drone.prefab");
+#endif
+            runtimePool.Add(cardDrone);
+
+            // 7. Repair Drone
+            var cardRepair = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
+            cardRepair.cardName = "Automated Repair Crawler";
+            cardRepair.cardDescription = "Deploy a specialized Repair Drone to automatically rebuild pipelines and repair bases.";
+#if UNITY_EDITOR
+            cardRepair.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Repair Drone/Repair Drone.prefab");
+#endif
+            runtimePool.Add(cardRepair);
+
+            // 8. Gather Speed Buff
+            var cardSpeed = ScriptableObject.CreateInstance<PassiveBuffCardSO>();
+            cardSpeed.cardName = "High-Power Induction Drills";
+            cardSpeed.cardDescription = "Upgrade mining tools. All mining droids gather minerals and deposits +30% faster permanently.";
+            cardSpeed.buffType = PassiveBuffCardSO.BuffType.GatherSpeed;
+            cardSpeed.multiplier = 1.3f;
+            runtimePool.Add(cardSpeed);
+
+            // 9. Power Gen Buff
+            var cardPower = ScriptableObject.CreateInstance<PassiveBuffCardSO>();
+            cardPower.cardName = "Photovoltaic Tuning Upgrades";
+            cardPower.cardDescription = "Install resonance tuners onto solar collectors. All Solar Panels generate +20% grid Power permanently.";
+            cardPower.buffType = PassiveBuffCardSO.BuffType.PowerGeneration;
+            cardPower.multiplier = 1.20f;
+            runtimePool.Add(cardPower);
+        }
+
+        private void AssembleUI()
+        {
+            // Find Main Canvas
+            Canvas mainCanvas = FindFirstObjectByType<Canvas>();
+            if (mainCanvas == null)
+            {
+                Debug.LogError("[BlueprintDraftUI] Could not find any active Canvas in scene to attach self-assembled UI!");
+                return;
+            }
+
+            // Create draftPanel root
+            draftPanel = new GameObject("Blueprint Draft Overlay", typeof(RectTransform));
+            draftPanel.transform.SetParent(mainCanvas.transform, false);
+
+            var panelRt = draftPanel.GetComponent<RectTransform>();
+            panelRt.anchorMin = Vector2.zero;
+            panelRt.anchorMax = Vector2.one;
+            panelRt.offsetMin = Vector2.zero;
+            panelRt.offsetMax = Vector2.zero;
+
+            // Add background overlay image
+            var bgImg = draftPanel.AddComponent<Image>();
+            bgImg.color = new Color(0.08f, 0.1f, 0.13f, 0.95f); // Deep dark space/slate color
+
+            // Title Text
+            GameObject titleGo = new GameObject("Draft Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+            titleGo.transform.SetParent(draftPanel.transform, false);
+            var titleRt = titleGo.GetComponent<RectTransform>();
+            titleRt.anchorMin = new Vector2(0.1f, 0.85f);
+            titleRt.anchorMax = new Vector2(0.9f, 0.95f);
+            titleRt.offsetMin = Vector2.zero;
+            titleRt.offsetMax = Vector2.zero;
+
+            var titleTmp = titleGo.GetComponent<TextMeshProUGUI>();
+            titleTmp.text = "NEW GENERATION: SELECT BLUEPRINT";
+            titleTmp.font = Resources.Load<TMP_FontAsset>("Fonts & Materials/Dogfish SDF");
+            if (titleTmp.font == null) titleTmp.font = Resources.FindObjectsOfTypeAll<TMP_FontAsset>()[0];
+            titleTmp.fontSize = 32f;
+            titleTmp.alignment = TextAlignmentOptions.Center;
+            titleTmp.color = new Color(0.2f, 0.8f, 1f, 1f); // Electrifying cyan
+
+            // Horizontal layout for cards
+            GameObject cardContainer = new GameObject("Cards Container", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            cardContainer.transform.SetParent(draftPanel.transform, false);
+            var ccRt = cardContainer.GetComponent<RectTransform>();
+            ccRt.anchorMin = new Vector2(0.05f, 0.2f);
+            ccRt.anchorMax = new Vector2(0.95f, 0.8f);
+            ccRt.offsetMin = Vector2.zero;
+            ccRt.offsetMax = Vector2.zero;
+
+            var hlg = cardContainer.GetComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 40f;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlHeight = true;
+            hlg.childControlWidth = true;
+            hlg.childForceExpandHeight = true;
+            hlg.childForceExpandWidth = true;
+
+            // Create 3 Cards
+            cardSlots.Clear();
+            for (int i = 0; i < 3; i++)
+            {
+                GameObject cardObj = new GameObject($"Card Slot ({i})", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
+                cardObj.transform.SetParent(cardContainer.transform, false);
+
+                var cardImg = cardObj.GetComponent<Image>();
+                cardImg.color = new Color(0.12f, 0.15f, 0.18f, 1f); // Slate grey
+
+                var vlg = cardObj.GetComponent<VerticalLayoutGroup>();
+                vlg.padding = new RectOffset(20, 20, 20, 20);
+                vlg.spacing = 15f;
+                vlg.childAlignment = TextAnchor.UpperCenter;
+                vlg.childControlHeight = false;
+                vlg.childControlWidth = true;
+                vlg.childForceExpandHeight = false;
+                vlg.childForceExpandWidth = true;
+
+                // Card Title
+                GameObject cTitleGo = new GameObject("Card Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+                cTitleGo.transform.SetParent(cardObj.transform, false);
+                var cTitleTmp = cTitleGo.GetComponent<TextMeshProUGUI>();
+                cTitleTmp.text = "BLUEPRINT CARD";
+                cTitleTmp.fontSize = 20f;
+                cTitleTmp.alignment = TextAlignmentOptions.Center;
+                cTitleTmp.color = new Color(1f, 0.85f, 0.2f, 1f); // Vibrant Gold
+                cTitleTmp.font = titleTmp.font;
+
+                // Divider Line
+                GameObject cDivGo = new GameObject("Divider", typeof(RectTransform), typeof(Image));
+                cDivGo.transform.SetParent(cardObj.transform, false);
+                var cDivRt = cDivGo.GetComponent<RectTransform>();
+                cDivRt.sizeDelta = new Vector2(250f, 2f);
+                cDivGo.GetComponent<Image>().color = new Color(0.3f, 0.4f, 0.5f, 0.5f);
+
+                // Card Description
+                GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI));
+                cDescGo.transform.SetParent(cardObj.transform, false);
+                var cDescRt = cDescGo.GetComponent<RectTransform>();
+                cDescRt.sizeDelta = new Vector2(260f, 180f);
+                var cDescTmp = cDescGo.GetComponent<TextMeshProUGUI>();
+                cDescTmp.text = "This is the detailed description of the card's action or unlocked blueprint.";
+                cDescTmp.fontSize = 15f;
+                cDescTmp.alignment = TextAlignmentOptions.TopLeft;
+                cDescTmp.color = Color.white;
+                cDescTmp.enableWordWrapping = true;
+
+                // Spacing block before button
+                GameObject spacer = new GameObject("Spacer", typeof(RectTransform));
+                spacer.transform.SetParent(cardObj.transform, false);
+                var spacerRt = spacer.GetComponent<RectTransform>();
+                spacerRt.sizeDelta = new Vector2(100f, 40f);
+
+                // Select Button
+                GameObject cBtnGo = new GameObject("Select Button", typeof(RectTransform), typeof(Image), typeof(Button));
+                cBtnGo.transform.SetParent(cardObj.transform, false);
+                var cBtnRt = cBtnGo.GetComponent<RectTransform>();
+                cBtnRt.sizeDelta = new Vector2(220f, 40f);
+
+                var btnImg = cBtnGo.GetComponent<Image>();
+                btnImg.color = new Color(0.2f, 0.7f, 0.3f, 1f); // Sci-Fi Green
+
+                var cBtn = cBtnGo.GetComponent<Button>();
+                
+                // Button Text
+                GameObject btnTxtGo = new GameObject("Button Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                btnTxtGo.transform.SetParent(cBtnGo.transform, false);
+                var btnTxtRt = btnTxtGo.GetComponent<RectTransform>();
+                btnTxtRt.anchorMin = Vector2.zero;
+                btnTxtRt.anchorMax = Vector2.one;
+                btnTxtRt.offsetMin = Vector2.zero;
+                btnTxtRt.offsetMax = Vector2.zero;
+
+                var btnTxtTmp = btnTxtGo.GetComponent<TextMeshProUGUI>();
+                btnTxtTmp.text = "CHOOSE BLUEPRINT";
+                btnTxtTmp.fontSize = 14f;
+                btnTxtTmp.alignment = TextAlignmentOptions.Center;
+                btnTxtTmp.color = Color.white;
+                btnTxtTmp.font = titleTmp.font;
+
+                cardSlots.Add(new CardUIElements
+                {
+                    cardObj = cardObj,
+                    titleText = cTitleTmp,
+                    descText = cDescTmp,
+                    iconImage = null,
+                    selectButton = cBtn
+                });
+            }
+
+            Debug.Log("[BlueprintDraftUI] Successfully assembled fully functional and dynamic Card Overlay!");
+        }
+    }
+}
