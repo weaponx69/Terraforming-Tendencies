@@ -57,52 +57,6 @@ namespace GameDevTV.RTS.Units
             particleSystems = GetComponentsInChildren<ParticleSystem>();
 
             initialCommands = AvailableCommands;
-
-            if (selectionIndicator == null)
-            {
-                Transform existing = transform.Find("Selection Indicator");
-                if (existing != null)
-                {
-                    selectionIndicator = existing.gameObject;
-                }
-                else
-                {
-                    Transform indicatorTemplate = null;
-                    foreach (var commandable in ActiveCommandables)
-                    {
-                        if (commandable == this || commandable == null) continue;
-                        indicatorTemplate = commandable.transform.Find("Selection Indicator");
-                        if (indicatorTemplate != null)
-                        {
-                            break;
-                        }
-                    }
-
-                    if (indicatorTemplate != null)
-                    {
-                        selectionIndicator = Instantiate(indicatorTemplate.gameObject, transform);
-                        selectionIndicator.name = "Selection Indicator";
-                        selectionIndicator.transform.localPosition = new Vector3(0, 0.05f, 0);
-                        selectionIndicator.transform.localRotation = Quaternion.Euler(90, 0, 0);
-                        
-                        float maxScale = 5f;
-                        if (TryGetComponent(out UnityEngine.AI.NavMeshObstacle obstacle))
-                        {
-                            if (obstacle.shape == UnityEngine.AI.NavMeshObstacleShape.Box)
-                                maxScale = Mathf.Max(obstacle.size.x, obstacle.size.z) + 1f;
-                            else
-                                maxScale = obstacle.radius * 2f + 1f;
-                        }
-                        else if (TryGetComponent(out Collider col))
-                        {
-                            maxScale = Mathf.Max(col.bounds.size.x, col.bounds.size.z) + 1f;
-                        }
-                        selectionIndicator.transform.localScale = new Vector3(maxScale * 2f, maxScale * 2f, 1f);
-                        selectionIndicator.SetActive(false);
-                    }
-                }
-            }
-
             isAbstractInitialized = true;
         }
 
