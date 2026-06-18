@@ -7,6 +7,7 @@ namespace GameDevTV.RTS.Commands
     public class ConnectPowerCommand : BaseCommand
     {
         public override bool RequiresClickToActivate => true;
+        public override bool StaysActive => true;
 
         public override bool CanHandle(CommandContext context)
         {

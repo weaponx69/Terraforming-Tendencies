@@ -32,6 +32,8 @@ namespace GameDevTV.RTS.Commands
         /// <returns></returns>
         public virtual bool IsAvailable(CommandContext context) => true;
 
+        public virtual bool StaysActive => false;
+
         public virtual bool AllRestrictionsPass(Vector3 point) =>
             Restrictions.Length == 0 || Restrictions.All(restriction => restriction.CanPlace(point));
 

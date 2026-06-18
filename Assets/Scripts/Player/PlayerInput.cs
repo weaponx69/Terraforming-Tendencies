@@ -706,7 +706,10 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 }
             }
 
-            activeCommand = null;
+            if (activeCommand != null && !activeCommand.StaysActive)
+            {
+                activeCommand = null;
+            }
         }
 
         private void HandleRotation()

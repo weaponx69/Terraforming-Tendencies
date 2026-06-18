@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f185a45e660fa34bb6472929a4cdd40, type: 3}
   m_Name: SolarPanel
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BuildingSO
-  <Name>k__BackingField: Unit
+  <Name>k__BackingField: Solar Panel
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 5
   <Icon>k__BackingField: {fileID: 0}

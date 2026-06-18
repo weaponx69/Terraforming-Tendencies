@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f185a45e660fa34bb6472929a4cdd40, type: 3}
   m_Name: Habitat
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BuildingSO
-  <Name>k__BackingField: Unit
+  <Name>k__BackingField: Habitat
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 5
   <Icon>k__BackingField: {fileID: 21300000, guid: e7c49208e47e57c47b55c30f3f47b29d, type: 3}
