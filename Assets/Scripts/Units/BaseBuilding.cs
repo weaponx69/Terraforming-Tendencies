@@ -198,6 +198,7 @@ namespace GameDevTV.RTS.Units
 
         public void CompleteConstruction()
         {
+            Debug.Log($"[BaseBuilding] CompleteConstruction called on {gameObject.name} (Owner={Owner})");
             if (CurrentHealth == 0)
             {
                 CurrentHealth = MaxHealth;
@@ -244,6 +245,8 @@ namespace GameDevTV.RTS.Units
         {
             var config = BuildingSO.BuildingConfig;
             if (config == null) yield break;
+
+            Debug.Log($"[BaseBuilding] UpkeepRoutine started on {gameObject.name} — PowerGeneration={config.PowerGeneration}");
 
             while (gameObject.activeInHierarchy && Progress.State == BuildingProgress.BuildingState.Completed)
             {

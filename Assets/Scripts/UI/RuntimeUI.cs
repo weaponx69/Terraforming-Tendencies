@@ -384,8 +384,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 integrityValueText.SetText(integrityInitial.ToString("F1"));
             }
 
-            Supplies.OnPopulationChanged += HandlePopulationChanged;
-            Supplies.OnPopulationLimitChanged += HandlePopulationLimitChanged;
             UpdatePopulationText();
         }
 
@@ -460,6 +458,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
         private void HandlePowerChanged(Owner owner, float newValue)
         {
             if (owner != displayedOwner) return;
+            Debug.Log($"[RuntimeUI] HandlePowerChanged: value={newValue}, powerValueText={(powerValueText == null ? "NULL" : powerValueText.name)}");
             if (powerValueText != null) powerValueText.SetText($"{newValue:F0}");
         }
 
