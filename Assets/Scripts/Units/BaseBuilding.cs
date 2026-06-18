@@ -293,6 +293,42 @@ namespace GameDevTV.RTS.Units
                 StartCoroutine(UpkeepRoutine());
             }
 
+            if (isCommandPost && Owner == Owner.Player1)
+            {
+                var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                int count = 0;
+                foreach (var w in workers)
+                {
+                    if (w != null && w.Owner == Owner.Player1) count++;
+                }
+
+                if (count == 0)
+                {
+                    var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+                    if (miningDroneSO == null)
+                    {
+#if UNITY_EDITOR
+                        miningDroneSO = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>("Assets/Resources/Units/MiningDrone.asset");
+#endif
+                    }
+
+                    if (miningDroneSO != null && miningDroneSO.Prefab != null)
+                    {
+                        Vector3 spawnPos = transform.position + new Vector3(5f, 0f, 5f);
+                        if (UnityEngine.AI.NavMesh.SamplePosition(spawnPos, out UnityEngine.AI.NavMeshHit hit, 15f, UnityEngine.AI.NavMesh.AllAreas))
+                        {
+                            spawnPos = hit.position;
+                        }
+                        GameObject instance = Instantiate(miningDroneSO.Prefab, spawnPos, Quaternion.identity);
+                        if (instance.TryGetComponent(out AbstractCommandable commandable))
+                        {
+                            commandable.Owner = Owner.Player1;
+                        }
+                        Debug.Log("[BaseBuilding] Spawned 1 free starting Mining Drone for Player 1 to prevent softlock.");
+                    }
+                }
+            }
+
             RaiseSpawnEvent();
         }
 

@@ -178,7 +178,7 @@ namespace GameDevTV.RTS.Units
         {
             if (Supplies.Materials == null) return;
             int current = Supplies.Materials.TryGetValue(aiOwner, out int materials) ? materials : 0;
-            if (current < 1000)
+            if (aiOwner != Owner.Player1 && current < 1000)
             {
                 Supplies.Materials[aiOwner] = 1000;
                 Supplies.RaiseMaterialsChanged(aiOwner, 1000);

@@ -8,6 +8,30 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: _availableCommands.Array.size
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[0]'
+      value: 
+      objectReference: {fileID: 11400000, guid: b52e644dd3b5a564abc2f7e477be148b, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[1]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 8258cb2e05e86f348b76da1f7d531b3a, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[2]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 3ef62f1f947fc5df5a509360e9c4e637, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[3]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 2ebe41fb690ef785d99032c25551defa, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[4]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 2e1eb4965418920b8a032e3883db6b3c, type: 2}
     - target: {fileID: 1589499662120937400, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: m_Name
       value: Barracks

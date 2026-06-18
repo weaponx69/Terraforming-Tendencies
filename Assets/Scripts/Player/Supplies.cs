@@ -191,7 +191,7 @@ namespace GameDevTV.RTS.Player
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _materials[owner] = 1000;
+                _materials[owner] = (owner == Owner.Player1) ? 0 : 1000;
                 _biomass[owner] = 0;
                 _power[owner] = 0f;
                 _population[owner] = 0;
@@ -226,7 +226,7 @@ namespace GameDevTV.RTS.Player
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _materials.Add(owner, startingMaterials);
+                _materials.Add(owner, (owner == Owner.Player1) ? 0 : startingMaterials);
                 _biomass.Add(owner, 0);
                 _power.Add(owner, 0f);
                 _population.Add(owner, 0);

@@ -64,10 +64,13 @@ namespace GameDevTV.RTS.Player
             unlockedBuildings.Add(name);
         }
 
+        public static BlueprintCardSO LastDraftedCard { get; private set; }
+
         public static void CompleteDraft(BlueprintCardSO chosenCard)
         {
             if (chosenCard != null)
             {
+                LastDraftedCard = chosenCard;
                 chosenCard.Apply();
             }
 

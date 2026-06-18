@@ -8,6 +8,26 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: _availableCommands.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[0]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 38bf002dbb78db14d9e557702ff5f0b6, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[1]'
+      value: 
+      objectReference: {fileID: 11400000, guid: f4a32045a16c4dc4681ff73d5a107103, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[2]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 7b576323a871a594d8859f3cb1889489, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: '_availableCommands.Array.data[3]'
+      value: 
+      objectReference: {fileID: 11400000, guid: b4a2c682ca799124ab10977bca60f293, type: 2}
     - target: {fileID: 1589499662120937400, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: m_Name
       value: Infantry School

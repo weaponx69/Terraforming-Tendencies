@@ -34,6 +34,16 @@ namespace GameDevTV.RTS.Player
         public bool IsBetweenRounds { get; private set; } = false;
         public bool IsExpansionPhase { get; private set; } = false;
 
+        public string CurrentMilestoneDescription
+        {
+            get
+            {
+                if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
+                int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
+                return milestones[milestoneIndex].GoalDescription;
+            }
+        }
+
         [Header("Milestones Config")]
         [SerializeField] private List<SectorMilestone> milestones = new();
 
@@ -86,7 +96,7 @@ namespace GameDevTV.RTS.Player
             {
                 milestones = new List<SectorMilestone>
                 {
-                    new SectorMilestone { Type = MilestoneType.Biomass, TargetValue = 50f, GoalDescription = "Accumulate 50 Biomass" },
+                    new SectorMilestone { Type = MilestoneType.Biomass, TargetValue = 250f, GoalDescription = "Accumulate 250 Biomass" },
                     new SectorMilestone { Type = MilestoneType.Power, TargetValue = 20f, GoalDescription = "Generate 20 Grid Power" },
                     new SectorMilestone { Type = MilestoneType.Oxygen, TargetValue = 30f, GoalDescription = "Reach 30% Atmospheric Oxygen" },
                     new SectorMilestone { Type = MilestoneType.Population, TargetValue = 10f, GoalDescription = "Establish 10 Colonists" },
