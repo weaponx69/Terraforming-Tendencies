@@ -37,7 +37,6 @@ namespace GameDevTV.RTS.Player
         [Header("Milestones Config")]
         [SerializeField] private List<SectorMilestone> milestones = new();
 
-        private int initialAmountInSector = 0;
         private float roundStartTime = 0f;
 
         public static event Action<int, int> OnGenerationStarted; // current, max
@@ -78,7 +77,6 @@ namespace GameDevTV.RTS.Player
             CurrentGeneration = 1;
             IsBetweenRounds = false;
             IsExpansionPhase = false;
-            initialAmountInSector = 0;
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 
@@ -225,7 +223,6 @@ namespace GameDevTV.RTS.Player
 
             // Replenish resources on the map
             PlanetGenerator.Instance?.ReplenishResources();
-            initialAmountInSector = 0; // Recalculate next frame
             roundStartTime = Time.time; // Start the grace period
 
             // Fire event
@@ -239,7 +236,6 @@ namespace GameDevTV.RTS.Player
             CurrentGeneration = 1;
             
             PlanetGenerator.Instance?.ReplenishResources();
-            initialAmountInSector = 0; // Recalculate next frame
 
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
