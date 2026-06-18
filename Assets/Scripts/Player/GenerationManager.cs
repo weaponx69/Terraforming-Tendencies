@@ -58,12 +58,12 @@ namespace GameDevTV.RTS.Player
             }
         }
 
-        private void Start()
+        private void OnEnable()
         {
             PlanetGenerator.OnPlanetGenerated += InitializeGenerations;
         }
 
-        private void OnDestroy()
+        private void OnDisable()
         {
             PlanetGenerator.OnPlanetGenerated -= InitializeGenerations;
         }
