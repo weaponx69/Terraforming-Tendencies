@@ -24,7 +24,7 @@ public static class SetupAIAutomation
 {
     // ── Known asset paths ──────────────────────────────────────────────────────
     private const string CMD_POST_PREFAB = "Assets/Units/Buildings/Command Post/Command Post.prefab";
-    private const string CMD_POST_SO     = "Assets/Units/Buildings/Command Post/Command Post.asset";
+    private const string CMD_POST_SO     = "Assets/Resources/Buildings/Command Post/Command Post.asset";
     private const string AIR_TRANSPORT_SO= "Assets/Units/Air Transport/Air Transport.asset";
 
     // [MenuItem("Terraforming/Setup AI Automation")]

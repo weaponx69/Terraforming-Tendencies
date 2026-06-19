@@ -144,14 +144,14 @@ namespace GameDevTV.RTS.Units
         private void LoadAssets()
         {
 #if UNITY_EDITOR
-            if (commandPostSO == null) commandPostSO = AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Command Post/Command Post.asset");
-            if (oxygenProcessorSO == null) oxygenProcessorSO = AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Oxygen Processor/Oxygen Processor.asset");
+            if (commandPostSO == null) commandPostSO = AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/Command Post/Command Post.asset");
+            if (oxygenProcessorSO == null) oxygenProcessorSO = AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/Oxygen Processor/Oxygen Processor.asset");
 
             if (workerSO == null) workerSO = AssetDatabase.LoadAssetAtPath<AbstractUnitSO>("Assets/Resources/Units/MiningDrone.asset");
 #endif
             // Fallbacks for build
-            if (commandPostSO == null) commandPostSO = Resources.Load<BuildingSO>("Buildings/CommandPost");
-            if (oxygenProcessorSO == null) oxygenProcessorSO = Resources.Load<BuildingSO>("Buildings/OxygenProcessor");
+            if (commandPostSO == null) commandPostSO = Resources.Load<BuildingSO>("Buildings/Command Post/Command Post");
+            if (oxygenProcessorSO == null) oxygenProcessorSO = Resources.Load<BuildingSO>("Buildings/Oxygen Processor/Oxygen Processor");
             if (workerSO == null) workerSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
             if (constructionDroneSO == null) constructionDroneSO = Resources.Load<AbstractUnitSO>("Units/ConstructionDrone");
         }

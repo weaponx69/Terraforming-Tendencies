@@ -421,6 +421,16 @@ namespace GameDevTV.RTS.Units
             var unlockedBuildingNames = BlueprintDraftManager.GetUnlockedBuildingNames();
             if (unlockedBuildingNames.Count == 0) return cmds;
 
+            bool hasShowBuildingsMenu = false;
+            foreach (var cmd in cmds)
+            {
+                if (cmd != null && cmd is OverrideCommandsCommand overrideCmd && overrideCmd.name.Contains("Show Buildings"))
+                {
+                    hasShowBuildingsMenu = true;
+                    break;
+                }
+            }
+
             var list = new System.Collections.Generic.List<BaseCommand>();
             foreach (var cmd in cmds)
             {
@@ -447,42 +457,45 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            foreach (var bldName in unlockedBuildingNames)
+            if (!hasShowBuildingsMenu)
             {
-                var bldSO = BlueprintDraftManager.GetBuildingSOByName(bldName);
-                if (bldSO != null)
+                foreach (var bldName in unlockedBuildingNames)
                 {
-                    bool alreadyExists = false;
-                    foreach (var c in list)
+                    var bldSO = BlueprintDraftManager.GetBuildingSOByName(bldName);
+                    if (bldSO != null)
                     {
-                        if (c is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Name == bldSO.Name)
+                        bool alreadyExists = false;
+                        foreach (var c in list)
                         {
-                            alreadyExists = true;
-                            break;
-                        }
-                    }
-
-                    if (!alreadyExists)
-                    {
-                        var newCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
-                        newCmd.Name = "Build " + bldSO.Name;
-                        newCmd.Building = bldSO;
-                        newCmd.Icon = bldSO.Icon;
-                        newCmd.Slot = FindFreeSlot(list);
-
-                        // Set restrictions using reflection
-                        bool targetIsCommand = bldSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-                        var copiedRestrictions = GetTemplateRestrictions(cmds, targetIsCommand) ?? FindAnyRestrictions(cmds);
-                        if (copiedRestrictions != null)
-                        {
-                            var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                            if (restrictionsField != null)
+                            if (c is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Name == bldSO.Name)
                             {
-                                restrictionsField.SetValue(newCmd, copiedRestrictions);
+                                alreadyExists = true;
+                                break;
                             }
                         }
 
-                        list.Add(newCmd);
+                        if (!alreadyExists)
+                        {
+                            var newCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
+                            newCmd.Name = "Build " + bldSO.Name;
+                            newCmd.Building = bldSO;
+                            newCmd.Icon = bldSO.Icon;
+                            newCmd.Slot = FindFreeSlot(list);
+
+                            // Set restrictions using reflection
+                            bool targetIsCommand = bldSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                            var copiedRestrictions = GetTemplateRestrictions(cmds, targetIsCommand) ?? FindAnyRestrictions(cmds);
+                            if (copiedRestrictions != null)
+                            {
+                                var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                                if (restrictionsField != null)
+                                {
+                                    restrictionsField.SetValue(newCmd, copiedRestrictions);
+                                }
+                            }
+
+                            list.Add(newCmd);
+                        }
                     }
                 }
             }

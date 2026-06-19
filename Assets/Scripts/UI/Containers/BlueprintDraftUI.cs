@@ -161,7 +161,7 @@ namespace GameDevTV.RTS.UI.Containers
             cardSolar.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
             cardSolar.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/SolarPanel/SolarPanel");
 #if UNITY_EDITOR
-            if (cardSolar.buildingToUnlock == null) cardSolar.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/SolarPanel/SolarPanel.asset");
+            if (cardSolar.buildingToUnlock == null) cardSolar.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/SolarPanel/SolarPanel.asset");
 #endif
             runtimePool.Add(cardSolar);
 
@@ -171,7 +171,7 @@ namespace GameDevTV.RTS.UI.Containers
             cardOxygen.cardDescription = "Unlocks the Oxygen Processor to extract carbon dioxide and enrich colony atmosphere.";
             cardOxygen.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Oxygen Processor/Oxygen Processor");
 #if UNITY_EDITOR
-            if (cardOxygen.buildingToUnlock == null) cardOxygen.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Oxygen Processor/Oxygen Processor.asset");
+            if (cardOxygen.buildingToUnlock == null) cardOxygen.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/Oxygen Processor/Oxygen Processor.asset");
 #endif
             runtimePool.Add(cardOxygen);
 
@@ -181,7 +181,7 @@ namespace GameDevTV.RTS.UI.Containers
             cardHabitat.cardDescription = "Unlocks the Colonist Habitat building, increasing your maximum colony housing capacity.";
             cardHabitat.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Habitat/Habitat");
 #if UNITY_EDITOR
-            if (cardHabitat.buildingToUnlock == null) cardHabitat.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Habitat/Habitat.asset");
+            if (cardHabitat.buildingToUnlock == null) cardHabitat.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/Habitat/Habitat.asset");
 #endif
             runtimePool.Add(cardHabitat);
 
