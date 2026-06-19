@@ -94,7 +94,96 @@ namespace GameDevTV.RTS.UI.Containers
                     var card = selectedCards[i];
                     
                     cardSlots[i].titleText.text = card.cardName.ToUpper();
-                    cardSlots[i].descText.text = card.cardDescription;
+                    
+                    string desc = card.cardDescription;
+                    if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
+                    {
+                        var building = unlockCard.buildingToUnlock;
+                        var sb = new System.Text.StringBuilder();
+                        sb.AppendLine(desc);
+                        sb.AppendLine();
+                        
+                        if (building.Cost != null)
+                        {
+                            var costs = new List<string>();
+                            if (building.Cost.Minerals > 0) costs.Add($"{building.Cost.Minerals} Minerals");
+                            if (building.Cost.Gas > 0) costs.Add($"{building.Cost.Gas} Gas");
+                            if (costs.Count > 0)
+                            {
+                                sb.AppendLine($"<color=#FFD700>Cost:</color> {string.Join(", ", costs)}");
+                            }
+                        }
+
+                        if (building.BuildingConfig != null)
+                        {
+                            var stats = new List<string>();
+                            if (building.BuildingConfig.PowerUpkeep > 0) stats.Add($"-{building.BuildingConfig.PowerUpkeep} Power Upkeep");
+                            if (building.BuildingConfig.PowerGeneration > 0) stats.Add($"+{building.BuildingConfig.PowerGeneration} Power Gen");
+                            if (building.BuildingConfig.HousingCapacity > 0) stats.Add($"+{building.BuildingConfig.HousingCapacity} Housing");
+                            if (building.BuildingConfig.BiomassGeneration > 0) stats.Add($"+{building.BuildingConfig.BiomassGeneration} Biomass Gen");
+                            if (stats.Count > 0)
+                            {
+                                sb.AppendLine($"<color=#ADD8E6>Stats:</color> {string.Join(", ", stats)}");
+                            }
+                        }
+
+                        if (card is TerraformingCardSO tfCard)
+                        {
+                            var reqs = new List<string>();
+                            if (tfCard.minTemperature > -9999f && tfCard.maxTemperature < 9999f)
+                            {
+                                reqs.Add($"Temp: {tfCard.minTemperature:F0}°C to {tfCard.maxTemperature:F0}°C");
+                            }
+                            else if (tfCard.minTemperature > -9999f)
+                            {
+                                reqs.Add($"Temp: >= {tfCard.minTemperature:F0}°C");
+                            }
+                            else if (tfCard.maxTemperature < 9999f)
+                            {
+                                reqs.Add($"Temp: <= {tfCard.maxTemperature:F0}°C");
+                            }
+
+                            if (tfCard.minOxygen > -9999f && tfCard.maxOxygen < 9999f)
+                            {
+                                reqs.Add($"O2: {tfCard.minOxygen:F1}% to {tfCard.maxOxygen:F1}%");
+                            }
+                            else if (tfCard.minOxygen > -9999f)
+                            {
+                                reqs.Add($"O2: >= {tfCard.minOxygen:F1}%");
+                            }
+                            else if (tfCard.maxOxygen < 9999f)
+                            {
+                                reqs.Add($"O2: <= {tfCard.maxOxygen:F1}%");
+                            }
+
+                            if (tfCard.minAtmosphere > -9999f && tfCard.maxAtmosphere < 9999f)
+                            {
+                                reqs.Add($"Atmos: {tfCard.minAtmosphere:F2} to {tfCard.maxAtmosphere:F2} atm");
+                            }
+                            else if (tfCard.minAtmosphere > -9999f)
+                            {
+                                reqs.Add($"Atmos: >= {tfCard.minAtmosphere:F2} atm");
+                            }
+                            else if (tfCard.maxAtmosphere < 9999f)
+                            {
+                                reqs.Add($"Atmos: <= {tfCard.maxAtmosphere:F2} atm");
+                            }
+
+                            if (tfCard.requiredSectorFeature != SectorManager.SectorFeature.None)
+                            {
+                                reqs.Add($"Feature: {tfCard.requiredSectorFeature}");
+                            }
+
+                            if (reqs.Count > 0)
+                            {
+                                sb.AppendLine($"<color=#FFA07A>Reqs:</color> {string.Join(", ", reqs)}");
+                            }
+                        }
+
+                        desc = sb.ToString();
+                    }
+
+                    cardSlots[i].descText.text = desc;
                     if (cardSlots[i].iconImage != null && card.icon != null)
                     {
                         cardSlots[i].iconImage.sprite = card.icon;
@@ -431,16 +520,20 @@ namespace GameDevTV.RTS.UI.Containers
                 cDivGo.GetComponent<Image>().color = new Color(0.3f, 0.4f, 0.5f, 0.5f);
 
                 // Card Description
-                GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI));
+                GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(ContentSizeFitter));
                 cDescGo.transform.SetParent(cardObj.transform, false);
                 var cDescRt = cDescGo.GetComponent<RectTransform>();
                 cDescRt.sizeDelta = new Vector2(260f, 180f);
                 var cDescTmp = cDescGo.GetComponent<TextMeshProUGUI>();
                 cDescTmp.text = "This is the detailed description of the card's action or unlocked blueprint.";
-                cDescTmp.fontSize = 15f;
+                cDescTmp.fontSize = 13f;
                 cDescTmp.alignment = TextAlignmentOptions.TopLeft;
                 cDescTmp.color = Color.white;
                 cDescTmp.textWrappingMode = TextWrappingModes.Normal;
+
+                var fitter = cDescGo.GetComponent<ContentSizeFitter>();
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
                 // Spacing block before button
                 GameObject spacer = new GameObject("Spacer", typeof(RectTransform));
