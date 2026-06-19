@@ -109,6 +109,10 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 
         private void Awake()
         {
+            GameObject objectivesPanel = new GameObject("Active Objectives Panel");
+            objectivesPanel.transform.SetParent(transform, false);
+            objectivesPanel.AddComponent<GameDevTV.RTS.UI.Containers.ActiveObjectivesUI>();
+
             FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");

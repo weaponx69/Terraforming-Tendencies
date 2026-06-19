@@ -125,6 +125,8 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        private bool hasDoneStartingDiscovery = false;
+
         private void Update()
         {
             if (Sectors.Count == 0 && Time.timeSinceLevelLoad > 1f)
@@ -132,6 +134,13 @@ namespace GameDevTV.RTS.Environment
                 InitializeSectors();
             }
             UpdateOccupancy();
+
+            if (!hasDoneStartingDiscovery && Sectors.Count > 0 && Time.timeSinceLevelLoad > 0.1f)
+            {
+                hasDoneStartingDiscovery = true;
+                DiscoverResourcesInUnlockedSectors();
+                Debug.Log("[SectorManager] Completed deferred starting resource discovery for unlocked sectors!");
+            }
         }
 
         private void UpdateOccupancy()
