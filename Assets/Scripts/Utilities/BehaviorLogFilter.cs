@@ -30,8 +30,15 @@ namespace GameDevTV.RTS.Utilities
         private static readonly string[] SuppressedMessages = 
         {
             "SetAnimatorBoolAction: No Animator set.",
-            "Curl error 3: URL rejected"
+            "Curl error 3: URL rejected",
+            "Resolve of invalid GC handle",
+            "ScriptableSingleton already exists",
+            "Assertion failed on expression: '!m_MonoReference.HasTarget()'"
         };
+
+#if UNITY_EDITOR
+        private static ILogHandler originalHandler;
+#endif
 
 #if UNITY_EDITOR
         static BehaviorLogFilter()
@@ -47,11 +54,30 @@ namespace GameDevTV.RTS.Utilities
             if (Debug.unityLogger.logHandler is FilteringLogHandler) return;
             
             ILogHandler currentHandler = Debug.unityLogger.logHandler;
+#if UNITY_EDITOR
+            originalHandler = currentHandler;
+            AssemblyReloadEvents.beforeAssemblyReload += Cleanup;
+#endif
             Debug.unityLogger.logHandler = new FilteringLogHandler(currentHandler);
             
             // Log installation
             Debug.Log("[BehaviorLogFilter] Log suppression active (dropping SetAnimatorBoolAction warnings).");
         }
+
+#if UNITY_EDITOR
+        private static void Cleanup()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= Cleanup;
+            if (originalHandler != null)
+            {
+                if (Debug.unityLogger.logHandler is FilteringLogHandler)
+                {
+                    Debug.unityLogger.logHandler = originalHandler;
+                }
+                originalHandler = null;
+            }
+        }
+#endif
 
         private class FilteringLogHandler : ILogHandler
         {
@@ -76,8 +102,6 @@ namespace GameDevTV.RTS.Utilities
 
             private static bool IsSuppressed(LogType logType, string format, object[] args)
             {
-                if (logType != LogType.Warning && logType != LogType.Error) return false;
-
                 foreach (string msg in SuppressedMessages)
                 {
                     if (ContainsMessage(msg, format, args)) return true;
