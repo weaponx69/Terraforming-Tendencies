@@ -52,7 +52,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             headerText = headerGO.AddComponent<TextMeshProUGUI>();
             if (projectFont != null) headerText.font = projectFont;
-            headerText.fontSize = 13.5f;
+            headerText.fontSize = 17f;
             headerText.alignment = TextAlignmentOptions.Left;
             headerText.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
             headerText.color = new Color(0f, 0.9f, 1f, 1f); // Tech Cyan
@@ -68,7 +68,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             bodyText = bodyGO.AddComponent<TextMeshProUGUI>();
             if (projectFont != null) bodyText.font = projectFont;
-            bodyText.fontSize = 11.5f;
+            bodyText.fontSize = 14.5f;
             bodyText.alignment = TextAlignmentOptions.TopLeft;
             bodyText.enableWordWrapping = true;
             bodyText.lineSpacing = 1.15f;
