@@ -87,12 +87,13 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void Start()
         {
-            if (panel != null) panel.SetActive(false);
+            if (!isOpened && panel != null) panel.SetActive(false);
         }
 
         public void Open(GameObject parentPanel)
         {
             Debug.Log("[TechTreeUI] Open called.");
+            isOpened = true;
             summaryPanel = parentPanel;
 
             // Ensure the root GameObject is active, otherwise setting the child panel to active does nothing!
@@ -126,6 +127,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void Close()
         {
+            isOpened = false;
             if (panel != null) panel.SetActive(false);
             gameObject.SetActive(false); // Also disable the root GameObject to release UI raycasts!
             if (summaryPanel != null) summaryPanel.SetActive(true);
