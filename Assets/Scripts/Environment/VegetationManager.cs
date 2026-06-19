@@ -341,7 +341,17 @@ namespace GameDevTV.RTS.Environment
             Vector2 randomCircle = Random.insideUnitCircle * node.Radius;
             Vector3 spawnPos = node.transform.position + new Vector3(randomCircle.x, 50f, randomCircle.y);
 
-            int mask = groundLayer.value | (1 << LayerMask.NameToLayer("TransparentFX"));
+            int mask = groundLayer.value;
+            if (mask == 0)
+            {
+                mask = LayerMask.GetMask("Default", "Terrain");
+            }
+            int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+            if (transparentLayer != -1)
+            {
+                mask |= (1 << transparentLayer);
+            }
+
             if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 100f, mask))
             {
                 int prefabIdx = Random.Range(0, grassPrefabs.Length);
@@ -437,7 +447,17 @@ namespace GameDevTV.RTS.Environment
             Vector2 randomCircle = Random.insideUnitCircle * node.Radius;
             Vector3 spawnPos = node.transform.position + new Vector3(randomCircle.x, 50f, randomCircle.y);
 
-            int mask = groundLayer.value | (1 << LayerMask.NameToLayer("TransparentFX"));
+            int mask = groundLayer.value;
+            if (mask == 0)
+            {
+                mask = LayerMask.GetMask("Default", "Terrain");
+            }
+            int transparentLayer = LayerMask.NameToLayer("TransparentFX");
+            if (transparentLayer != -1)
+            {
+                mask |= (1 << transparentLayer);
+            }
+
             if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 100f, mask))
             {
                 // Simple distance check for plant spacing
