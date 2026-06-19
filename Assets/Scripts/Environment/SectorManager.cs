@@ -117,22 +117,10 @@ namespace GameDevTV.RTS.Environment
             {
                 if (hr == null || hr.IsDiscovered) continue;
 
-                foreach (var sector in Sectors)
+                var nearestSector = GetNearestSector(hr.transform.position);
+                if (nearestSector != null && !nearestSector.IsLocked)
                 {
-                    if (sector != null && !sector.IsLocked)
-                    {
-                        float distance = Vector3.Distance(hr.transform.position, sector.Center);
-                        float radius = 55f; // Safe margin for sector size
-                        if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
-                        {
-                            radius = PlanetGenerator.Instance.Config.SectorOccupationRadius * 1.5f; 
-                        }
-                        if (distance <= radius)
-                        {
-                            hr.Discover();
-                            break;
-                        }
-                    }
+                    hr.Discover();
                 }
             }
         }
