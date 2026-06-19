@@ -87,6 +87,7 @@ namespace GameDevTV.RTS.Player
             CurrentGeneration = 1;
             IsBetweenRounds = false;
             IsExpansionPhase = false;
+            UnlockPrerequisitesForMilestone();
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 
@@ -235,8 +236,35 @@ namespace GameDevTV.RTS.Player
             PlanetGenerator.Instance?.ReplenishResources();
             roundStartTime = Time.time; // Start the grace period
 
+            UnlockPrerequisitesForMilestone();
+
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
+        }
+
+        private void UnlockPrerequisitesForMilestone()
+        {
+            if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
+            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
+            var milestone = milestones[milestoneIndex];
+
+            switch (milestone.Type)
+            {
+                case MilestoneType.Biomass:
+                case MilestoneType.Oxygen:
+                    BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
+                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
+                    break;
+                case MilestoneType.Power:
+                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
+                    break;
+                case MilestoneType.Population:
+                    BlueprintDraftManager.UnlockBuilding("Habitat");
+                    break;
+                case MilestoneType.CommandPosts:
+                    BlueprintDraftManager.UnlockBuilding("Command Post");
+                    break;
+            }
         }
 
         public void CompleteExpansion()
@@ -246,6 +274,8 @@ namespace GameDevTV.RTS.Player
             CurrentGeneration = 1;
             
             PlanetGenerator.Instance?.ReplenishResources();
+
+            UnlockPrerequisitesForMilestone();
 
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
