@@ -381,8 +381,8 @@ namespace GameDevTV.RTS.UI.Containers
             GameObject cardContainer = new GameObject("Cards Container", typeof(RectTransform), typeof(HorizontalLayoutGroup));
             cardContainer.transform.SetParent(draftPanel.transform, false);
             var ccRt = cardContainer.GetComponent<RectTransform>();
-            ccRt.anchorMin = new Vector2(0.05f, 0.2f);
-            ccRt.anchorMax = new Vector2(0.95f, 0.8f);
+            ccRt.anchorMin = new Vector2(0.05f, 0.28f);
+            ccRt.anchorMax = new Vector2(0.95f, 0.83f);
             ccRt.offsetMin = Vector2.zero;
             ccRt.offsetMax = Vector2.zero;
 
