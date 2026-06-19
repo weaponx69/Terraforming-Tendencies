@@ -299,8 +299,13 @@ namespace GameDevTV.RTS.UI.Containers
             var cardDrone = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
             cardDrone.cardName = "Mining Drone";
             cardDrone.cardDescription = "Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.";
+            var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+            if (miningDroneSO != null)
+            {
+                cardDrone.unitPrefab = miningDroneSO.Prefab;
+            }
 #if UNITY_EDITOR
-            cardDrone.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Mining Drone/Mining Drone.prefab");
+            if (cardDrone.unitPrefab == null) cardDrone.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Mining Drone/Mining Drone.prefab");
 #endif
             runtimePool.Add(cardDrone);
 
@@ -308,8 +313,13 @@ namespace GameDevTV.RTS.UI.Containers
             var cardRepair = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
             cardRepair.cardName = "Automated Repair Crawler";
             cardRepair.cardDescription = "Deploy a specialized Repair Drone to automatically rebuild pipelines and repair bases.";
+            var repairDroneSO = Resources.Load<AbstractUnitSO>("Units/RepairDrone");
+            if (repairDroneSO != null)
+            {
+                cardRepair.unitPrefab = repairDroneSO.Prefab;
+            }
 #if UNITY_EDITOR
-            cardRepair.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Repair Drone/Repair Drone.prefab");
+            if (cardRepair.unitPrefab == null) cardRepair.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Repair Drone/Repair Drone.prefab");
 #endif
             runtimePool.Add(cardRepair);
 

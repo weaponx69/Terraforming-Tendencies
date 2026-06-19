@@ -281,6 +281,18 @@ namespace GameDevTV.RTS.Units
                 {
                     AddActiveAbilityCommand("Spread Algae", "Disperse oxygen-generating algae cultures.", 0f, 0f, 2.0f, 0, 60);
                 }
+                else if (BuildingSO.Name.Contains("GHG Factory"))
+                {
+                    AddActiveAbilityCommand("Release GHG", "Vaporize greenhouse gases to raise temperature and thicken atmosphere.", 1.0f, 0.02f, 0f, 0, 0);
+                }
+                else if (BuildingSO.Name.Contains("Atmospheric Condenser"))
+                {
+                    AddActiveAbilityCommand("Condense Atmosphere", "Extract and concentrate atmospheric gases to enrich oxygen.", 0f, 0f, 0.5f, 0, 0);
+                }
+                else if (BuildingSO.Name.Contains("Basalt Strip-Mine"))
+                {
+                    AddActiveAbilityCommand("Strip-Mine Basalt", "Mine surface basalt to gain construction materials.", 0f, 0f, 0f, 150, 0);
+                }
             }
 
             if (BuildingSO != null && BuildingSO.BuildingConfig != null)
