@@ -81,6 +81,10 @@ namespace GameDevTV.RTS.Commands
 
         public override bool IsLocked(CommandContext context)
         {
+            if (context.Commandable is BaseBuilding building)
+            {
+                if (!building.IsOperating) return true;
+            }
             return Time.time - _lastUsedTime < _cooldown;
         }
     }

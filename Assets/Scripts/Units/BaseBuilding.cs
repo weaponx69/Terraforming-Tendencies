@@ -49,6 +49,57 @@ namespace GameDevTV.RTS.Units
         public delegate void QueueUpdatedEvent(UnlockableSO[] unitsInQueue);
         public event QueueUpdatedEvent OnQueueUpdated;
 
+        public bool IsOperating
+        {
+            get
+            {
+                if (Progress.State != BuildingProgress.BuildingState.Completed) return false;
+                
+                bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
+                if (needsPower)
+                {
+                    var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                    if (pNode != null && !pNode.IsPowered) return false;
+                }
+                return true;
+            }
+        }
+
+        private bool isHousingActive = false;
+
+        private void HandlePowerStateChanged(bool isPowered)
+        {
+            UpdateHousingContribution();
+        }
+
+        private void UpdateHousingContribution()
+        {
+            if (BuildingSO == null || BuildingSO.BuildingConfig == null || BuildingSO.BuildingConfig.HousingCapacity <= 0) return;
+
+            bool shouldBeActive = Progress.State == BuildingProgress.BuildingState.Completed;
+            if (shouldBeActive && BuildingSO.BuildingConfig.PowerUpkeep > 0)
+            {
+                var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                if (pNode != null && !pNode.IsPowered)
+                {
+                    shouldBeActive = false;
+                }
+            }
+
+            if (shouldBeActive && !isHousingActive)
+            {
+                isHousingActive = true;
+                int currentPopLimit = Supplies.PopulationLimit != null && Supplies.PopulationLimit.TryGetValue(Owner, out int l) ? l : 0;
+                Supplies.UpdatePopulationLimit(Owner, currentPopLimit + BuildingSO.BuildingConfig.HousingCapacity);
+            }
+            else if (!shouldBeActive && isHousingActive)
+            {
+                isHousingActive = false;
+                int currentPopLimit = Supplies.PopulationLimit != null && Supplies.PopulationLimit.TryGetValue(Owner, out int l) ? l : 0;
+                Supplies.UpdatePopulationLimit(Owner, Mathf.Max(0, currentPopLimit - BuildingSO.BuildingConfig.HousingCapacity));
+            }
+        }
+
         private Placeholder culledVisuals;
         private IBuildingBuilder unitBuildingThis;
         private Coroutine productionCoroutine;
@@ -119,10 +170,17 @@ namespace GameDevTV.RTS.Units
             ActiveBuildings.Remove(this);
             productionCoroutine = null;
 
-            if (Progress.State == BuildingProgress.BuildingState.Completed && BuildingSO != null && BuildingSO.BuildingConfig != null)
+            if (BuildingSO != null && BuildingSO.BuildingConfig != null)
             {
-                if (BuildingSO.BuildingConfig.HousingCapacity > 0)
+                var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                if (pNode != null)
                 {
+                    pNode.OnPowerStateChanged -= HandlePowerStateChanged;
+                }
+
+                if (isHousingActive)
+                {
+                    isHousingActive = false;
                     int currentPopLimit = Supplies.PopulationLimit != null && Supplies.PopulationLimit.TryGetValue(Owner, out int l) ? l : 0;
                     Supplies.UpdatePopulationLimit(Owner, Mathf.Max(0, currentPopLimit - BuildingSO.BuildingConfig.HousingCapacity));
                 }
@@ -297,12 +355,16 @@ namespace GameDevTV.RTS.Units
 
             if (BuildingSO != null && BuildingSO.BuildingConfig != null)
             {
-                if (BuildingSO.BuildingConfig.HousingCapacity > 0)
+                if (BuildingSO.BuildingConfig.PowerUpkeep > 0)
                 {
-                    int currentPopLimit = Supplies.PopulationLimit != null && Supplies.PopulationLimit.TryGetValue(Owner, out int l) ? l : 0;
-                    Supplies.UpdatePopulationLimit(Owner, currentPopLimit + BuildingSO.BuildingConfig.HousingCapacity);
+                    var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                    if (pNode != null)
+                    {
+                        pNode.OnPowerStateChanged += HandlePowerStateChanged;
+                    }
                 }
 
+                UpdateHousingContribution();
                 StartCoroutine(UpkeepRoutine());
             }
 

@@ -16,8 +16,8 @@ namespace GameDevTV.RTS.Units
         private void Update()
         {
             
-            // Only generate oxygen if the building is fully constructed and alive
-            if (Owner != Owner.Invalid && Progress.State == BuildingProgress.BuildingState.Completed)
+            // Only generate oxygen if the building is fully operating and powered
+            if (Owner != Owner.Invalid && IsOperating)
             {
                 tickTimer += Time.deltaTime;
                 if (tickTimer >= tickRate)
