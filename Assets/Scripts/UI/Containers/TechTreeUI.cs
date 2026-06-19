@@ -38,6 +38,51 @@ namespace GameDevTV.RTS.UI.Containers
             GenerationManager.OnTerraCoinsChanged -= UpdateBalanceText;
         }
 
+        private void Awake()
+        {
+            if (panel == null)
+            {
+                var t = transform.Find("Panel") ?? transform.Find("Tech Tree Panel");
+                if (t != null) panel = t.gameObject;
+                else if (transform.childCount > 0) panel = transform.GetChild(0).gameObject;
+            }
+
+            if (closeButton == null)
+            {
+                var buttons = GetComponentsInChildren<Button>(true);
+                foreach (var b in buttons)
+                {
+                    if (b.name.Contains("Close", System.StringComparison.OrdinalIgnoreCase) ||
+                        b.name.Contains("Back", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        closeButton = b;
+                        break;
+                    }
+                }
+            }
+
+            if (tcBalanceText == null)
+            {
+                var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (var t in texts)
+                {
+                    if (t.name.Contains("Balance", System.StringComparison.OrdinalIgnoreCase) ||
+                        t.name.Contains("TC", System.StringComparison.OrdinalIgnoreCase) ||
+                        t.name.Contains("Coin", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        tcBalanceText = t;
+                        break;
+                    }
+                }
+            }
+
+            if (techTreeSO == null)
+            {
+                var configs = Resources.FindObjectsOfTypeAll<TechTreeSO>();
+                if (configs.Length > 0) techTreeSO = configs[0];
+            }
+        }
+
         private void Start()
         {
             if (panel != null) panel.SetActive(false);
@@ -58,6 +103,10 @@ namespace GameDevTV.RTS.UI.Containers
             if (panel != null) 
             {
                 panel.SetActive(true);
+                if (!panel.activeInHierarchy)
+                {
+                    Debug.LogError("[TechTreeUI] CRITICAL: Tech Tree Panel was activated, but is NOT active in the hierarchy! A parent GameObject is likely disabled.");
+                }
             }
             else
             {
@@ -76,6 +125,7 @@ namespace GameDevTV.RTS.UI.Containers
         public void Close()
         {
             if (panel != null) panel.SetActive(false);
+            gameObject.SetActive(false); // Also disable the root GameObject to release UI raycasts!
             if (summaryPanel != null) summaryPanel.SetActive(true);
         }
 

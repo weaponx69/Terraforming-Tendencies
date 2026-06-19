@@ -193,7 +193,6 @@ namespace GameDevTV.RTS.Player
                         current = current.parent;
                     }
                     ui.gameObject.SetActive(true);
-                    ui.ShowSummaryDirect(earnedTC, TotalTerraCoins);
                 }
             }
 

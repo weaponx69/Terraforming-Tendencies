@@ -42,6 +42,49 @@ namespace GameDevTV.RTS.UI.Containers
             }
         }
 
+        private void Awake()
+        {
+            if (panel == null)
+            {
+                var t = transform.Find("Panel") ?? transform.Find("Summary Panel") ?? transform.Find("Generation Summary Panel");
+                if (t != null) panel = t.gameObject;
+                else if (transform.childCount > 0) panel = transform.GetChild(0).gameObject;
+            }
+
+            if (nextGenerationButton == null)
+            {
+                var buttons = GetComponentsInChildren<Button>(true);
+                foreach (var b in buttons)
+                {
+                    if (b.name.Contains("Next", System.StringComparison.OrdinalIgnoreCase) ||
+                        b.name.Contains("Gen", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        nextGenerationButton = b;
+                        break;
+                    }
+                }
+            }
+
+            if (viewTechTreeButton == null)
+            {
+                var buttons = GetComponentsInChildren<Button>(true);
+                foreach (var b in buttons)
+                {
+                    if (b.name.Contains("Tech", System.StringComparison.OrdinalIgnoreCase) ||
+                        b.name.Contains("Tree", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        viewTechTreeButton = b;
+                        break;
+                    }
+                }
+            }
+
+            if (techTreeUI == null)
+            {
+                techTreeUI = FindObjectOfType<TechTreeUI>(true);
+            }
+        }
+
         private void Start()
         {
             if (panel != null) panel.SetActive(false);
@@ -96,7 +139,12 @@ namespace GameDevTV.RTS.UI.Containers
             if (techTreeUI != null)
             {
                 if (panel != null) panel.SetActive(false);
-                techTreeUI.Open(panel);
+                techTreeUI.Open(panel); // Pass the child panel so Close() reactivates it
+
+                if (!techTreeUI.gameObject.activeInHierarchy)
+                {
+                    Debug.LogError("[GenerationSummaryUI] CRITICAL: TechTreeUI GameObject is inactive in the hierarchy after Open() was called! Check its parent GameObjects.");
+                }
             }
             else
             {

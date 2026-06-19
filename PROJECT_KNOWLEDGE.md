@@ -357,6 +357,11 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 #### 21. Dynamic Drafting UI Details & Guaranteed Sector Resource Spawning
 * **Guaranteed Sector Resource Spawning:** Refactoring `PlanetGenerator.ScatterResources()` guarantees that every single sector on the generated map contains at least one Mineral deposit and one Gas deposit inside its boundaries. It places guaranteed deposits by iterating mathematically through all sector grid cells, while maintaining safety clearances from the central exclusion zone (radius 15f) and minimum spacing (5f) from other nodes. Residual resources are randomly scattered across the rest of the map to meet the targeted map count.
 
+#### 23. UI Raycast Blocking & Auto-Resolution Fallbacks
+* **UI Raycast Blocking Bug:** Discovered that closing the `TechTreeUI` would hide its inner panel but leave its root GameObject active. Since the root GameObject spans the entire screen canvas with a Graphic Raycaster, it blocked all mouse raycasts from hitting the underlying `GenerationSummaryUI` buttons. Now, closing `TechTreeUI` deactivates its root GameObject to free up raycasts. We keep `GenerationSummaryUI`'s controller root GameObject active during navigation to prevent disabling any nested child components (such as `TechTreeUI` itself if it is located inside the same hierarchy).
+* **Auto-Resolution Fallbacks:** Added `Awake()` fallback resolution methods to `TechTreeUI` and `GenerationSummaryUI` to automatically locate and bind missing button and panel references at runtime, safeguarding against unassigned variables in Unity Inspector setups.
+* **Active Hierarchy Validations:** Added explicit `Debug.LogError` calls inside `TechTreeUI.Open` and `GenerationSummaryUI.OnViewTechTreeClicked` that check if the activated GameObjects or panels are `activeInHierarchy`. If any parent objects are disabled (which would silently hide the UI), Unity will now throw a prominent red error to the console indicating a hierarchy setup issue.
+
 #### 22. Blueprint Drafting Deck Cards (Complete Pool)
 The following is the exhaustive database of all **29 cards** in the game's blueprint deck:
 
