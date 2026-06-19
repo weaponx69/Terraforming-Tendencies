@@ -457,7 +457,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             // Add background overlay image
             var bgImg = draftPanel.AddComponent<Image>();
-            bgImg.color = new Color(0.08f, 0.1f, 0.13f, 0.95f); // Deep dark space/slate color
+            bgImg.color = new Color(0.08f, 0.1f, 0.13f, 1.0f); // Make background fully opaque
 
             // Title Text
             GameObject titleGo = new GameObject("Draft Title", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -472,7 +472,7 @@ namespace GameDevTV.RTS.UI.Containers
             titleTmp.text = "NEW GENERATION: SELECT BLUEPRINT";
             titleTmp.font = Resources.Load<TMP_FontAsset>("Fonts & Materials/Dogfish SDF");
             if (titleTmp.font == null) titleTmp.font = Resources.FindObjectsOfTypeAll<TMP_FontAsset>()[0];
-            titleTmp.fontSize = 32f;
+            titleTmp.fontSize = 36f; // Larger title text
             titleTmp.alignment = TextAlignmentOptions.Center;
             titleTmp.color = new Color(0.2f, 0.8f, 1f, 1f); // Electrifying cyan
 
@@ -501,7 +501,7 @@ namespace GameDevTV.RTS.UI.Containers
                 cardObj.transform.SetParent(cardContainer.transform, false);
 
                 var cardImg = cardObj.GetComponent<Image>();
-                cardImg.color = new Color(0.12f, 0.15f, 0.18f, 1f); // Slate grey
+                cardImg.color = new Color(0.06f, 0.08f, 0.10f, 1f); // Completely opaque solid card background
 
                 var vlg = cardObj.GetComponent<VerticalLayoutGroup>();
                 vlg.padding = new RectOffset(20, 20, 20, 20);
@@ -517,7 +517,7 @@ namespace GameDevTV.RTS.UI.Containers
                 cTitleGo.transform.SetParent(cardObj.transform, false);
                 var cTitleTmp = cTitleGo.GetComponent<TextMeshProUGUI>();
                 cTitleTmp.text = "BLUEPRINT CARD";
-                cTitleTmp.fontSize = 20f;
+                cTitleTmp.fontSize = 26f; // Larger card title
                 cTitleTmp.alignment = TextAlignmentOptions.Center;
                 cTitleTmp.color = new Color(1f, 0.85f, 0.2f, 1f); // Vibrant Gold
                 cTitleTmp.font = titleTmp.font;
@@ -527,16 +527,16 @@ namespace GameDevTV.RTS.UI.Containers
                 cDivGo.transform.SetParent(cardObj.transform, false);
                 var cDivRt = cDivGo.GetComponent<RectTransform>();
                 cDivRt.sizeDelta = new Vector2(250f, 2f);
-                cDivGo.GetComponent<Image>().color = new Color(0.3f, 0.4f, 0.5f, 0.5f);
+                cDivGo.GetComponent<Image>().color = new Color(0.3f, 0.4f, 0.5f, 1.0f); // Fully opaque divider
 
                 // Card Description
                 GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(ContentSizeFitter));
                 cDescGo.transform.SetParent(cardObj.transform, false);
                 var cDescRt = cDescGo.GetComponent<RectTransform>();
-                cDescRt.sizeDelta = new Vector2(260f, 180f);
+                cDescRt.sizeDelta = new Vector2(260f, 220f); // Expanded vertical space for larger text
                 var cDescTmp = cDescGo.GetComponent<TextMeshProUGUI>();
                 cDescTmp.text = "This is the detailed description of the card's action or unlocked blueprint.";
-                cDescTmp.fontSize = 13f;
+                cDescTmp.fontSize = 17f; // Larger description text
                 cDescTmp.alignment = TextAlignmentOptions.TopLeft;
                 cDescTmp.color = Color.white;
                 cDescTmp.textWrappingMode = TextWrappingModes.Normal;
@@ -573,7 +573,7 @@ namespace GameDevTV.RTS.UI.Containers
 
                 var btnTxtTmp = btnTxtGo.GetComponent<TextMeshProUGUI>();
                 btnTxtTmp.text = "CHOOSE BLUEPRINT";
-                btnTxtTmp.fontSize = 14f;
+                btnTxtTmp.fontSize = 18f; // Larger button text
                 btnTxtTmp.alignment = TextAlignmentOptions.Center;
                 btnTxtTmp.color = Color.white;
                 btnTxtTmp.font = titleTmp.font;
