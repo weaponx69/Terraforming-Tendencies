@@ -33,6 +33,14 @@ namespace GameDevTV.RTS.Player
         {
             if (building == null) return;
             knownBuildings[building.Name] = building;
+
+            if (unlockedBuildings.Contains(building.Name) && building.BuildingConfig != null && building.BuildingConfig.PowerUpkeep > 0)
+            {
+                if (!unlockedBuildings.Contains("Solar Panel"))
+                {
+                    unlockedBuildings.Add("Solar Panel");
+                }
+            }
         }
 
         public static BuildingSO GetBuildingSOByName(string name)
@@ -62,6 +70,26 @@ namespace GameDevTV.RTS.Player
         public static void UnlockBuilding(string name)
         {
             unlockedBuildings.Add(name);
+
+            BuildingSO building = GetBuildingSOByName(name);
+            if (building != null && building.BuildingConfig != null && building.BuildingConfig.PowerUpkeep > 0)
+            {
+                bool hasPowerGenerator = false;
+                foreach (var bldName in unlockedBuildings)
+                {
+                    var bld = GetBuildingSOByName(bldName);
+                    if (bld != null && bld.BuildingConfig != null && bld.BuildingConfig.PowerGeneration > 0)
+                    {
+                        hasPowerGenerator = true;
+                        break;
+                    }
+                }
+
+                if (!hasPowerGenerator)
+                {
+                    unlockedBuildings.Add("Solar Panel");
+                }
+            }
         }
 
         public static BlueprintCardSO LastDraftedCard { get; private set; }
