@@ -46,7 +46,9 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (panel == null)
             {
-                var t = transform.Find("Panel") ?? transform.Find("Summary Panel") ?? transform.Find("Generation Summary Panel");
+                var t = transform.Find("Panel");
+                if (t == null) t = transform.Find("Summary Panel");
+                if (t == null) t = transform.Find("Generation Summary Panel");
                 if (t != null) panel = t.gameObject;
                 else if (transform.childCount > 0) panel = transform.GetChild(0).gameObject;
             }
@@ -81,7 +83,15 @@ namespace GameDevTV.RTS.UI.Containers
 
             if (techTreeUI == null)
             {
-                techTreeUI = FindObjectOfType<TechTreeUI>(true);
+                var found = Resources.FindObjectsOfTypeAll<TechTreeUI>();
+                foreach (var t in found)
+                {
+                    if (t.gameObject.scene.name != null)
+                    {
+                        techTreeUI = t;
+                        break;
+                    }
+                }
             }
         }
 

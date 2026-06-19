@@ -24,6 +24,7 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private Vector2 gridSpacing = new Vector2(20f, 20f);
 
         private GameObject summaryPanel;
+        private bool isOpened = false;
 
         private void OnEnable()
         {
@@ -42,7 +43,8 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (panel == null)
             {
-                var t = transform.Find("Panel") ?? transform.Find("Tech Tree Panel");
+                var t = transform.Find("Panel");
+                if (t == null) t = transform.Find("Tech Tree Panel");
                 if (t != null) panel = t.gameObject;
                 else if (transform.childCount > 0) panel = transform.GetChild(0).gameObject;
             }
