@@ -13,6 +13,7 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private float mineralsToMaterialsRate = 1f;
         [SerializeField] private float gasToMaterialsRate = 1f;
         [SerializeField] private int startingMaterials = 1000;
+        [SerializeField] private float startingOxygen = 0f;
 
         [SerializeField] private SupplySO oxygenSO;
         private static Dictionary<Owner, int> _materials;
@@ -189,6 +190,7 @@ namespace GameDevTV.RTS.Player
             _temperature = new Dictionary<Owner, float>();
             _atmosphere = new Dictionary<Owner, float>();
 
+            float initialOxygen = (Instance != null) ? Instance.startingOxygen : 0f;
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
                 _materials[owner] = (owner == Owner.Player1) ? 0 : 1000;
@@ -196,7 +198,7 @@ namespace GameDevTV.RTS.Player
                 _power[owner] = 0f;
                 _population[owner] = 0;
                 _populationLimit[owner] = 0;
-                _oxygen[owner] = 0f;
+                _oxygen[owner] = initialOxygen;
                 _integrity[owner] = 100f;
                 _temperature[owner] = -60f;
                 _atmosphere[owner] = 0.01f;
@@ -231,7 +233,7 @@ namespace GameDevTV.RTS.Player
                 _power.Add(owner, 0f);
                 _population.Add(owner, 0);
                 _populationLimit.Add(owner, 0);
-                _oxygen.Add(owner, 0f);
+                _oxygen.Add(owner, startingOxygen);
                 _integrity.Add(owner, 100f);
                 _temperature.Add(owner, -60f);
                 _atmosphere.Add(owner, 0.01f);
@@ -275,7 +277,7 @@ namespace GameDevTV.RTS.Player
                     maxOxygen = ((float)occupied / total) * 100f;
                 }
 
-                Oxygen[owner] = Mathf.Min(value, maxOxygen);
+                Oxygen[owner] = Mathf.Clamp(value, 0f, maxOxygen);
                 OnOxygenChanged?.Invoke(owner, Oxygen[owner]);
             }
         }

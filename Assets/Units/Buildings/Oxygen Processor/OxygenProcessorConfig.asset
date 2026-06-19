@@ -17,6 +17,6 @@ MonoBehaviour:
   buildTimeMultiplier: 1
   powerUpkeep: 10
   oxygenUpkeep: 0
-  biomassGeneration: 0
+  biomassGeneration: 2
   powerGeneration: 0
   housingCapacity: 0
