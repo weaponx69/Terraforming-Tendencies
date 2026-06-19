@@ -104,9 +104,37 @@ namespace GameDevTV.RTS.Environment
             if (Sectors.Count > 0)
             {
                 ActiveSector = Sectors[0];
+                DiscoverResourcesInUnlockedSectors();
                 OnSectorUnlocked?.Invoke();
             }
             Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector 0 is unlocked.");
+        }
+
+        public void DiscoverResourcesInUnlockedSectors()
+        {
+            var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var hr in hiddenResources)
+            {
+                if (hr == null || hr.IsDiscovered) continue;
+
+                foreach (var sector in Sectors)
+                {
+                    if (sector != null && !sector.IsLocked)
+                    {
+                        float distance = Vector3.Distance(hr.transform.position, sector.Center);
+                        float radius = 55f; // Safe margin for sector size
+                        if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
+                        {
+                            radius = PlanetGenerator.Instance.Config.SectorOccupationRadius * 1.5f; 
+                        }
+                        if (distance <= radius)
+                        {
+                            hr.Discover();
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         private void Update()
@@ -189,6 +217,7 @@ namespace GameDevTV.RTS.Environment
                     Sectors[i].IsLocked = false;
                     ActiveSector = Sectors[i];
                     Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
+                    DiscoverResourcesInUnlockedSectors();
                     OnSectorUnlocked?.Invoke();
                     return; // Only unlock one at a time
                 }

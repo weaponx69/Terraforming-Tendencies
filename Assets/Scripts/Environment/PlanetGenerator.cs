@@ -377,6 +377,11 @@ namespace GameDevTV.RTS.Environment
                     ScatterResources();
                     ScatterFuelResources();
 
+                    if (SectorManager.Instance != null)
+                    {
+                        SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
+                    }
+
                     Debug.Log("[PlanetGenerator] Resources replenished for new generation.");
                 }
 
