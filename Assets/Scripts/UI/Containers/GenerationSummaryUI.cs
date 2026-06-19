@@ -47,6 +47,11 @@ namespace GameDevTV.RTS.UI.Containers
             if (panel != null) panel.SetActive(false);
         }
 
+        public void ShowSummaryDirect(int earnedTC, int totalTC)
+        {
+            ShowSummary(earnedTC, totalTC);
+        }
+
         private void ShowSummary(int earnedTC, int totalTC)
         {
             Debug.Log($"[GenerationSummaryUI] ShowSummary called! Earned TC: {earnedTC}, Total: {totalTC}");

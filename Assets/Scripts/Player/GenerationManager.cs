@@ -176,16 +176,24 @@ namespace GameDevTV.RTS.Player
 
             Debug.Log($"[GenerationManager] Generation {CurrentGeneration} ended. Earned {earnedTC} TC. Total TC: {TotalTerraCoins}");
             
-            if (OnGenerationEnded == null)
+            // Robust auto-activation of any GenerationSummaryUI in the scene
+            var summaryUIs = Resources.FindObjectsOfTypeAll<GameDevTV.RTS.UI.Containers.GenerationSummaryUI>();
+            foreach (var ui in summaryUIs)
             {
-                Debug.LogError("[GenerationManager] CRITICAL: OnGenerationEnded is NULL! No one is subscribed! GenerationSummaryUI must have unsubscribed or never subscribed!");
-            }
-            else
-            {
-                Debug.Log($"[GenerationManager] Invoking OnGenerationEnded. Subscribers count: {OnGenerationEnded.GetInvocationList().Length}");
-                foreach (var d in OnGenerationEnded.GetInvocationList())
+                if (ui != null && ui.gameObject != null && ui.gameObject.scene.name != null)
                 {
-                    Debug.Log($"[GenerationManager] Subscriber: {d.Target?.GetType().Name}.{d.Method.Name}");
+                    // Ensure the entire parent hierarchy is active so the UI panel is visible
+                    Transform current = ui.transform.parent;
+                    while (current != null)
+                    {
+                        if (!current.gameObject.activeSelf)
+                        {
+                            current.gameObject.SetActive(true);
+                        }
+                        current = current.parent;
+                    }
+                    ui.gameObject.SetActive(true);
+                    ui.ShowSummaryDirect(earnedTC, TotalTerraCoins);
                 }
             }
 
