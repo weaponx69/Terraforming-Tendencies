@@ -355,5 +355,133 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 * **Active Abilities Integration:** `ActiveAbilityCommand.cs` handles active structure actions with cooldowns. `BaseBuilding.CompleteConstruction()` automatically attaches these commands to constructed active structures (*Deep-Core Mining Laser*, *Carbon Dioxide Import Laser*, *Methanogenic Microbe Spreader*, *Genetically Modified Algae Spreader*).
 
 #### 21. Dynamic Drafting UI Details & Guaranteed Sector Resource Spawning
-* **Dynamic Drafting Details UI Formatting:** Updates to `BlueprintDraftUI.ShowDraftSelection()` allow the card selection panel to dynamically read and format building cost parameters (Minerals, Gas), building configurations (Power Upkeep, Power Generation, Housing Capacity, Biomass Generation), and climate/sector feature gates (for `TerraformingCardSO` cards), appending them clearly to the card slot's description.
 * **Guaranteed Sector Resource Spawning:** Refactoring `PlanetGenerator.ScatterResources()` guarantees that every single sector on the generated map contains at least one Mineral deposit and one Gas deposit inside its boundaries. It places guaranteed deposits by iterating mathematically through all sector grid cells, while maintaining safety clearances from the central exclusion zone (radius 15f) and minimum spacing (5f) from other nodes. Residual resources are randomly scattered across the rest of the map to meet the targeted map count.
+
+#### 22. Blueprint Drafting Deck Cards (Complete Pool)
+The following is the exhaustive database of all **29 cards** in the game's blueprint deck:
+
+##### Default Blueprint & Resource Cards
+1. **Solar Array Project**
+   * *Type:* Unlock Building
+   * *Description:* Unlocks the ability to construct Solar Panels to generate massive clean grid Power.
+   * *Target:* `Buildings/SolarPanel/SolarPanel`
+2. **Atmosphere Processor**
+   * *Type:* Unlock Building
+   * *Description:* Unlocks the Oxygen Processor to extract carbon dioxide and enrich colony atmosphere.
+   * *Target:* `Buildings/Oxygen Processor/Oxygen Processor`
+3. **Modular Habitat Dome**
+   * *Type:* Unlock Building
+   * *Description:* Unlocks the Colonist Habitat building, increasing your maximum colony housing capacity.
+   * *Target:* `Buildings/Habitat/Habitat`
+4. **Heavy Alloys Shipment**
+   * *Type:* Resource Shipment
+   * *Description:* Receive an immediate cargo supply shipment of +400 Materials for base construction.
+   * *Stats:* +400 Materials instantly.
+5. **Bio-Dome Culture Serum**
+   * *Type:* Resource Shipment
+   * *Description:* Deploy advanced fertilizer cultures to instantly receive +150 Biomass.
+   * *Stats:* +150 Biomass instantly.
+6. **Mining Drone**
+   * *Type:* Spawn Unit
+   * *Description:* Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.
+7. **Automated Repair Crawler**
+   * *Type:* Spawn Unit
+   * *Description:* Deploy a specialized Repair Drone to automatically rebuild pipelines and repair bases.
+8. **High-Power Induction Drills**
+   * *Type:* Passive Buff
+   * *Description:* Upgrade mining tools. All mining droids gather minerals and deposits +30% faster permanently.
+   * *Stats:* 1.3x Gather Speed multiplier.
+9. **Photovoltaic Tuning Upgrades**
+   * *Type:* Passive Buff
+   * *Description:* Install resonance tuners onto solar collectors. All Solar Panels generate +20% grid Power permanently.
+   * *Stats:* 1.2x Power Gen multiplier.
+
+##### Themed Building Unlock Cards (Procedural)
+*All themed cards cost Minerals (Materials) to construct. Some require specific climate thresholds or geological features to be built.*
+
+* **Utility & Mining Deck**
+  10. **Basalt Strip-Mine**
+      * *Cost:* 120 Materials | *Upkeep:* 2 Power
+      * *Description:* Unlocks the Basalt Strip-Mine building, providing solid planetary foundations. Includes active "Strip-Mine Basalt" ability (+150 Materials).
+  11. **Deep-Core Mining Laser**
+      * *Cost:* 200 Materials | *Upkeep:* 5 Power
+      * *Gate:* Temperature $\ge -40^{\circ}\text{C}$
+      * *Description:* Unlocks active fire mining laser. Includes active "Fire Mining Laser" ability (+200 Materials, +2.0°C Temp).
+  12. **Water Ice Aquifer**
+      * *Cost:* 150 Materials | *Upkeep:* 3 Power | *Biomass Gen:* +5
+      * *Gate:* Temperature $\ge -20^{\circ}\text{C}$
+      * *Description:* Extracts subterranean ice reservoirs.
+  13. **Geothermal Generator**
+      * *Cost:* 250 Materials | *Power Gen:* +15 Power
+      * *Gate:* Temperature $\ge -10^{\circ}\text{C}$
+      * *Description:* Converts thermal vents into clean energy.
+  14. **Lava Tube Outpost**
+      * *Cost:* 180 Materials | *Upkeep:* 2 Power | *Housing:* +12
+      * *Gate:* Lava Tube sector feature
+      * *Description:* Establishes a shelter inside a protective lava tube feature.
+
+* **Urban & Residential Deck**
+  15. **Inflatable Bio-Dome**
+      * *Cost:* 100 Materials | *Upkeep:* 1 Power | *Housing:* +10
+      * *Gate:* Atmosphere $\ge 0.05\text{ atm}$
+      * *Description:* Creates modular colonist housing.
+  16. **Urban Green Commons**
+      * *Cost:* 150 Materials | *Upkeep:* 2 Power | *Housing:* +15
+      * *Gate:* Atmosphere $\ge 0.15\text{ atm}$
+      * *Description:* Fosters colonist happiness and health.
+  17. **Solar Greenhouse**
+      * *Cost:* 140 Materials | *Upkeep:* 2 Power | *Biomass Gen:* +2
+      * *Gate:* Atmosphere $\ge 0.20\text{ atm}$
+      * *Description:* Integrates vegetation modules into habitats.
+  18. **Subterranean Apartment Block**
+      * *Cost:* 300 Materials | *Upkeep:* 4 Power | *Housing:* +30
+      * *Gate:* Lava Tube sector feature
+      * *Description:* Deep housing inside a lava tube, shielded from cosmic radiation.
+  19. **Sector Command Center**
+      * *Cost:* 400 Materials | *Upkeep:* 5 Power | *Housing:* +20
+      * *Gate:* Fault Line sector feature
+      * *Description:* Coordinates regional supply lines from a fault line feature.
+
+* **Science & Terraforming Deck**
+  20. **GHG Factory**
+      * *Cost:* 150 Materials | *Upkeep:* 4 Power
+      * *Description:* Vaporizes chemicals to heat the planet. Includes active "Release GHG" ability (+1.0°C Temp, +0.02 atm Atmos).
+  21. **Atmospheric Condenser**
+      * *Cost:* 180 Materials | *Upkeep:* 3 Power
+      * *Gate:* Atmosphere $\ge 0.05\text{ atm}$
+      * *Description:* Extracts gases from thin air. Includes active "Condense Atmosphere" ability (+0.5% Oxygen).
+  22. **Carbon Dioxide Import Laser**
+      * *Cost:* 250 Materials | *Upkeep:* 6 Power
+      * *Gate:* Atmosphere $\ge 0.10\text{ atm}$
+      * *Description:* Attracts cometary ice to enrich atmosphere. Includes active "Import CO2" ability (+0.05 atm Atmos).
+  23. **Subglacial Water Extractor**
+      * *Cost:* 220 Materials | *Upkeep:* 4 Power | *Biomass Gen:* +4
+      * *Gate:* Water Deposit sector feature
+      * *Description:* Drills deep into subglacial water deposits to pump biomass media.
+  24. **Magnetic Shield Generator**
+      * *Cost:* 350 Materials | *Power Gen:* +25 Power
+      * *Gate:* Fault Line sector feature
+      * *Description:* Protects regional grids from solar wind from an elevated fault line.
+
+* **Ecological & Biosphere Deck**
+  25. **Methanogenic Microbe Spreader**
+      * *Cost:* 130 Materials | *Upkeep:* 2 Power
+      * *Gate:* Temperature $\ge -30^{\circ}\text{C}$ & Atmosphere $\ge 0.05\text{ atm}$
+      * *Description:* Spreads methane-producing microbes. Includes active "Spread Microbes" ability (+1.5°C Temp, +30 Biomass).
+  26. **Lichen Nursery**
+      * *Cost:* 140 Materials | *Upkeep:* 2 Power | *Biomass Gen:* +3
+      * *Gate:* Temperature $\ge -25^{\circ}\text{C}$ & Atmosphere $\ge 0.10\text{ atm}$
+      * *Description:* Cultivates rock-decomposing lichens.
+  27. **Genetically Modified Algae Spreader**
+      * *Cost:* 210 Materials | *Upkeep:* 3 Power
+      * *Gate:* Temperature $\ge -15^{\circ}\text{C}$ & Atmosphere $\ge 0.15\text{ atm}$ & Oxygen $\ge 1.0\%$
+      * *Description:* Sows oxygen-producing algae pools. Includes active "Spread Algae" ability (+2.0% Oxygen, +60 Biomass).
+  28. **Greenery Dome**
+      * *Cost:* 280 Materials | *Upkeep:* 4 Power | *Biomass Gen:* +6
+      * *Gate:* Temperature $\ge -10^{\circ}\text{C}$ & Atmosphere $\ge 0.20\text{ atm}$ & Oxygen $\ge 2.0\%$
+      * *Description:* Advanced glass canopy housing local flora.
+  29. **Biosphere Center**
+      * *Cost:* 500 Materials | *Upkeep:* 6 Power | *Biomass Gen:* +10
+      * *Gate:* Water Deposit sector feature
+      * *Description:* Coordinates global ecological cycles from a protected water deposit.
+
