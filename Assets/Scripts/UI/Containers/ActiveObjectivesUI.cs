@@ -28,7 +28,7 @@ namespace GameDevTV.RTS.UI.Containers
             background.color = new Color(0.05f, 0.05f, 0.08f, 0.75f); // 75% opacity dark obsidian
             
             TMP_FontAsset projectFont = null;
-            var allTmp = Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var allTmp = Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include);
             foreach (var tmp in allTmp)
             {
                 if (tmp != null && tmp.font != null)
@@ -70,7 +70,7 @@ namespace GameDevTV.RTS.UI.Containers
             if (projectFont != null) bodyText.font = projectFont;
             bodyText.fontSize = 14.5f;
             bodyText.alignment = TextAlignmentOptions.TopLeft;
-            bodyText.enableWordWrapping = true;
+            bodyText.textWrappingMode = TextWrappingModes.Normal;
             bodyText.lineSpacing = 1.15f;
             bodyText.color = Color.white;
         }

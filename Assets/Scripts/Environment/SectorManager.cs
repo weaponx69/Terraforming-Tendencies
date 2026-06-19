@@ -112,7 +112,7 @@ namespace GameDevTV.RTS.Environment
 
         public void DiscoverResourcesInUnlockedSectors()
         {
-            var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include);
             foreach (var hr in hiddenResources)
             {
                 if (hr == null || hr.IsDiscovered) continue;

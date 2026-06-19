@@ -308,7 +308,7 @@ namespace GameDevTV.RTS.Units
 
             if (isCommandPost && Owner == Owner.Player1)
             {
-                var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Include);
                 int count = 0;
                 foreach (var w in workers)
                 {

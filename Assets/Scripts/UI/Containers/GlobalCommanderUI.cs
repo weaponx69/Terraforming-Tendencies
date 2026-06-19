@@ -101,7 +101,7 @@ namespace GameDevTV.RTS.UI.Containers
                     objectivesBodyText.fontSize = budgetTmp.fontSize * 0.85f;
                 }
                 objectivesBodyText.alignment = TextAlignmentOptions.TopLeft;
-                objectivesBodyText.enableWordWrapping = true;
+                objectivesBodyText.textWrappingMode = TextWrappingModes.Normal;
                 objectivesBodyText.lineSpacing = 1.15f;
                 objectivesBodyText.color = Color.white;
             }
