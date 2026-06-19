@@ -1,1 +1,34 @@
-# Overwritten to avoid duplication with Assets/Resources/Buildings/Command Post/Command Post.asset
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f185a45e660fa34bb6472929a4cdd40, type: 3}
+  m_Name: Command Post
+  m_EditorClassIdentifier: 
+  <Name>k__BackingField: Command Post
+  <IsOneTimeUnlock>k__BackingField: 0
+  <BuildTime>k__BackingField: 60
+  <Icon>k__BackingField: {fileID: 21300000, guid: dfebbdf93f58d764ab9aa4d54edd629e, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: f8fef7237b7177a4f8683bfa15d740b8, type: 2}
+  <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
+  <unlockRequirements>k__BackingField: []
+  health: 400
+  prefab: {fileID: 1589499662120937400, guid: 43943267dde60fe4a88cf5bd885c00e3, type: 3}
+  upgrades:
+  - {fileID: 11400000, guid: 36ff1e486d0f958c9a77311bb9410ea0, type: 2}
+  sightConfig: {fileID: 11400000, guid: f72837298f54f6540bf60aa3b317c6f8, type: 2}
+  movementConfig: {fileID: 0}
+  gatherConfig: {fileID: 0}
+  builderConfig: {fileID: 0}
+  probeConfig: {fileID: 0}
+  buildingConfig: {fileID: 11400000, guid: c0000000000000000000000000000001, type: 2}
+  <PlacementMaterial>k__BackingField: {fileID: 2100000, guid: b1ef2fa16faec654da7102aa095d466e, type: 2}
+  <IsLifeSupport>k__BackingField: 0
+  <LifeSupportRadius>k__BackingField: 25
