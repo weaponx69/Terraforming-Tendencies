@@ -282,12 +282,15 @@ namespace GameDevTV.RTS.Units
 
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
             bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
-            if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isCommandPost)
+            bool isOxygenProcessor = BuildingSO != null && (BuildingSO.Name.Contains("Oxygen", System.StringComparison.OrdinalIgnoreCase));
+            if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isCommandPost || isOxygenProcessor)
             {
                 if (!TryGetComponent<LifeSupportNode>(out _))
                 {
                     var node = gameObject.AddComponent<LifeSupportNode>();
-                    node.Radius = isCommandPost ? Mathf.Max(BuildingSO.LifeSupportRadius, 30f) : BuildingSO.LifeSupportRadius;
+                    node.Radius = isCommandPost ? Mathf.Max(BuildingSO.LifeSupportRadius, 30f) :
+                                  isOxygenProcessor ? Mathf.Max(BuildingSO.LifeSupportRadius, 25f) : 
+                                  BuildingSO.LifeSupportRadius;
                 }
 
                 AssignUniqueName();

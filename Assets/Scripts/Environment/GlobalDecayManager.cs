@@ -38,8 +38,8 @@ namespace GameDevTV.RTS.Environment
                     AbstractCommandable target = allCommandables[i];
                     if (target == null) continue;
 
-                    // Skip decay for objects that ARE LifeSupportNodes or are within range of one, or is the Hero Drone.
-                    if (target.TryGetComponent<LifeSupportNode>(out _) || target.GetComponent<HeroDroneController>() != null)
+                    // Skip decay for objects that ARE LifeSupportNodes or are within range of one.
+                    if (target.TryGetComponent<LifeSupportNode>(out _))
                         continue;
 
                     bool isSupported = false;
