@@ -180,24 +180,27 @@ namespace GameDevTV.RTS.Commands
             // Evaluate restrictions directly to ignore NavMesh holes!
             // The ground is covered in rocks which have NavMeshObstacles. This creates holes in the NavMesh.
             // If we strictly check IsFullyOnNavMesh, players can never place buildings!
-            foreach (BuildingRestrictionSO restriction in Restrictions)
+            if (Restrictions != null)
             {
-                int hits = restriction.HitDetectionStyle switch
+                foreach (BuildingRestrictionSO restriction in Restrictions)
                 {
-                    BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask).Length,
-                    BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask).Length,
-                    _ => 0
-                };
+                    int hits = restriction.HitDetectionStyle switch
+                    {
+                        BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask).Length,
+                        BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask).Length,
+                        _ => 0
+                    };
 
-                if (hits > 0)
-                {
-                    // Command posts crush supplies, so ignore those restrictions
-                    bool isCommandPost = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-                    bool isSuppliesRestriction = (restriction.LayerMask.value & LayerMask.GetMask("Supplies")) != 0;
-                    
-                    if (isCommandPost && isSuppliesRestriction) continue;
-                    
-                    return false;
+                    if (hits > 0)
+                    {
+                        // Command posts crush supplies, so ignore those restrictions
+                        bool isCommandPost = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                        bool isSuppliesRestriction = (restriction.LayerMask.value & LayerMask.GetMask("Supplies")) != 0;
+                        
+                        if (isCommandPost && isSuppliesRestriction) continue;
+                        
+                        return false;
+                    }
                 }
             }
 

@@ -469,12 +469,67 @@ namespace GameDevTV.RTS.Units
                         newCmd.Building = bldSO;
                         newCmd.Icon = bldSO.Icon;
                         newCmd.Slot = FindFreeSlot(list);
+
+                        // Set restrictions using reflection
+                        bool targetIsCommand = bldSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                        var copiedRestrictions = GetTemplateRestrictions(cmds, targetIsCommand) ?? FindAnyRestrictions(cmds);
+                        if (copiedRestrictions != null)
+                        {
+                            var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                            if (restrictionsField != null)
+                            {
+                                restrictionsField.SetValue(newCmd, copiedRestrictions);
+                            }
+                        }
+
                         list.Add(newCmd);
                     }
                 }
             }
 
             return list.ToArray();
+        }
+
+        private BuildingRestrictionSO[] GetTemplateRestrictions(BaseCommand[] sourceCmds, bool targetIsCommand)
+        {
+            if (sourceCmds == null) return null;
+
+            foreach (var cmd in sourceCmds)
+            {
+                if (cmd is BuildBuildingCommand bbc && bbc.Restrictions != null && bbc.Restrictions.Length > 0)
+                {
+                    bool templateIsCommand = bbc.Building != null && bbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    if (templateIsCommand == targetIsCommand)
+                    {
+                        return bbc.Restrictions;
+                    }
+                }
+                else if (cmd is OverrideCommandsCommand overrideCmd && overrideCmd.Commands != null)
+                {
+                    var res = GetTemplateRestrictions(overrideCmd.Commands, targetIsCommand);
+                    if (res != null) return res;
+                }
+            }
+            return null;
+        }
+
+        private BuildingRestrictionSO[] FindAnyRestrictions(BaseCommand[] sourceCmds)
+        {
+            if (sourceCmds == null) return null;
+
+            foreach (var cmd in sourceCmds)
+            {
+                if (cmd is BuildBuildingCommand bbc && bbc.Restrictions != null && bbc.Restrictions.Length > 0)
+                {
+                    return bbc.Restrictions;
+                }
+                else if (cmd is OverrideCommandsCommand overrideCmd && overrideCmd.Commands != null)
+                {
+                    var res = FindAnyRestrictions(overrideCmd.Commands);
+                    if (res != null) return res;
+                }
+            }
+            return null;
         }
 
         private int FindFreeSlot(System.Collections.Generic.List<BaseCommand> list)
