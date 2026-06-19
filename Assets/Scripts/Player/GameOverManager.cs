@@ -96,6 +96,7 @@ namespace GameDevTV.RTS.Player
         private void HandleIntegrityChanged(Owner owner, float value)
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
+            if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
             if (owner != monitoredOwner) return;
             if (value > 0f) return;
             if (Time.timeSinceLevelLoad < 30f) return;
@@ -106,6 +107,7 @@ namespace GameDevTV.RTS.Player
         private void Update()
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
+            if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
             
             // Wait for colony to bootstrap
             if (Time.timeSinceLevelLoad < 30f) return;
@@ -132,7 +134,7 @@ namespace GameDevTV.RTS.Player
             {
                 biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int currentBiomass) ? currentBiomass : 0;
             }
-bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRemain();
+            bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRemain();
 
             // Loss Condition 1: Colony life support coverage collapsed.
             if (!AnyLifeSupportNodesRemain(monitoredOwner) && !canRebuild)
@@ -201,12 +203,14 @@ bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRem
         private void HandleSupplyDepleted(SupplyDepletedEvent evt)
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
+            if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
             CheckNoRecovery();
         }
 
         private void CheckNoRecovery()
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
+            if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
 
             if (Supplies.Materials == null)
             {
