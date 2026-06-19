@@ -122,8 +122,9 @@ namespace GameDevTV.RTS.Environment
         {
             Owner owner = GameOverManager.MonitoredOwner;
             float totalOxygenBoost = 0f;
+            float totalBiomassBoost = 0f;
 
-            // 1. Calculate Oxygen and Process Decay for Plants
+            // 1. Calculate Oxygen, Biomass, and Process Decay for Plants
             var zonesToCleanup = new List<LifeSupportNode>();
             foreach (var kvp in zonePlants)
             {
@@ -132,6 +133,7 @@ namespace GameDevTV.RTS.Environment
                 bool isOrphaned = node == null;
 
                 totalOxygenBoost += plants.Count * oxygenPerPlant;
+                totalBiomassBoost += plants.Count * biomassCostPerPlant; // biomassCostPerPlant now acts as generation
 
                 // Decay plants
                 float chance = isOrphaned ? baseDecayChance * orphanedDecayMultiplier : baseDecayChance;
@@ -149,7 +151,7 @@ namespace GameDevTV.RTS.Environment
             foreach (var node in zonesToCleanup) zonePlants.Remove(node);
             zonesToCleanup.Clear();
 
-            // 2. Calculate Oxygen and Process Decay for Grass
+            // 2. Calculate Oxygen, Biomass, and Process Decay for Grass
             foreach (var kvp in zoneGrassBatches)
             {
                 LifeSupportNode node = kvp.Key;
@@ -157,6 +159,7 @@ namespace GameDevTV.RTS.Environment
                 bool isOrphaned = node == null;
 
                 totalOxygenBoost += batch.Instances.Count * oxygenPerGrass;
+                totalBiomassBoost += batch.Instances.Count * biomassCostPerGrass; // biomassCostPerGrass now acts as generation
 
                 // Decay grass
                 float chance = isOrphaned ? baseDecayChance * orphanedDecayMultiplier : baseDecayChance;
@@ -174,11 +177,23 @@ namespace GameDevTV.RTS.Environment
             }
             foreach (var node in zonesToCleanup) zoneGrassBatches.Remove(node);
 
-            // 3. Update Global Oxygen
+            // 3. Update Global Oxygen and Biomass
             if (totalOxygenBoost > 0)
             {
                 float currentOxygen = Supplies.Oxygen.TryGetValue(owner, out float val) ? val : 0;
                 Supplies.UpdateOxygen(owner, currentOxygen + totalOxygenBoost);
+            }
+
+            if (totalBiomassBoost > 0)
+            {
+                biomassDebt += totalBiomassBoost;
+                if (biomassDebt >= 1f)
+                {
+                    int toAdd = Mathf.FloorToInt(biomassDebt);
+                    int currentBiomass = Supplies.Biomass.TryGetValue(owner, out int b) ? b : 0;
+                    Supplies.UpdateBiomass(owner, currentBiomass + toAdd);
+                    biomassDebt -= toAdd;
+                }
             }
         }
 
@@ -329,19 +344,6 @@ namespace GameDevTV.RTS.Environment
             int mask = groundLayer.value | (1 << LayerMask.NameToLayer("TransparentFX"));
             if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 100f, mask))
             {
-                // Biomass Cost Check
-                Owner owner = GameOverManager.MonitoredOwner;
-                int currentBiomass = Supplies.Biomass.TryGetValue(owner, out int b) ? b : 0;
-                if (currentBiomass <= 0) return;
-
-                biomassDebt += biomassCostPerGrass;
-                if (biomassDebt >= 1f)
-                {
-                    int toSubtract = Mathf.FloorToInt(biomassDebt);
-                    Bus<SupplyEvent>.Raise(owner, new SupplyEvent(owner, -toSubtract, null));
-                    biomassDebt -= toSubtract;
-                }
-
                 int prefabIdx = Random.Range(0, grassPrefabs.Length);
                 var inst = new GrassInstance
                 {
@@ -451,19 +453,6 @@ namespace GameDevTV.RTS.Environment
 
                 if (!tooClose)
                 {
-                    // Biomass Cost Check
-                    Owner owner = GameOverManager.MonitoredOwner;
-                    int currentBiomass = Supplies.Biomass.TryGetValue(owner, out int b) ? b : 0;
-                    if (currentBiomass < 50) return null;
-
-                    biomassDebt += biomassCostPerPlant;
-                    if (biomassDebt >= 1f)
-                    {
-                        int toSubtract = Mathf.FloorToInt(biomassDebt);
-                        Bus<SupplyEvent>.Raise(owner, new SupplyEvent(owner, -toSubtract, null));
-                        biomassDebt -= toSubtract;
-                    }
-
                     GameObject prefab = prefabs[Random.Range(0, prefabs.Length)];
                     GameObject item = Instantiate(prefab, hit.point, Quaternion.Euler(0, Random.Range(0, 360), 0));
                     item.transform.SetParent(transform);

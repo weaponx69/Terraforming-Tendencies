@@ -362,6 +362,10 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 * **Auto-Resolution Fallbacks:** Added `Awake()` fallback resolution methods to `TechTreeUI` and `GenerationSummaryUI` to automatically locate and bind missing button and panel references at runtime, safeguarding against unassigned variables in Unity Inspector setups.
 * **Active Hierarchy Validations:** Added explicit `Debug.LogError` calls inside `TechTreeUI.Open` and `GenerationSummaryUI.OnViewTechTreeClicked` that check if the activated GameObjects or panels are `activeInHierarchy`. If any parent objects are disabled (which would silently hide the UI), Unity will now throw a prominent red error to the console indicating a hierarchy setup issue.
 
+#### 24. Vegetation Biomass Generation Rule
+* **Spawning Costs Removed:** Spawning grass or plants no longer checks for nor consumes the player's Biomass. This allows vegetation to grow dynamically without any initial resource blocks.
+* **Biomass Generation Added:** Every active plant and grass blade in the scene now acts as a source of Biomass. In `VegetationManager.ProcessBalanceTick()`, active vegetation objects generate Biomass over time based on the `biomassCostPerPlant` and `biomassCostPerGrass` values, contributing directly to the player's global Biomass pool.
+
 #### 22. Blueprint Drafting Deck Cards (Complete Pool)
 The following is the exhaustive database of all **29 cards** in the game's blueprint deck:
 
