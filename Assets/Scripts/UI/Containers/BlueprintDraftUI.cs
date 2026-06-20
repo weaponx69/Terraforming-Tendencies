@@ -498,9 +498,16 @@ namespace GameDevTV.RTS.UI.Containers
             panelRt.offsetMin = Vector2.zero;
             panelRt.offsetMax = Vector2.zero;
 
+            // Make the draft panel a high-priority Canvas to render on top of all other UI/Canvases
+            var draftCanvas = draftPanel.AddComponent<Canvas>();
+            draftCanvas.overrideSorting = true;
+            draftCanvas.sortingOrder = 999;
+            draftPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
             // Add background overlay image
-            var bgImg = draftPanel.AddComponent<Image>();
+            var bgImg = draftPanel.AddComponent<UnityEngine.UI.Image>();
             bgImg.color = new Color(0.08f, 0.1f, 0.13f, 1.0f); // Make background fully opaque
+            bgImg.raycastTarget = true;
 
             // Title Text
             GameObject titleGo = new GameObject("Draft Title", typeof(RectTransform), typeof(TextMeshProUGUI));
