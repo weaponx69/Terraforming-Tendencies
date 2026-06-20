@@ -38,11 +38,36 @@ namespace GameDevTV.RTS.Player
             isWarningActive = false;
         }
 
+        private bool HasUnlockedHousing()
+        {
+            foreach (string name in BlueprintDraftManager.GetUnlockedBuildingNames())
+            {
+                BuildingSO bld = BlueprintDraftManager.GetBuildingSOByName(name);
+                if (bld != null && bld.BuildingConfig != null && bld.BuildingConfig.HousingCapacity > 0)
+                {
+                    return true;
+                }
+                if (name.Contains("Habitat") || name.Contains("Apartment") || name.Contains("Dome") || name.Contains("Commons"))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void Update()
         {
             if (GameOverManager.Instance != null && GameOverManager.Instance.gameObject.activeInHierarchy)
             {
                 // Don't run logic if game over UI is showing
+                return;
+            }
+
+            // Do not run colonist timers or warnings until the player has unlocked at least one housing building card
+            if (!HasUnlockedHousing())
+            {
+                nextArrivalTime = Time.time + initialDelay + warningDuration;
+                return;
             }
 
             if (!isWarningActive && Time.time >= nextArrivalTime - warningDuration)
