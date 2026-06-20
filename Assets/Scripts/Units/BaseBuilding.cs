@@ -367,6 +367,53 @@ namespace GameDevTV.RTS.Units
 
             if (isCommandPost && Owner == Owner.Player1)
             {
+                // Spawn a solar panel array (4 solar panels) to satisfy the Command Post's 20 power requirement
+                var solarPanelSO = Resources.Load<BuildingSO>("Buildings/SolarPanel/SolarPanel");
+#if UNITY_EDITOR
+                if (solarPanelSO == null)
+                {
+                    solarPanelSO = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/SolarPanel/SolarPanel.asset");
+                }
+#endif
+                if (solarPanelSO != null && solarPanelSO.Prefab != null)
+                {
+                    var myPowerNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                    if (myPowerNode != null)
+                    {
+                        Vector3[] offsets = new Vector3[]
+                        {
+                            new Vector3(6f, 0f, 0f),
+                            new Vector3(-6f, 0f, 0f),
+                            new Vector3(0f, 0f, 6f),
+                            new Vector3(0f, 0f, -6f)
+                        };
+
+                        foreach (var offset in offsets)
+                        {
+                            Vector3 spawnPos = transform.position + offset;
+                            Ray ray = new Ray(spawnPos + Vector3.up * 50f, Vector3.down);
+                            if (Physics.Raycast(ray, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
+                            {
+                                spawnPos.y = hit.point.y;
+                            }
+
+                            GameObject solarObj = Instantiate(solarPanelSO.Prefab, spawnPos, Quaternion.identity);
+                            var solarBuilding = solarObj.GetComponent<BaseBuilding>();
+                            if (solarBuilding != null)
+                            {
+                                solarBuilding.Owner = Owner;
+                                solarBuilding.CompleteConstruction();
+                            }
+
+                            var solarPowerNode = solarObj.GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                            if (solarPowerNode != null)
+                            {
+                                myPowerNode.ConnectTo(solarPowerNode);
+                            }
+                        }
+                    }
+                }
+
                 var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Include);
                 int count = 0;
                 foreach (var w in workers)
