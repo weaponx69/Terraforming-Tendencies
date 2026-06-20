@@ -500,3 +500,15 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
 * **Operational-Aware Game Over Checks:** Updated `GameOverManager.AnyLifeSupportNodesRemain()` to verify `b.IsOperating` before counting a completed life support building. An unpowered Command Post or Oxygen Processor will not count as a functioning life support node, ensuring the player faces loss if their colony collapses and cannot be rebuilt.
 * **Operational-Aware Vegetation Growth:** Updated `VegetationManager`'s growth loop and balance tick to check if the building associated with a `LifeSupportNode` is operational. If a node's building is not operational, vegetation spawning is blocked around it, and existing vegetation in that zone decays at an accelerated, orphaned rate.
 * **Dynamic Selection Indicator Generation:** Added fallbacks in `BaseBuilding.InitializeIfNeeded()` to dynamically construct and configure a `Selection Indicator` quad if it is missing from a building's prefab (such as the Solar Panel). This ensures any selected building receives a properly sized, styled selection indicator ring even when spawned procedurally.
+
+#### 26. Prefab Variant Architecture & Automated Conversion
+* **Building Architecture Rule:** All building prefabs in the project should ideally be created as **Prefab Variants** of `Assets/Units/Buildings/BaseBuilding.prefab`. This ensures they automatically inherit common sub-hierarchies, such as the `Selection Indicator` child GameObject, the `Vision` child GameObject, the `BaseBuilding` behavior component, and their proper default configurations.
+* **Automated Standalone-to-Variant Conversion Script:** Added an editor utility script `Assets/Scripts/Editor/ConvertPrefabsToVariants.cs` that automatically converts standalone building prefabs (like `Command Post` and `Solar Panel`) to `BaseBuilding` Prefab Variants on Unity startup/recompile. 
+* **Manual Prefab Variant Creation Guide:**
+  1. In the Project tab, right-click `BaseBuilding.prefab` and select **Create -> Prefab Variant**.
+  2. Rename the variant to the new building name (e.g., `Solar Panel`).
+  3. Drag the visual mesh/model FBX or GLB of the new building into the variant's hierarchy.
+  4. Select the inherited `Selection Indicator` child GameObject and scale it (typically `10` for normal buildings, `15` for Command Posts) to match the visual footprint of the building.
+  5. Drag the `Selection Indicator` child into the `Selection Indicator` field on the `BaseBuilding` script component on the root of the prefab.
+  6. Fill in the values for `UnitSO`, custom commands, health, etc. in the inspector.
+
