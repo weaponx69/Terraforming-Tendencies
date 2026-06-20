@@ -17,85 +17,85 @@ MonoBehaviour:
       lastSelectedModels:
         serializedData:
         - key:
-            rid: 7234513178787316698
+            rid: 7234513189679923200
           value:
-            rid: 7234513178787316699
+            rid: 7234513189679923201
         - key:
-            rid: 7234513178787316700
+            rid: 7234513189679923202
           value:
-            rid: 7234513178787316701
+            rid: 7234513189679923203
         - key:
-            rid: 7234513178787316702
+            rid: 7234513189679923204
           value:
-            rid: 7234513178787316703
+            rid: 7234513189679923205
         - key:
-            rid: 7234513178787316704
+            rid: 7234513189679923206
           value:
-            rid: 7234513178787316705
+            rid: 7234513189679923207
         - key:
-            rid: 7234513178787316706
+            rid: 7234513189679923208
           value:
-            rid: 7234513178787316707
+            rid: 7234513189679923209
         - key:
-            rid: 7234513178787316708
+            rid: 7234513189679923210
           value:
-            rid: 7234513178787316709
+            rid: 7234513189679923211
       previewSettings:
         sizeFactor: 1.54
   references:
     version: 2
     RefIds:
-    - rid: 7234513178787316698
+    - rid: 7234513189679923200
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 0
-    - rid: 7234513178787316699
+    - rid: 7234513189679923201
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: flux-2-dev
-    - rid: 7234513178787316700
+    - rid: 7234513189679923202
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 1
-    - rid: 7234513178787316701
+    - rid: 7234513189679923203
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234513178787316702
+    - rid: 7234513189679923204
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 2
-    - rid: 7234513178787316703
+    - rid: 7234513189679923205
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234513178787316704
+    - rid: 7234513189679923206
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 3
-    - rid: 7234513178787316705
+    - rid: 7234513189679923207
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234513178787316706
+    - rid: 7234513189679923208
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Image
         mode: 4
-    - rid: 7234513178787316707
+    - rid: 7234513189679923209
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
-    - rid: 7234513178787316708
+    - rid: 7234513189679923210
       type: {class: LastSelectedModelKey, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modality: Video
         mode: 6
-    - rid: 7234513178787316709
+    - rid: 7234513189679923211
       type: {class: ModelSelection, ns: Unity.AI.Image.Services.Stores.States, asm: Unity.AI.Image}
       data:
         modelID: 
