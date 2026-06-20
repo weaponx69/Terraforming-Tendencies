@@ -491,8 +491,22 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void AssembleUI()
         {
-            // Find Main Canvas
-            Canvas mainCanvas = FindAnyObjectByType<Canvas>();
+            // Find the correct Main Canvas (prefer "Runtime UI UGUI" for correct "Scale With Screen Size" behavior)
+            Canvas mainCanvas = null;
+            Canvas[] allCanvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+            foreach (var c in allCanvases)
+            {
+                if (c.gameObject.name == "Runtime UI UGUI")
+                {
+                    mainCanvas = c;
+                    break;
+                }
+            }
+            if (mainCanvas == null)
+            {
+                mainCanvas = FindAnyObjectByType<Canvas>();
+            }
+
             if (mainCanvas == null)
             {
                 Debug.LogError("[BlueprintDraftUI] Could not find any active Canvas in scene to attach self-assembled UI!");
