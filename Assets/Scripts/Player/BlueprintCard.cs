@@ -13,12 +13,15 @@ namespace GameDevTV.RTS.Player
 
         public abstract void Apply();
         public virtual bool IsGateMet() => true;
+        public virtual string GetCardPurpose() => "BLUEPRINT";
     }
 
     [CreateAssetMenu(fileName = "Unlock Building Card", menuName = "Blueprints/Unlock Building Card")]
     public class UnlockBuildingCardSO : BlueprintCardSO
     {
         public BuildingSO buildingToUnlock;
+
+        public override string GetCardPurpose() => "UNLOCK BUILDING";
 
         public override void Apply()
         {

@@ -23,6 +23,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             public GameObject cardObj;
             public TextMeshProUGUI titleText;
+            public TextMeshProUGUI purposeText;
             public TextMeshProUGUI descText;
             public Image iconImage;
             public Button selectButton;
@@ -559,10 +560,20 @@ namespace GameDevTV.RTS.UI.Containers
                 cTitleGo.transform.SetParent(cardObj.transform, false);
                 var cTitleTmp = cTitleGo.GetComponent<TextMeshProUGUI>();
                 cTitleTmp.text = "BLUEPRINT CARD";
-                cTitleTmp.fontSize = 26f; // Larger card title
+                cTitleTmp.fontSize = 24f; // Clean constant title size
                 cTitleTmp.alignment = TextAlignmentOptions.Center;
                 cTitleTmp.color = new Color(1f, 0.85f, 0.2f, 1f); // Vibrant Gold
                 cTitleTmp.font = titleTmp.font;
+
+                // Card Purpose
+                GameObject cPurposeGo = new GameObject("Card Purpose", typeof(RectTransform), typeof(TextMeshProUGUI));
+                cPurposeGo.transform.SetParent(cardObj.transform, false);
+                var cPurposeTmp = cPurposeGo.GetComponent<TextMeshProUGUI>();
+                cPurposeTmp.text = "PURPOSE";
+                cPurposeTmp.fontSize = 13f; // Small constant sub-header size
+                cPurposeTmp.alignment = TextAlignmentOptions.Center;
+                cPurposeTmp.color = Color.gray;
+                cPurposeTmp.font = titleTmp.font;
 
                 // Divider Line
                 GameObject cDivGo = new GameObject("Divider", typeof(RectTransform), typeof(Image));
@@ -571,27 +582,23 @@ namespace GameDevTV.RTS.UI.Containers
                 cDivRt.sizeDelta = new Vector2(250f, 2f);
                 cDivGo.GetComponent<Image>().color = new Color(0.3f, 0.4f, 0.5f, 1.0f); // Fully opaque divider
 
-                // Card Description
-                GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(ContentSizeFitter));
+                // Card Description (No ContentSizeFitter to prevent dynamic card size changing)
+                GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI));
                 cDescGo.transform.SetParent(cardObj.transform, false);
                 var cDescRt = cDescGo.GetComponent<RectTransform>();
-                cDescRt.sizeDelta = new Vector2(260f, 220f); // Expanded vertical space for larger text
+                cDescRt.sizeDelta = new Vector2(260f, 220f); // STRICTLY CONSTANT fixed height text box
                 var cDescTmp = cDescGo.GetComponent<TextMeshProUGUI>();
                 cDescTmp.text = "This is the detailed description of the card's action or unlocked blueprint.";
-                cDescTmp.fontSize = 17f; // Larger description text
+                cDescTmp.fontSize = 15f; // STRICTLY CONSTANT description text size
                 cDescTmp.alignment = TextAlignmentOptions.TopLeft;
                 cDescTmp.color = Color.white;
                 cDescTmp.textWrappingMode = TextWrappingModes.Normal;
-
-                var fitter = cDescGo.GetComponent<ContentSizeFitter>();
-                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-                fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
                 // Spacing block before button
                 GameObject spacer = new GameObject("Spacer", typeof(RectTransform));
                 spacer.transform.SetParent(cardObj.transform, false);
                 var spacerRt = spacer.GetComponent<RectTransform>();
-                spacerRt.sizeDelta = new Vector2(100f, 40f);
+                spacerRt.sizeDelta = new Vector2(100f, 15f); // Constant spacing height
 
                 // Select Button
                 GameObject cBtnGo = new GameObject("Select Button", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -624,6 +631,7 @@ namespace GameDevTV.RTS.UI.Containers
                 {
                     cardObj = cardObj,
                     titleText = cTitleTmp,
+                    purposeText = cPurposeTmp,
                     descText = cDescTmp,
                     iconImage = null,
                     selectButton = cBtn
