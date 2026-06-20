@@ -20,7 +20,7 @@ MonoBehaviour:
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField: []
   health: 1000
-  prefab: {fileID: 5827066523746683823, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+  prefab: {fileID: 6791043362217924006, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
   upgrades: []
   sightConfig: {fileID: 11400000, guid: f72837298f54f6540bf60aa3b317c6f8, type: 2}
   movementConfig: {fileID: 0}

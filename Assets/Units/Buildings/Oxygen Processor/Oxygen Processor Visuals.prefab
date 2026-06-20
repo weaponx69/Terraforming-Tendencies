@@ -10,9 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 2994398032375324829}
   - component: {fileID: 8741250658672354495}
-  - component: {fileID: 5181083360040488168}
   - component: {fileID: 747873501555348051}
-  - component: {fileID: 5551410182379394720}
+  - component: {fileID: 785219842989219631}
+  - component: {fileID: 3289805880170723667}
   m_Layer: 0
   m_Name: Oxygen Processor Visuals
   m_TagString: Untagged
@@ -56,37 +56,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 3.5, y: 2.05, z: 3.2}
   m_Center: {x: 0, y: 1, z: 0}
---- !u!114 &5181083360040488168
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2595850435611690952}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 77dc3c65aec326e48a1029494090bcfc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BaseBuilding
-  <IsSelected>k__BackingField: 0
-  <CurrentHealth>k__BackingField: 0
-  <MaxHealth>k__BackingField: 0
-  <Owner>k__BackingField: 0
-  <IsVisible>k__BackingField: 1
-  _availableCommands: []
-  <UnitSO>k__BackingField: {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}
-  selectionIndicator: {fileID: 0}
-  VisionTransform: {fileID: 0}
-  <CurrentQueueStartTime>k__BackingField: 0
-  <SOBeingBuilt>k__BackingField: {fileID: 0}
-  <MainRenderer>k__BackingField: {fileID: 0}
-  <Progress>k__BackingField:
-    <StartTime>k__BackingField: 0
-    <Completion>k__BackingField: 1
-    <State>k__BackingField: 2
-  <BuildingSO>k__BackingField: {fileID: 0}
-  primaryMaterial: {fileID: 0}
-  navMeshObstacle: {fileID: 0}
 --- !u!208 &747873501555348051
 NavMeshObstacle:
   m_ObjectHideFlags: 0
@@ -103,7 +72,40 @@ NavMeshObstacle:
   m_CarveOnlyStationary: 1
   m_Center: {x: 0, y: 1, z: 0}
   m_TimeToStationary: 0.5
---- !u!114 &5551410182379394720
+--- !u!114 &785219842989219631
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2595850435611690952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f482ed22270e671aa9e352d65ac6818c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.OxygenProcessor
+  <IsSelected>k__BackingField: 0
+  <CurrentHealth>k__BackingField: 0
+  <MaxHealth>k__BackingField: 0
+  <Owner>k__BackingField: 0
+  <IsVisible>k__BackingField: 1
+  _availableCommands: []
+  <UnitSO>k__BackingField: {fileID: 0}
+  selectionIndicator: {fileID: 0}
+  VisionTransform: {fileID: 0}
+  <CurrentQueueStartTime>k__BackingField: 0
+  <SOBeingBuilt>k__BackingField: {fileID: 0}
+  <MainRenderer>k__BackingField: {fileID: 0}
+  <Progress>k__BackingField:
+    <StartTime>k__BackingField: 0
+    <Completion>k__BackingField: 1
+    <State>k__BackingField: 2
+  <BuildingSO>k__BackingField: {fileID: 0}
+  primaryMaterial: {fileID: 0}
+  navMeshObstacle: {fileID: 0}
+  oxygenPerTick: 0.001
+  tickRate: 1
+--- !u!114 &3289805880170723667
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

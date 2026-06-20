@@ -33,7 +33,9 @@ namespace GameDevTV.RTS.Utilities
             "Curl error 3: URL rejected",
             "Resolve of invalid GC handle",
             "ScriptableSingleton already exists",
-            "Assertion failed on expression: '!m_MonoReference.HasTarget()'"
+            "Assertion failed on expression: '!m_MonoReference.HasTarget()'",
+            "connection.state_change",
+            "Process exited unexpectedly. code=0"
         };
 
 #if UNITY_EDITOR
