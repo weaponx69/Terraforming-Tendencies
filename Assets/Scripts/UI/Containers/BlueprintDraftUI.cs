@@ -95,6 +95,7 @@ namespace GameDevTV.RTS.UI.Containers
                     var card = selectedCards[i];
                     
                     cardSlots[i].titleText.text = card.cardName.ToUpper();
+                    cardSlots[i].goalText.text = card.GetCardGoal().ToUpper();
                     
                     string desc = card.cardDescription;
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)

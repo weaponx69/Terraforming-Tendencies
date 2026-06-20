@@ -21,7 +21,39 @@ namespace GameDevTV.RTS.Player
     {
         public BuildingSO buildingToUnlock;
 
-        public override string GetCardGoal() => "UNLOCK BUILDING";
+        public override string GetCardGoal()
+        {
+            if (buildingToUnlock != null)
+            {
+                string name = buildingToUnlock.Name.ToLower();
+                if (name.Contains("algae") || name.Contains("oxygen") || name.Contains("atmosphere processor"))
+                    return "OXYGEN";
+                if (name.Contains("solar") || name.Contains("geothermal") || name.Contains("magnetic shield") || name.Contains("power"))
+                    return "POWER";
+                if (name.Contains("habitat") || name.Contains("bio-dome") || name.Contains("commons") || name.Contains("apartment") || name.Contains("housing") || name.Contains("command center"))
+                    return "POPULATION";
+                if (name.Contains("aquifer") || name.Contains("greenhouse") || name.Contains("extractor") || name.Contains("nursery") || name.Contains("greenery") || name.Contains("biosphere") || name.Contains("biomass"))
+                    return "BIOMASS";
+                if (name.Contains("mine") || name.Contains("laser"))
+                    return "MATERIALS";
+                if (name.Contains("ghg") || name.Contains("microbe"))
+                    return "TEMPERATURE";
+                if (name.Contains("condenser") || name.Contains("import"))
+                    return "ATMOSPHERE";
+                if (name.Contains("command post"))
+                    return "COMMAND POST";
+
+                // Fallback check on config stats
+                var config = buildingToUnlock.BuildingConfig;
+                if (config != null)
+                {
+                    if (config.PowerGeneration > 0) return "POWER";
+                    if (config.BiomassGeneration > 0) return "BIOMASS";
+                    if (config.HousingCapacity > 0) return "POPULATION";
+                }
+            }
+            return "CONSTRUCTION";
+        }
 
         public override void Apply()
         {
@@ -40,7 +72,13 @@ namespace GameDevTV.RTS.Player
         public int biomassAmount = 0;
         public int oxygenAmount = 0;
 
-        public override string GetCardGoal() => "RESOURCE SHIPMENT";
+        public override string GetCardGoal()
+        {
+            if (biomassAmount > 0) return "BIOMASS";
+            if (oxygenAmount > 0) return "OXYGEN";
+            if (materialsAmount > 0) return "MATERIALS";
+            return "RESOURCES";
+        }
 
         public override void Apply()
         {
@@ -71,7 +109,16 @@ namespace GameDevTV.RTS.Player
     {
         public GameObject unitPrefab;
 
-        public override string GetCardGoal() => "SPAWN UNIT";
+        public override string GetCardGoal()
+        {
+            if (unitPrefab != null)
+            {
+                string name = unitPrefab.name.ToLower();
+                if (name.Contains("repair")) return "MAINTENANCE";
+                if (name.Contains("mining")) return "MINING";
+            }
+            return "UNIT SUPPORT";
+        }
 
         public override void Apply()
         {
@@ -128,7 +175,12 @@ namespace GameDevTV.RTS.Player
         public BuffType buffType;
         public float multiplier = 1.2f;
 
-        public override string GetCardGoal() => "PASSIVE BUFF";
+        public override string GetCardGoal()
+        {
+            if (buffType == BuffType.GatherSpeed) return "MINING";
+            if (buffType == BuffType.PowerGeneration) return "POWER";
+            return "PASSIVE BUFF";
+        }
 
         public override void Apply()
         {
