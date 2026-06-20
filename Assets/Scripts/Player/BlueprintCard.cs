@@ -13,7 +13,7 @@ namespace GameDevTV.RTS.Player
 
         public abstract void Apply();
         public virtual bool IsGateMet() => true;
-        public virtual string GetCardPurpose() => "BLUEPRINT";
+        public virtual string GetCardGoal() => "BLUEPRINT";
     }
 
     [CreateAssetMenu(fileName = "Unlock Building Card", menuName = "Blueprints/Unlock Building Card")]
@@ -21,7 +21,7 @@ namespace GameDevTV.RTS.Player
     {
         public BuildingSO buildingToUnlock;
 
-        public override string GetCardPurpose() => "UNLOCK BUILDING";
+        public override string GetCardGoal() => "UNLOCK BUILDING";
 
         public override void Apply()
         {
@@ -40,7 +40,7 @@ namespace GameDevTV.RTS.Player
         public int biomassAmount = 0;
         public int oxygenAmount = 0;
 
-        public override string GetCardPurpose() => "RESOURCE SHIPMENT";
+        public override string GetCardGoal() => "RESOURCE SHIPMENT";
 
         public override void Apply()
         {
@@ -71,7 +71,7 @@ namespace GameDevTV.RTS.Player
     {
         public GameObject unitPrefab;
 
-        public override string GetCardPurpose() => "SPAWN UNIT";
+        public override string GetCardGoal() => "SPAWN UNIT";
 
         public override void Apply()
         {

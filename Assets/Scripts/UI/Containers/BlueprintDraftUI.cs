@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             public GameObject cardObj;
             public TextMeshProUGUI titleText;
-            public TextMeshProUGUI purposeText;
+            public TextMeshProUGUI goalText;
             public TextMeshProUGUI descText;
             public Image iconImage;
             public Button selectButton;
@@ -605,18 +605,18 @@ namespace GameDevTV.RTS.UI.Containers
                 cTitleTmp.font = titleTmp.font;
                 cTitleTmp.textWrappingMode = TextWrappingModes.Normal;
 
-                // Card Purpose
-                GameObject cPurposeGo = new GameObject("Card Purpose", typeof(RectTransform), typeof(TextMeshProUGUI));
-                cPurposeGo.transform.SetParent(cardObj.transform, false);
-                var cPurposeRt = cPurposeGo.GetComponent<RectTransform>();
-                cPurposeRt.sizeDelta = new Vector2(280f, 20f);
-                var cPurposeTmp = cPurposeGo.GetComponent<TextMeshProUGUI>();
-                cPurposeTmp.text = "PURPOSE";
-                cPurposeTmp.fontSize = 15f; // Small constant sub-header size (permanently increased)
-                cPurposeTmp.alignment = TextAlignmentOptions.Center;
-                cPurposeTmp.color = new Color(0.4f, 0.8f, 1f, 1f); // Highly readable cyan-blue
-                cPurposeTmp.font = titleTmp.font;
-                cPurposeTmp.textWrappingMode = TextWrappingModes.Normal;
+                // Card Goal
+                GameObject cGoalGo = new GameObject("Card Goal", typeof(RectTransform), typeof(TextMeshProUGUI));
+                cGoalGo.transform.SetParent(cardObj.transform, false);
+                var cGoalRt = cGoalGo.GetComponent<RectTransform>();
+                cGoalRt.sizeDelta = new Vector2(280f, 20f);
+                var cGoalTmp = cGoalGo.GetComponent<TextMeshProUGUI>();
+                cGoalTmp.text = "GOAL";
+                cGoalTmp.fontSize = 15f; // Small constant sub-header size (permanently increased)
+                cGoalTmp.alignment = TextAlignmentOptions.Center;
+                cGoalTmp.color = new Color(0.4f, 0.8f, 1f, 1f); // Highly readable cyan-blue
+                cGoalTmp.font = titleTmp.font;
+                cGoalTmp.textWrappingMode = TextWrappingModes.Normal;
 
                 // Divider Line
                 GameObject cDivGo = new GameObject("Divider", typeof(RectTransform), typeof(Image));
@@ -674,7 +674,7 @@ namespace GameDevTV.RTS.UI.Containers
                 {
                     cardObj = cardObj,
                     titleText = cTitleTmp,
-                    purposeText = cPurposeTmp,
+                    goalText = cGoalTmp,
                     descText = cDescTmp,
                     iconImage = null,
                     selectButton = cBtn
