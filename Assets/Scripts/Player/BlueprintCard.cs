@@ -128,6 +128,8 @@ namespace GameDevTV.RTS.Player
         public BuffType buffType;
         public float multiplier = 1.2f;
 
+        public override string GetCardGoal() => "PASSIVE BUFF";
+
         public override void Apply()
         {
             if (buffType == BuffType.GatherSpeed)
