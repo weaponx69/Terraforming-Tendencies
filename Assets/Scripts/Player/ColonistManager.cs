@@ -55,6 +55,21 @@ namespace GameDevTV.RTS.Player
             return false;
         }
 
+        private bool HasBuiltSpaceport()
+        {
+            foreach (var building in BaseBuilding.ActiveBuildings)
+            {
+                if (building != null && building.BuildingSO != null &&
+                    building.BuildingSO.Name.Contains("Spaceport", System.StringComparison.OrdinalIgnoreCase) &&
+                    building.Progress.State == BuildingProgress.BuildingState.Completed &&
+                    building.Owner == Owner.Player1)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void Update()
         {
             if (GameOverManager.Instance != null && GameOverManager.Instance.gameObject.activeInHierarchy)
@@ -63,8 +78,8 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // Do not run colonist timers or warnings until the player has unlocked at least one housing building card
-            if (!HasUnlockedHousing())
+            // Do not run colonist timers or warnings until the player has unlocked at least one housing building card AND built a Spaceport
+            if (!HasUnlockedHousing() || !HasBuiltSpaceport())
             {
                 nextArrivalTime = Time.time + initialDelay + warningDuration;
                 return;
