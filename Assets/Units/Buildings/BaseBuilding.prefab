@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1422532545010619854}
   - component: {fileID: 4408794320720015172}
   - component: {fileID: 1374989911307791933}
+  - component: {fileID: 5767467227222323868}
   m_Layer: 7
   m_Name: BaseBuilding
   m_TagString: Home
@@ -119,6 +120,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &5767467227222323868
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1589499662120937400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &2882957689940254626
 GameObject:
   m_ObjectHideFlags: 0

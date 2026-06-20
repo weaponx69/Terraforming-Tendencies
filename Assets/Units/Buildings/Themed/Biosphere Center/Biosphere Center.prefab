@@ -404,6 +404,7 @@ GameObject:
   - component: {fileID: 3656225137781346248}
   - component: {fileID: 7127253743566178757}
   - component: {fileID: 5160537134364102618}
+  - component: {fileID: 5192393689255115881}
   m_Layer: 7
   m_Name: Biosphere Center
   m_TagString: Home
@@ -512,6 +513,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &5192393689255115881
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6106122204386883103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1001 &4298611601405284118
 PrefabInstance:
   m_ObjectHideFlags: 0

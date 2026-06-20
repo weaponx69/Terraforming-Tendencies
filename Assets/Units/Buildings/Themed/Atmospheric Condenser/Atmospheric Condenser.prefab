@@ -150,6 +150,7 @@ GameObject:
   - component: {fileID: 8515412488544051861}
   - component: {fileID: 4248554478263795047}
   - component: {fileID: 6153852054385527973}
+  - component: {fileID: 536467927866897794}
   m_Layer: 7
   m_Name: Atmospheric Condenser
   m_TagString: Home
@@ -258,6 +259,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &536467927866897794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3073431629557682937}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &6197874886797181044
 GameObject:
   m_ObjectHideFlags: 0

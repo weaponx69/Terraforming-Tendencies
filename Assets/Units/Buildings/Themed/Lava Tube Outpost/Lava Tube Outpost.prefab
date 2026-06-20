@@ -314,6 +314,7 @@ GameObject:
   - component: {fileID: 7325913639342282151}
   - component: {fileID: 8065702860836976297}
   - component: {fileID: 3417824695831017364}
+  - component: {fileID: 8336463378909870979}
   m_Layer: 7
   m_Name: Lava Tube Outpost
   m_TagString: Home
@@ -422,6 +423,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &8336463378909870979
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7874038175138218510}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &8860495887124367242
 GameObject:
   m_ObjectHideFlags: 0

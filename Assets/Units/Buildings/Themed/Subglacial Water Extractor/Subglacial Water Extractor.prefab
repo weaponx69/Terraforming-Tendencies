@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 5160333703639833930}
   - component: {fileID: 8865324567181830452}
   - component: {fileID: 277192139477881396}
+  - component: {fileID: 8569573944480861970}
   m_Layer: 7
   m_Name: Subglacial Water Extractor
   m_TagString: Home
@@ -121,6 +122,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &8569573944480861970
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2866119047177236371}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &3811756983913806611
 GameObject:
   m_ObjectHideFlags: 0

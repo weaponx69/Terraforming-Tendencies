@@ -24,7 +24,6 @@ namespace GameDevTV.RTS.UI.Components
         private void Awake()
         {
             building = GetComponent<BaseBuilding>();
-            powerNode = GetComponent<PowerNode>();
         }
 
         private void Start()
@@ -35,12 +34,41 @@ namespace GameDevTV.RTS.UI.Components
                 CreateDefaultIndicator();
             }
 
+            EnsurePowerNodeCached();
+
             // Start in the correct state
+            UpdateIndicatorState();
+        }
+
+        private void EnsurePowerNodeCached()
+        {
+            if (powerNode == null)
+            {
+                powerNode = GetComponent<PowerNode>();
+                if (powerNode != null)
+                {
+                    powerNode.OnPowerStateChanged += HandlePowerStateChanged;
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (powerNode != null)
+            {
+                powerNode.OnPowerStateChanged -= HandlePowerStateChanged;
+            }
+        }
+
+        private void HandlePowerStateChanged(bool isPowered)
+        {
             UpdateIndicatorState();
         }
 
         private void Update()
         {
+            EnsurePowerNodeCached();
+
             // Only check when the operating state changes to avoid unnecessary overhead
             bool isOperating = building.IsOperating;
             if (isOperating != wasOperatingLastCheck)
@@ -54,6 +82,8 @@ namespace GameDevTV.RTS.UI.Components
         {
             if (visualIndicator == null) return;
 
+            EnsurePowerNodeCached();
+
             // A building is considered 'unpowered' if:
             // 1. It is fully constructed (not a ghost/under construction).
             // 2. Its config requires power (PowerUpkeep > 0).
@@ -64,7 +94,7 @@ namespace GameDevTV.RTS.UI.Components
 
             bool isUnpowered = building.Progress.State == BuildingProgress.BuildingState.Completed && 
                                needsPower && 
-                               (powerNode != null && !powerNode.IsPowered);
+                               (powerNode == null || !powerNode.IsPowered);
 
             visualIndicator.SetActive(isUnpowered);
         }

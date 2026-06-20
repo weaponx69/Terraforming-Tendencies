@@ -330,6 +330,7 @@ GameObject:
   - component: {fileID: 5714037447226057857}
   - component: {fileID: 2031590026708284304}
   - component: {fileID: 2520765283998622233}
+  - component: {fileID: 1339685992281023262}
   m_Layer: 7
   m_Name: Urban Green Commons
   m_TagString: Home
@@ -438,6 +439,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &1339685992281023262
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8377980113244391674}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &8741913448054517060
 GameObject:
   m_ObjectHideFlags: 0

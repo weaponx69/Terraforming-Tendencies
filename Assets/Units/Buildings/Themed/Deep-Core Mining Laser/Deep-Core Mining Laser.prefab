@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 8790433354187211358}
   - component: {fileID: 3925876938810755617}
   - component: {fileID: 574733437885886039}
+  - component: {fileID: 2797007213874806277}
   m_Layer: 7
   m_Name: Deep-Core Mining Laser
   m_TagString: Home
@@ -121,6 +122,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &2797007213874806277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773036561045915792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &4389684369125521140
 GameObject:
   m_ObjectHideFlags: 0

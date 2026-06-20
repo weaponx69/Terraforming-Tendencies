@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 986263793837253581}
   - component: {fileID: 4302008171502747938}
   - component: {fileID: 7002904548383520438}
+  - component: {fileID: 5344271589415917992}
   m_Layer: 7
   m_Name: Subterranean Apartment Block
   m_TagString: Home
@@ -121,6 +122,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &5344271589415917992
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2975368579399331532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &3704900934265010266
 GameObject:
   m_ObjectHideFlags: 0

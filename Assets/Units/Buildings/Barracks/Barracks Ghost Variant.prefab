@@ -64,11 +64,37 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 6791043362217924006, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      propertyPath: m_Name
+      value: Barracks Ghost Variant
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 4212464277386913961, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
     - {fileID: 9126003935667859044, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
     - {fileID: 6234324901356792241, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6791043362217924006, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1801297942416039350}
   m_SourcePrefab: {fileID: 100100000, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+--- !u!1 &4640564619881756065 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6791043362217924006, guid: 0769b0d4430bf10488837724577a9cde, type: 3}
+  m_PrefabInstance: {fileID: 2186560404095377415}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1801297942416039350
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4640564619881756065}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4

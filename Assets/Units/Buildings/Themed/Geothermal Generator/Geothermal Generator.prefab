@@ -267,6 +267,7 @@ GameObject:
   - component: {fileID: 7598272640447376184}
   - component: {fileID: 1549853853973358581}
   - component: {fileID: 1817036354315548250}
+  - component: {fileID: 8322727055676969942}
   m_Layer: 7
   m_Name: Geothermal Generator
   m_TagString: Home
@@ -375,6 +376,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.LifeSupportNode
   Radius: 35
+--- !u!114 &8322727055676969942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5757422537782867676}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a1bc5a4e8f2762ba9217499671e400f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
+  visualIndicator: {fileID: 0}
+  heightOffset: 4
 --- !u!1 &7802828284905870637
 GameObject:
   m_ObjectHideFlags: 0
