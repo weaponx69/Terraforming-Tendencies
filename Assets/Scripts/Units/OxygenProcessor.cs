@@ -19,6 +19,15 @@ namespace GameDevTV.RTS.Units
             // Only generate oxygen if the building is fully operating and powered
             if (Owner != Owner.Invalid && IsOperating)
             {
+                bool shouldGenerateOxygen = BuildingSO != null && (
+                    BuildingSO.Name.Contains("Oxygen Processor") || 
+                    BuildingSO.Name.Contains("Algae Spreader") || 
+                    BuildingSO.Name.Contains("Atmospheric Condenser") ||
+                    BuildingSO.Name.Contains("Greenery Dome")
+                );
+
+                if (!shouldGenerateOxygen) return;
+
                 tickTimer += Time.deltaTime;
                 if (tickTimer >= tickRate)
                 {

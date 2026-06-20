@@ -274,9 +274,42 @@ namespace GameDevTV.RTS.UI.Containers
 #endif
             runtimePool.Add(cardHabitat);
 
+            // 3b. Barracks Project
+            var cardBarracks = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardBarracks.cardName = "Garrison Barracks";
+            cardBarracks.cardDescription = "Unlocks the Barracks building, allowing you to train light combat units to defend your colony.";
+            cardBarracks.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Barracks/Barracks");
+#if UNITY_EDITOR
+            if (cardBarracks.buildingToUnlock == null) cardBarracks.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Barracks/Barracks.asset");
+#endif
+            runtimePool.Add(cardBarracks);
+
+            // 3c. Infantry School Project
+            var cardInfantrySchool = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardInfantrySchool.cardName = "Tactical Training Academy";
+            cardInfantrySchool.cardDescription = "Unlocks the Infantry School, enabling advanced training, speed upgrades, and research options.";
+            cardInfantrySchool.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Infantry School/Infantry School");
+#if UNITY_EDITOR
+            if (cardInfantrySchool.buildingToUnlock == null) cardInfantrySchool.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Infantry School/Infantry School.asset");
+#endif
+            runtimePool.Add(cardInfantrySchool);
+
+            // 3d. Spaceport Project
+            var cardSpaceport = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardSpaceport.cardName = "Colony Spaceport";
+            cardSpaceport.cardDescription = "Unlocks the Spaceport to handle heavy shipping, trading, and advanced drone assembly.";
+            cardSpaceport.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Spaceport/Spaceport");
+#if UNITY_EDITOR
+            if (cardSpaceport.buildingToUnlock == null) cardSpaceport.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Units/Buildings/Spaceport/Spaceport.asset");
+#endif
+            runtimePool.Add(cardSpaceport);
+
             if (cardSolar.buildingToUnlock != null) BlueprintDraftManager.RegisterBuildingSO(cardSolar.buildingToUnlock);
             if (cardOxygen.buildingToUnlock != null) BlueprintDraftManager.RegisterBuildingSO(cardOxygen.buildingToUnlock);
             if (cardHabitat.buildingToUnlock != null) BlueprintDraftManager.RegisterBuildingSO(cardHabitat.buildingToUnlock);
+            if (cardBarracks.buildingToUnlock != null) BlueprintDraftManager.RegisterBuildingSO(cardBarracks.buildingToUnlock);
+            if (cardInfantrySchool.buildingToUnlock != null) BlueprintDraftManager.RegisterBuildingSO(cardInfantrySchool.buildingToUnlock);
+            if (cardSpaceport.buildingToUnlock != null) BlueprintDraftManager.RegisterBuildingSO(cardSpaceport.buildingToUnlock);
 
             BuildingSO templateBuilding = cardSolar.buildingToUnlock;
             Sprite defaultIcon = templateBuilding != null ? templateBuilding.Icon : null;
