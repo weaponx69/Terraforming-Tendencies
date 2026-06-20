@@ -40,6 +40,8 @@ namespace GameDevTV.RTS.Player
         public int biomassAmount = 0;
         public int oxygenAmount = 0;
 
+        public override string GetCardPurpose() => "RESOURCE SHIPMENT";
+
         public override void Apply()
         {
             if (materialsAmount > 0)
@@ -68,6 +70,8 @@ namespace GameDevTV.RTS.Player
     public class SpawnUnitCardSO : BlueprintCardSO
     {
         public GameObject unitPrefab;
+
+        public override string GetCardPurpose() => "SPAWN UNIT";
 
         public override void Apply()
         {
