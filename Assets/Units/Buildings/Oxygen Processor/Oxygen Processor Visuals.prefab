@@ -87,7 +87,7 @@ MonoBehaviour:
   <IsSelected>k__BackingField: 0
   <CurrentHealth>k__BackingField: 0
   <MaxHealth>k__BackingField: 0
-  <Owner>k__BackingField: 0
+  <Owner>k__BackingField: 1
   <IsVisible>k__BackingField: 1
   _availableCommands: []
   <UnitSO>k__BackingField: {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}
@@ -103,7 +103,7 @@ MonoBehaviour:
   <BuildingSO>k__BackingField: {fileID: 0}
   primaryMaterial: {fileID: 0}
   navMeshObstacle: {fileID: 0}
-  oxygenPerTick: 0.001
+  oxygenPerTick: 5
   tickRate: 1
 --- !u!114 &3289805880170723667
 MonoBehaviour:
