@@ -177,7 +177,7 @@ namespace GameDevTV.RTS.Player
                 // Completed buildings with life support
                 if (node.TryGetComponent<BaseBuilding>(out var b) && b.Owner == owner)
                 {
-                    if (b.Progress.State == BuildingProgress.BuildingState.Completed) return true;
+                    if (b.Progress.State == BuildingProgress.BuildingState.Completed && b.IsOperating) return true;
                 }
 
                 // Hero Drone acts as a mobile life support node

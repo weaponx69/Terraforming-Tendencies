@@ -130,7 +130,7 @@ namespace GameDevTV.RTS.Environment
             {
                 LifeSupportNode node = kvp.Key;
                 List<GameObject> plants = kvp.Value;
-                bool isOrphaned = node == null;
+                bool isOrphaned = node == null || (node.TryGetComponent<BaseBuilding>(out var b) && !b.IsOperating);
 
                 totalOxygenBoost += plants.Count * oxygenPerPlant;
                 totalBiomassBoost += plants.Count * biomassCostPerPlant; // biomassCostPerPlant now acts as generation
@@ -156,7 +156,7 @@ namespace GameDevTV.RTS.Environment
             {
                 LifeSupportNode node = kvp.Key;
                 GrassBatch batch = kvp.Value;
-                bool isOrphaned = node == null;
+                bool isOrphaned = node == null || (node.TryGetComponent<BaseBuilding>(out var b) && !b.IsOperating);
 
                 totalOxygenBoost += batch.Instances.Count * oxygenPerGrass;
                 totalBiomassBoost += batch.Instances.Count * biomassCostPerGrass; // biomassCostPerGrass now acts as generation
@@ -308,6 +308,7 @@ namespace GameDevTV.RTS.Environment
                 foreach (var node in cachedNodes)
                 {
                     if (node == null) continue;
+                    if (node.TryGetComponent<BaseBuilding>(out var b) && !b.IsOperating) continue;
                     EnsureNodeData(node);
 
                     float oxFactor = Mathf.Clamp01(oxygen / 40f);

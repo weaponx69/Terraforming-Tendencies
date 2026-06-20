@@ -40,12 +40,24 @@ namespace GameDevTV.RTS.Environment
 
                     // Skip decay for objects that ARE LifeSupportNodes or are within range of one.
                     if (target.TryGetComponent<LifeSupportNode>(out _))
-                        continue;
+                    {
+                        if (target.TryGetComponent<BaseBuilding>(out var targetBuilding) && !targetBuilding.IsOperating)
+                        {
+                            // Unpowered/non-operating life support buildings do not skip decay
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
 
                     bool isSupported = false;
                     foreach (var node in lifeSupportNodes)
                     {
                         if (node == null) continue;
+                        if (node.TryGetComponent<BaseBuilding>(out var nodeBuilding) && !nodeBuilding.IsOperating)
+                            continue;
+
                         if (Vector3.Distance(target.transform.position, node.transform.position) <= node.Radius)
                         {
                             isSupported = true;

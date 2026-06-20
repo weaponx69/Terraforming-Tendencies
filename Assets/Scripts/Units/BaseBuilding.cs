@@ -137,12 +137,6 @@ namespace GameDevTV.RTS.Units
                 gameObject.AddComponent<GameDevTV.RTS.Environment.PowerNode>();
             }
 
-            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
-            if (isCommandPost && gameObject.GetComponent<GameDevTV.RTS.Environment.BatteryNode>() == null)
-            {
-                gameObject.AddComponent<GameDevTV.RTS.Environment.BatteryNode>();
-            }
-
             isBuildingInitialized = true;
         }
 

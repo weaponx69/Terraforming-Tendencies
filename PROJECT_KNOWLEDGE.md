@@ -489,8 +489,13 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
       * *Cost:* 280 Materials | *Upkeep:* 4 Power | *Biomass Gen:* +6
       * *Gate:* Temperature $\ge -10^{\circ}\text{C}$ & Atmosphere $\ge 0.20\text{ atm}$ & Oxygen $\ge 2.0\%$
       * *Description:* Advanced glass canopy housing local flora.
-  29. **Biosphere Center**
-      * *Cost:* 500 Materials | *Upkeep:* 6 Power | *Biomass Gen:* +10
-      * *Gate:* Water Deposit sector feature
-      * *Description:* Coordinates global ecological cycles from a protected water deposit.
+    29. **Biosphere Center**
+        *Cost:* 500 Materials | *Upkeep:* 6 Power | *Biomass Gen:* +10
+        *Gate:* Water Deposit sector feature
+        *Description:* Coordinates global ecological cycles from a protected water deposit.
 
+#### 25. Building Operational State & Power Upkeep Fixes
+* **Battery Removal on Command Post:** Removed the dynamic `BatteryNode` component addition on the Command Post in `BaseBuilding.InitializeIfNeeded()`. This guarantees the Command Post respects its `powerUpkeep` value of 20 and immediately stops operating (e.g., stops unit training, housing limits, and active abilities) when grid power is insufficient.
+* **Operational-Aware Decay Protection:** Updated `GlobalDecayManager.DecayLoop()` to only grant decay protection to buildings that are both completed and operational (`IsOperating` is true). Unpowered or shut-down life support buildings (like the Command Post or Oxygen Processors) will not prevent decay for themselves or nearby structures.
+* **Operational-Aware Game Over Checks:** Updated `GameOverManager.AnyLifeSupportNodesRemain()` to verify `b.IsOperating` before counting a completed life support building. An unpowered Command Post or Oxygen Processor will not count as a functioning life support node, ensuring the player faces loss if their colony collapses and cannot be rebuilt.
+* **Operational-Aware Vegetation Growth:** Updated `VegetationManager`'s growth loop and balance tick to check if the building associated with a `LifeSupportNode` is operational. If a node's building is not operational, vegetation spawning is blocked around it, and existing vegetation in that zone decays at an accelerated, orphaned rate.
