@@ -552,17 +552,22 @@ namespace GameDevTV.RTS.UI.Containers
             hlg.childControlHeight = true;
             hlg.childControlWidth = true;
             hlg.childForceExpandHeight = true;
-            hlg.childForceExpandWidth = true;
+            hlg.childForceExpandWidth = false; // Prevent auto-stretching card width dynamically based on screen size or count
 
             // Create 3 Cards
             cardSlots.Clear();
             for (int i = 0; i < 3; i++)
             {
-                GameObject cardObj = new GameObject($"Card Slot ({i})", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
+                GameObject cardObj = new GameObject($"Card Slot ({i})", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup), typeof(LayoutElement));
                 cardObj.transform.SetParent(cardContainer.transform, false);
 
                 var cardImg = cardObj.GetComponent<Image>();
                 cardImg.color = new Color(0.06f, 0.08f, 0.10f, 1f); // Completely opaque solid card background
+
+                // Enforce STRICTLY CONSTANT identical card width via LayoutElement
+                var le = cardObj.GetComponent<LayoutElement>();
+                le.minWidth = 320f;
+                le.preferredWidth = 320f;
 
                 var vlg = cardObj.GetComponent<VerticalLayoutGroup>();
                 vlg.padding = new RectOffset(20, 20, 20, 20);
@@ -577,10 +582,10 @@ namespace GameDevTV.RTS.UI.Containers
                 GameObject cTitleGo = new GameObject("Card Title", typeof(RectTransform), typeof(TextMeshProUGUI));
                 cTitleGo.transform.SetParent(cardObj.transform, false);
                 var cTitleRt = cTitleGo.GetComponent<RectTransform>();
-                cTitleRt.sizeDelta = new Vector2(260f, 35f);
+                cTitleRt.sizeDelta = new Vector2(280f, 35f);
                 var cTitleTmp = cTitleGo.GetComponent<TextMeshProUGUI>();
                 cTitleTmp.text = "BLUEPRINT CARD";
-                cTitleTmp.fontSize = 24f; // Clean constant title size
+                cTitleTmp.fontSize = 26f; // Clean constant title size (permanently increased)
                 cTitleTmp.alignment = TextAlignmentOptions.Center;
                 cTitleTmp.color = new Color(1f, 0.85f, 0.2f, 1f); // Vibrant Gold
                 cTitleTmp.font = titleTmp.font;
@@ -590,10 +595,10 @@ namespace GameDevTV.RTS.UI.Containers
                 GameObject cPurposeGo = new GameObject("Card Purpose", typeof(RectTransform), typeof(TextMeshProUGUI));
                 cPurposeGo.transform.SetParent(cardObj.transform, false);
                 var cPurposeRt = cPurposeGo.GetComponent<RectTransform>();
-                cPurposeRt.sizeDelta = new Vector2(260f, 20f);
+                cPurposeRt.sizeDelta = new Vector2(280f, 20f);
                 var cPurposeTmp = cPurposeGo.GetComponent<TextMeshProUGUI>();
                 cPurposeTmp.text = "PURPOSE";
-                cPurposeTmp.fontSize = 13f; // Small constant sub-header size
+                cPurposeTmp.fontSize = 15f; // Small constant sub-header size (permanently increased)
                 cPurposeTmp.alignment = TextAlignmentOptions.Center;
                 cPurposeTmp.color = new Color(0.4f, 0.8f, 1f, 1f); // Highly readable cyan-blue
                 cPurposeTmp.font = titleTmp.font;
@@ -603,17 +608,17 @@ namespace GameDevTV.RTS.UI.Containers
                 GameObject cDivGo = new GameObject("Divider", typeof(RectTransform), typeof(Image));
                 cDivGo.transform.SetParent(cardObj.transform, false);
                 var cDivRt = cDivGo.GetComponent<RectTransform>();
-                cDivRt.sizeDelta = new Vector2(250f, 2f);
+                cDivRt.sizeDelta = new Vector2(280f, 2f);
                 cDivGo.GetComponent<Image>().color = new Color(0.3f, 0.4f, 0.5f, 1.0f); // Fully opaque divider
 
                 // Card Description (No ContentSizeFitter to prevent dynamic card size changing)
                 GameObject cDescGo = new GameObject("Card Description", typeof(RectTransform), typeof(TextMeshProUGUI));
                 cDescGo.transform.SetParent(cardObj.transform, false);
                 var cDescRt = cDescGo.GetComponent<RectTransform>();
-                cDescRt.sizeDelta = new Vector2(260f, 220f); // STRICTLY CONSTANT fixed height text box
+                cDescRt.sizeDelta = new Vector2(280f, 230f); // STRICTLY CONSTANT fixed height text box with extra height for larger font
                 var cDescTmp = cDescGo.GetComponent<TextMeshProUGUI>();
                 cDescTmp.text = "This is the detailed description of the card's action or unlocked blueprint.";
-                cDescTmp.fontSize = 15f; // STRICTLY CONSTANT description text size
+                cDescTmp.fontSize = 18f; // STRICTLY CONSTANT description text size (permanently increased)
                 cDescTmp.alignment = TextAlignmentOptions.TopLeft;
                 cDescTmp.color = Color.white;
                 cDescTmp.textWrappingMode = TextWrappingModes.Normal;
@@ -628,7 +633,7 @@ namespace GameDevTV.RTS.UI.Containers
                 GameObject cBtnGo = new GameObject("Select Button", typeof(RectTransform), typeof(Image), typeof(Button));
                 cBtnGo.transform.SetParent(cardObj.transform, false);
                 var cBtnRt = cBtnGo.GetComponent<RectTransform>();
-                cBtnRt.sizeDelta = new Vector2(220f, 40f);
+                cBtnRt.sizeDelta = new Vector2(240f, 40f);
 
                 var btnImg = cBtnGo.GetComponent<Image>();
                 btnImg.color = new Color(0.2f, 0.7f, 0.3f, 1f); // Sci-Fi Green
@@ -646,7 +651,7 @@ namespace GameDevTV.RTS.UI.Containers
 
                 var btnTxtTmp = btnTxtGo.GetComponent<TextMeshProUGUI>();
                 btnTxtTmp.text = "CHOOSE BLUEPRINT";
-                btnTxtTmp.fontSize = 18f; // Larger button text
+                btnTxtTmp.fontSize = 20f; // Larger button text (permanently increased)
                 btnTxtTmp.alignment = TextAlignmentOptions.Center;
                 btnTxtTmp.color = Color.white;
                 btnTxtTmp.font = titleTmp.font;
