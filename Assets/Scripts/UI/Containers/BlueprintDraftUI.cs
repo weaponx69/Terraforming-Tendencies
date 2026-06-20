@@ -565,22 +565,28 @@ namespace GameDevTV.RTS.UI.Containers
                 // Card Title
                 GameObject cTitleGo = new GameObject("Card Title", typeof(RectTransform), typeof(TextMeshProUGUI));
                 cTitleGo.transform.SetParent(cardObj.transform, false);
+                var cTitleRt = cTitleGo.GetComponent<RectTransform>();
+                cTitleRt.sizeDelta = new Vector2(260f, 35f);
                 var cTitleTmp = cTitleGo.GetComponent<TextMeshProUGUI>();
                 cTitleTmp.text = "BLUEPRINT CARD";
                 cTitleTmp.fontSize = 24f; // Clean constant title size
                 cTitleTmp.alignment = TextAlignmentOptions.Center;
                 cTitleTmp.color = new Color(1f, 0.85f, 0.2f, 1f); // Vibrant Gold
                 cTitleTmp.font = titleTmp.font;
+                cTitleTmp.textWrappingMode = TextWrappingModes.Normal;
 
                 // Card Purpose
                 GameObject cPurposeGo = new GameObject("Card Purpose", typeof(RectTransform), typeof(TextMeshProUGUI));
                 cPurposeGo.transform.SetParent(cardObj.transform, false);
+                var cPurposeRt = cPurposeGo.GetComponent<RectTransform>();
+                cPurposeRt.sizeDelta = new Vector2(260f, 20f);
                 var cPurposeTmp = cPurposeGo.GetComponent<TextMeshProUGUI>();
                 cPurposeTmp.text = "PURPOSE";
                 cPurposeTmp.fontSize = 13f; // Small constant sub-header size
                 cPurposeTmp.alignment = TextAlignmentOptions.Center;
-                cPurposeTmp.color = Color.gray;
+                cPurposeTmp.color = new Color(0.4f, 0.8f, 1f, 1f); // Highly readable cyan-blue
                 cPurposeTmp.font = titleTmp.font;
+                cPurposeTmp.textWrappingMode = TextWrappingModes.Normal;
 
                 // Divider Line
                 GameObject cDivGo = new GameObject("Divider", typeof(RectTransform), typeof(Image));
