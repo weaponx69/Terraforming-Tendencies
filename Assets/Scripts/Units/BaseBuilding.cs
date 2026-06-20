@@ -126,23 +126,27 @@ namespace GameDevTV.RTS.Units
                     Material selectionMat = null;
                     foreach (var cmd in ActiveCommandables)
                     {
-                        if (cmd != null && cmd.selectionIndicator != null)
+                        if (cmd != null)
                         {
-                            var renderer = cmd.selectionIndicator.GetComponent<MeshRenderer>();
-                            if (renderer != null && renderer.sharedMaterial != null)
+                            var cmdIndicator = cmd.transform.Find("Selection Indicator");
+                            if (cmdIndicator != null)
                             {
-                                selectionMat = renderer.sharedMaterial;
-                                break;
+                                var renderer = cmdIndicator.GetComponent<MeshRenderer>();
+                                if (renderer != null && renderer.sharedMaterial != null)
+                                {
+                                    selectionMat = renderer.sharedMaterial;
+                                    break;
+                                }
                             }
                         }
                     }
 
                     if (selectionMat == null && GameConfiguration.Instance != null && GameConfiguration.Instance.CommandPostPrefab != null)
                     {
-                        var cpCmd = GameConfiguration.Instance.CommandPostPrefab.GetComponent<AbstractCommandable>();
-                        if (cpCmd != null && cpCmd.selectionIndicator != null)
+                        var cpIndicator = GameConfiguration.Instance.CommandPostPrefab.transform.Find("Selection Indicator");
+                        if (cpIndicator != null)
                         {
-                            var renderer = cpCmd.selectionIndicator.GetComponent<MeshRenderer>();
+                            var renderer = cpIndicator.GetComponent<MeshRenderer>();
                             if (renderer != null)
                             {
                                 selectionMat = renderer.sharedMaterial;
@@ -192,7 +196,7 @@ namespace GameDevTV.RTS.Units
                     var mr = indicatorGO.GetComponent<MeshRenderer>();
                     if (mr != null)
                     {
-                        mr.castShadows = false;
+                        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                         mr.receiveShadows = false;
                         if (selectionMat != null)
                         {
