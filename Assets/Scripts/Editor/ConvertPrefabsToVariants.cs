@@ -16,8 +16,11 @@ namespace GameDevTV.RTS.EditorScripts
 
         private static void ConvertPrefabs()
         {
-            if (EditorPrefs.GetBool("PrefabVariantConversionRan_v1", false))
+            if (EditorPrefs.GetBool("PrefabVariantConversionRan_v2", false))
                 return;
+
+            // Set the flag immediately to prevent re-entry loops during domain reload
+            EditorPrefs.SetBool("PrefabVariantConversionRan_v2", true);
 
             // Load the BaseBuilding prefab (source)
             string baseBuildingPath = "Assets/Units/Buildings/BaseBuilding.prefab";
@@ -38,7 +41,6 @@ namespace GameDevTV.RTS.EditorScripts
             // Convert Solar Panel
             ConvertPrefab(solarPanelPath, baseBuildingPrefab, "Solar Panel", 10f);
 
-            EditorPrefs.SetBool("PrefabVariantConversionRan_v1", true);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("[ConvertPrefabs] Successfully converted Command Post and Solar Panel standalone prefabs to BaseBuilding variants!");
@@ -48,19 +50,18 @@ namespace GameDevTV.RTS.EditorScripts
         {
             string backupPath = targetPrefabPath.Replace(".prefab", "_Backup.prefab");
             
-            // Backup the original standalone prefab
-            string moveError = AssetDatabase.MoveAsset(targetPrefabPath, backupPath);
-            if (!string.IsNullOrEmpty(moveError))
+            // Copy the original standalone prefab to a backup path (preserving targetPrefab's original GUID on the original file)
+            if (!AssetDatabase.CopyAsset(targetPrefabPath, backupPath))
             {
-                Debug.LogError($"[ConvertPrefabs] Failed to backup prefab {targetPrefabPath} to {backupPath}: {moveError}");
+                Debug.LogError($"[ConvertPrefabs] Failed to copy prefab {targetPrefabPath} to {backupPath}!");
                 return;
             }
-            AssetDatabase.Refresh();
 
             GameObject backupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(backupPath);
             if (backupPrefab == null)
             {
                 Debug.LogError($"[ConvertPrefabs] Backup prefab not found at {backupPath}!");
+                AssetDatabase.DeleteAsset(backupPath);
                 return;
             }
 
@@ -72,7 +73,7 @@ namespace GameDevTV.RTS.EditorScripts
             {
                 if (backupInstance != null) Object.DestroyImmediate(backupInstance);
                 if (variantInstance != null) Object.DestroyImmediate(variantInstance);
-                AssetDatabase.MoveAsset(backupPath, targetPrefabPath); // Restore
+                AssetDatabase.DeleteAsset(backupPath);
                 return;
             }
 
@@ -168,7 +169,6 @@ namespace GameDevTV.RTS.EditorScripts
 
             // Delete backup asset
             AssetDatabase.DeleteAsset(backupPath);
-            AssetDatabase.Refresh();
         }
     }
 }
