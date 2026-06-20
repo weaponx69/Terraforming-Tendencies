@@ -114,6 +114,97 @@ namespace GameDevTV.RTS.Units
             if (isBuildingInitialized) return;
             base.InitializeIfNeeded();
 
+            if (selectionIndicator == null)
+            {
+                Transform child = transform.Find("Selection Indicator");
+                if (child != null)
+                {
+                    selectionIndicator = child.gameObject;
+                }
+                else
+                {
+                    Material selectionMat = null;
+                    foreach (var cmd in ActiveCommandables)
+                    {
+                        if (cmd != null && cmd.selectionIndicator != null)
+                        {
+                            var renderer = cmd.selectionIndicator.GetComponent<MeshRenderer>();
+                            if (renderer != null && renderer.sharedMaterial != null)
+                            {
+                                selectionMat = renderer.sharedMaterial;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (selectionMat == null && GameConfiguration.Instance != null && GameConfiguration.Instance.CommandPostPrefab != null)
+                    {
+                        var cpCmd = GameConfiguration.Instance.CommandPostPrefab.GetComponent<AbstractCommandable>();
+                        if (cpCmd != null && cpCmd.selectionIndicator != null)
+                        {
+                            var renderer = cpCmd.selectionIndicator.GetComponent<MeshRenderer>();
+                            if (renderer != null)
+                            {
+                                selectionMat = renderer.sharedMaterial;
+                            }
+                        }
+                    }
+
+                    if (selectionMat == null)
+                    {
+                        selectionMat = Resources.Load<Material>("Materials/SelectionIndicator");
+                    }
+                    if (selectionMat == null)
+                    {
+                        selectionMat = Resources.Load<Material>("SelectionIndicator");
+                    }
+#if UNITY_EDITOR
+                    if (selectionMat == null)
+                    {
+                        selectionMat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/SelectionIndicator.mat");
+                    }
+#endif
+
+                    GameObject indicatorGO = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    indicatorGO.name = "Selection Indicator";
+                    var col = indicatorGO.GetComponent<Collider>();
+                    if (col != null) Destroy(col);
+                    indicatorGO.transform.SetParent(transform, false);
+                    indicatorGO.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+                    indicatorGO.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+                    float scale = 8f;
+                    BuildingSO = UnitSO as BuildingSO;
+                    var checkSO = BuildingSO != null ? BuildingSO : (UnitSO as BuildingSO);
+                    if (checkSO != null)
+                    {
+                        if (checkSO.Name.Contains("Solar", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            scale = 10f;
+                        }
+                        else if (checkSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            scale = 15f;
+                        }
+                    }
+                    indicatorGO.transform.localScale = new Vector3(scale, scale, 1f);
+
+                    var mr = indicatorGO.GetComponent<MeshRenderer>();
+                    if (mr != null)
+                    {
+                        mr.castShadows = false;
+                        mr.receiveShadows = false;
+                        if (selectionMat != null)
+                        {
+                            mr.sharedMaterial = selectionMat;
+                        }
+                    }
+
+                    indicatorGO.SetActive(false);
+                    selectionIndicator = indicatorGO;
+                }
+            }
+
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO != null ? BuildingSO.Health : 1000;
             
