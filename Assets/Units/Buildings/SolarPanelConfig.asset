@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: SolarPanelConfig
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BuildingConfigSO
   queueSize: 1
-  lifeSupportRadius: 10
+  lifeSupportRadius: 1
   buildTimeMultiplier: 1
   biomassUpkeep: 0
   powerUpkeep: 0
   oxygenUpkeep: 0
   biomassGeneration: 0
-  powerGeneration: 50
+  powerGeneration: 25
   housingCapacity: 0

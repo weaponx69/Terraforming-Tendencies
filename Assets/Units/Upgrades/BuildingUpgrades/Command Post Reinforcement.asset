@@ -18,6 +18,7 @@ MonoBehaviour:
   <Icon>k__BackingField: {fileID: 21300000, guid: d74fb2f9c3c6e3e448f89c5a560817d3, type: 3}
   <Cost>k__BackingField: {fileID: 11400000, guid: a68da87a5083eca4f9c3683619338103, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
-  <unlockRequirements>k__BackingField: []
+  <unlockRequirements>k__BackingField:
+  - {fileID: 11400000, guid: 9884a756ab958db61b4f24c529adca43, type: 2}
   <PropertyPath>k__BackingField: Health
   <Amount>k__BackingField: 300

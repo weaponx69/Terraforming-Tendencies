@@ -13,10 +13,11 @@ MonoBehaviour:
   m_Name: OxygenProcessorConfig
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BuildingConfigSO
   queueSize: 5
-  lifeSupportRadius: 0
-  buildTimeMultiplier: 1
+  lifeSupportRadius: 20
+  buildTimeMultiplier: 8
+  biomassUpkeep: 0
   powerUpkeep: 10
   oxygenUpkeep: 0
-  biomassGeneration: 2
+  biomassGeneration: 40
   powerGeneration: 0
   housingCapacity: 0
