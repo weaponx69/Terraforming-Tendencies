@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f185a45e660fa34bb6472929a4cdd40, type: 3}
+  m_Name: Solar Greenhouse
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BuildingSO
+  <Name>k__BackingField: Solar Greenhouse
+  <IsOneTimeUnlock>k__BackingField: 0
+  <BuildTime>k__BackingField: 10
+  <Icon>k__BackingField: {fileID: 0}
+  <Cost>k__BackingField: {fileID: 0}
+  <TechTree>k__BackingField: {fileID: 0}
+  <unlockRequirements>k__BackingField: []
+  health: 100
+  prefab: {fileID: 1015629346199916127, guid: c70a85a202e4d733a8140a0927f5eda2, type: 3}
+  upgrades: []
+  sightConfig: {fileID: 0}
+  movementConfig: {fileID: 0}
+  gatherConfig: {fileID: 0}
+  builderConfig: {fileID: 0}
+  probeConfig: {fileID: 0}
+  buildingConfig: {fileID: 11400000, guid: d9c1b5f364fae779991c1b2790e2f69a, type: 2}
+  <PlacementMaterial>k__BackingField: {fileID: 0}
+  <IsLifeSupport>k__BackingField: 0
+  <LifeSupportRadius>k__BackingField: 25

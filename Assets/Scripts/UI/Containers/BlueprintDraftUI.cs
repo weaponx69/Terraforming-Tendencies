@@ -421,38 +421,47 @@ namespace GameDevTV.RTS.UI.Containers
             Sprite defaultIcon
         )
         {
-            var bldSO = ScriptableObject.CreateInstance<BuildingSO>();
-            bldSO.Name = buildingName;
-            bldSO.BuildTime = 10f;
-            bldSO.Icon = defaultIcon;
+            BuildingSO bldSO = null;
+#if UNITY_EDITOR
+            string path = "Assets/Units/Buildings/Themed/" + buildingName + "/" + buildingName + ".asset";
+            bldSO = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>(path);
+#endif
 
-            var cost = ScriptableObject.CreateInstance<SupplyCostSO>();
-            cost.Minerals = materialsCost;
-            if (templateBuilding != null && templateBuilding.Cost != null)
+            if (bldSO == null)
             {
-                cost.MineralsSO = templateBuilding.Cost.MineralsSO;
-                cost.GasSO = templateBuilding.Cost.GasSO;
-            }
-            bldSO.Cost = cost;
+                bldSO = ScriptableObject.CreateInstance<BuildingSO>();
+                bldSO.Name = buildingName;
+                bldSO.BuildTime = 10f;
+                bldSO.Icon = defaultIcon;
 
-            if (templateBuilding != null)
-            {
-                bldSO.Prefab = templateBuilding.Prefab;
-                bldSO.PlacementMaterial = templateBuilding.PlacementMaterial;
-                bldSO.SightConfig = templateBuilding.SightConfig;
-            }
+                var cost = ScriptableObject.CreateInstance<SupplyCostSO>();
+                cost.Minerals = materialsCost;
+                if (templateBuilding != null && templateBuilding.Cost != null)
+                {
+                    cost.MineralsSO = templateBuilding.Cost.MineralsSO;
+                    cost.GasSO = templateBuilding.Cost.GasSO;
+                }
+                bldSO.Cost = cost;
 
-            var config = ScriptableObject.CreateInstance<BuildingConfigSO>();
-            config.PowerUpkeep = powerUpkeep;
-            config.PowerGeneration = powerGen;
-            config.HousingCapacity = housingCap;
-            config.BiomassGeneration = biomassGen;
-            bldSO.BuildingConfig = config;
+                if (templateBuilding != null)
+                {
+                    bldSO.Prefab = templateBuilding.Prefab;
+                    bldSO.PlacementMaterial = templateBuilding.PlacementMaterial;
+                    bldSO.SightConfig = templateBuilding.SightConfig;
+                }
+
+                var config = ScriptableObject.CreateInstance<BuildingConfigSO>();
+                config.PowerUpkeep = powerUpkeep;
+                config.PowerGeneration = powerGen;
+                config.HousingCapacity = housingCap;
+                config.BiomassGeneration = biomassGen;
+                bldSO.BuildingConfig = config;
+            }
 
             var card = ScriptableObject.CreateInstance<TerraformingCardSO>();
             card.cardName = cardName;
             card.cardDescription = cardDesc;
-            card.icon = defaultIcon;
+            card.icon = bldSO.Icon != null ? bldSO.Icon : defaultIcon;
             card.buildingToUnlock = bldSO;
 
             card.minTemperature = minTemp;
