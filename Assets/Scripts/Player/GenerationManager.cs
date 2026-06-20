@@ -104,6 +104,22 @@ namespace GameDevTV.RTS.Player
                     new SectorMilestone { Type = MilestoneType.CommandPosts, TargetValue = 1f, GoalDescription = "Establish a Command Post in the sector" }
                 };
             }
+
+            // Dynamically scale the Oxygen milestone target to (100% / number of sectors)
+            if (SectorManager.Instance != null && SectorManager.Instance.Sectors != null && SectorManager.Instance.Sectors.Count > 0)
+            {
+                float targetValue = 100f / SectorManager.Instance.Sectors.Count;
+                for (int i = 0; i < milestones.Count; i++)
+                {
+                    if (milestones[i].Type == MilestoneType.Oxygen)
+                    {
+                        var m = milestones[i];
+                        m.TargetValue = targetValue;
+                        m.GoalDescription = $"Reach {targetValue:F0}% Atmospheric Oxygen";
+                        milestones[i] = m;
+                    }
+                }
+            }
         }
 
         private void Update()
