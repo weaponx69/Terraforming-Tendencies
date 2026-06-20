@@ -90,7 +90,7 @@ MonoBehaviour:
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
   _availableCommands: []
-  <UnitSO>k__BackingField: {fileID: 0}
+  <UnitSO>k__BackingField: {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}
   selectionIndicator: {fileID: 0}
   VisionTransform: {fileID: 0}
   <CurrentQueueStartTime>k__BackingField: 0

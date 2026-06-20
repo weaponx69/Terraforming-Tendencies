@@ -8,6 +8,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: <UnitSO>k__BackingField
+      value: 
+      objectReference: {fileID: 11400000, guid: 8dd662d3b241c224ab9deac17c33674b, type: 2}
     - target: {fileID: 1589499662120937400, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: m_Name
       value: Supply Hut

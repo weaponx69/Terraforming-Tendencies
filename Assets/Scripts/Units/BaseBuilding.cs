@@ -462,7 +462,7 @@ namespace GameDevTV.RTS.Units
 
             if (isCommandPost && Owner == Owner.Player1)
             {
-                // Spawn a solar panel array (4 solar panels) to satisfy the Command Post's 20 power requirement
+                // Spawn a single solar panel to satisfy initial power requirements
                 var solarPanelSO = Resources.Load<BuildingSO>("Buildings/SolarPanel/SolarPanel");
 #if UNITY_EDITOR
                 if (solarPanelSO == null)
@@ -477,10 +477,7 @@ namespace GameDevTV.RTS.Units
                     {
                         Vector3[] offsets = new Vector3[]
                         {
-                            new Vector3(6f, 0f, 0f),
-                            new Vector3(-6f, 0f, 0f),
-                            new Vector3(0f, 0f, 6f),
-                            new Vector3(0f, 0f, -6f)
+                            new Vector3(6f, 0f, 0f)
                         };
 
                         foreach (var offset in offsets)
