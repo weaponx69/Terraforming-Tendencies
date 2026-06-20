@@ -64,25 +64,24 @@ namespace GameDevTV.RTS.EditorScripts
                 return;
             }
 
-            // Create variant prefab of BaseBuilding at targetPrefabPath
-            GameObject variantPrefab = PrefabUtility.CreateVariantPrefabOf(baseBuildingPrefab, targetPrefabPath);
-            if (variantPrefab == null)
+            // Instantiate both prefabs in the scene to copy settings/structure
+            GameObject backupInstance = PrefabUtility.InstantiatePrefab(backupPrefab) as GameObject;
+            GameObject variantInstance = PrefabUtility.InstantiatePrefab(baseBuildingPrefab) as GameObject;
+
+            if (backupInstance == null || variantInstance == null)
             {
-                Debug.LogError($"[ConvertPrefabs] Failed to create variant prefab at {targetPrefabPath}!");
+                if (backupInstance != null) Object.DestroyImmediate(backupInstance);
+                if (variantInstance != null) Object.DestroyImmediate(variantInstance);
                 AssetDatabase.MoveAsset(backupPath, targetPrefabPath); // Restore
                 return;
             }
 
-            // Load contents of both prefabs for editing
-            GameObject backupRoot = PrefabUtility.LoadPrefabContents(backupPath);
-            GameObject variantRoot = PrefabUtility.LoadPrefabContents(targetPrefabPath);
-
             // Rename root GameObject
-            variantRoot.name = name;
+            variantInstance.name = name;
 
-            // Copy component values from backupRoot to variantRoot
-            var variantBuilding = variantRoot.GetComponent<BaseBuilding>();
-            var backupBuilding = backupRoot.GetComponent<BaseBuilding>();
+            // Copy component values from backupInstance to variantInstance
+            var variantBuilding = variantInstance.GetComponent<BaseBuilding>();
+            var backupBuilding = backupInstance.GetComponent<BaseBuilding>();
             if (variantBuilding != null && backupBuilding != null)
             {
                 SerializedObject backupSO = new SerializedObject(backupBuilding);
@@ -103,16 +102,16 @@ namespace GameDevTV.RTS.EditorScripts
             }
 
             // Copy LifeSupportNode component values if present
-            var backupLifeSupport = backupRoot.GetComponent<GameDevTV.RTS.Environment.LifeSupportNode>();
-            var variantLifeSupport = variantRoot.GetComponent<GameDevTV.RTS.Environment.LifeSupportNode>();
+            var backupLifeSupport = backupInstance.GetComponent<GameDevTV.RTS.Environment.LifeSupportNode>();
+            var variantLifeSupport = variantInstance.GetComponent<GameDevTV.RTS.Environment.LifeSupportNode>();
             if (backupLifeSupport != null && variantLifeSupport != null)
             {
                 variantLifeSupport.Radius = backupLifeSupport.Radius;
             }
 
             // Copy NavMeshObstacle component values if present
-            var backupNavMesh = backupRoot.GetComponent<UnityEngine.AI.NavMeshObstacle>();
-            var variantNavMesh = variantRoot.GetComponent<UnityEngine.AI.NavMeshObstacle>();
+            var backupNavMesh = backupInstance.GetComponent<UnityEngine.AI.NavMeshObstacle>();
+            var variantNavMesh = variantInstance.GetComponent<UnityEngine.AI.NavMeshObstacle>();
             if (backupNavMesh != null && variantNavMesh != null)
             {
                 variantNavMesh.size = backupNavMesh.size;
@@ -121,28 +120,28 @@ namespace GameDevTV.RTS.EditorScripts
             }
 
             // Delete variant's default mesh children (keep Selection Indicator and Vision)
-            for (int i = variantRoot.transform.childCount - 1; i >= 0; i--)
+            for (int i = variantInstance.transform.childCount - 1; i >= 0; i--)
             {
-                Transform child = variantRoot.transform.GetChild(i);
+                Transform child = variantInstance.transform.GetChild(i);
                 if (child.name != "Selection Indicator" && child.name != "Vision")
                 {
                     Object.DestroyImmediate(child.gameObject);
                 }
             }
 
-            // Copy visual mesh/model children from backupRoot to variantRoot
-            for (int i = 0; i < backupRoot.transform.childCount; i++)
+            // Copy visual mesh/model children from backupInstance to variantInstance
+            for (int i = 0; i < backupInstance.transform.childCount; i++)
             {
-                Transform child = backupRoot.transform.GetChild(i);
+                Transform child = backupInstance.transform.GetChild(i);
                 if (child.name != "Selection Indicator" && child.name != "Vision")
                 {
-                    GameObject childCopy = Object.Instantiate(child.gameObject, variantRoot.transform);
+                    GameObject childCopy = Object.Instantiate(child.gameObject, variantInstance.transform);
                     childCopy.name = child.name;
                 }
             }
 
             // Configure Selection Indicator scale
-            Transform selectionIndicatorTrans = variantRoot.transform.Find("Selection Indicator");
+            Transform selectionIndicatorTrans = variantInstance.transform.Find("Selection Indicator");
             if (selectionIndicatorTrans != null)
             {
                 selectionIndicatorTrans.localScale = new Vector3(indicatorScale, indicatorScale, 1f);
@@ -160,10 +159,12 @@ namespace GameDevTV.RTS.EditorScripts
                 }
             }
 
-            // Save and Unload
-            PrefabUtility.SaveAsPrefabAsset(variantRoot, targetPrefabPath);
-            PrefabUtility.UnloadPrefabContents(variantRoot);
-            PrefabUtility.UnloadPrefabContents(backupRoot);
+            // Save variantInstance as Prefab Variant at targetPrefabPath
+            PrefabUtility.SaveAsPrefabAsset(variantInstance, targetPrefabPath);
+
+            // Clean up scene instances
+            Object.DestroyImmediate(backupInstance);
+            Object.DestroyImmediate(variantInstance);
 
             // Delete backup asset
             AssetDatabase.DeleteAsset(backupPath);
