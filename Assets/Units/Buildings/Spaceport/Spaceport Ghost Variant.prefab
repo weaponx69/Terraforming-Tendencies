@@ -60,6 +60,14 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 6467999797456621292, guid: ce58b4a7676b51d45869f6a426cf2db8, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6660863287538449562, guid: ce58b4a7676b51d45869f6a426cf2db8, type: 3}
+      propertyPath: m_Name
+      value: Spaceport Ghost Variant
+      objectReference: {fileID: 0}
     - target: {fileID: 7972912619656734410, guid: ce58b4a7676b51d45869f6a426cf2db8, type: 3}
       propertyPath: m_Layer
       value: 1

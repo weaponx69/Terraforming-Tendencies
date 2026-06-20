@@ -458,6 +458,17 @@ namespace GameDevTV.RTS.UI.Containers
                 config.BiomassGeneration = biomassGen;
                 bldSO.BuildingConfig = config;
             }
+            else if (bldSO.Cost == null)
+            {
+                var cost = ScriptableObject.CreateInstance<SupplyCostSO>();
+                cost.Minerals = materialsCost;
+                if (templateBuilding != null && templateBuilding.Cost != null)
+                {
+                    cost.MineralsSO = templateBuilding.Cost.MineralsSO;
+                    cost.GasSO = templateBuilding.Cost.GasSO;
+                }
+                bldSO.Cost = cost;
+            }
 
             var card = ScriptableObject.CreateInstance<TerraformingCardSO>();
             card.cardName = cardName;
