@@ -28,6 +28,7 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private float smokeSpeed = 0.6f;
 
         // Exposed so BaseBuilding can query it during InitializeAsGhost and StartBuilding.
+        public float Height => height;
         public Material GhostMaterial  { get; private set; }
         public Material FinalMaterial  { get; private set; }
 

@@ -19,7 +19,8 @@ namespace GameDevTV.RTS.UI.Components
 
         private BaseBuilding building;
         private PowerNode powerNode;
-        private bool wasOperatingLastCheck = true;
+        private BuildingProgress.BuildingState lastState = BuildingProgress.BuildingState.Building;
+        private bool lastPoweredState = false;
 
         private void Awake()
         {
@@ -35,6 +36,9 @@ namespace GameDevTV.RTS.UI.Components
             }
 
             EnsurePowerNodeCached();
+
+            lastState = building.Progress.State;
+            lastPoweredState = (powerNode != null && powerNode.IsPowered);
 
             // Start in the correct state
             UpdateIndicatorState();
@@ -69,11 +73,13 @@ namespace GameDevTV.RTS.UI.Components
         {
             EnsurePowerNodeCached();
 
-            // Only check when the operating state changes to avoid unnecessary overhead
-            bool isOperating = building.IsOperating;
-            if (isOperating != wasOperatingLastCheck)
+            BuildingProgress.BuildingState currentState = building.Progress.State;
+            bool currentPowered = (powerNode != null && powerNode.IsPowered);
+
+            if (currentState != lastState || currentPowered != lastPoweredState)
             {
-                wasOperatingLastCheck = isOperating;
+                lastState = currentState;
+                lastPoweredState = currentPowered;
                 UpdateIndicatorState();
             }
         }

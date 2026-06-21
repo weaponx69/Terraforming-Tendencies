@@ -18,6 +18,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         private List<BlueprintCardSO> runtimePool = new();
         private List<CardUIElements> cardSlots = new();
+        private TextMeshProUGUI roundGoalText;
 
         private struct CardUIElements
         {
@@ -82,6 +83,11 @@ namespace GameDevTV.RTS.UI.Containers
             // Pause the game
             Time.timeScale = 0f;
             draftPanel.SetActive(true);
+
+            if (roundGoalText != null && GenerationManager.Instance != null)
+            {
+                roundGoalText.text = $"ACTIVE ROUND GOAL: {GenerationManager.Instance.CurrentMilestoneDescription.ToUpper()}";
+            }
 
             // Select 3 random unique cards from the pool
             List<BlueprintCardSO> selectedCards = GetRandomCards(3);
@@ -552,12 +558,28 @@ namespace GameDevTV.RTS.UI.Containers
             titleTmp.alignment = TextAlignmentOptions.Center;
             titleTmp.color = new Color(0.2f, 0.8f, 1f, 1f); // Electrifying cyan
 
-            // Horizontal layout for cards
+            // Subtitle / Round Goal Text
+            GameObject subtitleGo = new GameObject("Draft Subtitle", typeof(RectTransform), typeof(TextMeshProUGUI));
+            subtitleGo.transform.SetParent(draftPanel.transform, false);
+            var subtitleRt = subtitleGo.GetComponent<RectTransform>();
+            subtitleRt.anchorMin = new Vector2(0.1f, 0.76f);
+            subtitleRt.anchorMax = new Vector2(0.9f, 0.84f);
+            subtitleRt.offsetMin = Vector2.zero;
+            subtitleRt.offsetMax = Vector2.zero;
+
+            roundGoalText = subtitleGo.GetComponent<TextMeshProUGUI>();
+            roundGoalText.font = titleTmp.font;
+            roundGoalText.fontSize = 22f; // Subtitle text size
+            roundGoalText.alignment = TextAlignmentOptions.Center;
+            roundGoalText.color = new Color(1f, 0.85f, 0.2f, 1f); // Vibrant Gold
+            roundGoalText.text = "";
+
+            // Horizontal layout for cards (shifted down to fit subtitle)
             GameObject cardContainer = new GameObject("Cards Container", typeof(RectTransform), typeof(HorizontalLayoutGroup));
             cardContainer.transform.SetParent(draftPanel.transform, false);
             var ccRt = cardContainer.GetComponent<RectTransform>();
-            ccRt.anchorMin = new Vector2(0.05f, 0.28f);
-            ccRt.anchorMax = new Vector2(0.95f, 0.83f);
+            ccRt.anchorMin = new Vector2(0.05f, 0.20f);
+            ccRt.anchorMax = new Vector2(0.95f, 0.75f);
             ccRt.offsetMin = Vector2.zero;
             ccRt.offsetMax = Vector2.zero;
 
