@@ -76,11 +76,38 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
-                bool isPowered = totalGeneration >= totalUpkeep;
-                
-                foreach(var gridNode in currentGrid)
+                // Sort grid nodes: Command Posts first
+                var sortedNodes = new List<PowerNode>(currentGrid);
+                sortedNodes.Sort((a, b) =>
                 {
-                    gridNode.IsGridPowered = isPowered;
+                    bool aIsCP = a.Building != null && a.Building.BuildingSO != null && a.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    bool bIsCP = b.Building != null && b.Building.BuildingSO != null && b.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    if (aIsCP && !bIsCP) return -1;
+                    if (!aIsCP && bIsCP) return 1;
+                    return 0;
+                });
+
+                float remainingPower = totalGeneration;
+                foreach (var gridNode in sortedNodes)
+                {
+                    float upkeep = 0f;
+                    if (gridNode.Building != null && gridNode.Building.BuildingSO != null && gridNode.Building.BuildingSO.BuildingConfig != null)
+                    {
+                        if (gridNode.Building.Progress.State == GameDevTV.RTS.Units.BuildingProgress.BuildingState.Completed)
+                        {
+                            upkeep = gridNode.Building.BuildingSO.BuildingConfig.PowerUpkeep;
+                        }
+                    }
+
+                    if (upkeep <= remainingPower)
+                    {
+                        gridNode.IsGridPowered = true;
+                        remainingPower -= upkeep;
+                    }
+                    else
+                    {
+                        gridNode.IsGridPowered = false;
+                    }
                 }
 
                 powerGrids.Add(currentGrid);

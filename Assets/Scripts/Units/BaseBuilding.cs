@@ -458,6 +458,9 @@ namespace GameDevTV.RTS.Units
 
                 UpdateHousingContribution();
                 StartCoroutine(UpkeepRoutine());
+
+                // Trigger grid recalculation on construction completed
+                GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
             }
 
             if (isCommandPost && Owner == Owner.Player1)
