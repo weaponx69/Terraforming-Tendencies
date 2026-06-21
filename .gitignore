@@ -88,3 +88,7 @@ UserSettings/Layouts/default-6000.dwlt
 /[Ss]aves/
 *.json
 
+# LLMUnity generated and downloaded files
+/[Aa]ssets/LLMUnity/llm-*
+/[Aa]ssets/LLMUnity/models-*
+/[Aa]ssets/LLMUnity/Cache/
