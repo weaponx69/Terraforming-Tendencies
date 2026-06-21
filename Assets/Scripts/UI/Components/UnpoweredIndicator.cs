@@ -105,19 +105,55 @@ namespace GameDevTV.RTS.UI.Components
             visualIndicator.SetActive(isUnpowered);
         }
 
+        private float GetBuildingHeight()
+        {
+            // 1. If it has SmokestackVisuals (procedural height), query its Height
+            if (TryGetComponent<SmokestackVisuals>(out var sv))
+            {
+                return sv.Height;
+            }
+
+            // 2. Check if it has a Collider to determine vertical bounds
+            if (TryGetComponent<Collider>(out var col))
+            {
+                return col.bounds.size.y;
+            }
+
+            // 3. Check child colliders
+            var childCols = GetComponentsInChildren<Collider>();
+            float maxHeight = 0f;
+            foreach (var childCol in childCols)
+            {
+                float localY = transform.InverseTransformPoint(childCol.bounds.max).y;
+                if (localY > maxHeight)
+                {
+                    maxHeight = localY;
+                }
+            }
+            if (maxHeight > 0f)
+            {
+                return maxHeight;
+            }
+
+            // 4. Default fallback
+            return heightOffset;
+        }
+
         private void CreateDefaultIndicator()
         {
             // Create a child container
             GameObject container = new GameObject("UnpoweredIndicator_Container");
             container.transform.SetParent(transform, false);
-            container.transform.localPosition = Vector3.up * heightOffset;
+            
+            // Set position dynamically above the top of the building
+            container.transform.localPosition = Vector3.up * (GetBuildingHeight() + 1.2f);
 
             // Set up a billboard Canvas
             Canvas canvas = container.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             
-            // Set a small scale for World Space UI
-            container.transform.localScale = Vector3.one * 0.1f;
+            // Set a small, polished scale for World Space UI (0.015 is crisp and standard)
+            container.transform.localScale = Vector3.one * 0.015f;
 
             // Make it face the camera using our existing FaceCamera utility
             container.AddComponent<FaceCamera>();

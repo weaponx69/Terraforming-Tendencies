@@ -540,6 +540,7 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
             RaiseSpawnEvent();
         }
 
