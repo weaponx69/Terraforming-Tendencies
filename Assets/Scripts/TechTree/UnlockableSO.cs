@@ -27,15 +27,25 @@ namespace GameDevTV.RTS.TechTree
             return copy;
         }
 
+        private string GetUnlockableName()
+        {
+            string n = Name;
+            if (string.IsNullOrEmpty(n) || n == "Unit")
+            {
+                n = name;
+            }
+            return n ?? "";
+        }
+
         public override int GetHashCode()
         {
-            return (Name ?? name ?? "").GetHashCode();
+            return GetUnlockableName().GetHashCode();
         }
 
         public override bool Equals(object other)
         {
             if (other is not UnlockableSO otherUnlockable) return false;
-            return string.Equals(Name, otherUnlockable.Name);
+            return string.Equals(GetUnlockableName(), otherUnlockable.GetUnlockableName());
         }
     }
 }
