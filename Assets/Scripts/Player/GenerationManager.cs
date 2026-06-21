@@ -60,11 +60,6 @@ namespace GameDevTV.RTS.Player
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
-
-                if (GetComponent<ColonistManager>() == null)
-                {
-                    gameObject.AddComponent<ColonistManager>();
-                }
             }
             else
             {

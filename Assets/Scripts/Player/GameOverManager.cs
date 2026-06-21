@@ -60,18 +60,10 @@ namespace GameDevTV.RTS.Player
             if (Instance == null) Instance = this;
             MonitoredOwner = monitoredOwner;
             
-            if (Object.FindAnyObjectByType<ColonistManager>() == null)
+            if (GenerationManager.Instance == null)
             {
-                if (GenerationManager.Instance != null)
-                {
-                    GenerationManager.Instance.gameObject.AddComponent<ColonistManager>();
-                }
-                else
-                {
-                    var mgr = new GameObject("Managers");
-                    mgr.AddComponent<GenerationManager>();
-                    mgr.AddComponent<ColonistManager>();
-                }
+                var mgr = new GameObject("Managers");
+                mgr.AddComponent<GenerationManager>();
             }
         }
 

@@ -11,6 +11,31 @@ namespace GameDevTV.RTS.Player
 {
     public class ColonistManager : MonoBehaviour
     {
+        private static ColonistManager instance;
+        public static ColonistManager Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = Object.FindAnyObjectByType<ColonistManager>();
+                    if (instance == null)
+                    {
+                        GameObject go = new GameObject("ColonistManager");
+                        instance = go.AddComponent<ColonistManager>();
+                        DontDestroyOnLoad(go);
+                    }
+                }
+                return instance;
+            }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void OnStartup()
+        {
+            var activeInstance = Instance;
+        }
+
         [Header("Settings")]
         [SerializeField] private float initialDelay = 300f; // 5 minutes until first arrival warning
         [SerializeField] private float arrivalIntervalMin = 300f; // 5 mins
@@ -20,6 +45,19 @@ namespace GameDevTV.RTS.Player
         private float nextArrivalTime;
         private bool isWarningActive = false;
         private int currentWaveSize = 2; // Starts at 2, scales up
+
+        private void Awake()
+        {
+            if (instance == null)
+            {
+                instance = this;
+                DontDestroyOnLoad(gameObject);
+            }
+            else if (instance != this)
+            {
+                Destroy(gameObject);
+            }
+        }
 
         private void Start()
         {
@@ -138,5 +176,15 @@ namespace GameDevTV.RTS.Player
             // Schedule next
             nextArrivalTime = Time.time + Random.Range(arrivalIntervalMin, arrivalIntervalMax) + warningDuration;
         }
+
+#if UNITY_EDITOR
+        private void OnGUI()
+        {
+            if (GUI.Button(new Rect(10, 80, 220, 40), "Debug: Force Colonist Arrival"))
+            {
+                Arrive();
+            }
+        }
+#endif
     }
 }
