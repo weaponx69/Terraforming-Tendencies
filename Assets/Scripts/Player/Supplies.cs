@@ -15,6 +15,18 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private int startingMaterials = 1000;
         [SerializeField] private float startingOxygen = 0f;
 
+        public static int StartingMaterials
+        {
+            get
+            {
+                if (Instance != null)
+                {
+                    return Instance.startingMaterials;
+                }
+                return 1000;
+            }
+        }
+
         [SerializeField] private SupplySO oxygenSO;
         private static Dictionary<Owner, int> _materials;
         public static Dictionary<Owner, int> Materials 
@@ -193,7 +205,7 @@ namespace GameDevTV.RTS.Player
             float initialOxygen = (Instance != null) ? Instance.startingOxygen : 0f;
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _materials[owner] = (owner == Owner.Player1) ? 0 : 1000;
+                _materials[owner] = (owner == Owner.Player1) ? 1000 : 0;
                 _biomass[owner] = 0;
                 _power[owner] = 0f;
                 _population[owner] = 0;
@@ -228,7 +240,7 @@ namespace GameDevTV.RTS.Player
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _materials.Add(owner, (owner == Owner.Player1) ? 0 : startingMaterials);
+                _materials.Add(owner, (owner == Owner.Player1) ? startingMaterials : 0);
                 _biomass.Add(owner, 0);
                 _power.Add(owner, 0f);
                 _population.Add(owner, 0);

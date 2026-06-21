@@ -302,6 +302,7 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             HandleRightClick();
             HandleDragSelect();
             HandleBasePaging();
+            HandleCheats();
         }
 
         private void LateUpdate()
@@ -320,6 +321,14 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
             else if (Keyboard.current.eKey.wasPressedThisFrame)
             {
                 PageBases(1);
+            }
+        }
+
+        private void HandleCheats()
+        {
+            if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame && GenerationManager.Instance != null)
+            {
+                GenerationManager.Instance.TriggerGenerationEnd();
             }
         }
 

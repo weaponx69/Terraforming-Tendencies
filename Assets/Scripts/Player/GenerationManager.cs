@@ -48,6 +48,10 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private List<SectorMilestone> milestones = new();
 
         private float roundStartTime = 0f;
+        private float baselineBiomass = 0f;
+        private float baselinePower = 0f;
+        private float baselineOxygen = 0f;
+        private float baselinePopulation = 0f;
 
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
@@ -88,6 +92,7 @@ namespace GameDevTV.RTS.Player
             IsBetweenRounds = false;
             IsExpansionPhase = false;
             UnlockPrerequisitesForMilestone();
+            RecordBaselines();
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 
@@ -122,6 +127,25 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        private void RecordBaselines()
+        {
+            baselineBiomass = 0f;
+            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int bio))
+                baselineBiomass = bio;
+
+            baselinePower = 0f;
+            if (Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow))
+                baselinePower = pow;
+
+            baselineOxygen = 0f;
+            if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))
+                baselineOxygen = ox;
+
+            baselinePopulation = 0f;
+            if (Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int pop))
+                baselinePopulation = pop;
+        }
+
         private void Update()
         {
             if (IsBetweenRounds) return;
@@ -139,19 +163,19 @@ namespace GameDevTV.RTS.Player
             {
                 case MilestoneType.Biomass:
                     if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int bio))
-                        currentValue = bio;
+                        currentValue = bio - baselineBiomass;
                     break;
                 case MilestoneType.Oxygen:
                     if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))
-                        currentValue = ox;
+                        currentValue = ox - baselineOxygen;
                     break;
                 case MilestoneType.Power:
                     if (Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow))
-                        currentValue = pow;
+                        currentValue = pow - baselinePower;
                     break;
                 case MilestoneType.Population:
                     if (Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int pop))
-                        currentValue = pop;
+                        currentValue = pop - baselinePopulation;
                     break;
                 case MilestoneType.CommandPosts:
                     int cpCount = 0;
@@ -243,11 +267,32 @@ namespace GameDevTV.RTS.Player
                 IsExpansionPhase = true;
                 IsBetweenRounds = false;
                 Time.timeScale = 1f;
+
+                // Grant starting materials for the expansion phase
+                if (Supplies.Materials != null && Supplies.Materials.ContainsKey(Owner.Player1))
+                {
+                    Supplies.Materials[Owner.Player1] = Supplies.StartingMaterials;
+                    Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
+                }
+
+                // Unlock the next sector so the player can build a Command Post in it!
+                if (SectorManager.Instance != null)
+                {
+                    SectorManager.Instance.UnlockNextSector();
+                }
+
                 return;
             }
 
             IsBetweenRounds = false;
             Time.timeScale = 1f;
+
+            // Grant starting materials for the next generation
+            if (Supplies.Materials != null && Supplies.Materials.ContainsKey(Owner.Player1))
+            {
+                Supplies.Materials[Owner.Player1] = Supplies.StartingMaterials;
+                Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
+            }
 
             // Unlock the next sector!
             if (SectorManager.Instance != null)
@@ -260,6 +305,7 @@ namespace GameDevTV.RTS.Player
             roundStartTime = Time.time; // Start the grace period
 
             UnlockPrerequisitesForMilestone();
+            RecordBaselines();
 
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
@@ -297,9 +343,17 @@ namespace GameDevTV.RTS.Player
             IsExpansionPhase = false;
             CurrentGeneration = 1;
             
+            // Grant starting materials for the first generation of the new sector
+            if (Supplies.Materials != null && Supplies.Materials.ContainsKey(Owner.Player1))
+            {
+                Supplies.Materials[Owner.Player1] = Supplies.StartingMaterials;
+                Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
+            }
+
             PlanetGenerator.Instance?.ReplenishResources();
 
             UnlockPrerequisitesForMilestone();
+            RecordBaselines();
 
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
