@@ -239,6 +239,29 @@ namespace GameDevTV.RTS.Player
             OnGenerationEnded?.Invoke(earnedTC, TotalTerraCoins);
         }
 
+        public void CheatCompleteGeneration()
+        {
+            if (IsBetweenRounds || IsExpansionPhase) return;
+
+            // Fire progress change to 100% so UI elements update and show 100% completion
+            OnGenerationProgressChanged?.Invoke(1f);
+
+            TriggerGenerationEnd();
+        }
+
+        public void CheatSkipToExpansion()
+        {
+            if (IsBetweenRounds || IsExpansionPhase) return;
+
+            // Skip straight to the final milestone so the next transition enters the expansion phase
+            CurrentGeneration = MaxGenerations;
+
+            // Fire progress change to 100% so UI elements update and show 100% completion
+            OnGenerationProgressChanged?.Invoke(1f);
+
+            TriggerGenerationEnd();
+        }
+
         private int LiquidateMaterials()
         {
             int tc = 0;

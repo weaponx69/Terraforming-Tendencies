@@ -328,7 +328,14 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
         {
             if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame && GenerationManager.Instance != null)
             {
-                GenerationManager.Instance.TriggerGenerationEnd();
+                if (Keyboard.current.shiftKey.isPressed)
+                {
+                    GenerationManager.Instance.CheatSkipToExpansion();
+                }
+                else
+                {
+                    GenerationManager.Instance.CheatCompleteGeneration();
+                }
             }
         }
 
