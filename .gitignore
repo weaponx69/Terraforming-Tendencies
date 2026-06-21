@@ -38,6 +38,7 @@ ExportedObj/
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
@@ -82,13 +83,17 @@ crashlytics-build.properties
 .plastic/plastic.wktree
 .plastic/plastic.changes
 # Unity Hub
-UserSettings/Layouts/default-6000.dwlt
+/[Uu]ser[Ss]ettings/
 
 # Game Saves
 /[Ss]aves/
 *.json
 
-# LLMUnity generated and downloaded files
-/[Aa]ssets/LLMUnity/llm-*
-/[Aa]ssets/LLMUnity/models-*
-/[Aa]ssets/LLMUnity/Cache/
+
+# LLMUnity packages and native binaries
+/Packages/ai.undream.llm/
+/[Aa]ssets/StreamingAssets/LlamaLib-*/
+/[Aa]ssets/StreamingAssets/LlamaLib-*.meta
+/[Aa]ssets/StreamingAssets.meta
+/[Aa]ssets/Samples/
+/[Aa]ssets/Samples.meta
