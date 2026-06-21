@@ -107,7 +107,7 @@ namespace GameDevTV.RTS.Player
             Debug.Log($"[ColonistManager] Warning started. Colonists arriving in {warningDuration}s");
         }
 
-        private void Arrive()
+        public void Arrive()
         {
             isWarningActive = false;
             RuntimeUI ui = Object.FindAnyObjectByType<RuntimeUI>();

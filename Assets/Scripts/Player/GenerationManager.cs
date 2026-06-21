@@ -283,6 +283,7 @@ namespace GameDevTV.RTS.Player
                     break;
                 case MilestoneType.Population:
                     BlueprintDraftManager.UnlockBuilding("Habitat");
+                    BlueprintDraftManager.UnlockBuilding("Spaceport");
                     break;
                 case MilestoneType.CommandPosts:
                     BlueprintDraftManager.UnlockBuilding("Command Post");
