@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Environment;
@@ -72,6 +73,13 @@ namespace GameDevTV.RTS.Player
 
         private void Update()
         {
+#if UNITY_EDITOR
+            if (Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame)
+            {
+                Arrive();
+            }
+#endif
+
             if (GameOverManager.Instance != null && GameOverManager.Instance.gameObject.activeInHierarchy)
             {
                 // Don't run logic if game over UI is showing
@@ -96,6 +104,7 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        [ContextMenu("Force Colonist Warning")]
         private void StartWarning()
         {
             isWarningActive = true;
@@ -107,6 +116,7 @@ namespace GameDevTV.RTS.Player
             Debug.Log($"[ColonistManager] Warning started. Colonists arriving in {warningDuration}s");
         }
 
+        [ContextMenu("Force Colonist Arrival")]
         public void Arrive()
         {
             isWarningActive = false;
