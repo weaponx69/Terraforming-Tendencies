@@ -60,6 +60,14 @@ namespace GameDevTV.RTS.Player
             if (Instance == null) Instance = this;
             MonitoredOwner = monitoredOwner;
             
+            // Create ColonistManager as a child GameObject so it is visible in the Hierarchy
+            if (transform.Find("ColonistManager") == null)
+            {
+                GameObject child = new GameObject("ColonistManager");
+                child.transform.SetParent(transform);
+                child.AddComponent<ColonistManager>();
+            }
+            
             if (GenerationManager.Instance == null)
             {
                 var mgr = new GameObject("Managers");

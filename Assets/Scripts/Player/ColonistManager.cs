@@ -11,30 +11,7 @@ namespace GameDevTV.RTS.Player
 {
     public class ColonistManager : MonoBehaviour
     {
-        private static ColonistManager instance;
-        public static ColonistManager Instance
-        {
-            get
-            {
-                if (instance == null)
-                {
-                    instance = Object.FindAnyObjectByType<ColonistManager>();
-                    if (instance == null)
-                    {
-                        GameObject go = new GameObject("ColonistManager");
-                        instance = go.AddComponent<ColonistManager>();
-                        DontDestroyOnLoad(go);
-                    }
-                }
-                return instance;
-            }
-        }
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void OnStartup()
-        {
-            var activeInstance = Instance;
-        }
+        public static ColonistManager Instance { get; private set; }
 
         [Header("Settings")]
         [SerializeField] private float initialDelay = 300f; // 5 minutes until first arrival warning
@@ -48,14 +25,13 @@ namespace GameDevTV.RTS.Player
 
         private void Awake()
         {
-            if (instance == null)
+            if (Instance == null)
             {
-                instance = this;
-                DontDestroyOnLoad(gameObject);
+                Instance = this;
             }
-            else if (instance != this)
+            else if (Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
             }
         }
 
