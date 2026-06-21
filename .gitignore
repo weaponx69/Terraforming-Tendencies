@@ -97,3 +97,7 @@ crashlytics-build.properties
 /[Aa]ssets/StreamingAssets.meta
 /[Aa]ssets/Samples/
 /[Aa]ssets/Samples.meta
+
+# UnityCodeLama package
+/[Aa]ssets/UnityCodeLama/
+/[Aa]ssets/UnityCodeLama.meta
