@@ -312,6 +312,9 @@ namespace GameDevTV.RTS.Player
                     SectorManager.Instance.UnlockNextSector();
                 }
 
+                // Explicitly unlock the Command Post blueprint for the expansion phase
+                BlueprintDraftManager.UnlockBuilding("Command Post");
+
                 // Reset progress bar to 0% for the expansion phase
                 OnGenerationProgressChanged?.Invoke(0f);
 

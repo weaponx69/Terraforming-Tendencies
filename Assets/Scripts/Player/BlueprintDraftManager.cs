@@ -25,6 +25,23 @@ namespace GameDevTV.RTS.Player
 
             knownBuildings.Clear();
 
+            // Load all BuildingSO from Resources to populate knownBuildings
+            BuildingSO[] allBuildings = Resources.LoadAll<BuildingSO>("");
+            foreach (var bld in allBuildings)
+            {
+                if (bld != null)
+                {
+                    if (!string.IsNullOrEmpty(bld.Name))
+                    {
+                        knownBuildings[bld.Name] = bld;
+                    }
+                    if (!string.IsNullOrEmpty(bld.name))
+                    {
+                        knownBuildings[bld.name] = bld;
+                    }
+                }
+            }
+
             GatherSpeedMultiplier = 1.0f;
             PowerGenMultiplier = 1.0f;
         }
@@ -32,7 +49,14 @@ namespace GameDevTV.RTS.Player
         public static void RegisterBuildingSO(BuildingSO building)
         {
             if (building == null) return;
-            knownBuildings[building.Name] = building;
+            if (!string.IsNullOrEmpty(building.Name))
+            {
+                knownBuildings[building.Name] = building;
+            }
+            if (!string.IsNullOrEmpty(building.name))
+            {
+                knownBuildings[building.name] = building;
+            }
 
             if (unlockedBuildings.Contains(building.Name) && building.BuildingConfig != null && building.BuildingConfig.PowerUpkeep > 0)
             {
@@ -45,7 +69,48 @@ namespace GameDevTV.RTS.Player
 
         public static BuildingSO GetBuildingSOByName(string name)
         {
+            if (string.IsNullOrEmpty(name)) return null;
+
             if (knownBuildings.TryGetValue(name, out var b)) return b;
+
+            // Try direct case/space-insensitive search in currently knownBuildings
+            foreach (var kvp in knownBuildings)
+            {
+                if (string.Equals(kvp.Key, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Key.Replace(" ", ""), name.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                {
+                    return kvp.Value;
+                }
+            }
+
+            // Fallback load from Resources if not found
+            BuildingSO[] allBuildings = Resources.LoadAll<BuildingSO>("");
+            foreach (var bld in allBuildings)
+            {
+                if (bld != null)
+                {
+                    if (!string.IsNullOrEmpty(bld.Name))
+                    {
+                        knownBuildings[bld.Name] = bld;
+                    }
+                    if (!string.IsNullOrEmpty(bld.name))
+                    {
+                        knownBuildings[bld.name] = bld;
+                    }
+                }
+            }
+
+            if (knownBuildings.TryGetValue(name, out b)) return b;
+
+            foreach (var kvp in knownBuildings)
+            {
+                if (string.Equals(kvp.Key, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Key.Replace(" ", ""), name.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                {
+                    return kvp.Value;
+                }
+            }
+
             return null;
         }
 
