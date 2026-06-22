@@ -84,8 +84,12 @@ namespace GameDevTV.RTS.Player
         private void InitializeGenerations()
         {
             InitializeDefaultMilestones();
-            if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+            if (SectorManager.Instance != null)
             {
+                if (SectorManager.Instance.Sectors.Count == 0)
+                {
+                    SectorManager.Instance.InitializeSectors();
+                }
                 MaxGenerations = Mathf.Min(SectorManager.Instance.Sectors.Count, milestones.Count);
             }
             CurrentGeneration = 1;
@@ -93,6 +97,7 @@ namespace GameDevTV.RTS.Player
             IsExpansionPhase = false;
             UnlockPrerequisitesForMilestone();
             RecordBaselines();
+            OnGenerationProgressChanged?.Invoke(0f);
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }
 
@@ -284,6 +289,9 @@ namespace GameDevTV.RTS.Player
             
             CurrentGeneration++;
 
+            // Reset progress bar to 0% for the new generation
+            OnGenerationProgressChanged?.Invoke(0f);
+
             if (CurrentGeneration > MaxGenerations)
             {
                 Debug.Log("[GenerationManager] All Milestones Completed! Sector Completed.");
@@ -303,6 +311,9 @@ namespace GameDevTV.RTS.Player
                 {
                     SectorManager.Instance.UnlockNextSector();
                 }
+
+                // Reset progress bar to 0% for the expansion phase
+                OnGenerationProgressChanged?.Invoke(0f);
 
                 return;
             }
@@ -374,9 +385,13 @@ namespace GameDevTV.RTS.Player
             }
 
             PlanetGenerator.Instance?.ReplenishResources();
+            roundStartTime = Time.time; // Start the grace period
 
             UnlockPrerequisitesForMilestone();
             RecordBaselines();
+
+            // Reset progress bar UI to 0% for the new generation
+            OnGenerationProgressChanged?.Invoke(0f);
 
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }

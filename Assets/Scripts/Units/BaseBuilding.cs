@@ -543,6 +543,14 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            if (isCommandPost && Owner == Owner.Player1)
+            {
+                if (GenerationManager.Instance != null && GenerationManager.Instance.IsExpansionPhase)
+                {
+                    GenerationManager.Instance.CompleteExpansion();
+                }
+            }
+
             GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
             RaiseSpawnEvent();
         }
