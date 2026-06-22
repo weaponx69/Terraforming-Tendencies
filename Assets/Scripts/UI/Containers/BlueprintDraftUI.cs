@@ -599,7 +599,7 @@ namespace GameDevTV.RTS.UI.Containers
                 cardObj.transform.SetParent(cardContainer.transform, false);
 
                 var cardImg = cardObj.GetComponent<Image>();
-                cardImg.color = new Color(0.06f, 0.08f, 0.10f, 1f); // Completely opaque solid card background
+                cardImg.color = new Color(0f, 0f, 0f, 1f); // Completely black, fully opaque background
 
                 // Enforce STRICTLY CONSTANT identical card width via LayoutElement
                 var le = cardObj.GetComponent<LayoutElement>();
