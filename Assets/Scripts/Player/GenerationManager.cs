@@ -167,7 +167,7 @@ namespace GameDevTV.RTS.Player
                     break;
                 case MilestoneType.Oxygen:
                     if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))
-                        currentValue = ox - baselineOxygen;
+                        currentValue = ox;
                     break;
                 case MilestoneType.Power:
                     if (Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow))
