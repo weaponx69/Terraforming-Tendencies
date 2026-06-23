@@ -228,10 +228,18 @@ namespace GameDevTV.RTS.Commands
         public override bool IsLocked(CommandContext context)
         {
             if (Building == null) return false;
+
+            // Check if the tech tree is unlocked.
             if (!BlueprintDraftManager.IsBuildingUnlocked(Building)) return true;
+
+            // Check if the player has completed a round for Command Center.
+            if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                TechTreeSO techTree = Building.TechTree;
+                if (!techTree.HasCompletedRound(context.Owner) && !techTree.IsUnlocked(context.Owner, Building)) return true;
+            }
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
-
         public UnlockableSO[] GetUnmetDependencies(Owner owner)
         {
             if (Building.TechTree == null) return new UnlockableSO[0];

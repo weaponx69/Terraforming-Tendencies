@@ -28,149 +28,155 @@ namespace GameDevTV.RTS.TechTree
             if (unlockedDependencies == null || !unlockedDependencies.ContainsKey(owner)) return false;
             return unlockedDependencies[owner].Contains(unlockable);
         }
-public UnlockableSO[] GetUnmetDependencies(Owner owner, UnlockableSO unlockableSO)
-{
-    if (techTrees == null || !techTrees.ContainsKey(owner)) return Array.Empty<UnlockableSO>();
-    if (techTrees[owner].TryGetValue(unlockableSO, out Dependency dependency))
+    public UnlockableSO[] GetUnmetDependencies(Owner owner, UnlockableSO unlockableSO)
     {
-        return dependency.GetUnmetDependencies();
+        if (techTrees == null || !techTrees.ContainsKey(owner)) return Array.Empty<UnlockableSO>();
+        if (techTrees[owner].TryGetValue(unlockableSO, out Dependency dependency))
+        {
+            return dependency.GetUnmetDependencies();
+        }
+
+        return Array.Empty<UnlockableSO>();
     }
 
-    return Array.Empty<UnlockableSO>();
-}
+    public bool HasCompletedRound(Owner owner)
+    {
+        // Implement logic to check if the player has completed a round.
+        return GameDevTV.RTS.GameState.Instance.PlayerHasCompletedRound(owner);
+    }
 
-        private void OnEnable()
+    private void OnEnable()
+    {
+        try
         {
-            try
-            {
-                BuildTechTrees();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[TechTreeSO] Failed to build tech trees: {ex.Message}");
-            }
-
-            Bus<BuildingSpawnEvent>.RegisterForAll(HandleBuildingSpawn);
-            Bus<UpgradeResearchedEvent>.RegisterForAll(HandleUpgradeResearched);
-            Bus<BuildingDeathEvent>.RegisterForAll(HandleBuildingDeath);
-            Bus<UnitSpawnEvent>.RegisterForAll(HandleUnitSpawn);
-            Bus<UnitDeathEvent>.RegisterForAll(HandleUnitDeath);
+            BuildTechTrees();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[TechTreeSO] Failed to build tech trees: {ex.Message}");
         }
 
-        private void HandleUpgradeResearched(UpgradeResearchedEvent evt)
-        {
-            // // Debug.Log($"Researched {evt.Upgrade.Name} for {evt.Owner}!");
-            unlockedDependencies[evt.Owner].Add(evt.Upgrade);
+        Bus<BuildingSpawnEvent>.RegisterForAll(HandleBuildingSpawn);
+        Bus<UpgradeResearchedEvent>.RegisterForAll(HandleUpgradeResearched);
+        Bus<BuildingDeathEvent>.RegisterForAll(HandleBuildingDeath);
+        Bus<UnitSpawnEvent>.RegisterForAll(HandleUnitSpawn);
+        Bus<UnitDeathEvent>.RegisterForAll(HandleUnitDeath);
+    }
 
-            foreach(KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
-            {
-                keyValuePair.Value.UnlockDependency(evt.Upgrade);
-            }
+    private void HandleUpgradeResearched(UpgradeResearchedEvent evt)
+    {
+        // // Debug.Log($"Researched {evt.Upgrade.Name} for {evt.Owner}!");
+        unlockedDependencies[evt.Owner].Add(evt.Upgrade);
+
+        foreach(KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
+        {
+            keyValuePair.Value.UnlockDependency(evt.Upgrade);
         }
+    }
 
-        private void OnDisable()
+    private void OnDisable()
+    {
+        techTrees = null;
+        Bus<BuildingSpawnEvent>.UnregisterForAll(HandleBuildingSpawn);
+        Bus<UpgradeResearchedEvent>.UnregisterForAll(HandleUpgradeResearched);
+        Bus<BuildingDeathEvent>.UnregisterForAll(HandleBuildingDeath);
+        Bus<UnitSpawnEvent>.UnregisterForAll(HandleUnitSpawn);
+        Bus<UnitDeathEvent>.UnregisterForAll(HandleUnitDeath);
+    }
+
+    private void HandleBuildingSpawn(BuildingSpawnEvent evt)
+    {
+        foreach(KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
         {
-            techTrees = null;
-            Bus<BuildingSpawnEvent>.UnregisterForAll(HandleBuildingSpawn);
-            Bus<UpgradeResearchedEvent>.UnregisterForAll(HandleUpgradeResearched);
-            Bus<BuildingDeathEvent>.UnregisterForAll(HandleBuildingDeath);
-            Bus<UnitSpawnEvent>.UnregisterForAll(HandleUnitSpawn);
-            Bus<UnitDeathEvent>.UnregisterForAll(HandleUnitDeath);
+            keyValuePair.Value.UnlockDependency(evt.Building.BuildingSO);
         }
+    }
 
-        private void HandleBuildingSpawn(BuildingSpawnEvent evt)
+    private void HandleBuildingDeath(BuildingDeathEvent evt)
+    {
+        foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
         {
-            foreach(KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
-            {
-                keyValuePair.Value.UnlockDependency(evt.Building.BuildingSO);
-            }
+            keyValuePair.Value.LoseDependency(evt.Building.BuildingSO);
         }
+    }
 
-        private void HandleBuildingDeath(BuildingDeathEvent evt)
+    private void HandleUnitSpawn(UnitSpawnEvent evt)
+    {
+        foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
         {
-            foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Owner])
-            {
-                keyValuePair.Value.LoseDependency(evt.Building.BuildingSO);
-            }
+            keyValuePair.Value.UnlockDependency(evt.Unit.UnitSO);
         }
+    }
 
-        private void HandleUnitSpawn(UnitSpawnEvent evt)
+    private void HandleUnitDeath(UnitDeathEvent evt)
+    {
+        if (evt.Unit == null || evt.Unit.UnitSO == null) return;
+
+        foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
         {
-            foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
-            {
-                keyValuePair.Value.UnlockDependency(evt.Unit.UnitSO);
-            }
+            keyValuePair.Value.LoseDependency(evt.Unit.UnitSO);
         }
+    }
 
-        private void HandleUnitDeath(UnitDeathEvent evt)
+    private void BuildTechTrees()
+    {
+        techTrees = new Dictionary<Owner, Dictionary<UnlockableSO, Dependency>>();
+        unlockedDependencies = new Dictionary<Owner, HashSet<UnlockableSO>>();
+
+        foreach(Owner owner in Enum.GetValues(typeof(Owner)))
         {
-            if (evt.Unit == null || evt.Unit.UnitSO == null) return;
+            techTrees[owner] = new Dictionary<UnlockableSO, Dependency>();
+            unlockedDependencies[owner] = new HashSet<UnlockableSO>();
 
-            foreach (KeyValuePair<UnlockableSO, Dependency> keyValuePair in techTrees[evt.Unit.Owner])
+            foreach(UnlockableSO unlockableSO in allUnlockables)
             {
-                keyValuePair.Value.LoseDependency(evt.Unit.UnitSO);
-            }
-        }
-
-        private void BuildTechTrees()
-        {
-            techTrees = new Dictionary<Owner, Dictionary<UnlockableSO, Dependency>>();
-            unlockedDependencies = new Dictionary<Owner, HashSet<UnlockableSO>>();
-
-            foreach(Owner owner in Enum.GetValues(typeof(Owner)))
-            {
-                techTrees[owner] = new Dictionary<UnlockableSO, Dependency>();
-                unlockedDependencies[owner] = new HashSet<UnlockableSO>();
-
-                foreach(UnlockableSO unlockableSO in allUnlockables)
-                {
-                    if (unlockableSO == null) continue;
-                    techTrees[owner][unlockableSO] = new Dependency(unlockableSO);
-                }
-            }
-        }
-
-        private readonly struct Dependency
-        {
-            public HashSet<UnlockableSO> Dependencies { get; }
-            public bool IsUnlocked => Dependencies.Count == metDependencies.Count;
-            private readonly Dictionary<UnlockableSO, int> metDependencies;
-
-            public Dependency(UnlockableSO unlockable)
-            {
-                Dependencies = new HashSet<UnlockableSO>(unlockable.UnlockRequirements);
-                metDependencies = new Dictionary<UnlockableSO, int>(Dependencies.Count);
-            }
-
-            public UnlockableSO[] GetUnmetDependencies()
-            {
-                Dictionary<UnlockableSO, int> metDependencies = this.metDependencies;
-                return Dependencies.Where(dependency => !metDependencies.ContainsKey(dependency)).ToArray();
-            }
-
-            public void UnlockDependency(UnlockableSO dependency)
-            {
-                if (Dependencies.Contains(dependency) && !metDependencies.TryAdd(dependency, 1))
-                {
-                    metDependencies[dependency]++;
-                }
-            }
-
-            public void LoseDependency(UnlockableSO dependency)
-            {
-                if (dependency.IsOneTimeUnlock || !metDependencies.TryGetValue(dependency, out int count)) return;
-
-                count--;
-
-                if (count > 0)
-                {
-                    metDependencies[dependency] = count;
-                }
-                else
-                {
-                    metDependencies.Remove(dependency);
-                }
+                if (unlockableSO == null) continue;
+                techTrees[owner][unlockableSO] = new Dependency(unlockableSO);
             }
         }
     }
-}
+
+    private readonly struct Dependency
+    {
+        public HashSet<UnlockableSO> Dependencies { get; }
+        public bool IsUnlocked => Dependencies.Count == metDependencies.Count;
+        private readonly Dictionary<UnlockableSO, int> metDependencies;
+
+        public Dependency(UnlockableSO unlockable)
+        {
+            Dependencies = new HashSet<UnlockableSO>(unlockable.UnlockRequirements);
+            metDependencies = new Dictionary<UnlockableSO, int>(Dependencies.Count);
+        }
+
+        public UnlockableSO[] GetUnmetDependencies()
+        {
+            Dictionary<UnlockableSO, int> metDependencies = this.metDependencies;
+            return Dependencies.Where(dependency => !metDependencies.ContainsKey(dependency)).ToArray();
+        }
+
+        public void UnlockDependency(UnlockableSO dependency)
+        {
+            if (Dependencies.Contains(dependency) && !metDependencies.TryAdd(dependency, 1))
+            {
+                metDependencies[dependency]++;
+            }
+        }
+
+        public void LoseDependency(UnlockableSO dependency)
+        {
+            if (dependency.IsOneTimeUnlock || !metDependencies.TryGetValue(dependency, out int count)) return;
+
+            count--;
+
+            if (count > 0)
+            {
+                metDependencies[dependency] = count;
+            }
+            else
+            {
+                metDependencies.Remove(dependency);
+            }
+        }
+    }
+  }
+}//namespace
