@@ -235,8 +235,7 @@ namespace GameDevTV.RTS.Commands
             // Check if the player has completed a round for Command Center.
             if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
-                TechTreeSO techTree = Building.TechTree;
-                if (!techTree.HasCompletedRound(context.Owner) && !techTree.IsUnlocked(context.Owner, Building)) return true;
+                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase) return true;
             }
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
