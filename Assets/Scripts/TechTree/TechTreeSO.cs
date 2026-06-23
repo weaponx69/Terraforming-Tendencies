@@ -4,6 +4,7 @@ using System.Linq;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Player;
 using UnityEngine;
 
 namespace GameDevTV.RTS.TechTree
@@ -41,8 +42,7 @@ namespace GameDevTV.RTS.TechTree
 
     public bool HasCompletedRound(Owner owner)
     {
-        // Implement logic to check if the player has completed a round.
-        return GameDevTV.RTS.GameState.Instance.PlayerHasCompletedRound(owner);
+        return GenerationManager.Instance != null && GenerationManager.Instance.IsExpansionPhase;
     }
 
     private void OnEnable()
