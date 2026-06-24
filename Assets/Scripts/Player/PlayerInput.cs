@@ -326,7 +326,9 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
 
         private void HandleCheats()
         {
-            if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame && GenerationManager.Instance != null)
+            if (Keyboard.current == null) return;
+
+            if (Keyboard.current.kKey.wasPressedThisFrame && GenerationManager.Instance != null)
             {
                 if (Keyboard.current.shiftKey.isPressed)
                 {
@@ -336,6 +338,27 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 {
                     GenerationManager.Instance.CheatCompleteGeneration();
                 }
+            }
+
+            if (Keyboard.current.tKey.wasPressedThisFrame)
+            {
+                float currentVal = Supplies.Temperature.TryGetValue(Owner.Player1, out float val) ? val : -60f;
+                float change = Keyboard.current.shiftKey.isPressed ? -5f : 5f;
+                Supplies.UpdateTemperature(Owner.Player1, currentVal + change);
+            }
+
+            if (Keyboard.current.yKey.wasPressedThisFrame)
+            {
+                float currentVal = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float val) ? val : 0.01f;
+                float change = Keyboard.current.shiftKey.isPressed ? -0.05f : 0.05f;
+                Supplies.UpdateAtmosphere(Owner.Player1, Mathf.Max(0.01f, currentVal + change));
+            }
+
+            if (Keyboard.current.uKey.wasPressedThisFrame)
+            {
+                float currentVal = Supplies.Water.TryGetValue(Owner.Player1, out float val) ? val : 0f;
+                float change = Keyboard.current.shiftKey.isPressed ? -5f : 5f;
+                Supplies.UpdateWater(Owner.Player1, Mathf.Clamp(currentVal + change, 0f, 100f));
             }
         }
 

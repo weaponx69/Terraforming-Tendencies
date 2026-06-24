@@ -20,8 +20,19 @@ namespace GameDevTV.RTS.TechTree
 
         public bool IsUnlocked(Owner owner, UnlockableSO unlockable)
         {
+            if (unlockable == null) return true;
             if (techTrees == null || !techTrees.ContainsKey(owner)) return true;
-            return techTrees[owner].TryGetValue(unlockable, out Dependency value) && value.IsUnlocked;
+            if (techTrees[owner].TryGetValue(unlockable, out Dependency value))
+            {
+                return value.IsUnlocked;
+            }
+
+            // Fallback: If not in the tech tree or dictionary lookup failed,
+            // check if it has no requirements or if all its requirements are met.
+            var requirements = unlockable.UnlockRequirements;
+            if (requirements == null || !requirements.Any()) return true;
+
+            return requirements.All(req => IsResearched(owner, req) || IsUnlocked(owner, req));
         }
 
         // Did the research get done?
@@ -30,16 +41,21 @@ namespace GameDevTV.RTS.TechTree
             if (unlockedDependencies == null || !unlockedDependencies.ContainsKey(owner)) return false;
             return unlockedDependencies[owner].Contains(unlockable);
         }
-    public UnlockableSO[] GetUnmetDependencies(Owner owner, UnlockableSO unlockableSO)
-    {
-        if (techTrees == null || !techTrees.ContainsKey(owner)) return Array.Empty<UnlockableSO>();
-        if (techTrees[owner].TryGetValue(unlockableSO, out Dependency dependency))
-        {
-            return dependency.GetUnmetDependencies();
-        }
 
-        return Array.Empty<UnlockableSO>();
-    }
+        public UnlockableSO[] GetUnmetDependencies(Owner owner, UnlockableSO unlockableSO)
+        {
+            if (unlockableSO == null) return Array.Empty<UnlockableSO>();
+            if (techTrees == null || !techTrees.ContainsKey(owner)) return Array.Empty<UnlockableSO>();
+            if (techTrees[owner].TryGetValue(unlockableSO, out Dependency dependency))
+            {
+                return dependency.GetUnmetDependencies();
+            }
+
+            // Fallback: check raw requirements that are not yet met
+            var requirements = unlockableSO.UnlockRequirements;
+            if (requirements == null) return Array.Empty<UnlockableSO>();
+            return requirements.Where(req => !IsResearched(owner, req) && !IsUnlocked(owner, req)).ToArray();
+        }
 
     public bool HasCompletedRound(Owner owner)
     {

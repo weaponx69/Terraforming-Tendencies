@@ -10,17 +10,26 @@ namespace GameDevTV.RTS.UI.Components
 
         private void Awake()
         {
+            EnsureInitialized();
+        }
+
+        private void EnsureInitialized()
+        {
+            if (maskParentRectTransform != null) return;
             if (mask == null)
             {
                 Debug.LogError($"Progress bar {name} is missing a mask! This progress bar will not work!");
                 return;
             }
 
-            maskParentRectTransform = mask.parent.GetComponent<RectTransform>();
+            maskParentRectTransform = mask.parent != null ? mask.parent.GetComponent<RectTransform>() : null;
         }
 
         public void SetProgress(float progress)
         {
+            EnsureInitialized();
+            if (maskParentRectTransform == null || mask == null) return;
+
             Vector2 parentSize = maskParentRectTransform.sizeDelta;
             Vector2 targetSize = parentSize - padding * 2;
 

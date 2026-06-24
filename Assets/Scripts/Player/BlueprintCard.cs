@@ -207,6 +207,8 @@ namespace GameDevTV.RTS.Player
         public float maxOxygen = float.MaxValue;
         public float minAtmosphere = float.MinValue;
         public float maxAtmosphere = float.MaxValue;
+        public float minWater = float.MinValue;
+        public float maxWater = float.MaxValue;
         public GameDevTV.RTS.Environment.SectorManager.SectorFeature requiredSectorFeature = GameDevTV.RTS.Environment.SectorManager.SectorFeature.None;
 
         public override bool IsGateMet()
@@ -219,6 +221,9 @@ namespace GameDevTV.RTS.Player
 
             float currentAtmosphere = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
             if (currentAtmosphere < minAtmosphere || currentAtmosphere > maxAtmosphere) return false;
+
+            float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float w) ? w : 0f;
+            if (currentWater < minWater || currentWater > maxWater) return false;
 
             if (requiredSectorFeature != GameDevTV.RTS.Environment.SectorManager.SectorFeature.None)
             {

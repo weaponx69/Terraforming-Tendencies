@@ -369,6 +369,8 @@ namespace GameDevTV.RTS.Units
                 MainRenderer.material = primaryMaterial;
             }
 
+            SpawnWaterVisualEffect();
+
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
             bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
             bool isOxygenProcessor = BuildingSO != null && (BuildingSO.Name.Contains("Oxygen", System.StringComparison.OrdinalIgnoreCase));
@@ -442,6 +444,22 @@ namespace GameDevTV.RTS.Units
                 else if (BuildingSO.Name.Contains("Basalt Strip-Mine"))
                 {
                     AddActiveAbilityCommand("Strip-Mine Basalt", "Mine surface basalt to gain construction materials.", 0f, 0f, 0f, 150, 0);
+                }
+                else if (BuildingSO.Name.Contains("Water Ice Aquifer"))
+                {
+                    AddActiveAbilityCommand("Extract Water Ice", "Melt and extract subterranean ice reservoirs.", 0f, 0f, 0f, 0, 0, 5.0f);
+                }
+                else if (BuildingSO.Name.Contains("Subglacial Water Extractor"))
+                {
+                    AddActiveAbilityCommand("Pump Subglacial Water", "Pump subglacial water to surface reservoirs.", 0f, 0f, 0f, 0, 0, 8.0f);
+                }
+                else if (BuildingSO.Name.Contains("Biosphere Center"))
+                {
+                    AddActiveAbilityCommand("Release Glacial Melt", "Release glacial water to global biosphere.", 0f, 0f, 0f, 0, 0, 15.0f);
+                }
+                else if (BuildingSO.Name.Contains("Lake"))
+                {
+                    AddActiveAbilityCommand("Refill Lake", "Pump active water lines to expand the lake surface.", 0f, 0f, 0f, 0, 0, 10.0f);
                 }
             }
 
@@ -555,15 +573,85 @@ namespace GameDevTV.RTS.Units
             RaiseSpawnEvent();
         }
 
-        private void AddActiveAbilityCommand(string name, string desc, float tempBonus, float atmosBonus, float oxyBonus, int matsBonus, int bioBonus)
+        private void AddActiveAbilityCommand(string name, string desc, float tempBonus, float atmosBonus, float oxyBonus, int matsBonus, int bioBonus, float waterBonus = 0f)
         {
             var cmd = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ActiveAbilityCommand>();
-            cmd.Initialize(name, desc, tempBonus, atmosBonus, oxyBonus, matsBonus, bioBonus);
+            cmd.Initialize(name, desc, tempBonus, atmosBonus, oxyBonus, matsBonus, bioBonus, waterBonus);
             cmd.Slot = 0;
 
             var list = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
             list.Add(cmd);
             AvailableCommands = list.ToArray();
+        }
+
+        private void SpawnWaterVisualEffect()
+        {
+            if (BuildingSO == null) return;
+
+            bool isAquifer = BuildingSO.Name.Contains("Water Ice Aquifer", System.StringComparison.OrdinalIgnoreCase);
+            bool isExtractor = BuildingSO.Name.Contains("Subglacial Water Extractor", System.StringComparison.OrdinalIgnoreCase);
+            bool isBiosphere = BuildingSO.Name.Contains("Biosphere Center", System.StringComparison.OrdinalIgnoreCase);
+            bool isLake = BuildingSO.Name.Contains("Lake", System.StringComparison.OrdinalIgnoreCase);
+
+            if (isAquifer || isExtractor || isBiosphere || isLake)
+            {
+                GameObject waterPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                waterPlane.name = "Terraformed Water Body";
+
+                // Position on the ground, slightly offset vertically to avoid z-fighting
+                waterPlane.transform.position = transform.position + new Vector3(0f, 0.1f, 0f);
+
+                float radius = isBiosphere ? 25f : (isLake ? 20f : (isExtractor ? 15f : 8f));
+                float scale = (radius * 2f) / 10f;
+                waterPlane.transform.localScale = new Vector3(scale, 1f, scale);
+
+                var col = waterPlane.GetComponent<Collider>();
+                if (col != null) Destroy(col);
+
+                var renderer = waterPlane.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    Material waterMat = Resources.Load<Material>("Materials/Water");
+                    if (waterMat == null)
+                    {
+#if UNITY_EDITOR
+                        waterMat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Water.mat");
+#endif
+                    }
+                    if (waterMat != null)
+                    {
+                        renderer.material = waterMat;
+                    }
+                    else
+                    {
+                        Material fallbackMat = new Material(Shader.Find("Standard"));
+                        fallbackMat.color = new Color(0f, 0.4f, 0.8f, 0.6f);
+                        fallbackMat.SetFloat("_Mode", 3f); // Transparent
+                        fallbackMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        fallbackMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        fallbackMat.SetInt("_ZWrite", 0);
+                        fallbackMat.DisableKeyword("_ALPHATEST_ON");
+                        fallbackMat.EnableKeyword("_ALPHABLEND_ON");
+                        fallbackMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                        fallbackMat.renderQueue = 3000;
+                        renderer.material = fallbackMat;
+                    }
+                }
+
+                waterPlane.transform.SetParent(transform, true);
+
+                if (isLake)
+                {
+                    // Hide default metal meshes/structures so that only the water plane is visible
+                    foreach (var r in GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (r != renderer)
+                        {
+                            r.enabled = false;
+                        }
+                    }
+                }
+            }
         }
 
         private IEnumerator UpkeepRoutine()
@@ -852,145 +940,150 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
 
         private IEnumerator DoBuildUnits()
         {
-            while (buildingQueue.Count > 0)
+            try
             {
-                SOBeingBuilt = buildingQueue[0];
-                CurrentQueueStartTime = Time.time;
-                OnQueueUpdated?.Invoke(buildingQueue.ToArray());
-
-                float buildTime = SOBeingBuilt.BuildTime;
-                if (BuildingSO != null && BuildingSO.BuildingConfig != null)
+                while (buildingQueue.Count > 0)
                 {
-                    buildTime *= BuildingSO.BuildingConfig.BuildTimeMultiplier;
-                }
+                    SOBeingBuilt = buildingQueue[0];
+                    CurrentQueueStartTime = Time.time;
+                    OnQueueUpdated?.Invoke(buildingQueue.ToArray());
 
-                float elapsed = 0f;
-                bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
-                GameDevTV.RTS.Environment.PowerNode pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
-
-                while (elapsed < buildTime)
-                {
-                    bool isPowered = true;
-                    if (needsPower && pNode != null && !pNode.IsPowered)
+                    float buildTime = SOBeingBuilt.BuildTime;
+                    if (BuildingSO != null && BuildingSO.BuildingConfig != null)
                     {
-                        isPowered = false;
+                        buildTime *= BuildingSO.BuildingConfig.BuildTimeMultiplier;
                     }
 
-                    if (isPowered)
+                    float elapsed = 0f;
+                    bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
+                    GameDevTV.RTS.Environment.PowerNode pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+
+                    while (elapsed < buildTime)
                     {
-                        elapsed += Time.deltaTime;
-                    }
-
-                    // Update UI timer (which is based on CurrentQueueStartTime). We shift the start time forward when stalled so the UI doesn't think it's done.
-                    if (!isPowered)
-                    {
-                        CurrentQueueStartTime += Time.deltaTime;
-                    }
-
-                    yield return null;
-                }
-
-                if (SOBeingBuilt is AbstractUnitSO unitSO)
-                {
-                    // Determine AgentTypeID from the prefab
-                    int agentTypeID = 0; // Default to Humanoid
-                    if (unitSO.Prefab.TryGetComponent(out NavMeshAgent prefabAgent))
-                    {
-                        agentTypeID = prefabAgent.agentTypeID;
-                    }
-
-                    bool isAirUnit = agentTypeID != 0;
-
-                    // Calculate building footprint radius to ensure ground units spawn outside the NavMeshObstacle
-                    float buildingRadius = 4f; // Safe fallback
-                    if (navMeshObstacle != null)
-                    {
-                        if (navMeshObstacle.shape == NavMeshObstacleShape.Capsule)
+                        bool isPowered = true;
+                        if (needsPower && pNode != null && !pNode.IsPowered)
                         {
-                            buildingRadius = navMeshObstacle.radius + 1f;
+                            isPowered = false;
                         }
-                        else if (navMeshObstacle.shape == NavMeshObstacleShape.Box)
+
+                        if (isPowered)
                         {
-                            buildingRadius = Mathf.Max(navMeshObstacle.size.x, navMeshObstacle.size.z) * 0.5f + 1f;
+                            elapsed += Time.deltaTime;
                         }
-                    }
 
-                    // Distribute drones evenly around the building to prevent overlap.
-                    // Each unit gets a base angle of (360 / goldenRatio) * spawnCount to spread them
-                    // naturally, plus a small random jitter to avoid perfect symmetry.
-                    float goldenAngle = 137.508f * Mathf.Deg2Rad; // Golden angle for natural spread
-                    float baseAngle = goldenAngle * spawnCount;
-                    float jitter = Random.Range(-0.2f, 0.2f);
-                    float angle = baseAngle + jitter;
-                    spawnCount++;
-
-                    float distance = isAirUnit ? Random.Range(4f, 8f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
-                    
-                    float heightOffset = 0f;
-                    if (isAirUnit && PlanetGenerator.Instance != null)
-                    {
-                        heightOffset = PlanetGenerator.Instance.AirUnitFlightHeight;
-                    }
-
-                    Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, heightOffset, Mathf.Sin(angle) * distance);
-                    Vector3 spawnPosition = transform.position + offset;
-
-                    // Snap to NavMesh for the specific agent type
-                    NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeID, areaMask = NavMesh.AllAreas };
-                    bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 15f, filter);
-                    
-                    if (onNavMesh)
-                    {
-                        spawnPosition = hit.position;
-                    }
-                    else
-                    {
-                        // CRITICAL: Ensure the fallback spawn position is at the flight height for Air units
-                        // so they are close enough to the Air NavMesh even if SamplePosition fails.
-                        // Air Units have agentTypeID -1372625422 and standard flight height is 4.0
-                        if (agentTypeID == -1372625422)
+                        // Update UI timer (which is based on CurrentQueueStartTime). We shift the start time forward when stalled so the UI doesn't think it's done.
+                        if (!isPowered)
                         {
-                            spawnPosition = transform.position + offset + Vector3.up * 4f;
+                            CurrentQueueStartTime += Time.deltaTime;
                         }
-                        else
-                        {
-                            spawnPosition = transform.position + offset;
-                        }
+
+                        yield return null;
                     }
 
-                    GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);
-                    if (instance.TryGetComponent(out AbstractCommandable commandable))
+                    if (SOBeingBuilt is AbstractUnitSO unitSO)
                     {
-                        commandable.Owner = Owner;
-                    }
-                    
-                    if (instance.TryGetComponent(out NavMeshAgent agent))
-                    {
-                        agent.enabled = false; 
-                        instance.transform.position = spawnPosition;
+                        // Determine AgentTypeID from the prefab
+                        int agentTypeID = 0; // Default to Humanoid
+                        if (unitSO.Prefab.TryGetComponent(out NavMeshAgent prefabAgent))
+                        {
+                            agentTypeID = prefabAgent.agentTypeID;
+                        }
+
+                        bool isAirUnit = agentTypeID != 0;
+
+                        // Calculate building footprint radius to ensure ground units spawn outside the NavMeshObstacle
+                        float buildingRadius = 4f; // Safe fallback
+                        if (navMeshObstacle != null)
+                        {
+                            if (navMeshObstacle.shape == NavMeshObstacleShape.Capsule)
+                            {
+                                buildingRadius = navMeshObstacle.radius + 1f;
+                            }
+                            else if (navMeshObstacle.shape == NavMeshObstacleShape.Box)
+                            {
+                                buildingRadius = Mathf.Max(navMeshObstacle.size.x, navMeshObstacle.size.z) * 0.5f + 1f;
+                            }
+                        }
+
+                        // Distribute drones evenly around the building to prevent overlap.
+                        // Each unit gets a base angle of (360 / goldenRatio) * spawnCount to spread them
+                        // naturally, plus a small random jitter to avoid perfect symmetry.
+                        float goldenAngle = 137.508f * Mathf.Deg2Rad; // Golden angle for natural spread
+                        float baseAngle = goldenAngle * spawnCount;
+                        float jitter = Random.Range(-0.2f, 0.2f);
+                        float angle = baseAngle + jitter;
+                        spawnCount++;
+
+                        float distance = isAirUnit ? Random.Range(4f, 8f) : Random.Range(buildingRadius + 1f, buildingRadius + 3f);
+                        
+                        float heightOffset = 0f;
+                        if (isAirUnit && PlanetGenerator.Instance != null)
+                        {
+                            heightOffset = PlanetGenerator.Instance.AirUnitFlightHeight;
+                        }
+
+                        Vector3 offset = new Vector3(Mathf.Cos(angle) * distance, heightOffset, Mathf.Sin(angle) * distance);
+                        Vector3 spawnPosition = transform.position + offset;
+
+                        // Snap to NavMesh for the specific agent type
+                        NavMeshQueryFilter filter = new NavMeshQueryFilter { agentTypeID = agentTypeID, areaMask = NavMesh.AllAreas };
+                        bool onNavMesh = NavMesh.SamplePosition(spawnPosition, out NavMeshHit hit, 15f, filter);
                         
                         if (onNavMesh)
                         {
-                            agent.enabled = true;
-                            agent.Warp(spawnPosition);
+                            spawnPosition = hit.position;
                         }
                         else
                         {
-                            // // Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found for type {agentTypeID} at spawn location.");
+                            // CRITICAL: Ensure the fallback spawn position is at the flight height for Air units
+                            // so they are close enough to the Air NavMesh even if SamplePosition fails.
+                            // Air Units have agentTypeID -1372625422 and standard flight height is 4.0
+                            if (agentTypeID == -1372625422)
+                            {
+                                spawnPosition = transform.position + offset + Vector3.up * 4f;
+                            }
+                            else
+                            {
+                                spawnPosition = transform.position + offset;
+                            }
+                        }
+
+                        GameObject instance = Instantiate(unitSO.Prefab, spawnPosition, Quaternion.identity);
+                        if (instance.TryGetComponent(out AbstractCommandable commandable))
+                        {
+                            commandable.Owner = Owner;
+                        }
+                        
+                        if (instance.TryGetComponent(out NavMeshAgent agent))
+                        {
+                            agent.enabled = false; 
+                            instance.transform.position = spawnPosition;
+                            
+                            if (onNavMesh)
+                            {
+                                agent.enabled = true;
+                                agent.Warp(spawnPosition);
+                            }
+                            else
+                            {
+                                // // Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found for type {agentTypeID} at spawn location.");
+                            }
                         }
                     }
-                }
-else if (SOBeingBuilt is UpgradeSO upgrade)
-                {
-                    Bus<UpgradeResearchedEvent>.Raise(Owner, new UpgradeResearchedEvent(Owner, upgrade));
-                }
+                    else if (SOBeingBuilt is UpgradeSO upgrade)
+                    {
+                        Bus<UpgradeResearchedEvent>.Raise(Owner, new UpgradeResearchedEvent(Owner, upgrade));
+                    }
 
-                buildingQueue.RemoveAt(0);
+                    buildingQueue.RemoveAt(0);
+                }
             }
-
-            SOBeingBuilt = null;
-            OnQueueUpdated?.Invoke(buildingQueue.ToArray());
-            productionCoroutine = null;
+            finally
+            {
+                SOBeingBuilt = null;
+                OnQueueUpdated?.Invoke(buildingQueue.ToArray());
+                productionCoroutine = null;
+            }
         }
 
         protected override void OnDestroy()

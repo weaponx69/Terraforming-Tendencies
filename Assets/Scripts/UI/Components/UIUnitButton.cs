@@ -29,7 +29,11 @@ namespace GameDevTV.RTS.UI.Components
 
         public void Disable()
         {
-            button.onClick.RemoveAllListeners();
+            if (button == null) button = GetComponent<Button>();
+            if (button != null)
+            {
+                button.onClick.RemoveAllListeners();
+            }
             gameObject.SetActive(false);
         }
     }

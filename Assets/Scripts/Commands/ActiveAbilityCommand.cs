@@ -13,6 +13,7 @@ namespace GameDevTV.RTS.Commands
         private float _oxyBonus;
         private int _matsBonus;
         private int _bioBonus;
+        private float _waterBonus;
         private float _cooldown = 10f; // 10 second cooldown
         private float _lastUsedTime = -999f;
 
@@ -21,7 +22,7 @@ namespace GameDevTV.RTS.Commands
             RequiresClickToActivate = false;
         }
 
-        public void Initialize(string name, string desc, float temp, float atmos, float oxy, int mats, int bio)
+        public void Initialize(string name, string desc, float temp, float atmos, float oxy, int mats, int bio, float water = 0f)
         {
             Name = name;
             _description = desc;
@@ -30,6 +31,7 @@ namespace GameDevTV.RTS.Commands
             _oxyBonus = oxy;
             _matsBonus = mats;
             _bioBonus = bio;
+            _waterBonus = water;
             
             // Try to load a plug icon or use any fallback
             Icon = Resources.Load<Sprite>("PlugIcon");
@@ -70,6 +72,11 @@ namespace GameDevTV.RTS.Commands
             {
                 float cur = Supplies.Biomass.TryGetValue(owner, out float val) ? val : 0f;
                 Supplies.UpdateBiomass(owner, cur + _bioBonus);
+            }
+            if (_waterBonus > 0f)
+            {
+                float cur = Supplies.Water.TryGetValue(owner, out float val) ? val : 0f;
+                Supplies.UpdateWater(owner, cur + _waterBonus);
             }
 
             // Trigger re-selection to refresh UI

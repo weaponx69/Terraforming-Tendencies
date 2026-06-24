@@ -127,9 +127,21 @@ namespace GameDevTV.RTS.Player
             private set => _atmosphere = value;
         }
 
+        private static Dictionary<Owner, float> _water;
+        public static Dictionary<Owner, float> Water 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _water;
+            }
+            private set => _water = value;
+        }
+
         public static event Action<Owner, float> OnOxygenChanged;
         public static event Action<Owner, float> OnTemperatureChanged;
         public static event Action<Owner, float> OnAtmosphereChanged;
+        public static event Action<Owner, float> OnWaterChanged;
         public static event Action<Owner, float> OnIntegrityChanged;
         public static event Action<Owner, float> OnPowerChanged;
         public static event Action<Owner, float> OnBiomassChanged;
@@ -210,6 +222,7 @@ namespace GameDevTV.RTS.Player
             _integrity = new Dictionary<Owner, float>();
             _temperature = new Dictionary<Owner, float>();
             _atmosphere = new Dictionary<Owner, float>();
+            _water = new Dictionary<Owner, float>();
 
             float initialOxygen = (Instance != null) ? Instance.startingOxygen : 0f;
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
@@ -223,6 +236,7 @@ namespace GameDevTV.RTS.Player
                 _integrity[owner] = 100f;
                 _temperature[owner] = -60f;
                 _atmosphere[owner] = 0.01f;
+                _water[owner] = 0f;
             }
         }
 
@@ -246,6 +260,7 @@ namespace GameDevTV.RTS.Player
             _integrity = new Dictionary<Owner, float>();
             _temperature = new Dictionary<Owner, float>();
             _atmosphere = new Dictionary<Owner, float>();
+            _water = new Dictionary<Owner, float>();
 
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
@@ -258,6 +273,7 @@ namespace GameDevTV.RTS.Player
                 _integrity.Add(owner, 100f);
                 _temperature.Add(owner, -60f);
                 _atmosphere.Add(owner, 0.01f);
+                _water.Add(owner, 0f);
             }
 
             MineralsToMaterialsRateStatic = mineralsToMaterialsRate;
@@ -318,6 +334,15 @@ namespace GameDevTV.RTS.Player
             {
                 Atmosphere[owner] = Mathf.Max(0, value);
                 OnAtmosphereChanged?.Invoke(owner, Atmosphere[owner]);
+            }
+        }
+
+        public static void UpdateWater(Owner owner, float value)
+        {
+            if (Water != null && Water.ContainsKey(owner))
+            {
+                Water[owner] = Mathf.Max(0f, value);
+                OnWaterChanged?.Invoke(owner, Water[owner]);
             }
         }
 

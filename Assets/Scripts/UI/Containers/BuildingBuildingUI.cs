@@ -84,31 +84,36 @@ namespace GameDevTV.RTS.UI.Containers
 
         private IEnumerator UpdateUnitProgress()
         {
-            while (this != null && enabled && building != null && building.QueueSize > 0)
+            try
             {
-                if (building.SOBeingBuilt == null)
+                while (this != null && enabled && building != null && building.QueueSize > 0)
                 {
+                    if (building.SOBeingBuilt == null)
+                    {
+                        yield return null;
+                        continue;
+                    }
+
+                    if (progressBar == null)
+                    {
+                        yield break;
+                    }
+
+                    float startTime = building.CurrentQueueStartTime;
+                    float buildTime = building.SOBeingBuilt.BuildTime;
+                    if (buildTime <= 0) buildTime = 1f;
+
+                    float progress = Mathf.Clamp01((Time.time - startTime) / buildTime);
+                    progressBar.SetProgress(progress);
+                    
                     yield return null;
-                    continue;
                 }
-
-                if (progressBar == null)
-                {
-                    yield break;
-                }
-
-                float startTime = building.CurrentQueueStartTime;
-                float buildTime = building.SOBeingBuilt.BuildTime;
-                if (buildTime <= 0) buildTime = 1f;
-
-                float progress = Mathf.Clamp01((Time.time - startTime) / buildTime);
-                progressBar.SetProgress(progress);
-                
-                yield return null;
             }
-
-            if (progressBar != null) progressBar.SetProgress(0);
-            buildCoroutine = null;
+            finally
+            {
+                if (progressBar != null) progressBar.SetProgress(0);
+                buildCoroutine = null;
+            }
         }
     }
 }

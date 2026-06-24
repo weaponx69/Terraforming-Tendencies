@@ -177,6 +177,19 @@ namespace GameDevTV.RTS.UI.Containers
                                 reqs.Add($"Atmos: <= {tfCard.maxAtmosphere:F2} atm");
                             }
 
+                            if (tfCard.minWater > -9999f && tfCard.maxWater < 9999f)
+                            {
+                                reqs.Add($"Water: {tfCard.minWater:F1}% to {tfCard.maxWater:F1}%");
+                            }
+                            else if (tfCard.minWater > -9999f)
+                            {
+                                reqs.Add($"Water: >= {tfCard.minWater:F1}%");
+                            }
+                            else if (tfCard.maxWater < 9999f)
+                            {
+                                reqs.Add($"Water: <= {tfCard.maxWater:F1}%");
+                            }
+
                             if (tfCard.requiredSectorFeature != SectorManager.SectorFeature.None)
                             {
                                 reqs.Add($"Feature: {tfCard.requiredSectorFeature}");
@@ -400,13 +413,14 @@ namespace GameDevTV.RTS.UI.Containers
             AddThemedBuildingCard("Carbon Dioxide Import Laser", "Attracts cometary ice to enrich atmosphere. REQUIRES Atmosphere >= 0.10 atm.", "Carbon Dioxide Import Laser", 250, 6f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, 0.10f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
             AddThemedBuildingCard("Subglacial Water Extractor", "Drills deep into subglacial water deposits to pump biomass media.", "Subglacial Water Extractor", 220, 4f, 0f, 0, 4, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon);
             AddThemedBuildingCard("Magnetic Shield Generator", "Protects regional grids from solar wind from an elevated fault line.", "Magnetic Shield Generator", 350, 0f, 25f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.FaultLine, templateBuilding, defaultIcon);
+            AddThemedBuildingCard("Terraformed Lake", "Creates a visual water body on the planet surface. REQUIRES Temp >= -15C, Atmos >= 0.05 atm, Water >= 5%.", "Terraformed Lake", 150, 2f, 0f, 0, 2, -15f, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 5.0f);
 
             // Ecological & Biosphere Deck
             AddThemedBuildingCard("Methanogenic Microbe Spreader", "Spreads methane-producing microbes. REQUIRES Temp >= -30C and Atmos >= 0.05 atm.", "Methanogenic Microbe Spreader", 130, 2f, 0f, 0, 0, -30f, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
             AddThemedBuildingCard("Lichen Nursery", "Cultivates rock-decomposing lichens. REQUIRES Temp >= -25C and Atmos >= 0.10 atm.", "Lichen Nursery", 140, 2f, 0f, 0, 3, -25f, float.MaxValue, float.MinValue, float.MaxValue, 0.10f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Genetically Modified Algae Spreader", "Sows oxygen-producing algae pools. REQUIRES Temp >= -15C, Atmos >= 0.15 atm, Oxy >= 1.0%.", "Genetically Modified Algae Spreader", 210, 3f, 0f, 0, 0, -15f, float.MaxValue, 1.0f, float.MaxValue, 0.15f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Greenery Dome", "Advanced glass canopy housing local flora. REQUIRES Temp >= -10C, Atmos >= 0.20 atm, Oxy >= 2.0%.", "Greenery Dome", 280, 4f, 0f, 0, 6, -10f, float.MaxValue, 2.0f, float.MaxValue, 0.20f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Biosphere Center", "Coordinates global ecological cycles from a protected water deposit.", "Biosphere Center", 500, 6f, 0f, 0, 10, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon);
+            AddThemedBuildingCard("Genetically Modified Algae Spreader", "Sows oxygen-producing algae pools. REQUIRES Temp >= -15C, Atmos >= 0.15 atm, Oxy >= 1.0%, Water >= 10%.", "Genetically Modified Algae Spreader", 210, 3f, 0f, 0, 0, -15f, float.MaxValue, 1.0f, float.MaxValue, 0.15f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 10.0f);
+            AddThemedBuildingCard("Greenery Dome", "Advanced glass canopy housing local flora. REQUIRES Temp >= -10C, Atmos >= 0.20 atm, Oxy >= 2.0%, Water >= 20%.", "Greenery Dome", 280, 4f, 0f, 0, 6, -10f, float.MaxValue, 2.0f, float.MaxValue, 0.20f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 20.0f);
+            AddThemedBuildingCard("Biosphere Center", "Coordinates global ecological cycles from a protected water deposit. REQUIRES Water >= 30%.", "Biosphere Center", 500, 6f, 0f, 0, 10, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon, 30.0f);
         }
 
         private void AddThemedBuildingCard(
@@ -426,7 +440,9 @@ namespace GameDevTV.RTS.UI.Containers
             float maxAtmos,
             SectorManager.SectorFeature requiredFeature,
             BuildingSO templateBuilding,
-            Sprite defaultIcon
+            Sprite defaultIcon,
+            float minWater = float.MinValue,
+            float maxWater = float.MaxValue
         )
         {
             BuildingSO bldSO = null;
@@ -489,6 +505,8 @@ namespace GameDevTV.RTS.UI.Containers
             card.maxOxygen = maxOxy;
             card.minAtmosphere = minAtmos;
             card.maxAtmosphere = maxAtmos;
+            card.minWater = minWater;
+            card.maxWater = maxWater;
             card.requiredSectorFeature = requiredFeature;
 
             runtimePool.Add(card);

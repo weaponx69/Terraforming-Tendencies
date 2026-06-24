@@ -34,13 +34,40 @@ namespace GameDevTV.RTS.Player
         public bool IsBetweenRounds { get; private set; } = false;
         public bool IsExpansionPhase { get; private set; } = false;
 
+        public float CurrentMilestoneValue { get; private set; }
+        public float CurrentMilestoneTarget { get; private set; }
+        public MilestoneType CurrentMilestoneType { get; private set; }
+
+        public float GetTargetTemperature(int generation)
+        {
+            return -60f + (15f * generation);
+        }
+
+        public float GetTargetAtmosphere(int generation)
+        {
+            return 0.25f * generation;
+        }
+
+        public float GetTargetWater(int generation)
+        {
+            return 10.0f * generation - 5.0f;
+        }
+
         public string CurrentMilestoneDescription
         {
             get
             {
                 if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
                 int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
-                return milestones[milestoneIndex].GoalDescription;
+                string baseDesc = milestones[milestoneIndex].GoalDescription;
+                if (IsExpansionPhase)
+                {
+                    return baseDesc;
+                }
+                float targetTemp = GetTargetTemperature(CurrentGeneration);
+                float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
+                float targetWater = GetTargetWater(CurrentGeneration);
+                return $"{baseDesc} (Temp >= {targetTemp:F0}°C, Atmos >= {targetAtmos:F2} atm, Water >= {targetWater:F0}%)";
             }
         }
 
@@ -103,6 +130,14 @@ namespace GameDevTV.RTS.Player
             CurrentGeneration = 1;
             IsBetweenRounds = false;
             IsExpansionPhase = false;
+
+            if (milestones != null && milestones.Count > 0)
+            {
+                CurrentMilestoneType = milestones[0].Type;
+                CurrentMilestoneTarget = milestones[0].TargetValue;
+            }
+            CurrentMilestoneValue = 0f;
+
             UnlockPrerequisitesForMilestone();
             RecordBaselines();
             OnGenerationProgressChanged?.Invoke(0f);
@@ -222,7 +257,29 @@ namespace GameDevTV.RTS.Player
                     break;
             }
 
-            float progress = milestone.TargetValue > 0 ? Mathf.Clamp01(currentValue / milestone.TargetValue) : 1f;
+            CurrentMilestoneTarget = milestone.TargetValue;
+            CurrentMilestoneType = milestone.Type;
+            CurrentMilestoneValue = currentValue;
+
+            float primaryProgress = milestone.TargetValue > 0 ? Mathf.Clamp01(currentValue / milestone.TargetValue) : 1f;
+
+            // Temperature progress
+            float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
+            float targetTemp = GetTargetTemperature(CurrentGeneration);
+            float tempProgress = Mathf.Clamp01((currentTemp - (-60f)) / (targetTemp - (-60f)));
+
+            // Atmosphere progress
+            float currentAtmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
+            float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
+            float atmosProgress = Mathf.Clamp01((currentAtmos - 0.01f) / (targetAtmos - 0.01f));
+
+            // Water progress
+            float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
+            float targetWater = GetTargetWater(CurrentGeneration);
+            float waterProgress = targetWater > 0f ? Mathf.Clamp01(currentWater / targetWater) : 1f;
+
+            // Combined progress is the bottleneck (minimum) of all four parameters
+            float progress = Mathf.Min(primaryProgress, Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress)));
             OnGenerationProgressChanged?.Invoke(progress);
 
             if (progress >= 1f)
@@ -348,6 +405,12 @@ namespace GameDevTV.RTS.Player
 
             IsBetweenRounds = false;
             Time.timeScale = 1f;
+
+            // Set properties for the new milestone
+            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
+            CurrentMilestoneType = milestones[milestoneIndex].Type;
+            CurrentMilestoneTarget = milestones[milestoneIndex].TargetValue;
+            CurrentMilestoneValue = 0f;
 
             // Grant starting materials for the next generation
             if (Supplies.Materials != null && Supplies.Materials.ContainsKey(Owner.Player1))

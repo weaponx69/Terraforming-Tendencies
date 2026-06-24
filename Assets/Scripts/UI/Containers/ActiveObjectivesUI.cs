@@ -21,7 +21,7 @@ namespace GameDevTV.RTS.UI.Containers
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(340f, 150f);
+            rect.sizeDelta = new Vector2(340f, 205f);
             rect.anchoredPosition = new Vector2(-20f, -140f); // Position below the Supplies Bar
 
             background = gameObject.AddComponent<Image>();
@@ -88,8 +88,28 @@ namespace GameDevTV.RTS.UI.Containers
 
             if (GameDevTV.RTS.Player.GenerationManager.Instance != null)
             {
-                string desc = GameDevTV.RTS.Player.GenerationManager.Instance.CurrentMilestoneDescription;
+                var gm = GameDevTV.RTS.Player.GenerationManager.Instance;
+                string desc = gm.CurrentMilestoneDescription;
                 sb.AppendLine($"<color=#FFD700>Goal:</color> {desc}");
+
+                if (!gm.IsExpansionPhase)
+                {
+                    float currentTemp = GameDevTV.RTS.Player.Supplies.Temperature.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float tVal) ? tVal : -60f;
+                    float targetTemp = gm.GetTargetTemperature(gm.CurrentGeneration);
+                    string tempColor = currentTemp >= targetTemp ? "#55FF55" : "#FF5555";
+
+                    float currentAtmos = GameDevTV.RTS.Player.Supplies.Atmosphere.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float aVal) ? aVal : 0.01f;
+                    float targetAtmos = gm.GetTargetAtmosphere(gm.CurrentGeneration);
+                    string atmosColor = currentAtmos >= targetAtmos ? "#55FF55" : "#FF5555";
+
+                    float currentWater = GameDevTV.RTS.Player.Supplies.Water.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float wVal) ? wVal : 0f;
+                    float targetWater = gm.GetTargetWater(gm.CurrentGeneration);
+                    string waterColor = currentWater >= targetWater ? "#55FF55" : "#FF5555";
+
+                    sb.AppendLine($"  <color=#CCCCCC>• Temp:</color> <color={tempColor}>{currentTemp:F1}°C / {targetTemp:F1}°C</color>");
+                    sb.AppendLine($"  <color=#CCCCCC>• Atmos:</color> <color={atmosColor}>{currentAtmos:F2} atm / {targetAtmos:F2} atm</color>");
+                    sb.AppendLine($"  <color=#CCCCCC>• Water:</color> <color={waterColor}>{currentWater:F0}% / {targetWater:F0}%</color>");
+                }
             }
             else
             {

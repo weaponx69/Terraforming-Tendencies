@@ -22,6 +22,11 @@ namespace GameDevTV.RTS.Player
             unlockedBuildings.Clear();
             unlockedBuildings.Add("Command Post");
             unlockedBuildings.Add("Supply Hut");
+            unlockedBuildings.Add("Solar Panel");
+            unlockedBuildings.Add("Oxygen Processor");
+            unlockedBuildings.Add("GHG Factory");
+            unlockedBuildings.Add("Water Ice Aquifer");
+            unlockedBuildings.Add("Subglacial Water Extractor");
 
             knownBuildings.Clear();
 
