@@ -49,6 +49,7 @@ namespace GameDevTV.RTS.Units
         public delegate void QueueUpdatedEvent(UnlockableSO[] unitsInQueue);
         public event QueueUpdatedEvent OnQueueUpdated;
 
+        //what does isOperating mean?
         public bool IsOperating
         {
             get
@@ -67,6 +68,7 @@ namespace GameDevTV.RTS.Units
 
         private bool isHousingActive = false;
 
+        // Must track if building is powered or not.
         private void HandlePowerStateChanged(bool isPowered)
         {
             UpdateHousingContribution();
@@ -578,9 +580,9 @@ namespace GameDevTV.RTS.Units
         {
             var cmd = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ActiveAbilityCommand>();
             cmd.Initialize(name, desc, tempBonus, atmosBonus, oxyBonus, matsBonus, bioBonus, waterBonus);
-            cmd.Slot = 0;
 
             var list = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
+            cmd.Slot = FindFreeSlot(list);
             list.Add(cmd);
             AvailableCommands = list.ToArray();
         }

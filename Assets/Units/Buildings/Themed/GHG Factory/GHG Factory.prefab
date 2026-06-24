@@ -159,7 +159,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4159092770635563937}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77dc3c65aec326e48a1029494090bcfc, type: 3}
   m_Name: 
@@ -169,7 +169,8 @@ MonoBehaviour:
   <MaxHealth>k__BackingField: 0
   <Owner>k__BackingField: 0
   <IsVisible>k__BackingField: 1
-  _availableCommands: []
+  _availableCommands:
+  - {fileID: 11400000, guid: 9d6e954ce0a9a934492a858213ad680e, type: 2}
   <UnitSO>k__BackingField: {fileID: 11400000, guid: ebc99338ffaca3fe2b9cdad4908d1646, type: 2}
   selectionIndicator: {fileID: 5997003499453182830}
   VisionTransform: {fileID: 4326540170533436170}

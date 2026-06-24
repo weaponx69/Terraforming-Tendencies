@@ -36,7 +36,7 @@ namespace GameDevTV.RTS.Player
                     return "BIOMASS";
                 if (name.Contains("mine") || name.Contains("laser"))
                     return "MATERIALS";
-                if (name.Contains("ghg") || name.Contains("microbe"))
+                if (name.Contains("GHG") || name.Contains("microbe"))
                     return "TEMPERATURE";
                 if (name.Contains("condenser") || name.Contains("import"))
                     return "ATMOSPHERE";
