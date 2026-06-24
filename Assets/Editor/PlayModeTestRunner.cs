@@ -13,10 +13,10 @@ namespace Unity.AI.Assistant.PlayModeTest
         private const string ScriptPathKey = "PlayModeTest.ScriptPath";
         private const string SentinelLog = "PLAY_MODE_TEST_COMPLETE";
 
-        private static readonly int WaitFrames = SessionState.GetInt("PlayModeTest.WaitFrames", 10);
+        private static readonly int WaitFrames = SessionState.GetInt("PlayModeTest.WaitFrames", 15);
 
         private static List<string> _capturedLogs = new List<string>();
-        private const int MaxCapturedLogs = 50;
+        private const int MaxCapturedLogs = 100;
 
         static PlayModeTestRunner()
         {
@@ -136,9 +136,9 @@ namespace Unity.AI.Assistant.PlayModeTest
 
         private static string RunTestLogic()
         {
-            Debug.Log("[Test] Running Worker commands inspection test...");
-            
-            // Log Unlocked Buildings at start of play
+            Debug.Log("[Test] Starting Play Mode test...");
+
+            // 1. Inspect BlueprintDraftManager Unlocked Buildings
             var draftManagerType = System.Type.GetType("GameDevTV.RTS.Player.BlueprintDraftManager, MainGame");
             if (draftManagerType != null)
             {
@@ -146,15 +146,44 @@ namespace Unity.AI.Assistant.PlayModeTest
                 if (getUnlockedMethod != null)
                 {
                     var unlocked = (HashSet<string>)getUnlockedMethod.Invoke(null, null);
-                    Debug.Log("[Test] Unlocked buildings in BlueprintDraftManager: " + string.Join(", ", unlocked));
+                    Debug.Log("[Test] UNLOCKED BUILDINGS: " + string.Join(", ", unlocked));
                 }
             }
+            else
+            {
+                Debug.LogError("[Test] BlueprintDraftManager class not found!");
+            }
 
-            // Find Worker gameobjects
+            // 2. Check if BlueprintDraftUI has the draft panel active
+            GameObject uiGo = GameObject.Find("Runtime UI UGUI");
+            if (uiGo != null)
+            {
+                Debug.Log("[Test] Found Runtime UI UGUI");
+                var draftUITrans = uiGo.transform.Find("Blueprint Draft Panel");
+                if (draftUITrans == null)
+                {
+                    // Find recursively
+                    draftUITrans = FindChildRecursive(uiGo.transform, "Blueprint Draft Panel");
+                }
+
+                if (draftUITrans != null)
+                {
+                    Debug.Log("[Test] Blueprint Draft Panel active state: " + draftUITrans.gameObject.activeSelf);
+                }
+                else
+                {
+                    Debug.LogWarning("[Test] Blueprint Draft Panel not found under Runtime UI UGUI!");
+                }
+            }
+            else
+            {
+                Debug.LogError("[Test] Runtime UI UGUI not found!");
+            }
+
+            // 3. Inspect worker commands to see if they can build the unlocked buildings
             GameObject[] workers = GameObject.FindGameObjectsWithTag("Worker");
             if (workers == null || workers.Length == 0)
             {
-                // Fallback search by name/components
                 var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
                 var workerList = new List<GameObject>();
                 foreach (var go in allGos)
@@ -170,7 +199,6 @@ namespace Unity.AI.Assistant.PlayModeTest
             Debug.Log("[Test] Found " + workers.Length + " worker/drone objects.");
             foreach (var w in workers)
             {
-                Debug.Log("[Test] Worker GO: " + w.name);
                 var workerComp = w.GetComponent("Worker");
                 if (workerComp != null)
                 {
@@ -178,7 +206,7 @@ namespace Unity.AI.Assistant.PlayModeTest
                     if (availableCmdsProp != null)
                     {
                         var cmds = (object[])availableCmdsProp.GetValue(workerComp);
-                        Debug.Log("[Test] - Number of available commands: " + (cmds != null ? cmds.Length : 0));
+                        Debug.Log("[Test] Worker " + w.name + " has " + (cmds != null ? cmds.Length : 0) + " commands:");
                         if (cmds != null)
                         {
                             foreach (var cmd in cmds)
@@ -187,20 +215,7 @@ namespace Unity.AI.Assistant.PlayModeTest
                                 {
                                     var nameProp = cmd.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance);
                                     string cmdName = nameProp != null ? (string)nameProp.GetValue(cmd) : "Unnamed";
-                                    
-                                    var buildingProp = cmd.GetType().GetProperty("Building", BindingFlags.Public | BindingFlags.Instance);
-                                    string bldStr = "";
-                                    if (buildingProp != null)
-                                    {
-                                        var bld = buildingProp.GetValue(cmd);
-                                        if (bld != null)
-                                        {
-                                            var bldNameProp = bld.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance);
-                                            bldStr = " (Building: " + (bldNameProp != null ? bldNameProp.GetValue(bld) : "Unnamed") + ")";
-                                        }
-                                    }
-
-                                    Debug.Log("[Test]   -> Command: " + cmdName + bldStr + " [Type: " + cmd.GetType().Name + "]");
+                                    Debug.Log("[Test]   -> Command: " + cmdName);
                                 }
                             }
                         }
@@ -213,6 +228,18 @@ namespace Unity.AI.Assistant.PlayModeTest
                 success = true,
                 logs = _capturedLogs.ToArray()
             });
+        }
+
+        private static Transform FindChildRecursive(Transform parent, string name)
+        {
+            if (parent == null) return null;
+            if (parent.name == name) return parent;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform found = FindChildRecursive(parent.GetChild(i), name);
+                if (found != null) return found;
+            }
+            return null;
         }
     }
 }

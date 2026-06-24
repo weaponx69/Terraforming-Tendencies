@@ -411,6 +411,7 @@ namespace GameDevTV.RTS.Units
                 if (iconField != null) iconField.SetValue(connectCommand, UnityEngine.Resources.Load<UnityEngine.Sprite>("PlugIcon"));
 
                 var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
+                connectCommand.Slot = FindFreeSlot(commandList);
                 commandList.Add(connectCommand);
                 AvailableCommands = commandList.ToArray();
             }
