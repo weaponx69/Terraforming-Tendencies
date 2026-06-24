@@ -24,6 +24,7 @@ namespace GameDevTV.RTS.TechTree
             return techTrees[owner].TryGetValue(unlockable, out Dependency value) && value.IsUnlocked;
         }
 
+        // Did the research get done?
         public bool IsResearched(Owner owner, UnlockableSO unlockable)
         {
             if (unlockedDependencies == null || !unlockedDependencies.ContainsKey(owner)) return false;

@@ -56,7 +56,6 @@ namespace GameDevTV.RTS.Environment
         private List<LifeSupportNode> cachedNodes = new List<LifeSupportNode>();
         private float nodeCacheTimer = 0f;
         private float balanceTickTimer = 0f;
-        private float biomassDebt = 0f;
 
         private class GrassInstance
         {
@@ -186,14 +185,8 @@ namespace GameDevTV.RTS.Environment
 
             if (totalBiomassBoost > 0)
             {
-                biomassDebt += totalBiomassBoost;
-                if (biomassDebt >= 1f)
-                {
-                    int toAdd = Mathf.FloorToInt(biomassDebt);
-                    int currentBiomass = Supplies.Biomass.TryGetValue(owner, out int b) ? b : 0;
-                    Supplies.UpdateBiomass(owner, currentBiomass + toAdd);
-                    biomassDebt -= toAdd;
-                }
+                float currentBiomass = Supplies.Biomass.TryGetValue(owner, out float b) ? b : 0f;
+                Supplies.UpdateBiomass(owner, currentBiomass + totalBiomassBoost);
             }
         }
 

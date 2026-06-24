@@ -135,13 +135,13 @@ namespace GameDevTV.RTS.Player
             // Hard biomass check removed because GenerationManager liquidates biomass to 0 at the end of every round.
 
             // 3. Check recovery potential BEFORE triggering life support failure.
-            // If the player has 400 biomass, they can orbital drop a new Command Center even if everything else is gone.
-            int biomass = 0;
+            // If the player has 10% biomass (40% of first sector capacity), they can orbital drop a new Command Center even if everything else is gone.
+            float biomass = 0f;
             if (Supplies.Biomass != null)
             {
-                biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out int currentBiomass) ? currentBiomass : 0;
+                biomass = Supplies.Biomass.TryGetValue(monitoredOwner, out float currentBiomass) ? currentBiomass : 0f;
             }
-            bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 400) && AnySupplyNodesRemain();
+            bool canRebuild = (AnyMiningUnitsAlive() || biomass >= 10f) && AnySupplyNodesRemain();
 
             // Loss Condition 1: Colony life support coverage collapsed.
             if (!AnyLifeSupportNodesRemain(monitoredOwner) && !canRebuild)

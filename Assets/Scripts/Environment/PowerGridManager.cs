@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Player;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -39,6 +41,13 @@ namespace GameDevTV.RTS.Environment
             powerGrids.Clear();
             HashSet<PowerNode> visited = new HashSet<PowerNode>();
 
+            // Track total net power for each owner
+            Dictionary<Owner, float> ownerPower = new Dictionary<Owner, float>();
+            foreach (Owner owner in System.Enum.GetValues(typeof(Owner)))
+            {
+                ownerPower[owner] = 0f;
+            }
+
             foreach(var node in allNodes)
             {
                 if (node == null || visited.Contains(node)) continue;
@@ -61,7 +70,8 @@ namespace GameDevTV.RTS.Environment
                     {
                         if (current.Building.Progress.State == GameDevTV.RTS.Units.BuildingProgress.BuildingState.Completed)
                         {
-                            totalGeneration += current.Building.BuildingSO.BuildingConfig.PowerGeneration;
+                            float effectiveGen = current.Building.BuildingSO.BuildingConfig.PowerGeneration * Player.BlueprintDraftManager.PowerGenMultiplier;
+                            totalGeneration += effectiveGen;
                             totalUpkeep += current.Building.BuildingSO.BuildingConfig.PowerUpkeep;
                         }
                     }
@@ -110,7 +120,20 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
+                // Accumulate the net power to the owner of the first node in the grid
+                if (currentGrid.Count > 0 && currentGrid[0].Building != null)
+                {
+                    Owner gridOwner = currentGrid[0].Building.Owner;
+                    ownerPower[gridOwner] += remainingPower;
+                }
+
                 powerGrids.Add(currentGrid);
+            }
+
+            // Update Supplies with the exact static net power level
+            foreach (var kvp in ownerPower)
+            {
+                Supplies.UpdatePower(kvp.Key, kvp.Value);
             }
         }
     }

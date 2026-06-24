@@ -68,7 +68,7 @@ namespace GameDevTV.RTS.Commands
             }
             if (_bioBonus > 0)
             {
-                int cur = Supplies.Biomass.TryGetValue(owner, out int val) ? val : 0;
+                float cur = Supplies.Biomass.TryGetValue(owner, out float val) ? val : 0f;
                 Supplies.UpdateBiomass(owner, cur + _bioBonus);
             }
 

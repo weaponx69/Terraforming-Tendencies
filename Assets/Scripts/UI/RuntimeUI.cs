@@ -68,6 +68,8 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnPowerChanged += HandlePowerChanged;
             Supplies.OnPopulationChanged += HandlePopulationChanged;
             Supplies.OnPopulationLimitChanged += HandlePopulationLimitChanged;
+            Supplies.OnTemperatureChanged += HandleTemperatureChanged;
+            Supplies.OnAtmosphereChanged += HandleAtmosphereChanged;
 
             InitializeUI();
         }
@@ -91,11 +93,8 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnPowerChanged -= HandlePowerChanged;
             Supplies.OnPopulationChanged -= HandlePopulationChanged;
             Supplies.OnPopulationLimitChanged -= HandlePopulationLimitChanged;
-
-            if (heroDroneReference != null)
-            {
-                heroDroneReference.OnCargoChanged -= HandleHeroCargoChanged;
-            }
+            Supplies.OnTemperatureChanged -= HandleTemperatureChanged;
+            Supplies.OnAtmosphereChanged -= HandleAtmosphereChanged;
         }
 
         [SerializeField] private TextMeshProUGUI biomassLabelText;
@@ -103,9 +102,96 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
         [SerializeField] private TextMeshProUGUI powerLabelText;
         [SerializeField] private TextMeshProUGUI powerValueText;
         
+        private TextMeshProUGUI temperatureLabelText;
+        private TextMeshProUGUI temperatureValueText;
+        private TextMeshProUGUI atmosphereLabelText;
+        private TextMeshProUGUI atmosphereValueText;
+        
         [Header("Warning UI")]
         [SerializeField] private GameObject warningBanner;
         [SerializeField] private TextMeshProUGUI warningText;
+
+        private Transform FindChildRecursive(Transform parent, string name)
+        {
+            if (parent == null) return null;
+            if (parent.name == name) return parent;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform found = FindChildRecursive(parent.GetChild(i), name);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private void ResolveTextsFromClone(GameObject clone, GameObject template, TextMeshProUGUI templateLabel, TextMeshProUGUI templateValue, out TextMeshProUGUI cloneLabel, out TextMeshProUGUI cloneValue, string fallbackLabelName, string fallbackValueName)
+        {
+            cloneLabel = null;
+            cloneValue = null;
+
+            if (clone == null || template == null) return;
+
+            var templateTexts = template.GetComponentsInChildren<TextMeshProUGUI>(true);
+            var cloneTexts = clone.GetComponentsInChildren<TextMeshProUGUI>(true);
+
+            // 1. Try structural index match
+            int labelIdx = System.Array.IndexOf(templateTexts, templateLabel);
+            int valueIdx = System.Array.IndexOf(templateTexts, templateValue);
+
+            if (labelIdx >= 0 && labelIdx < cloneTexts.Length)
+            {
+                cloneLabel = cloneTexts[labelIdx];
+            }
+            if (valueIdx >= 0 && valueIdx < cloneTexts.Length)
+            {
+                cloneValue = cloneTexts[valueIdx];
+            }
+
+            // 2. Fallback to name search using template names
+            if (cloneLabel == null && templateLabel != null)
+            {
+                cloneLabel = cloneTexts.FirstOrDefault(t => t.gameObject.name == templateLabel.name);
+            }
+            if (cloneValue == null && templateValue != null)
+            {
+                cloneValue = cloneTexts.FirstOrDefault(t => t.gameObject.name == templateValue.name);
+            }
+
+            // 3. Fallback by hardcoded template names (e.g. Integrity Header, Resource Label)
+            if (cloneLabel == null)
+            {
+                cloneLabel = cloneTexts.FirstOrDefault(t => t.gameObject.name == "Integrity Header" || t.gameObject.name == "Header" || t.gameObject.name.Contains("Label"));
+            }
+            if (cloneValue == null)
+            {
+                cloneValue = cloneTexts.FirstOrDefault(t => t.gameObject.name == "Resource Label" || t.gameObject.name == "Value" || t.gameObject.name.Contains("Value"));
+            }
+
+            // 4. Fallback by position/order (usually index 0 is label, index 1 is value)
+            if (cloneLabel == null && cloneTexts.Length > 0)
+            {
+                cloneLabel = cloneTexts[0];
+            }
+            if (cloneValue == null && cloneTexts.Length > 1)
+            {
+                cloneValue = cloneTexts[1];
+            }
+            else if (cloneValue == null && cloneTexts.Length == 1)
+            {
+                cloneValue = cloneTexts[0];
+            }
+        }
+
+        private void CopyRectTransform(RectTransform source, RectTransform target)
+        {
+            if (source == null || target == null) return;
+            target.anchorMin = source.anchorMin;
+            target.anchorMax = source.anchorMax;
+            target.pivot = source.pivot;
+            target.sizeDelta = source.sizeDelta;
+            target.localScale = source.localScale;
+            target.localRotation = source.localRotation;
+            target.anchoredPosition = source.anchoredPosition;
+        }
 
         private void Awake()
         {
@@ -119,22 +205,63 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
             FindAndLinkUI("Probe Progress Container", ref probeProgressLabelText, ref probeProgressValueText, "Probe Progress Header");
             
-            // We only need the Power Container cloned now
-            if (powerValueText == null && integrityLabelText != null)
+            // Setup layouts and alignments dynamically (Power, Temp, Atmos)
+            GameObject integrityContainerGo = GameObject.Find("Integrity Container");
+            if (integrityContainerGo == null)
             {
-                Transform containerParent = integrityLabelText.transform.parent.parent;
-                GameObject template = integrityLabelText.transform.parent.gameObject;
+                Transform t = FindChildRecursive(transform, "Integrity Container");
+                if (t != null) integrityContainerGo = t.gameObject;
+            }
 
-                GameObject clone = Instantiate(template, containerParent);
-                clone.name = "Power Container";
-                powerValueText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
-                    .FirstOrDefault(t => t.gameObject.name == "Resource Label");
-                powerLabelText = clone.GetComponentsInChildren<TextMeshProUGUI>(true)
-                    .FirstOrDefault(t => t.gameObject.name == "Integrity Header" || t.gameObject.name == "Power Header");
-                if (powerLabelText != null) powerLabelText.gameObject.name = "Power Header";
-                clone.SetActive(true);
+            if (integrityContainerGo != null)
+            {
+                Transform containerParent = integrityContainerGo.transform.parent;
+                GameObject template = integrityContainerGo;
 
-                // Attempt to add a HorizontalLayoutGroup for clean automatic layout
+                GameObject powerClone = null;
+                GameObject temperatureClone = null;
+                GameObject atmosphereClone = null;
+
+                // 1. Power Container
+                if (powerValueText == null)
+                {
+                    powerClone = Instantiate(template, containerParent);
+                    powerClone.name = "Power Container";
+                    CopyRectTransform(template.GetComponent<RectTransform>(), powerClone.GetComponent<RectTransform>());
+                    ResolveTextsFromClone(powerClone, template, integrityLabelText, integrityValueText, out powerLabelText, out powerValueText, "Power Header", "Resource Label");
+                    if (powerLabelText != null) powerLabelText.gameObject.name = "Power Header";
+                    powerClone.SetActive(true);
+                }
+
+                // 2. Temperature Container
+                if (temperatureValueText == null)
+                {
+                    temperatureClone = Instantiate(template, containerParent);
+                    temperatureClone.name = "Temperature Container";
+                    CopyRectTransform(template.GetComponent<RectTransform>(), temperatureClone.GetComponent<RectTransform>());
+                    ResolveTextsFromClone(temperatureClone, template, integrityLabelText, integrityValueText, out temperatureLabelText, out temperatureValueText, "Temperature Header", "Resource Label");
+                    if (temperatureLabelText != null) temperatureLabelText.gameObject.name = "Temperature Header";
+                    temperatureClone.SetActive(true);
+                }
+
+                // 3. Atmosphere Container
+                if (atmosphereValueText == null)
+                {
+                    atmosphereClone = Instantiate(template, containerParent);
+                    atmosphereClone.name = "Atmosphere Container";
+                    CopyRectTransform(template.GetComponent<RectTransform>(), atmosphereClone.GetComponent<RectTransform>());
+                    ResolveTextsFromClone(atmosphereClone, template, integrityLabelText, integrityValueText, out atmosphereLabelText, out atmosphereValueText, "Atmosphere Header", "Resource Label");
+                    if (atmosphereLabelText != null) atmosphereLabelText.gameObject.name = "Atmosphere Header";
+                    atmosphereClone.SetActive(true);
+                }
+
+                // Set proper layout group sibling indices so they layout in order
+                int integrityIndex = integrityContainerGo.transform.GetSiblingIndex();
+                if (powerClone != null) powerClone.transform.SetSiblingIndex(integrityIndex + 1);
+                if (temperatureClone != null) temperatureClone.transform.SetSiblingIndex(integrityIndex + 2);
+                if (atmosphereClone != null) atmosphereClone.transform.SetSiblingIndex(integrityIndex + 3);
+
+                // Auto Layout Group
                 if (containerParent.GetComponent<Canvas>() == null && containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
                     HorizontalLayoutGroup hlg = containerParent.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -147,17 +274,46 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 }
                 else if (containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
-                    // Fallback to manual offset if parent is the Canvas (to prevent destroying overall UI layout)
-                    RectTransform rtClone = clone.GetComponent<RectTransform>();
-                    RectTransform rtMat = materialsLabelText != null ? materialsLabelText.transform.parent.GetComponent<RectTransform>() : null;
+                    // Fallback to manual offset if parent is the Canvas
                     RectTransform rtInt = template.GetComponent<RectTransform>();
                     
-                    if (rtClone != null && rtMat != null && rtInt != null)
+                    GameObject materialsContainerGo = GameObject.Find("Materials Container");
+                    if (materialsContainerGo == null)
                     {
-                        float stepX = (rtInt.anchoredPosition.x - rtMat.anchoredPosition.x) / 3f; 
-                        if (stepX == 0) stepX = 150f; 
-                        rtClone.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX, 0f);
+                        Transform t = FindChildRecursive(transform, "Materials Container");
+                        if (t != null) materialsContainerGo = t.gameObject;
                     }
+                    RectTransform rtMat = materialsContainerGo != null ? materialsContainerGo.GetComponent<RectTransform>() : null;
+                    
+                    float stepX = 150f;
+                    if (rtInt != null && rtMat != null)
+                    {
+                        stepX = (rtInt.anchoredPosition.x - rtMat.anchoredPosition.x) / 3f;
+                        if (stepX == 0) stepX = 150f;
+                    }
+
+                    if (powerClone != null)
+                    {
+                        var rt = powerClone.GetComponent<RectTransform>();
+                        if (rt != null) rt.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX, 0f);
+                    }
+                    if (temperatureClone != null)
+                    {
+                        var rt = temperatureClone.GetComponent<RectTransform>();
+                        if (rt != null) rt.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX * 2f, 0f);
+                    }
+                    if (atmosphereClone != null)
+                    {
+                        var rt = atmosphereClone.GetComponent<RectTransform>();
+                        if (rt != null) rt.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX * 3f, 0f);
+                    }
+                }
+
+                // Force layout recalculation
+                var parentRt = containerParent.GetComponent<RectTransform>();
+                if (parentRt != null)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(parentRt);
                 }
             }
 
@@ -198,6 +354,23 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             
             // Special case for the duplicate population text if it exists
             if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
+
+            // Permanently deactivate Hero Cargo and Probe Progress containers as they are not needed
+            GameObject cargoContainer = GameObject.Find("Hero Cargo Container");
+            if (cargoContainer == null)
+            {
+                Transform t = FindChildRecursive(transform, "Hero Cargo Container");
+                if (t != null) cargoContainer = t.gameObject;
+            }
+            if (cargoContainer != null) cargoContainer.SetActive(false);
+
+            GameObject probeContainer = GameObject.Find("Probe Progress Container");
+            if (probeContainer == null)
+            {
+                Transform t = FindChildRecursive(transform, "Probe Progress Container");
+                if (t != null) probeContainer = t.gameObject;
+            }
+            if (probeContainer != null) probeContainer.SetActive(false);
         }
 
         public void ShowWarningBanner(string message)
@@ -236,21 +409,28 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 
         private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, params string[] headerNames)
         {
-            GameObject container = GameObject.Find(containerName);
-            if (container == null) return;
+            Transform containerT = FindChildRecursive(transform, containerName);
+            if (containerT == null)
+            {
+                GameObject containerGo = GameObject.Find(containerName);
+                if (containerGo != null) containerT = containerGo.transform;
+            }
+            if (containerT == null) return;
+
+            GameObject container = containerT.gameObject;
 
             if (valueField == null)
             {
                 // Look for Resource Label anywhere in children
                 valueField = container.GetComponentsInChildren<TextMeshProUGUI>(true)
-                    .FirstOrDefault(t => t.gameObject.name == "Resource Label");
+                    .FirstOrDefault(t => t.gameObject.name == "Resource Label" || t.gameObject.name.Contains("Value") || t.gameObject.name.Contains("Label"));
             }
 
             if (labelField == null)
             {
                 // Look for header anywhere in children
                 labelField = container.GetComponentsInChildren<TextMeshProUGUI>(true)
-                    .FirstOrDefault(t => headerNames.Contains(t.gameObject.name));
+                    .FirstOrDefault(t => headerNames.Contains(t.gameObject.name) || t.gameObject.name.Contains("Header") || t.gameObject.name.Contains("Title"));
             }
         }
 
@@ -262,47 +442,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
         private void Update()
         {
             UpdateSectorsUI();
-            UpdateProbeProgressUI();
-            UpdateHeroDroneSubscription();
-        }
-
-        private void UpdateProbeProgressUI()
-        {
-            if (probeProgressValueText == null) return;
-            GameObject container = probeProgressValueText.transform.parent?.parent?.gameObject;
-            if (container != null) container.SetActive(false);
-        }
-
-        private void UpdateHeroDroneSubscription()
-        {
-            if (heroDroneReference != null) return;
-
-            heroDroneReference = Object.FindAnyObjectByType<HeroDrone>();
-            if (heroDroneReference != null)
-            {
-                heroDroneReference.OnCargoChanged += HandleHeroCargoChanged;
-                HandleHeroCargoChanged();
-            }
-        }
-
-        private void HandleHeroCargoChanged()
-        {
-            if (heroDroneReference == null || heroCargoValueText == null) return;
-
-            GameObject container = heroCargoValueText.transform.parent?.parent?.gameObject;
-            if (container == null) return;
-
-            if (heroDroneReference.CarriedAmount > 0)
-            {
-                string supplyName = heroDroneReference.CarriedSupply != null ? heroDroneReference.CarriedSupply.name : "Resources";
-                heroCargoValueText.SetText($"{heroDroneReference.CarriedAmount}/{heroDroneReference.MaxCapacity} ({supplyName})");
-                if (heroCargoLabelText != null) heroCargoLabelText.SetText("Hero Cargo");
-                container.SetActive(true);
-            }
-            else
-            {
-                container.SetActive(false);
-            }
         }
 
         private void UpdateSectorsUI()
@@ -339,8 +478,8 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 materialsValueText.SetText(initial.ToString());
 
             if (biomassLabelText != null) biomassLabelText.SetText("Biomass");
-            if (biomassValueText != null && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(displayedOwner, out int bInitial))
-                biomassValueText.SetText(bInitial.ToString());
+            if (biomassValueText != null && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(displayedOwner, out float bInitial))
+                biomassValueText.SetText($"{bInitial:F1}%");
 
             if (powerLabelText != null) powerLabelText.SetText("Power");
             if (powerValueText != null && Supplies.Power != null && Supplies.Power.TryGetValue(displayedOwner, out float pInitial))
@@ -361,6 +500,18 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 integrityValueText.SetText(integrityInitial.ToString("F1"));
             }
 
+            if (temperatureLabelText != null) temperatureLabelText.SetText("Temp");
+            if (temperatureValueText != null && Supplies.Temperature != null && Supplies.Temperature.TryGetValue(displayedOwner, out float tempInitial))
+            {
+                temperatureValueText.SetText($"{tempInitial:F1}°C");
+            }
+
+            if (atmosphereLabelText != null) atmosphereLabelText.SetText("Atmos");
+            if (atmosphereValueText != null && Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(displayedOwner, out float atmosInitial))
+            {
+                atmosphereValueText.SetText($"{atmosInitial:F2} atm");
+            }
+
             UpdatePopulationText();
         }
 
@@ -373,6 +524,8 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnPowerChanged -= HandlePowerChanged;
             Supplies.OnPopulationChanged -= HandlePopulationChanged;
             Supplies.OnPopulationLimitChanged -= HandlePopulationLimitChanged;
+            Supplies.OnTemperatureChanged -= HandleTemperatureChanged;
+            Supplies.OnAtmosphereChanged -= HandleAtmosphereChanged;
         }
 
         private void HandlePopulationChanged(Owner owner, int newValue)
@@ -426,10 +579,10 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             materialsValueText.SetText(newValue.ToString());
         }
 
-        private void HandleBiomassChanged(Owner owner, int newValue)
+        private void HandleBiomassChanged(Owner owner, float newValue)
         {
             if (owner != displayedOwner) return;
-            if (biomassValueText != null) biomassValueText.SetText(newValue.ToString());
+            if (biomassValueText != null) biomassValueText.SetText($"{newValue:F1}%");
         }
 
         private void HandlePowerChanged(Owner owner, float newValue)
@@ -638,6 +791,20 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 // Reference was destroyed; clear local reference so future calls skip it.
                 iconImage = null;
             }
+        }
+
+        private void HandleTemperatureChanged(Owner owner, float newValue)
+        {
+            if (owner != displayedOwner) return;
+            if (temperatureValueText != null)
+                temperatureValueText.SetText($"{newValue:F1}°C");
+        }
+
+        private void HandleAtmosphereChanged(Owner owner, float newValue)
+        {
+            if (owner != displayedOwner) return;
+            if (atmosphereValueText != null)
+                atmosphereValueText.SetText($"{newValue:F2} atm");
         }
     }
 }

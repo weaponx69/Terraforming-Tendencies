@@ -34,10 +34,9 @@ namespace GameDevTV.RTS.Player
                 // Drain Biomass
                 if (Supplies.Biomass != null && Supplies.Biomass.ContainsKey(monitoredOwner))
                 {
-                    int currentBiomass = Supplies.Biomass[monitoredOwner];
-                    int drain = Mathf.CeilToInt(biomassDrainRate * tickRate);
-                    Supplies.Biomass[monitoredOwner] = Mathf.Max(0, currentBiomass - drain);
-                    Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
+                    float currentBiomass = Supplies.Biomass[monitoredOwner];
+                    float drain = biomassDrainRate * tickRate;
+                    Supplies.UpdateBiomass(monitoredOwner, currentBiomass - drain);
                 }
 
                 // Recalculate Integrity based on total unit/building health

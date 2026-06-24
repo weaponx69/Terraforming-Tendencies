@@ -39,8 +39,8 @@ namespace GameDevTV.RTS.Player
             private set => _materials = value;
         }
 
-        private static Dictionary<Owner, int> _biomass;
-        public static Dictionary<Owner, int> Biomass 
+        private static Dictionary<Owner, float> _biomass;
+        public static Dictionary<Owner, float> Biomass 
         { 
             get 
             {
@@ -132,7 +132,7 @@ namespace GameDevTV.RTS.Player
         public static event Action<Owner, float> OnAtmosphereChanged;
         public static event Action<Owner, float> OnIntegrityChanged;
         public static event Action<Owner, float> OnPowerChanged;
-        public static event Action<Owner, int> OnBiomassChanged;
+        public static event Action<Owner, float> OnBiomassChanged;
 
         public static float MineralsToMaterialsRateStatic { get; private set; } = 1f;
         public static float GasToMaterialsRateStatic { get; private set; } = 1f;
@@ -159,11 +159,20 @@ namespace GameDevTV.RTS.Player
             }
         }
 
-        public static void UpdateBiomass(Owner owner, int value)
+        public static void UpdateBiomass(Owner owner, float value)
         {
             if (Biomass != null && Biomass.ContainsKey(owner))
             {
-                Biomass[owner] = Mathf.Max(0, value);
+                float maxBiomass = 100f;
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                {
+                    int total = SectorManager.Instance.Sectors.Count;
+                    int occupied = 0;
+                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
+                    maxBiomass = ((float)occupied / total) * 100f;
+                }
+
+                Biomass[owner] = Mathf.Clamp(value, 0f, maxBiomass);
                 OnBiomassChanged?.Invoke(owner, Biomass[owner]);
             }
         }
@@ -193,7 +202,7 @@ namespace GameDevTV.RTS.Player
             if (_materials != null) return;
 
             _materials = new Dictionary<Owner, int>();
-            _biomass = new Dictionary<Owner, int>();
+            _biomass = new Dictionary<Owner, float>();
             _power = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
@@ -206,7 +215,7 @@ namespace GameDevTV.RTS.Player
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
                 _materials[owner] = (owner == Owner.Player1) ? 1000 : 0;
-                _biomass[owner] = 0;
+                _biomass[owner] = 0f;
                 _power[owner] = 0f;
                 _population[owner] = 0;
                 _populationLimit[owner] = 0;
@@ -229,7 +238,7 @@ namespace GameDevTV.RTS.Player
 
             // Re-initialize to ensure instance settings (startingMaterials) are applied
             _materials = new Dictionary<Owner, int>();
-            _biomass = new Dictionary<Owner, int>();
+            _biomass = new Dictionary<Owner, float>();
             _power = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
@@ -241,7 +250,7 @@ namespace GameDevTV.RTS.Player
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
                 _materials.Add(owner, (owner == Owner.Player1) ? startingMaterials : 0);
-                _biomass.Add(owner, 0);
+                _biomass.Add(owner, 0f);
                 _power.Add(owner, 0f);
                 _population.Add(owner, 0);
                 _populationLimit.Add(owner, 0);
@@ -383,7 +392,7 @@ namespace GameDevTV.RTS.Player
             }
             else if (isBiomass)
             {
-                int curBiomass = Biomass != null && Biomass.TryGetValue(evt.Owner, out int b) ? b : 0;
+                float curBiomass = Biomass != null && Biomass.TryGetValue(evt.Owner, out float b) ? b : 0f;
                 UpdateBiomass(evt.Owner, curBiomass + evt.Amount);
                 return;
             }

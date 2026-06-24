@@ -79,10 +79,10 @@ namespace GameDevTV.RTS.Tests
         [UnityTest]
         public IEnumerator BiomassUI_Updates_WhenBiomassChanges()
         {
-            biomassText.text = "0";
-            Supplies.RaiseMaterialsChanged(Owner.Player1, 500);
+            biomassText.text = "0.0%";
+            Supplies.UpdateBiomass(Owner.Player1, 50.5f);
             yield return null; 
-            Assert.AreEqual("500", biomassText.text, "Biomass UI text should update to match the new biomass value.");
+            Assert.AreEqual("50.5%", biomassText.text, "Biomass UI text should update to match the new biomass value.");
             Debug.Log("[UITest] BiomassUI_Updates_WhenBiomassChanges Passed");
         }
 
@@ -94,10 +94,10 @@ namespace GameDevTV.RTS.Tests
             var oxygenValueText = textObj.AddComponent<TextMeshProUGUI>();
             SetField(runtimeUI, "oxygenValueText", oxygenValueText);
             
-            oxygenValueText.text = "0.000";
+            oxygenValueText.text = "0.0%";
             Supplies.UpdateOxygen(Owner.Player1, 25f);
             yield return null; 
-            Assert.AreEqual("25.000", oxygenValueText.text, "Oxygen UI text should update to match the new oxygen value.");
+            Assert.AreEqual("25.0%", oxygenValueText.text, "Oxygen UI text should update to match the new oxygen value.");
             Debug.Log("[UITest] OxygenUI_Updates_WhenOxygenChanges Passed");
         }
 
@@ -137,8 +137,8 @@ namespace GameDevTV.RTS.Tests
             var supplies = Object.FindAnyObjectByType<Supplies>();
             SetField(supplies, "mineralsSO", mineralsSO);
             SetField(supplies, "mineralsToBiomassRate", 1.0f);
-            Supplies.Biomass[Owner.Player1] = 100;
-            biomassText.text = "100";
+            Supplies.Biomass[Owner.Player1] = 100f;
+            biomassText.text = "100.0%";
 
             var genObj = new GameObject("PlanetGenerator");
             var generator = genObj.AddComponent<PlanetGenerator>();
@@ -159,8 +159,8 @@ namespace GameDevTV.RTS.Tests
 
             yield return null;
 
-            Assert.AreEqual(110, Supplies.Biomass[Owner.Player1], "Biomass should have increased to 110.");
-            Assert.AreEqual("110", biomassText.text, "UI should show 110 biomass.");
+            Assert.AreEqual(110f, Supplies.Biomass[Owner.Player1], "Biomass should have increased to 110.");
+            Assert.AreEqual("110.0%", biomassText.text, "UI should show 110 biomass.");
 
             Object.Destroy(rockObj);
             Object.Destroy(genObj);

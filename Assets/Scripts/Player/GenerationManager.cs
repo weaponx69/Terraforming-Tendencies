@@ -74,11 +74,19 @@ namespace GameDevTV.RTS.Player
         private void OnEnable()
         {
             PlanetGenerator.OnPlanetGenerated += InitializeGenerations;
+            BlueprintDraftManager.OnDraftCompleted += HandleDraftCompleted;
         }
 
         private void OnDisable()
         {
             PlanetGenerator.OnPlanetGenerated -= InitializeGenerations;
+            BlueprintDraftManager.OnDraftCompleted -= HandleDraftCompleted;
+        }
+
+        private void HandleDraftCompleted()
+        {
+            RecordBaselines();
+            roundStartTime = Time.time; // Restart grace period after unpause
         }
 
         private void InitializeGenerations()
@@ -107,7 +115,7 @@ namespace GameDevTV.RTS.Player
             {
                 milestones = new List<SectorMilestone>
                 {
-                    new SectorMilestone { Type = MilestoneType.Biomass, TargetValue = 250f, GoalDescription = "Accumulate 250 Biomass" },
+                    new SectorMilestone { Type = MilestoneType.Biomass, TargetValue = 25f, GoalDescription = "Reach 25% Biomass" },
                     new SectorMilestone { Type = MilestoneType.Power, TargetValue = 20f, GoalDescription = "Generate 20 Grid Power" },
                     new SectorMilestone { Type = MilestoneType.Oxygen, TargetValue = 30f, GoalDescription = "Reach 30% Atmospheric Oxygen" },
                     new SectorMilestone { Type = MilestoneType.Population, TargetValue = 10f, GoalDescription = "Establish 10 Colonists" },
@@ -115,10 +123,20 @@ namespace GameDevTV.RTS.Player
                 };
             }
 
-            // Dynamically scale the Oxygen milestone target to (100% / number of sectors)
+            // Dynamically scale the Oxygen and Biomass milestone targets to (100% / number of sectors) * unlocked sectors count
             if (SectorManager.Instance != null && SectorManager.Instance.Sectors != null && SectorManager.Instance.Sectors.Count > 0)
             {
-                float targetValue = 100f / SectorManager.Instance.Sectors.Count;
+                int unlockedCount = 0;
+                foreach (var sector in SectorManager.Instance.Sectors)
+                {
+                    if (sector != null && !sector.IsLocked)
+                    {
+                        unlockedCount++;
+                    }
+                }
+                unlockedCount = Mathf.Max(1, unlockedCount);
+
+                float targetValue = (100f / SectorManager.Instance.Sectors.Count) * unlockedCount;
                 for (int i = 0; i < milestones.Count; i++)
                 {
                     if (milestones[i].Type == MilestoneType.Oxygen)
@@ -128,6 +146,13 @@ namespace GameDevTV.RTS.Player
                         m.GoalDescription = $"Reach {targetValue:F0}% Atmospheric Oxygen";
                         milestones[i] = m;
                     }
+                    else if (milestones[i].Type == MilestoneType.Biomass)
+                    {
+                        var m = milestones[i];
+                        m.TargetValue = targetValue;
+                        m.GoalDescription = $"Reach {targetValue:F0}% Biomass";
+                        milestones[i] = m;
+                    }
                 }
             }
         }
@@ -135,7 +160,7 @@ namespace GameDevTV.RTS.Player
         private void RecordBaselines()
         {
             baselineBiomass = 0f;
-            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int bio))
+            if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float bio))
                 baselineBiomass = bio;
 
             baselinePower = 0f;
@@ -167,8 +192,8 @@ namespace GameDevTV.RTS.Player
             switch (milestone.Type)
             {
                 case MilestoneType.Biomass:
-                    if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out int bio))
-                        currentValue = bio - baselineBiomass;
+                    if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float bio))
+                        currentValue = bio;
                     break;
                 case MilestoneType.Oxygen:
                     if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))

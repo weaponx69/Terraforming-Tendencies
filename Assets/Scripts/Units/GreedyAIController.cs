@@ -945,7 +945,7 @@ else
         {
             if (unlockable?.Cost == null) return true;
             int cost = Mathf.FloorToInt(unlockable.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic + unlockable.Cost.Gas * Supplies.GasToMaterialsRateStatic);
-            int available = Supplies.Biomass.TryGetValue(aiOwner, out int biomass) ? biomass : 0;
+            float available = Supplies.Biomass.TryGetValue(aiOwner, out float biomass) ? biomass : 0f;
             
             if (ignoreReserve)
             {
@@ -958,7 +958,7 @@ else
 
             // Factor in player spending allowance slider (0% to 100%)
             float spendingFraction = logarithmicFraction * aiSpendingAllowance;
-            int dynamicReserve = Mathf.FloorToInt((1f - spendingFraction) * available);
+            float dynamicReserve = (1f - spendingFraction) * available;
             return cost <= (available - dynamicReserve);
         }
     }

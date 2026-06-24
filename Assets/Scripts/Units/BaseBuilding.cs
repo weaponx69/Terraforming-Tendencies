@@ -598,33 +598,22 @@ namespace GameDevTV.RTS.Units
                     }
                 }
 
-                // Generation
-                if (config.PowerGeneration > 0)
-                {
-                    float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
-                    float effectivePowerGen = config.PowerGeneration * BlueprintDraftManager.PowerGenMultiplier;
-                    Supplies.UpdatePower(Owner, curPower + effectivePowerGen);
-                }
+                // Generation is managed globally via PowerGridManager.RecalculateGrids()
 
                 if (isOperating)
                 {
                     if (config.BiomassGeneration > 0)
                     {
-                        int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
+                        float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
                         Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
                     }
 
-                    // Upkeep
-                    if (config.PowerUpkeep > 0)
-                    {
-                        float curPower = Supplies.Power != null && Supplies.Power.TryGetValue(Owner, out float p) ? p : 0;
-                        Supplies.UpdatePower(Owner, Mathf.Max(0, curPower - config.PowerUpkeep));
-                    }
+                    // Upkeep is managed globally via PowerGridManager.RecalculateGrids()
                     
                     if (config.BiomassUpkeep > 0)
                     {
-                        int curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out int b) ? b : 0;
-                        Supplies.UpdateBiomass(Owner, Mathf.Max(0, curBiomass - Mathf.CeilToInt(config.BiomassUpkeep)));
+                        float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
+                        Supplies.UpdateBiomass(Owner, Mathf.Max(0f, curBiomass - config.BiomassUpkeep));
                     }
 
                     if (config.OxygenUpkeep > 0)

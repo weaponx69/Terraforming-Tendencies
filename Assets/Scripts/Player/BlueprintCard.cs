@@ -91,7 +91,7 @@ namespace GameDevTV.RTS.Player
             }
             if (biomassAmount > 0)
             {
-                int cur = Supplies.Biomass.TryGetValue(Owner.Player1, out int b) ? b : 0;
+                float cur = Supplies.Biomass.TryGetValue(Owner.Player1, out float b) ? b : 0f;
                 Supplies.UpdateBiomass(Owner.Player1, cur + biomassAmount);
                 Debug.Log($"[Blueprint] Biomass shipment delivered: +{biomassAmount}");
             }
