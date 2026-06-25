@@ -252,4 +252,198 @@ namespace GameDevTV.RTS.Player
             }
         }
     }
+
+    [CreateAssetMenu(fileName = "Discovery Card", menuName = "Blueprints/Discovery Card")]
+    public class DiscoveryCardSO : BlueprintCardSO
+    {
+        public enum DiscoveryType
+        {
+            IronVein,        // Reveals Iron deposits in explored sectors
+            GasPocket,       // Reveals Gas deposits
+            RegolithField,   // Reveals Regolith deposits
+            MineralSurvey,   // Reveals Minerals deposits
+            DeepCoreScan,    // Reveals hidden high-value deposits + bonus
+            DebrisField      // Drones can salvage debris
+        }
+
+        public DiscoveryType discoveryType;
+        public int bonusMaterials = 0;
+
+        public override string GetCardGoal()
+        {
+            return discoveryType switch
+            {
+                DiscoveryType.IronVein => "MATERIALS",
+                DiscoveryType.GasPocket => "GAS",
+                DiscoveryType.RegolithField => "MATERIALS",
+                DiscoveryType.MineralSurvey => "MATERIALS",
+                DiscoveryType.DeepCoreScan => "MATERIALS",
+                DiscoveryType.DebrisField => "SALVAGE",
+                _ => "DISCOVERY"
+            };
+        }
+
+        public override void Apply()
+        {
+            string typeName = discoveryType switch
+            {
+                DiscoveryType.IronVein => "Iron",
+                DiscoveryType.GasPocket => "Gas",
+                DiscoveryType.RegolithField => "Regolith",
+                DiscoveryType.MineralSurvey => "Minerals",
+                DiscoveryType.DeepCoreScan => null, // Handled specially
+                DiscoveryType.DebrisField => null,   // Handled specially
+                _ => null
+            };
+
+            if (discoveryType == DiscoveryType.DeepCoreScan)
+            {
+                // Reveal ALL resource types in explored sectors
+                var allTypes = Environment.DiscoverySystem.GetResourceTypesInExploredSectors();
+                foreach (var t in allTypes)
+                {
+                    Environment.DiscoverySystem.RevealResourceType(t);
+                }
+                Debug.Log("[Blueprint] Deep Core Scan: All resource types in explored sectors revealed!");
+            }
+            else if (discoveryType == DiscoveryType.DebrisField)
+            {
+                // Enable salvage mechanic — flag set for WorkerBrainController to check
+                BlueprintDraftManager.SalvageEnabled = true;
+                Debug.Log("[Blueprint] Debris Field Spotted: Salvage enabled for destroyed buildings.");
+            }
+            else if (!string.IsNullOrEmpty(typeName))
+            {
+                Environment.DiscoverySystem.RevealResourceType(typeName);
+                Debug.Log($"[Blueprint] Discovery: {typeName} deposits now visible in explored sectors!");
+            }
+
+            // Grant any bonus materials
+            if (bonusMaterials > 0)
+            {
+                int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
+                Supplies.Materials[Owner.Player1] = cur + bonusMaterials;
+                Supplies.RaiseMaterialsChanged(Owner.Player1, cur + bonusMaterials);
+                Debug.Log($"[Blueprint] Bonus salvage: +{bonusMaterials} Materials");
+            }
+        }
+
+        public override bool IsGateMet()
+        {
+            // Discovery cards only appear for types that exist in explored sectors
+            if (discoveryType == DiscoveryType.DeepCoreScan || discoveryType == DiscoveryType.DebrisField)
+                return true;
+
+            string typeName = discoveryType switch
+            {
+                DiscoveryType.IronVein => "Iron",
+                DiscoveryType.GasPocket => "Gas",
+                DiscoveryType.RegolithField => "Regolith",
+                DiscoveryType.MineralSurvey => "Minerals",
+                _ => null
+            };
+
+            if (string.IsNullOrEmpty(typeName)) return true;
+
+            // Only show this card if the resource type exists in explored sectors
+            var existingTypes = Environment.DiscoverySystem.GetResourceTypesInExploredSectors();
+            return existingTypes.Contains(typeName);
+        }
+    }
+
+    [CreateAssetMenu(fileName = "Scouting Card", menuName = "Blueprints/Scouting Card")]
+    public class ScoutingCardSO : BlueprintCardSO
+    {
+        public enum ScoutingType
+        {
+            OrbitalScan,      // Instantly reveal next sector
+            PipelineBoost,    // Exploration 2x faster this round
+            SurveyDrone,      // Deploy probe to scout ahead
+            EmergencyCaches   // Flat Materials (always available safety net)
+        }
+
+        public ScoutingType scoutingType;
+        public int materialsAmount = 0;
+
+        public override string GetCardGoal()
+        {
+            return scoutingType switch
+            {
+                ScoutingType.OrbitalScan => "EXPLORATION",
+                ScoutingType.PipelineBoost => "EXPLORATION",
+                ScoutingType.SurveyDrone => "EXPLORATION",
+                ScoutingType.EmergencyCaches => "MATERIALS",
+                _ => "SCOUTING"
+            };
+        }
+
+        public override void Apply()
+        {
+            var explorationMgr = Environment.ExplorationManager.Instance;
+
+            switch (scoutingType)
+            {
+                case ScoutingType.OrbitalScan:
+                    if (explorationMgr != null)
+                    {
+                        explorationMgr.InstantExplore();
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Blueprint] Orbital Scan: No ExplorationManager found in scene!");
+                    }
+                    break;
+
+                case ScoutingType.PipelineBoost:
+                    if (explorationMgr != null)
+                    {
+                        explorationMgr.BoostExplorationSpeed(2f, 60f);
+                    }
+                    Debug.Log("[Blueprint] Pipeline Boost: Exploration speed doubled for 60 seconds!");
+                    break;
+
+                case ScoutingType.SurveyDrone:
+                    if (explorationMgr != null)
+                    {
+                        explorationMgr.DeploySurveyDrone();
+                    }
+                    Debug.Log("[Blueprint] Survey Drone deployed to scout ahead!");
+                    break;
+
+                case ScoutingType.EmergencyCaches:
+                    if (materialsAmount > 0)
+                    {
+                        int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
+                        Supplies.Materials[Owner.Player1] = cur + materialsAmount;
+                        Supplies.RaiseMaterialsChanged(Owner.Player1, cur + materialsAmount);
+                        Debug.Log($"[Blueprint] Emergency Caches: +{materialsAmount} Materials from salvage.");
+                    }
+                    break;
+            }
+        }
+
+        public override bool IsGateMet()
+        {
+            // Scouting cards are always valid as long as locked sectors exist
+            if (scoutingType == ScoutingType.EmergencyCaches) return true;
+
+            var sectorMgr = Environment.SectorManager.Instance;
+            if (sectorMgr == null) return false;
+            return sectorMgr.GetNextLockedSectorIndex() >= 0;
+        }
+    }
+
+    [CreateAssetMenu(fileName = "Drill Breakthrough Card", menuName = "Blueprints/Drill Breakthrough Card")]
+    public class DrillBreakthroughCardSO : BlueprintCardSO
+    {
+        public float gatherSpeedMultiplier = 1.5f;
+
+        public override string GetCardGoal() => "MINING";
+
+        public override void Apply()
+        {
+            BlueprintDraftManager.GatherSpeedMultiplier *= gatherSpeedMultiplier;
+            Debug.Log($"[Blueprint] Drill Breakthrough: Gather speed multiplier now {BlueprintDraftManager.GatherSpeedMultiplier:F1}x");
+        }
+    }
 }

@@ -419,14 +419,8 @@ namespace GameDevTV.RTS.Player
                 Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
             }
 
-            // Unlock the next sector!
-            if (SectorManager.Instance != null)
-            {
-                SectorManager.Instance.UnlockNextSector();
-            }
-
-            // Replenish resources on the map
-            PlanetGenerator.Instance?.ReplenishResources();
+            // NOTE: Sector unlocking is now handled by ExplorationManager via scouting cards.
+            // Resources are no longer auto-replenished — they persist across rounds.
             roundStartTime = Time.time; // Start the grace period
 
             UnlockPrerequisitesForMilestone();
@@ -475,7 +469,7 @@ namespace GameDevTV.RTS.Player
                 Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
             }
 
-            PlanetGenerator.Instance?.ReplenishResources();
+            // NOTE: Resources are no longer auto-replenished — they persist across rounds.
             roundStartTime = Time.time; // Start the grace period
 
             UnlockPrerequisitesForMilestone();

@@ -14,6 +14,9 @@ namespace GameDevTV.RTS.Player
         public static float GatherSpeedMultiplier { get; set; } = 1.0f;
         public static float PowerGenMultiplier { get; set; } = 1.0f;
 
+        /// <summary>Whether salvage from destroyed buildings/debris is enabled (Debris Field discovery).</summary>
+        public static bool SalvageEnabled { get; set; } = false;
+
         public static event Action OnDraftCompleted;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -49,6 +52,7 @@ namespace GameDevTV.RTS.Player
 
             GatherSpeedMultiplier = 1.0f;
             PowerGenMultiplier = 1.0f;
+            SalvageEnabled = false;
         }
 
         public static void RegisterBuildingSO(BuildingSO building)

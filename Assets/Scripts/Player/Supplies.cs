@@ -154,9 +154,26 @@ namespace GameDevTV.RTS.Player
 
         public static event System.Action<Owner, int> OnMaterialsChanged;
 
+        /// <summary>Fired when the Materials pool hits 0.</summary>
+        public static event System.Action OnMaterialsDepleted;
+
+        /// <summary>Fired when panic mode activates (Materials critically low, all buildings degraded).</summary>
+        public static event System.Action OnPanicModeActivated;
+
+        /// <summary>Fired when panic mode deactivates.</summary>
+        public static event System.Action OnPanicModeDeactivated;
+
+        /// <summary>Whether the colony is in panic mode (upkeep paused, all buildings degraded).</summary>
+        public static bool IsPanicMode { get; set; } = false;
+
         public static void RaiseMaterialsChanged(Owner owner, int value)
         {
             OnMaterialsChanged?.Invoke(owner, value);
+
+            if (value <= 0)
+            {
+                OnMaterialsDepleted?.Invoke();
+            }
         }
 
         public static event Action<Owner, int> OnPopulationChanged;

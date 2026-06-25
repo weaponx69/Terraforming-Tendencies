@@ -385,6 +385,130 @@ namespace GameDevTV.RTS.Environment
                     Debug.Log("[PlanetGenerator] Resources replenished for new generation.");
                 }
 
+                /// <summary>
+                /// Replenish resources ONLY within the bounds of a newly explored sector.
+                /// Does NOT destroy existing resources — only adds new ones in the sector.
+                /// Used when a sector is explored for the first time.
+                /// </summary>
+                public void ReplenishResourcesInSector(SectorManager.Sector sector)
+                {
+                    if (Config == null || sector == null) return;
+
+                    float cellSize = CellSize;
+                    float worldWidth = Config.MapWidth * cellSize;
+                    float worldHeight = Config.MapHeight * cellSize;
+                    float secW = worldWidth / Config.SectorsX;
+                    float secH = worldHeight / Config.SectorsY;
+
+                    Vector3 sectorMin = sector.Center - new Vector3(secW * 0.5f, 0, secH * 0.5f);
+                    Vector3 sectorMax = sector.Center + new Vector3(secW * 0.5f, 0, secH * 0.5f);
+
+                    float exclusionRadius = 5f;
+                    Vector3 center = sector.Center;
+
+                    // Count existing resources in this sector
+                    int existingCount = 0;
+                    var existingSupplies = GetComponentsInChildren<GatherableSupply>(true);
+                    foreach (var gs in existingSupplies)
+                    {
+                        if (gs == null) continue;
+                        Vector3 pos = gs.transform.position;
+                        if (pos.x >= sectorMin.x && pos.x <= sectorMax.x &&
+                            pos.z >= sectorMin.z && pos.z <= sectorMax.z)
+                        {
+                            existingCount++;
+                        }
+                    }
+
+                    // Guarantee minimum 2-4 deposits with at least 2 resource types
+                    int minDeposits = 2;
+                    int maxNewDeposits = Mathf.Max(0, minDeposits - existingCount) + 2;
+
+                    int spawnedCount = 0;
+                    int maxAttempts = maxNewDeposits * 20;
+                    float minSpacing = 5f;
+                    var spawnedPositions = new System.Collections.Generic.List<Vector3>();
+
+                    for (int i = 0; i < maxAttempts && spawnedCount < maxNewDeposits; i++)
+                    {
+                        float randomX = Random.Range(sectorMin.x, sectorMax.x);
+                        float randomZ = Random.Range(sectorMin.z, sectorMax.z);
+                        Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+
+                        if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+
+                        bool tooClose = false;
+                        foreach (Vector3 pos in spawnedPositions)
+                        {
+                            if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                            {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (tooClose) continue;
+                        spawnedPositions.Add(spawnPos);
+
+                        // Alternate between Minerals/Gas and Iron/Regolith
+                        GameObject prefab;
+                        SupplySO so;
+                        string resourceType;
+                        if (spawnedCount % 2 == 0 && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
+                        {
+                            prefab = Config.ResourcePrefabs[Random.Range(0, Config.ResourcePrefabs.Length)];
+                            so = prefab.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
+                            resourceType = prefab.name.ToLower().Contains("gas") ? "Gas" : "Minerals";
+                        }
+                        else
+                        {
+                            // Use rock prefabs for Iron/Regolith
+                            var rockPrefabs = new System.Collections.Generic.List<GameObject>();
+                            if (Config.SurfaceFeaturePrefabs != null)
+                            {
+                                foreach (var p in Config.SurfaceFeaturePrefabs)
+                                {
+                                    if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
+                                        rockPrefabs.Add(p);
+                                }
+                            }
+                            if (rockPrefabs.Count == 0 && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
+                            {
+                                prefab = Config.ResourcePrefabs[0];
+                            }
+                            else if (rockPrefabs.Count == 0)
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                prefab = rockPrefabs[Random.Range(0, rockPrefabs.Count)];
+                            }
+
+                            SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
+                            SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
+                            so = Random.value > 0.5f ? ironSO : regolithSO;
+                            resourceType = (so != null && so.name.ToLower().Contains("regolith")) ? "Regolith" : "Iron";
+                        }
+
+                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                        GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                        EnsureGatherableSupply(instance, so);
+
+                        if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
+                        {
+                            var hr = instance.AddComponent<HiddenResource>();
+                            hr.ResourceTypeName = resourceType;
+                        }
+
+                        spawnedCount++;
+                    }
+
+                    if (spawnedCount > 0)
+                    {
+                        Debug.Log($"[PlanetGenerator] Replenished {spawnedCount} new resource nodes in explored sector at {sector.Center}.");
+                    }
+                }
+
                 public void ApplyCurvedWorldShader(GameObject root)
                 {
                     Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
@@ -575,12 +699,24 @@ namespace GameDevTV.RTS.Environment
                         Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
                         GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
                         
-                        SupplySO so = instance.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
+                        string resourceType;
+                        SupplySO so;
+                        if (instance.name.ToLower().Contains("gas"))
+                        {
+                            so = GasSupplySO;
+                            resourceType = "Gas";
+                        }
+                        else
+                        {
+                            so = MineralsSupplySO;
+                            resourceType = "Minerals";
+                        }
                         EnsureGatherableSupply(instance, so);
 
                         if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
                         {
-                            instance.AddComponent<HiddenResource>();
+                            var hr = instance.AddComponent<HiddenResource>();
+                            hr.ResourceTypeName = resourceType;
                         }
                         
                         spawnedCount++;
@@ -672,14 +808,17 @@ namespace GameDevTV.RTS.Environment
                         spawnedCount++;
 
                         SupplySO so = specificSOs[Random.Range(0, specificSOs.Length)];
+                        string resourceType = "Iron";
                         if (so != null)
                         {
                             EnsureGatherableSupply(instance, so);
+                            resourceType = so.name.ToLower().Contains("regolith") ? "Regolith" : "Iron";
                         }
 
                         if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
                         {
-                            instance.AddComponent<HiddenResource>();
+                            var hr = instance.AddComponent<HiddenResource>();
+                            hr.ResourceTypeName = resourceType;
                         }
 
                         Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();

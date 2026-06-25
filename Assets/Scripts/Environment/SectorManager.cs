@@ -19,6 +19,7 @@ namespace GameDevTV.RTS.Environment
             public bool IsOccupied;
             public BaseBuilding OccupyingBuilding;
             public bool IsLocked = true;
+            public bool IsExplored = false;
             public SectorFeature Feature = SectorFeature.None;
         }
 
@@ -27,6 +28,9 @@ namespace GameDevTV.RTS.Environment
 
         /// <summary>Fired whenever a previously locked sector becomes unlocked.</summary>
         public static event Action OnSectorUnlocked;
+
+        /// <summary>Fired when a sector is explored (scouted) but not necessarily unlocked yet.</summary>
+        public static event Action<int> OnSectorExplored;
 
         private void Awake()
         {
@@ -97,7 +101,7 @@ namespace GameDevTV.RTS.Environment
                         int featureIndex = 1 + ((Sectors.Count - 1) % 4);
                         feature = (SectorFeature)featureIndex;
                     }
-                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst, Feature = feature });
+                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst, IsExplored = isFirst, Feature = feature });
                 }
             }
             
@@ -211,6 +215,13 @@ namespace GameDevTV.RTS.Environment
             {
                 if (Sectors[i].IsLocked)
                 {
+                    // Only unlock if the sector has been explored first
+                    if (!Sectors[i].IsExplored)
+                    {
+                        Debug.LogWarning($"[SectorManager] Cannot unlock Sector {i} — it has not been explored yet. Use scouting cards to explore it first.");
+                        return;
+                    }
+
                     Sectors[i].IsLocked = false;
                     ActiveSector = Sectors[i];
                     Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
@@ -220,6 +231,53 @@ namespace GameDevTV.RTS.Environment
                 }
             }
             Debug.Log("[SectorManager] All sectors are already unlocked!");
+        }
+
+        /// <summary>Mark a specific sector as explored. Fires OnSectorExplored event.</summary>
+        public void ExploreSector(int index)
+        {
+            if (index < 0 || index >= Sectors.Count) return;
+            if (Sectors[index].IsExplored) return;
+
+            Sectors[index].IsExplored = true;
+            OnSectorExplored?.Invoke(index);
+            Debug.Log($"[SectorManager] Sector {index} explored (scouted).");
+        }
+
+        /// <summary>Explore the next locked sector. Returns the index, or -1 if none remain.</summary>
+        public int ExploreNextSector()
+        {
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                if (Sectors[i].IsLocked && !Sectors[i].IsExplored)
+                {
+                    Sectors[i].IsExplored = true;
+                    OnSectorExplored?.Invoke(i);
+                    Debug.Log($"[SectorManager] Sector {i} explored (scouted).");
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>Get the index of the next locked sector, or -1 if none remain.</summary>
+        public int GetNextLockedSectorIndex()
+        {
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                if (Sectors[i].IsLocked) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>Get the index of the next locked AND unexplored sector, or -1 if none.</summary>
+        public int GetNextUnexploredSectorIndex()
+        {
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                if (Sectors[i].IsLocked && !Sectors[i].IsExplored) return i;
+            }
+            return -1;
         }
 
         private void OnDrawGizmos()

@@ -49,6 +49,33 @@ namespace GameDevTV.RTS.Units
         public delegate void QueueUpdatedEvent(UnlockableSO[] unitsInQueue);
         public event QueueUpdatedEvent OnQueueUpdated;
 
+        private bool isDegraded = false;
+
+        /// <summary>Whether this building is in a degraded state due to Materials shortage (50% efficiency).</summary>
+        public bool IsDegraded => isDegraded;
+
+        /// <summary>Called by BuildingUpkeepManager to set the degraded state.</summary>
+        public void SetDegraded(bool degraded)
+        {
+            if (isDegraded == degraded) return;
+            isDegraded = degraded;
+
+            // Visual feedback: yellow tint when degraded
+            if (MainRenderer != null && primaryMaterial != null)
+            {
+                if (degraded)
+                {
+                    // Tint yellow
+                    MainRenderer.material.color = new Color(1f, 0.85f, 0.3f);
+                }
+                else
+                {
+                    // Restore original color
+                    MainRenderer.material.color = Color.white;
+                }
+            }
+        }
+
         //what does isOperating mean?
         public bool IsOperating
         {
@@ -253,12 +280,25 @@ namespace GameDevTV.RTS.Units
             {
                 productionCoroutine = StartCoroutine(DoBuildUnits());
             }
+
+            // Register with BuildingUpkeepManager for Materials upkeep tax
+            if (GameDevTV.RTS.Player.BuildingUpkeepManager.Instance != null &&
+                Progress.State == BuildingProgress.BuildingState.Completed)
+            {
+                GameDevTV.RTS.Player.BuildingUpkeepManager.Instance.RegisterBuilding(this);
+            }
         }
 
         protected override void OnDisable()
         {
             base.OnDisable();
             ActiveBuildings.Remove(this);
+
+            // Unregister from BuildingUpkeepManager
+            if (GameDevTV.RTS.Player.BuildingUpkeepManager.Instance != null)
+            {
+                GameDevTV.RTS.Player.BuildingUpkeepManager.Instance.UnregisterBuilding(this);
+            }
             productionCoroutine = null;
 
             if (BuildingSO != null && BuildingSO.BuildingConfig != null)
@@ -574,6 +614,13 @@ namespace GameDevTV.RTS.Units
             }
 
             GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
+
+            // Register with BuildingUpkeepManager for Materials upkeep tax
+            if (GameDevTV.RTS.Player.BuildingUpkeepManager.Instance != null)
+            {
+                GameDevTV.RTS.Player.BuildingUpkeepManager.Instance.RegisterBuilding(this);
+            }
+
             RaiseSpawnEvent();
         }
 

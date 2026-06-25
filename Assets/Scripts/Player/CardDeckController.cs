@@ -60,10 +60,8 @@ namespace GameDevTV.RTS.Player
         /// <summary>Trigger a draft immediately (use from Inspector button or milestone code).</summary>
         public void TriggerDraft()
         {
-            if (drawPile.Count < handSize) Reshuffle();
-            if (drawPile.Count == 0) return;
-
-            var hand = drawPile.Take(handSize).ToList();
+            var hand = GetCuratedHand();
+            if (hand == null || hand.Count == 0) return;
 
             Time.timeScale = 0f;
             OnDraftStarted?.Invoke(hand);
@@ -79,10 +77,76 @@ namespace GameDevTV.RTS.Player
                 if (card != chosen)
                     discardPile.Add(card); // Unchosen cards go to discard
             }
-            // Chosen card is consumed — optionally move to discard too
+            // Chosen card is consumed
             discardPile.Add(chosen);
 
             BlueprintDraftManager.CompleteDraft(chosen); // Applies effect + unpauses + fires OnDraftCompleted
+        }
+
+        // ── Draft Curation ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Build a curated draft hand:
+        /// - 3 cards from the master deck, filtered by what's relevant in explored sectors
+        /// - Guarantees at least 1 scouting card if sectors remain locked
+        /// - Emergency Caches is always a 4th extra option
+        /// </summary>
+        private List<BlueprintCardSO> GetCuratedHand()
+        {
+            if (masterDeck == null || masterDeck.Count == 0) return null;
+
+            // Find the Emergency Caches card (guaranteed 4th option)
+            BlueprintCardSO emergencyCaches = masterDeck.FirstOrDefault(c =>
+                c is ScoutingCardSO s && s.scoutingType == ScoutingCardSO.ScoutingType.EmergencyCaches);
+
+            // Filter the deck to only include valid cards for current game state
+            var curatedPool = masterDeck
+                .Where(c => c != emergencyCaches) // Exclude emergency card from normal pool
+                .Where(c => c.IsGateMet())        // Climate gates, discovery prerequisites
+                .ToList();
+
+            if (curatedPool.Count == 0)
+            {
+                // Fallback: if nothing is valid, just use emergency caches
+                var hand = new List<BlueprintCardSO>();
+                if (emergencyCaches != null) hand.Add(emergencyCaches);
+                return hand;
+            }
+
+            // Shuffle the curated pool
+            curatedPool = curatedPool.OrderBy(_ => UnityEngine.Random.value).ToList();
+
+            // Separate scouting cards from other types
+            var scoutingCards = curatedPool.Where(c => c is ScoutingCardSO).ToList();
+            var otherCards = curatedPool.Where(c => !(c is ScoutingCardSO)).ToList();
+
+            var hand = new List<BlueprintCardSO>();
+
+            // If sectors remain locked, guarantee at least 1 scouting card
+            bool hasLockedSectors = SectorManager.Instance != null &&
+                                    SectorManager.Instance.GetNextLockedSectorIndex() >= 0;
+
+            if (hasLockedSectors && scoutingCards.Count > 0)
+            {
+                hand.Add(scoutingCards[0]);
+                scoutingCards.RemoveAt(0);
+            }
+
+            // Fill remaining slots from the mixed pool
+            var mixedPool = scoutingCards.Concat(otherCards).OrderBy(_ => UnityEngine.Random.value).ToList();
+            int slotsRemaining = handSize - hand.Count;
+            for (int i = 0; i < slotsRemaining && i < mixedPool.Count; i++)
+            {
+                hand.Add(mixedPool[i]);
+            }
+
+            // Add Emergency Caches as guaranteed 4th option
+            if (emergencyCaches != null && !hand.Contains(emergencyCaches))
+            {
+                hand.Add(emergencyCaches);
+            }
+
+            return hand;
         }
 
         // ── Private Helpers ─────────────────────────────────────────────────────────
