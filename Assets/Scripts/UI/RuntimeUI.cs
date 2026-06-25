@@ -98,6 +98,9 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnTemperatureChanged -= HandleTemperatureChanged;
             Supplies.OnAtmosphereChanged -= HandleAtmosphereChanged;
             Supplies.OnWaterChanged -= HandleWaterChanged;
+
+           // Reset UI values when the component is disabled (e.g., game end)
+           ResetUI();
         }
 
         [SerializeField] private TextMeshProUGUI biomassLabelText;
@@ -651,6 +654,32 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             UpdatePopulationText();
         }
 
+        private void ResetUI()
+        {
+            // Materials
+            if (materialsValueText != null) materialsValueText.SetText("0");
+            // Oxygen
+            if (oxygenValueText != null) oxygenValueText.SetText("0.0%");
+            // Integrity
+            if (integrityValueText != null) integrityValueText.SetText("0.0");
+            // Power
+            if (powerValueText != null) powerValueText.SetText("0");
+            // Biomass
+            if (biomassValueText != null) biomassValueText.SetText("0.0%");
+            // Sectors
+            if (sectorsValueText != null) sectorsValueText.SetText("0/0");
+            // Population
+            if (populationText != null) populationText.SetText("0 / 0");
+            // Temperature
+            if (temperatureValueText != null) temperatureValueText.SetText("-60.0°C");
+            // Atmosphere
+            if (atmosphereValueText != null) atmosphereValueText.SetText("0.01 atm");
+            // Water
+            if (waterValueText != null) waterValueText.SetText("0.0%");
+            // Hero Cargo
+            if (heroCargoValueText != null) heroCargoValueText.SetText("0");
+        }
+
         private void OnDestroy()
         {
             Supplies.OnOxygenChanged -= HandleOxygenChanged;
@@ -663,6 +692,9 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnTemperatureChanged -= HandleTemperatureChanged;
             Supplies.OnAtmosphereChanged -= HandleAtmosphereChanged;
             Supplies.OnWaterChanged -= HandleWaterChanged;
+
+            // Reset UI values when the component is destroyed (e.g., game end)
+            ResetUI();
         }
 
         private void HandlePopulationChanged(Owner owner, int newValue)

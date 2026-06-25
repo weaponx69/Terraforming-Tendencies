@@ -340,7 +340,16 @@ namespace GameDevTV.RTS.Player
         {
             if (Temperature != null && Temperature.ContainsKey(owner))
             {
-                Temperature[owner] = value;
+                float maxTemperature = 100f;
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                {
+                    int total = SectorManager.Instance.Sectors.Count;
+                    int occupied = 0;
+                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
+                    maxTemperature = ((float)occupied / total) * 100f;
+                }
+
+                Temperature[owner] = Mathf.Min(value, maxTemperature);
                 OnTemperatureChanged?.Invoke(owner, Temperature[owner]);
             }
         }
@@ -349,7 +358,16 @@ namespace GameDevTV.RTS.Player
         {
             if (Atmosphere != null && Atmosphere.ContainsKey(owner))
             {
-                Atmosphere[owner] = Mathf.Max(0, value);
+                float maxAtmosphere = 1f; // default max atmosphere (e.g., 1 atm)
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                {
+                    int total = SectorManager.Instance.Sectors.Count;
+                    int occupied = 0;
+                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
+                    maxAtmosphere = ((float)occupied / total) * 1f; // scale up to 1 atm
+                }
+
+                Atmosphere[owner] = Mathf.Clamp(value, 0f, maxAtmosphere);
                 OnAtmosphereChanged?.Invoke(owner, Atmosphere[owner]);
             }
         }
@@ -358,7 +376,16 @@ namespace GameDevTV.RTS.Player
         {
             if (Water != null && Water.ContainsKey(owner))
             {
-                Water[owner] = Mathf.Max(0f, value);
+                float maxWater = 100f;
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                {
+                    int total = SectorManager.Instance.Sectors.Count;
+                    int occupied = 0;
+                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
+                    maxWater = ((float)occupied / total) * 100f;
+                }
+
+                Water[owner] = Mathf.Max(0f, Mathf.Min(value, maxWater));
                 OnWaterChanged?.Invoke(owner, Water[owner]);
             }
         }
