@@ -748,12 +748,10 @@ namespace GameDevTV.RTS.Units
                     if (BuildingSO != null && BuildingSO.Name.Contains("GHG Factory"))
                     {
                         float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
-                        Supplies.Temperature[Owner] = curTemp + 1.0f;
-                        GameDevTV.RTS.Player.Supplies.OnTemperatureChanged?.Invoke(Owner, Supplies.Temperature[Owner]);
+                        Supplies.UpdateTemperature(Owner, curTemp + 1.0f);
 
                         float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
-                        Supplies.Atmosphere[Owner] = curAtmos + 0.02f;
-                        GameDevTV.RTS.Player.Supplies.OnAtmosphereChanged?.Invoke(Owner, Supplies.Atmosphere[Owner]);
+                        Supplies.UpdateAtmosphere(Owner, curAtmos + 0.02f);
                     }
 
                     // Upkeep is managed globally via PowerGridManager.RecalculateGrids()
