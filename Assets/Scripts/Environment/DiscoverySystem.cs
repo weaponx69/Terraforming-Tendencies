@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using GameDevTV.RTS.Units;
 
 namespace GameDevTV.RTS.Environment
 {

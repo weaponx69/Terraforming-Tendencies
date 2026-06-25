@@ -108,9 +108,9 @@ namespace GameDevTV.RTS.Player
             if (curatedPool.Count == 0)
             {
                 // Fallback: if nothing is valid, just use emergency caches
-                var hand = new List<BlueprintCardSO>();
-                if (emergencyCaches != null) hand.Add(emergencyCaches);
-                return hand;
+                var fallbackHand = new List<BlueprintCardSO>();
+                if (emergencyCaches != null) fallbackHand.Add(emergencyCaches);
+                return fallbackHand;
             }
 
             // Shuffle the curated pool

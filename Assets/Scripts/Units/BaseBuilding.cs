@@ -477,10 +477,7 @@ namespace GameDevTV.RTS.Units
                 {
                     AddActiveAbilityCommand("Spread Algae", "Disperse oxygen-generating algae cultures.", 0f, 0f, 2.0f, 0, 60);
                 }
-                else if (BuildingSO.Name.Contains("GHG Factory"))
-                {
-                    AddActiveAbilityCommand("Release GHG", "Vaporize greenhouse gases to raise temperature and thicken atmosphere.", 1.0f, 0.02f, 0f, 0, 0);
-                }
+                // GHG Factory now generates temperature and atmosphere passively — see UpkeepRoutine
                 else if (BuildingSO.Name.Contains("Atmospheric Condenser"))
                 {
                     AddActiveAbilityCommand("Condense Atmosphere", "Extract and concentrate atmospheric gases to enrich oxygen.", 0f, 0f, 0.5f, 0, 0);
@@ -745,6 +742,18 @@ namespace GameDevTV.RTS.Units
                     {
                         float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
                         Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+                    }
+
+                    // Passive temperature + atmosphere generation for GHG Factory
+                    if (BuildingSO != null && BuildingSO.Name.Contains("GHG Factory"))
+                    {
+                        float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
+                        Supplies.Temperature[Owner] = curTemp + 1.0f;
+                        GameDevTV.RTS.Player.Supplies.OnTemperatureChanged?.Invoke(Owner, Supplies.Temperature[Owner]);
+
+                        float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
+                        Supplies.Atmosphere[Owner] = curAtmos + 0.02f;
+                        GameDevTV.RTS.Player.Supplies.OnAtmosphereChanged?.Invoke(Owner, Supplies.Atmosphere[Owner]);
                     }
 
                     // Upkeep is managed globally via PowerGridManager.RecalculateGrids()
