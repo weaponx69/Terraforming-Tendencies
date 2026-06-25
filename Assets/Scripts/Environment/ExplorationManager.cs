@@ -87,8 +87,8 @@ namespace GameDevTV.RTS.Environment
             }
 
             SectorManager.Instance.ExploreSector(nextIndex);
-            SectorManager.Instance.UnlockNextSector();
-            ReplenishNewSector(nextIndex);
+            ReplenishNewSector(nextIndex);     // Add resources FIRST so the draft sees them
+            SectorManager.Instance.UnlockNextSector(); // Triggers draft via OnSectorUnlocked
 
             Debug.Log($"[ExplorationManager] Orbital Scan: Sector {nextIndex} instantly explored and unlocked!");
         }
@@ -148,8 +148,8 @@ namespace GameDevTV.RTS.Environment
             if (nextIndex < 0) return;
 
             SectorManager.Instance.ExploreSector(nextIndex);
-            SectorManager.Instance.UnlockNextSector();
-            ReplenishNewSector(nextIndex);
+            ReplenishNewSector(nextIndex);     // Add resources FIRST so the draft sees them
+            SectorManager.Instance.UnlockNextSector(); // Triggers draft via OnSectorUnlocked
 
             OnSectorExplored?.Invoke(nextIndex);
             Debug.Log($"[ExplorationManager] Sector {nextIndex} exploration complete!");

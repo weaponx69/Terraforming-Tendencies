@@ -108,6 +108,12 @@ namespace GameDevTV.RTS.Environment
             if (Sectors.Count > 0)
             {
                 ActiveSector = Sectors[0];
+
+                // Force-discover Minerals and Gas in Sector 0 so the player can bootstrap.
+                // All other sectors require discovery cards to reveal resource types.
+                DiscoverySystem.RevealResourceType("Minerals");
+                DiscoverySystem.RevealResourceType("Gas");
+
                 DiscoverResourcesInUnlockedSectors();
                 OnSectorUnlocked?.Invoke();
             }

@@ -11,7 +11,12 @@ namespace GameDevTV.RTS.Environment
     /// </summary>
     public static class DiscoverySystem
     {
-        private static HashSet<string> discoveredTypes = new() { "Minerals", "Gas" };
+        /// <summary>
+        /// Default discovered types are empty — even Minerals and Gas must be discovered via cards
+        /// or via Sector 0 force-discovery. This creates real scarcity: players must find deposits
+        /// before they can mine them.
+        /// </summary>
+        private static HashSet<string> discoveredTypes = new();
 
         /// <summary>Check if a resource type has been discovered.</summary>
         public static bool IsTypeDiscovered(string typeName)
@@ -55,9 +60,7 @@ namespace GameDevTV.RTS.Environment
                     types.Add(hr.ResourceTypeName);
                 }
             }
-            // Always include default discovered types
-            types.Add("Minerals");
-            types.Add("Gas");
+            // Only return types that actually exist in explored sectors — no hardcoded defaults
             return types;
         }
 
@@ -88,8 +91,7 @@ namespace GameDevTV.RTS.Environment
         public static void Reset()
         {
             discoveredTypes.Clear();
-            discoveredTypes.Add("Minerals");
-            discoveredTypes.Add("Gas");
+            // No default types — Sector 0 force-discovery handles the starting resources
         }
     }
 }
