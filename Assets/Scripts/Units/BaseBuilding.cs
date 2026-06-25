@@ -417,7 +417,8 @@ namespace GameDevTV.RTS.Units
                 commandList.Add(connectCommand);
                 AvailableCommands = commandList.ToArray();
             }
-
+            
+            // This is where available commandables are named.
             if (BuildingSO != null)
             {
                 if (BuildingSO.Name.Contains("Deep-Core Mining Laser"))
