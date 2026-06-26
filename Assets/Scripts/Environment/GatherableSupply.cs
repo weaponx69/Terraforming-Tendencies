@@ -4,18 +4,70 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+#if UNITY_VISUALSCRIPTING_1_7_OR_NEWER
+using Unity.VisualScripting;
+#else
+using Unity.VisualScripting; // resolved by Assets/Scripts/VisualScriptingAttributes.cs (runtime stub)
+#endif
 
 namespace GameDevTV.RTS.Environment
 {
+    /// <summary>
+    /// A gatherable resource node on the planet surface.
+    /// <para>
+    /// Heavy logic (gather math, renderer loops, culled-visuals mesh construction,
+    /// WorldToScreenPoint labels) is intentionally kept in C#.
+    /// The VS-visible surface — <see cref="DepletionRatio"/>, <see cref="IsExhausted"/>,
+    /// and the four <c>[Inspectable]</c> interaction methods — lets companion Flow Graphs
+    /// react to proximity and depletion events without duplicating any formulas.
+    /// </para>
+    /// </summary>
+    [IncludeInSettings(true)]
     [SelectionBase]
     public class GatherableSupply : MonoBehaviour, IGatherable, IHideable
-{
+    {
+        // ── Inspector / VS-visible data properties ────────────────────────────
+
+        /// <summary>The ScriptableObject defining this resource's type and parameters.</summary>
+        [Inspectable]
         [field: SerializeField] public SupplySO Supply { get; set; }
+
+        /// <summary>Current amount of resource remaining on this node.</summary>
+        [Inspectable]
         [field: SerializeField] public int Amount { get; set; }
+
+        /// <summary>True while a drone has an active gather lock on this node.</summary>
+        [Inspectable]
         [field: SerializeField] public bool IsBusy { get; private set; }
+
+        /// <summary>True when this node is within a unit's vision radius.</summary>
+        [Inspectable]
         [field: SerializeField] public bool IsVisible { get; private set; }
+
         public Transform Transform => this == null ? null : transform;
-        
+
+        // ── VS-visible computed state ─────────────────────────────────────────
+
+        /// <summary>
+        /// Normalised depletion ratio [0, 1]. 1 = full, 0 = exhausted.
+        /// Flow Graph nodes read this to branch on threshold crossings without
+        /// repeating the Amount / MaxAmount division.
+        /// </summary>
+        [Inspectable]
+        public float DepletionRatio =>
+            (Supply != null && Supply.MaxAmount > 0)
+                ? Mathf.Clamp01((float)Amount / Supply.MaxAmount)
+                : 1f;
+
+        /// <summary>
+        /// True the frame the resource reaches zero (before <c>Destroy</c> is called).
+        /// Exposed so a companion Flow Graph can fire a one-shot exhaustion event
+        /// without polling <see cref="Amount"/> directly.
+        /// </summary>
+        [Inspectable]
+        public bool IsExhausted => Amount <= 0;
+
+        // ── Static registry ───────────────────────────────────────────────────
         public static readonly System.Collections.Generic.List<GatherableSupply> ActiveSupplies = new();
 
         private void OnEnable()
@@ -45,6 +97,11 @@ namespace GameDevTV.RTS.Environment
             colliders = GetComponentsInChildren<Collider>();
         }
 
+        /// <summary>
+        /// Enables or disables all colliders on this node.
+        /// Callable from a Flow Graph when revealing/hiding the node.
+        /// </summary>
+        [Inspectable]
         public void ToggleColliders(bool enabled)
         {
             foreach (Collider c in colliders)
@@ -78,6 +135,12 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        /// <summary>
+        /// Attempts to acquire a gather lock on this node.
+        /// Returns <c>true</c> if the lock was granted; <c>false</c> if already busy.
+        /// Callable from a Flow Graph to initiate a gather sequence.
+        /// </summary>
+        [Inspectable]
         public bool BeginGather()
         {
             if (IsBusy)
@@ -89,6 +152,12 @@ namespace GameDevTV.RTS.Environment
             return true;
         }
 
+        /// <summary>
+        /// Releases the gather lock, deducts resources, and returns the amount gathered.
+        /// Heavy math (Mathf.Min, parent ghost sync, scale ratio) stays in C#.
+        /// Callable from a Flow Graph as the terminal node of a gather sequence.
+        /// </summary>
+        [Inspectable]
         public int EndGather()
         {
             IsBusy = false;
@@ -121,11 +190,22 @@ namespace GameDevTV.RTS.Environment
             return amountGathered;
         }
 
+        /// <summary>
+        /// Cancels an in-progress gather without deducting resources.
+        /// Callable from a Flow Graph on unit death or command override.
+        /// </summary>
+        [Inspectable]
         public void AbortGather()
         {
             IsBusy = false;
         }
 
+        /// <summary>
+        /// Sets fog-of-war visibility on this node.
+        /// Renderer toggling and culled-visuals mesh construction remain in C#;
+        /// only the boolean intent is exposed to VS.
+        /// </summary>
+        [Inspectable]
         public void SetVisible(bool isVisible)
         {
             if (TryGetComponent<HiddenResource>(out var hr) && !hr.IsDiscovered)

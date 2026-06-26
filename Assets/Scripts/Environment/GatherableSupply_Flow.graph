@@ -1,0 +1,177 @@
+# ============================================================
+# GatherableSupply_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# STATUS: Specification stub.
+# Once com.unity.visualscripting is installed:
+#   1. Delete this file from the Project window.
+#   2. Right-click the Environment folder →
+#      Create > Visual Scripting > Script Graph
+#   3. Rename it "GatherableSupply_Flow".
+#   4. Add a Script Machine to each GatherableSupply prefab root
+#      alongside DepletionVisuals; assign this graph as Source.
+#   5. Wire the three sub-graphs documented below.
+# ============================================================
+#
+# ARCHITECTURE CONTRACT
+# ─────────────────────
+# This graph is a HIGH-LEVEL REACTION WRAPPER only.
+# The following logic is PERMANENTLY in C# and must never be
+# replicated inside graph nodes:
+#   • EndGather() gather math (Mathf.Min, Amount subtraction,
+#     parent ghost sync, Destroy cascade)
+#   • OnGainVisibility() / OnLoseVisibility() renderer loops
+#     and culled-visuals mesh construction
+#   • OnGUI() WorldToScreenPoint projection and label drawing
+#   • Awake() / OnEnable() / OnDisable() component caching
+#
+# The graph reads [Inspectable] computed properties and calls
+# [Inspectable] methods as atomic black-box operations.
+#
+# ============================================================
+# SUB-GRAPH A  —  Proximity Label Reaction
+# ============================================================
+# Triggers a downstream custom event when a camera (or unit)
+# enters the label-display radius, complementing the existing
+# C# OnGUI() label without duplicating WorldToScreenPoint math.
+#
+# NODE MAP
+# ────────────────────────────────────────────────────────────
+#
+# [1]  On Update
+#        ↓ trigger
+# [2]  This → GetComponent<Camera>   (Camera.main via static)
+#        ↓ camera
+# [3]  GetMember: Camera.transform.position   → Vector3
+# [4]  This → transform.position              → Vector3
+# [5]  Distance (Vector3, Vector3)             → float
+#        ↓ distance
+# [6]  Float Variable: prevInRange  (Object scope, default false)
+# [7]  LessOrEqual: distance ≤ 45.0            → bool (inRange)
+#
+# [8]  Branch
+#      Condition: inRange AND NOT prevInRange   (entered this frame)
+#        True  → [9]  Trigger Custom Event "OnProximityEntered"
+#                     Target: Self, Args: (none)
+#        False →
+# [10] Branch
+#      Condition: NOT inRange AND prevInRange   (exited this frame)
+#        True  → [11] Trigger Custom Event "OnProximityExited"
+#                     Target: Self, Args: (none)
+#        False → exit
+#
+# [12] Set Variable: prevInRange = inRange   (after both branches)
+#
+# EDGE-TRIGGER PATTERN (Nodes 8 & 10):
+#   Build condition as: (inRange XOR prevInRange) first, then
+#   branch on inRange to decide Entered vs Exited.
+#   Alternatively use two separate AND+NOT combos as shown above.
+#
+# CUSTOM EVENT LISTENERS suggested:
+#   "OnProximityEntered" → play a subtle scan-ping sound effect
+#   "OnProximityExited"  → no-op (label hides automatically via C# OnGUI)
+#
+# ============================================================
+# SUB-GRAPH B  —  Resource Exhaustion Reaction
+# ============================================================
+# Fires exactly once when the node reaches zero resources,
+# before Unity processes the Destroy() call queued in C#.
+#
+# NODE MAP
+# ────────────────────────────────────────────────────────────
+#
+# [1]  On Update
+#        ↓ trigger
+# [2]  This → GetComponent<GatherableSupply>
+#        ↓ component
+# [3]  GetMember: IsExhausted     → bool
+# [4]  Bool Variable: prevExhausted  (Object scope, default false)
+#
+# [5]  Branch
+#      Condition: IsExhausted AND NOT prevExhausted
+#        True  →
+#   [6]  GetMember: IsBusy → bool
+#   [7]  Branch: IsBusy?
+#          True  → [8]  Invoke: AbortGather()   (clean up lock)
+#          False → (skip)
+#   [9]  Trigger Custom Event "OnResourceExhausted"
+#        Target: Self, Args: (none)
+#        False → exit
+#
+# [10] Set Variable: prevExhausted = IsExhausted
+#
+# CUSTOM EVENT LISTENERS suggested:
+#   "OnResourceExhausted" →
+#     • Spawn a depletion particle burst at transform.position
+#     • Optionally broadcast to GenerationManager via EventBus
+#       (Bus<SupplyDepletedEvent> is already raised by C# OnDestroy;
+#        this event is for purely visual/audio reactions only)
+#
+# ============================================================
+# SUB-GRAPH C  —  Gather Lifecycle Reactions
+# ============================================================
+# Reacts to gather lock changes to drive animations/audio
+# without touching the gather math in C#.
+#
+# NODE MAP
+# ────────────────────────────────────────────────────────────
+#
+# [1]  On Update
+#        ↓ trigger
+# [2]  This → GetComponent<GatherableSupply>
+#        ↓ component
+# [3]  GetMember: IsBusy            → bool
+# [4]  Bool Variable: prevBusy  (Object scope, default false)
+#
+# [5]  Branch
+#      Condition: IsBusy AND NOT prevBusy     (lock just acquired)
+#        True  → [6]  Trigger Custom Event "OnGatherBegin"
+#        False →
+# [7]  Branch
+#      Condition: NOT IsBusy AND prevBusy     (lock just released)
+#        True  →
+#   [8]  GetMember: IsExhausted → bool
+#   [9]  Branch: IsExhausted?
+#          True  → exit   (exhaustion handled by Sub-Graph B)
+#          False → [10] Trigger Custom Event "OnGatherEnd"
+#        False → exit
+#
+# [11] Set Variable: prevBusy = IsBusy   (after all branches)
+#
+# CUSTOM EVENT LISTENERS suggested:
+#   "OnGatherBegin" →
+#     • Play a looping drill/harvest audio clip via AudioManager
+#     • Activate a pulsing highlight shader on the mesh
+#   "OnGatherEnd" →
+#     • Stop the drill audio clip
+#     • Deactivate the pulsing highlight shader
+#
+# ============================================================
+# NODE TYPES REFERENCE
+# ============================================================
+#
+# Unity.VisualScripting.Update
+# Unity.VisualScripting.GetComponent    (generic: GatherableSupply)
+# Unity.VisualScripting.GetMember       (DepletionRatio, IsExhausted,
+#                                        IsBusy, IsVisible, Supply, Amount)
+# Unity.VisualScripting.InvokeMember    (BeginGather, EndGather,
+#                                        AbortGather, SetVisible,
+#                                        ToggleColliders)
+# Unity.VisualScripting.GetVariable     (Object scope)
+# Unity.VisualScripting.SetVariable     (Object scope)
+# Unity.VisualScripting.Branch
+# Unity.VisualScripting.And
+# Unity.VisualScripting.Negate
+# Unity.VisualScripting.LessOrEqual
+# Unity.VisualScripting.Distance        (Vector3 overload)
+# Unity.VisualScripting.TriggerCustomEvent
+#
+# ============================================================
+# MACHINE SETUP
+# ============================================================
+# Component:  Script Machine
+# Source:     Graph   (assign GatherableSupply_Flow asset)
+# Attach to:  root GameObject of each GatherableSupply prefab
+#             (same root that carries GatherableSupply.cs,
+#              DepletionVisuals.cs, and HiddenResource.cs)
+# ============================================================
