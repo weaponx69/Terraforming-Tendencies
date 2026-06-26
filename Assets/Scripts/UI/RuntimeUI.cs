@@ -99,8 +99,8 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnAtmosphereChanged -= HandleAtmosphereChanged;
             Supplies.OnWaterChanged -= HandleWaterChanged;
 
-           // Reset UI values when the component is disabled (e.g., game end)
-           ResetUI();
+            // Reset UI values when the component is disabled (e.g., game end)
+            ResetUI();
         }
 
         [SerializeField] private TextMeshProUGUI biomassLabelText;

@@ -611,7 +611,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             // Create 3 Cards
             cardSlots.Clear();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
             {
                 GameObject cardObj = new GameObject($"Card Slot ({i})", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup), typeof(LayoutElement));
                 cardObj.transform.SetParent(cardContainer.transform, false);

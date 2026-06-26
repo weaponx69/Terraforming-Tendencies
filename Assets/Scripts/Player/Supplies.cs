@@ -399,6 +399,42 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        public static void ResetAllSupplies(Owner owner)
+        {
+            if (Materials != null && Materials.ContainsKey(owner))
+                Materials[owner] = 0;
+            if (Biomass != null && Biomass.ContainsKey(owner))
+                Biomass[owner] = 0f;
+            if (Power != null && Power.ContainsKey(owner))
+                Power[owner] = 0f;
+            if (Population != null && Population.ContainsKey(owner))
+                Population[owner] = 0;
+            if (PopulationLimit != null && PopulationLimit.ContainsKey(owner))
+                PopulationLimit[owner] = 0;
+            if (Oxygen != null && Oxygen.ContainsKey(owner))
+                Oxygen[owner] = 0f;
+            if (Integrity != null && Integrity.ContainsKey(owner))
+                Integrity[owner] = 100f;
+            if (Temperature != null && Temperature.ContainsKey(owner))
+                Temperature[owner] = -60f;
+            if (Atmosphere != null && Atmosphere.ContainsKey(owner))
+                Atmosphere[owner] = 0.01f;
+            if (Water != null && Water.ContainsKey(owner))
+                Water[owner] = 0f;
+            
+            // Trigger events to notify UI
+            OnMaterialsChanged?.Invoke(owner, Materials[owner]);
+            OnBiomassChanged?.Invoke(owner, Biomass[owner]);
+            OnPowerChanged?.Invoke(owner, Power[owner]);
+            OnPopulationChanged?.Invoke(owner, Population[owner]);
+            OnPopulationLimitChanged?.Invoke(owner, PopulationLimit[owner]);
+            OnOxygenChanged?.Invoke(owner, Oxygen[owner]);
+            OnIntegrityChanged?.Invoke(owner, Integrity[owner]);
+            OnTemperatureChanged?.Invoke(owner, Temperature[owner]);
+            OnAtmosphereChanged?.Invoke(owner, Atmosphere[owner]);
+            OnWaterChanged?.Invoke(owner, Water[owner]);
+        }
+
         public static float CalculateIntegrity(Owner owner)
         {
             var commandables = AbstractCommandable.ActiveCommandables;
