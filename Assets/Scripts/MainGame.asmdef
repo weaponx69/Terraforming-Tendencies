@@ -10,6 +10,7 @@
         "Unity.InputSystem",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.Cinemachine",
+        "Unity.VisualScripting.Core",
         "Unity.VisualScripting.Flow",
         "Unity.VisualScripting.State"
     ],
