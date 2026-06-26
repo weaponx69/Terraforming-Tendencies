@@ -1,0 +1,20 @@
+# ============================================================
+# MapWrapper_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   Camera position math, Cinemachine.OnTargetObjectWarped,
+#   and GameObject.Find lookups stay in C#.
+#   VS reads MapWidth and MapHeight for HUD/minimap scaling.
+#
+# NODE MAP:
+#   [Start] → [GetComponent<MapWrapper>]
+#     → [GetMember: MapWidth]  → wire to minimap scale X
+#     → [GetMember: MapHeight] → wire to minimap scale Y
+#
+# CUSTOM EVENTS:
+#   (none — this graph is purely data-provision for HUD systems)
+#
+# MACHINE SETUP:
+#   ScriptMachine on the MapWrapper GameObject in the scene
+# ============================================================

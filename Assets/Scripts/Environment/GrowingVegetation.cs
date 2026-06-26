@@ -1,26 +1,50 @@
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Environment
 {
+    /// <summary>
+    /// Drives per-plant growth animation via Vector3.Lerp in Update().
+    /// <para>
+    /// Heavy logic (shader/material loops in ApplyColorTint, Update Lerp math,
+    /// VegetationManager polling) stays in C#. VS reads <see cref="GrowthProgress"/>
+    /// and calls <see cref="SetDuration"/> / <see cref="SetTargetScale"/> as atomic ops.
+    /// </para>
+    /// </summary>
+    [IncludeInSettings(true)]
     public class GrowingVegetation : MonoBehaviour
     {
-        [SerializeField] private float growthDuration = 30f; // Default to 30 seconds for better feedback
+        [Inspectable]
+        [SerializeField] private float growthDuration = 30f;
+
+        [Inspectable]
         [SerializeField] private Vector3 targetScale = Vector3.one;
         
+        /// <summary>Normalised growth progress [0, 1]. 1 = fully grown.</summary>
+        [Inspectable]
         public float GrowthProgress { get => growthProgress; set => growthProgress = value; }
         private float growthProgress = 0f;
         private Vector3 initialScale;
 
+        /// <summary>Sets the total growth duration in seconds. Callable from a Flow Graph.</summary>
+        [Inspectable]
         public void SetDuration(float duration)
         {
             growthDuration = duration;
         }
 
+        /// <summary>Sets the target scale at full growth. Callable from a Flow Graph.</summary>
+        [Inspectable]
         public void SetTargetScale(Vector3 scale)
         {
             targetScale = scale;
         }
 
+        /// <summary>
+        /// Applies an emission color tint to all child renderers.
+        /// Heavy shader/material loops stay in C#.
+        /// </summary>
+        [Inspectable]
         public void ApplyColorTint(Color color)
         {
             Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");

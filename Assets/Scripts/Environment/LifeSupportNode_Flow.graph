@@ -1,0 +1,20 @@
+# ============================================================
+# LifeSupportNode_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   OnEnable/OnDisable static list management and OnDrawGizmos
+#   stay in C#. VS reads Radius and ActiveNodeCount for HUD
+#   and decay-zone visualisation.
+#
+# NODE MAP:
+#   [Update] → [GetComponent<LifeSupportNode>]
+#     → [GetMember: Radius] → [Branch: Radius changed?]
+#       True → [Trigger Custom Event "OnLifeSupportRadiusChanged"]
+#
+# CUSTOM EVENTS:
+#   "OnLifeSupportRadiusChanged" → update decay-zone gizmo / HUD ring
+#
+# MACHINE SETUP:
+#   ScriptMachine on building prefab root alongside LifeSupportNode
+# ============================================================

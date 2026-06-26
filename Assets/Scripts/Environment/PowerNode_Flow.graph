@@ -1,0 +1,139 @@
+# ============================================================
+# PowerNode_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# STATUS: Specification stub.
+# Once com.unity.visualscripting is installed:
+#   1. Delete this file from the Project window.
+#   2. Right-click the Environment folder →
+#      Create > Visual Scripting > Script Graph
+#   3. Rename it "PowerNode_Flow".
+#   4. Add a Script Machine to each building prefab root
+#      alongside PowerNode; assign this graph as Source.
+#   5. Wire the sub-graphs documented below.
+# ============================================================
+#
+# ARCHITECTURE CONTRACT
+# ─────────────────────
+# The following logic is PERMANENTLY in C# and must never be
+# replicated inside graph nodes:
+#   • ConnectTo() LineRenderer cord generation (10-point
+#     Mathf.Sin jitter, Vector3.Lerp, material creation)
+#   • OnDestroy() foreach cleanup with ToList()
+#   • IsPowered getter BatteryNode.TryGetComponent check
+#   • PowerGridManager.RecalculateGrids() calls
+#
+# The graph reads [Inspectable] computed properties and calls
+# [Inspectable] methods as atomic black-box operations.
+#
+# ============================================================
+# SUB-GRAPH A  —  Power State Change Reaction
+# ============================================================
+# Fires custom events when IsPowered transitions, enabling
+# downstream graphs to react to power loss/restoration.
+#
+# NODE MAP
+# ────────────────────────────────────────────────────────────
+#
+# [1]  On Update
+#        ↓ trigger
+# [2]  This → GetComponent<PowerNode>
+#        ↓ component
+# [3]  GetMember: IsPowered          → bool
+# [4]  Bool Variable: prevPowered  (Object scope, default true)
+#
+# [5]  Branch
+#      Condition: NOT IsPowered AND prevPowered   (power just lost)
+#        True  → [6]  Trigger Custom Event "OnPowerLost"
+#                     Target: Self
+#        False →
+# [7]  Branch
+#      Condition: IsPowered AND NOT prevPowered   (power just restored)
+#        True  → [8]  Trigger Custom Event "OnPowerRestored"
+#                     Target: Self
+#        False → exit
+#
+# [9]  Set Variable: prevPowered = IsPowered   (after both branches)
+#
+# CUSTOM EVENT LISTENERS suggested:
+#   "OnPowerLost"     → disable emission materials, play shutdown audio
+#   "OnPowerRestored" → re-enable emission, play power-up audio
+#
+# ============================================================
+# SUB-GRAPH B  —  Grid Connection Monitor
+# ============================================================
+# Tracks ConnectedNodeCount changes to detect new/removed
+# power connections.
+#
+# NODE MAP
+# ────────────────────────────────────────────────────────────
+#
+# [1]  On Update
+#        ↓ trigger
+# [2]  This → GetComponent<PowerNode>
+#        ↓ component
+# [3]  GetMember: ConnectedNodeCount   → int
+# [4]  Int Variable: prevCount  (Object scope, default 0)
+#
+# [5]  Branch
+#      Condition: ConnectedNodeCount > prevCount   (new connection)
+#        True  → [6]  Trigger Custom Event "OnPowerConnected"
+#        False →
+# [7]  Branch
+#      Condition: ConnectedNodeCount < prevCount   (connection removed)
+#        True  → [8]  Trigger Custom Event "OnPowerDisconnected"
+#        False → exit
+#
+# [9]  Set Variable: prevCount = ConnectedNodeCount
+#
+# ============================================================
+# SUB-GRAPH C  —  Battery Backup Status
+# ============================================================
+# Monitors HasBatteryBackup for backup power availability.
+#
+# NODE MAP
+# ────────────────────────────────────────────────────────────
+#
+# [1]  On Update
+#        ↓ trigger
+# [2]  This → GetComponent<PowerNode>
+#        ↓ component
+# [3]  GetMember: HasBatteryBackup    → bool
+# [4]  Bool Variable: prevBackup  (Object scope, default false)
+#
+# [5]  Branch
+#      Condition: HasBatteryBackup AND NOT prevBackup
+#        True  → [6]  Trigger Custom Event "OnBatteryBackupActive"
+#        False →
+# [7]  Branch
+#      Condition: NOT HasBatteryBackup AND prevBackup
+#        True  → [8]  Trigger Custom Event "OnBatteryBackupDepleted"
+#        False → exit
+#
+# [9]  Set Variable: prevBackup = HasBatteryBackup
+#
+# ============================================================
+# NODE TYPES REFERENCE
+# ============================================================
+#
+# Unity.VisualScripting.Update
+# Unity.VisualScripting.GetComponent    (generic: PowerNode)
+# Unity.VisualScripting.GetMember       (IsPowered, IsGridPowered,
+#                                        ConnectedNodeCount, HasBatteryBackup,
+#                                        Building, ConnectedNodes)
+# Unity.VisualScripting.InvokeMember    (ConnectTo)
+# Unity.VisualScripting.GetVariable     (Object scope)
+# Unity.VisualScripting.SetVariable     (Object scope)
+# Unity.VisualScripting.Branch
+# Unity.VisualScripting.And
+# Unity.VisualScripting.Negate
+# Unity.VisualScripting.TriggerCustomEvent
+#
+# ============================================================
+# MACHINE SETUP
+# ============================================================
+# Component:  Script Machine
+# Source:     Graph   (assign PowerNode_Flow asset)
+# Attach to:  root GameObject of each building prefab that
+#             carries a PowerNode component
+# ============================================================

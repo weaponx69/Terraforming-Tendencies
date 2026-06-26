@@ -2,18 +2,27 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Environment
 {
+    /// <summary>
+    /// Hides a GatherableSupply until its resource type is discovered.
+    /// DiscoverySystem checks and EventBus raises stay in C#.
+    /// </summary>
+    [IncludeInSettings(true)]
     [RequireComponent(typeof(GatherableSupply))]
     public class HiddenResource : MonoBehaviour
     {
+        /// <summary>True once this resource has been revealed to the player.</summary>
+        [Inspectable]
         public bool IsDiscovered { get; private set; } = false;
 
         /// <summary>
         /// The resource type name (e.g., "Iron", "Regolith", "Minerals", "Gas").
         /// Set during scatter by PlanetGenerator. Used by DiscoverySystem for type-based reveal.
         /// </summary>
+        [Inspectable]
         public string ResourceTypeName { get; set; } = "";
 
         private void Start()
@@ -24,16 +33,15 @@ namespace GameDevTV.RTS.Environment
 
         /// <summary>
         /// Standard discover — checks DiscoverySystem to see if this resource type has been revealed.
-        /// If the type hasn't been discovered yet, the resource stays hidden.
+        /// Callable from a Flow Graph when a probe scan completes.
         /// </summary>
+        [Inspectable]
         public void Discover()
         {
             if (IsDiscovered) return;
 
-            // Check if this resource type has been discovered by the player
             if (!string.IsNullOrEmpty(ResourceTypeName) && !DiscoverySystem.IsTypeDiscovered(ResourceTypeName))
             {
-                // Type not yet discovered — stay hidden
                 return;
             }
             
@@ -48,8 +56,9 @@ namespace GameDevTV.RTS.Environment
 
         /// <summary>
         /// Force-discover this resource, bypassing the DiscoverySystem type check.
-        /// Used for starting sector resources and for newly revealed types.
+        /// Callable from a Flow Graph for starting-sector resources.
         /// </summary>
+        [Inspectable]
         public void ForceDiscover()
         {
             if (IsDiscovered) return;

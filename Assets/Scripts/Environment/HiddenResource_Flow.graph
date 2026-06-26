@@ -1,0 +1,24 @@
+# ============================================================
+# HiddenResource_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   DiscoverySystem.IsTypeDiscovered check and EventBus.Raise
+#   stay in C#. VS reads IsDiscovered and calls Discover/ForceDiscover.
+#
+# NODE MAP:
+#   [On Custom Event "OnProbeScanComplete"]
+#     → [GetComponent<HiddenResource>]
+#     → [InvokeMember: Discover]
+#   [Update] → [GetComponent<HiddenResource>]
+#     → [GetMember: IsDiscovered]
+#     → [Branch: IsDiscovered AND NOT prevDiscovered]
+#       True → [Trigger Custom Event "OnResourceRevealed"]
+#   [Set Variable: prevDiscovered = IsDiscovered]
+#
+# CUSTOM EVENTS:
+#   "OnResourceRevealed" → play discovery ping VFX, update minimap
+#
+# MACHINE SETUP:
+#   ScriptMachine on GatherableSupply prefab root alongside HiddenResource
+# ============================================================

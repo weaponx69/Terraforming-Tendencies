@@ -2,20 +2,52 @@ using System.Collections.Generic;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 using System.Linq;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Environment
 {
+    /// <summary>
+    /// Represents a power-grid connection point on a building.
+    /// <para>
+    /// Heavy logic (LineRenderer cord generation with Mathf.Sin jitter,
+    /// OnDestroy foreach cleanup, BatteryNode charge checks) stays in C#.
+    /// VS-visible surface exposes grid state, connection count, and the
+    /// <see cref="ConnectTo"/> method for graph-driven power wiring.
+    /// </para>
+    /// </summary>
+    [IncludeInSettings(true)]
     [RequireComponent(typeof(BaseBuilding))]
     public class PowerNode : MonoBehaviour
     {
+        /// <summary>All power nodes directly connected to this one.</summary>
+        [Inspectable]
         public List<PowerNode> ConnectedNodes = new List<PowerNode>();
+
+        /// <summary>The building this power node is attached to.</summary>
+        [Inspectable]
         public BaseBuilding Building { get; private set; }
-        
+
+        /// <summary>Number of directly connected power nodes. VS-friendly alternative to List.Count.</summary>
+        [Inspectable]
+        public int ConnectedNodeCount => ConnectedNodes.Count;
+
+        /// <summary>True if this node has a BatteryNode with stored charge as backup.</summary>
+        [Inspectable]
+        public bool HasBatteryBackup =>
+            TryGetComponent(out BatteryNode battery) && battery.HasCharge;
+
         [SerializeField] private bool isGridPowered = false;
-        public bool IsGridPowered 
-        { 
-            get => isGridPowered; 
-            set 
+
+        /// <summary>
+        /// Whether this node is receiving power from the grid.
+        /// Setting this triggers <see cref="OnPowerStateChanged"/> if the
+        /// effective <see cref="IsPowered"/> state changes.
+        /// </summary>
+        [Inspectable]
+        public bool IsGridPowered
+        {
+            get => isGridPowered;
+            set
             {
                 bool wasPowered = IsPowered;
                 isGridPowered = value;
@@ -23,12 +55,17 @@ namespace GameDevTV.RTS.Environment
                 {
                     OnPowerStateChanged?.Invoke(IsPowered);
                 }
-            } 
+            }
         }
 
-        public bool IsPowered 
+        /// <summary>
+        /// Effective power state: true if grid-powered OR has battery backup.
+        /// Read by Flow Graphs to branch on power-loss events.
+        /// </summary>
+        [Inspectable]
+        public bool IsPowered
         {
-            get 
+            get
             {
                 if (isGridPowered) return true;
                 if (TryGetComponent(out BatteryNode battery) && battery.HasCharge) return true;
@@ -36,6 +73,7 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        /// <summary>Fires when <see cref="IsPowered"/> changes. Subscribe in C# or via a VS Custom Event listener.</summary>
         public event System.Action<bool> OnPowerStateChanged;
 
         private void Awake()
@@ -64,6 +102,12 @@ namespace GameDevTV.RTS.Environment
             PowerGridManager.RecalculateGrids();
         }
 
+        /// <summary>
+        /// Connects this power node to another, creating a visual cord and
+        /// recalculating the power grid. Heavy LineRenderer math stays in C#.
+        /// Callable from a Flow Graph to wire power dynamically.
+        /// </summary>
+        [Inspectable]
         public void ConnectTo(PowerNode other)
         {
             if (other == null || other == this) return;

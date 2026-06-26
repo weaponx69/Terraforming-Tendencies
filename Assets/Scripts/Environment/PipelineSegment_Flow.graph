@@ -1,0 +1,21 @@
+# ============================================================
+# PipelineSegment_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   Collider setup in Initialize(), OnTriggerEnter natural-event
+#   detection, and DieFromDamage() manager callback stay in C#.
+#   VS reads CurrentHealth and calls TakeDamage/Die as atomic ops.
+#
+# NODE MAP:
+#   [Update] → [GetComponent<PipelineSegment>]
+#     → [GetMember: CurrentHealth]
+#     → [Branch: CurrentHealth <= 0]
+#       True → [Trigger Custom Event "OnPipelineSegmentDestroyed"]
+#
+# CUSTOM EVENTS:
+#   "OnPipelineSegmentDestroyed" → play destruction VFX, notify HUD
+#
+# MACHINE SETUP:
+#   ScriptMachine on each PipelineSegment prefab instance
+# ============================================================

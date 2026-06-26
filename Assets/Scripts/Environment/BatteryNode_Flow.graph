@@ -1,0 +1,24 @@
+# ============================================================
+# BatteryNode_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   Mathf.Max/Min in Drain()/Charge() stay in C#.
+#   VS reads ChargeRatio and HasCharge for threshold reactions.
+#
+# NODE MAP:
+#   [Update] → [GetComponent<BatteryNode>]
+#     → [GetMember: ChargeRatio] → float
+#     → [Branch: ChargeRatio <= 0.25 AND prevRatio > 0.25]
+#       True → [Trigger Custom Event "OnBatteryLow"]
+#     → [Branch: ChargeRatio <= 0.0 AND prevRatio > 0.0]
+#       True → [Trigger Custom Event "OnBatteryDepleted"]
+#   [Set Variable: prevRatio = ChargeRatio]
+#
+# CUSTOM EVENTS:
+#   "OnBatteryLow"       → flash low-power warning on HUD
+#   "OnBatteryDepleted"  → trigger emergency shutdown sequence
+#
+# MACHINE SETUP:
+#   ScriptMachine on building prefab root alongside BatteryNode
+# ============================================================

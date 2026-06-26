@@ -1,0 +1,23 @@
+# ============================================================
+# NaturalEventImpact_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   Physics.OverlapSphere + HashSet dedup in Impact(),
+#   Vector3.MoveTowards in Update(), and warning-marker
+#   instantiation stay in C#. VS reads HasImpacted and
+#   DamageRadius for reactive branching.
+#
+# NODE MAP:
+#   [Update] → [GetComponent<NaturalEventImpact>]
+#     → [GetMember: HasImpacted]
+#     → [Branch: HasImpacted AND NOT prevImpacted]
+#       True → [Trigger Custom Event "OnNaturalEventImpacted"]
+#   [Set Variable: prevImpacted = HasImpacted]
+#
+# CUSTOM EVENTS:
+#   "OnNaturalEventImpacted" → screen shake, camera rumble, HUD flash
+#
+# MACHINE SETUP:
+#   ScriptMachine on NaturalEventImpact prefab root
+# ============================================================

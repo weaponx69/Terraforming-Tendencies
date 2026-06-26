@@ -1,20 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// Drives a single "natural event" (meteor strike, etc.). Spawned at the intended
-    /// impact point on the ground, it lifts itself into the sky, falls back down, and
-    /// deals area-of-effect damage to everything implementing <see cref="IDamageable"/>.
+    /// Drives a single "natural event" (meteor strike, etc.).
+    /// <para>
+    /// Heavy logic (Physics.OverlapSphere + HashSet dedup in Impact(),
+    /// Vector3.MoveTowards in Update(), warning-marker instantiation)
+    /// stays in C#. VS reads <see cref="DamageRadius"/> and
+    /// <see cref="HasImpacted"/> for reactive branching.
+    /// </para>
     /// </summary>
+    [IncludeInSettings(true)]
     public class NaturalEventImpact : MonoBehaviour, IDamageable
     {
         [Header("Impact")]
         [Tooltip("World-space radius of the damage area.")]
+        [Inspectable]
         [SerializeField] private float damageRadius = 5f;
         [Tooltip("Damage dealt to every damageable inside the radius.")]
+        [Inspectable]
         [SerializeField] private int damageAmount = 25;
 
         [Header("Destructibility")]
@@ -36,14 +44,27 @@ namespace GameDevTV.RTS.Environment
         private GameObject warningMarker;
         private bool hasImpacted;
 
+        /// <summary>World-space radius of the damage area.</summary>
+        [Inspectable]
         public float DamageRadius => damageRadius;
+
+        /// <summary>Damage dealt per target inside the radius.</summary>
+        [Inspectable]
+        public int DamageAmount => damageAmount;
+
+        /// <summary>True once the event has struck the ground.</summary>
+        [Inspectable]
+        public bool HasImpacted => hasImpacted;
 
         // IDamageable implementation
         public int MaxHealth => maxHealth;
+        [Inspectable]
         public int CurrentHealth => currentHealth;
         public Transform Transform => transform;
-        public Owner Owner => Owner.Unowned; // Meteors are neutral/hostile environment
+        public Owner Owner => Owner.Unowned;
 
+        /// <summary>Applies damage; destroys the event if health reaches zero.</summary>
+        [Inspectable]
         public void TakeDamage(int damage)
         {
             if (hasImpacted) return;
@@ -54,6 +75,8 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        /// <summary>Destroys the event with effects. Callable from a Flow Graph.</summary>
+        [Inspectable]
         public void Die()
         {
             if (hasImpacted) return;

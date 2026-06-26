@@ -1,0 +1,25 @@
+# ============================================================
+# GrowingVegetation_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# ARCHITECTURE CONTRACT:
+#   Update() Vector3.Lerp math, ApplyColorTint() shader/material
+#   loops, and VegetationManager polling stay in C#.
+#   VS reads GrowthProgress for growth-stage reactions.
+#
+# NODE MAP:
+#   [Update] → [GetComponent<GrowingVegetation>]
+#     → [GetMember: GrowthProgress] → float
+#     → [Branch: GrowthProgress >= 1.0 AND prevProgress < 1.0]
+#       True → [Trigger Custom Event "OnVegetationFullyGrown"]
+#     → [Branch: GrowthProgress >= 0.5 AND prevProgress < 0.5]
+#       True → [Trigger Custom Event "OnVegetationHalfGrown"]
+#   [Set Variable: prevProgress = GrowthProgress]
+#
+# CUSTOM EVENTS:
+#   "OnVegetationHalfGrown"  → enable subtle sway animation
+#   "OnVegetationFullyGrown" → add to biomass contribution tally
+#
+# MACHINE SETUP:
+#   ScriptMachine on vegetation prefab root alongside GrowingVegetation
+# ============================================================
