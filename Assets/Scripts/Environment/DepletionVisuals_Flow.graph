@@ -1,0 +1,139 @@
+# ============================================================
+# DepletionVisuals_Flow.graph
+# Unity Visual Scripting  –  FlowGraph Node Specification
+#
+# STATUS: Specification stub.
+# Once com.unity.visualscripting is installed:
+#   1. Delete this file from the Project window.
+#   2. Right-click the Environment folder →
+#      Create > Visual Scripting > Script Graph.
+#   3. Rename it "DepletionVisuals_Flow".
+#   4. Add the ScriptMachine component to the GatherableSupply
+#      prefab root and assign this graph as its Source.
+#   5. Wire the nodes exactly as documented below.
+# ============================================================
+#
+# ARCHITECTURE CONTRACT
+# ─────────────────────
+# This graph is a HIGH-LEVEL THRESHOLD-REACTION WRAPPER only.
+# The localScale Lerp formula lives permanently in C#
+# (DepletionVisuals.Update) and must NEVER be replicated here.
+# The graph's sole responsibility is to read the pre-computed
+# [Inspectable] DepletionRatio property and dispatch Custom
+# Events when the value crosses designer-tunable thresholds.
+#
+# ============================================================
+# NODE MAP  (read top → bottom, left → right)
+# ============================================================
+#
+# ┌─────────────────────────────────────────────────────┐
+# │  [1]  Update  (On Update event)                     │
+# │        ↓ trigger                                    │
+# │  [2]  This → GetComponent<DepletionVisuals>         │
+# │        ↓ component                                  │
+# │  [3]  GetMember: DepletionRatio                     │
+# │       (reads the [Inspectable] float 0.0 – 1.0)     │
+# │        ↓ value                                      │
+# │  [4]  Float Variable: prevRatio  (scene variable)   │
+# │       (read previous frame value for edge-trigger)  │
+# │        ↓                                            │
+# │  [5]  Branch A                                      │
+# │       Condition: (DepletionRatio ≤ 0.5)             │
+# │                  AND (prevRatio > 0.5)              │
+# │        True  ──→ [6]  Trigger Custom Event          │
+# │                        Name:   "OnHalfDepleted"     │
+# │                        Target: Self                 │
+# │        False ──→ [7]  Branch B                      │
+# │                  Condition: (DepletionRatio ≤ 0.2)  │
+# │                             AND (prevRatio > 0.2)   │
+# │                   True  ──→ [8]  Trigger Custom     │
+# │                                  Event              │
+# │                                  Name:              │
+# │                                  "OnCritically      │
+# │                                   Depleted"         │
+# │                                  Target: Self       │
+# │                   False ──→ (exit / no-op)          │
+# │  [9]  Set Variable: prevRatio = DepletionRatio      │
+# │       (always executes after branches — wire into   │
+# │        each branch's exit trigger)                  │
+# └─────────────────────────────────────────────────────┘
+#
+# ============================================================
+# NODES — DETAILED SPEC
+# ============================================================
+#
+# Node 1 — Update
+#   Type:    Unity.VisualScripting.Update
+#   Ports:   out trigger (control)
+#
+# Node 2 — GetComponent<DepletionVisuals>
+#   Type:    Unity.VisualScripting.GetComponent
+#   Generic: GameDevTV.RTS.Environment.DepletionVisuals
+#   Input:   gameObject  ← This (self)
+#   Output:  component   → Node 3 target port
+#
+# Node 3 — GetMember: DepletionRatio
+#   Type:    Unity.VisualScripting.GetMember
+#   Member:  GameDevTV.RTS.Environment.DepletionVisuals.DepletionRatio
+#   Input:   target  ← Node 2 component
+#   Output:  value (float)  → Nodes 5 & 7 condition ports
+#
+# Node 4 — Float Variable: prevRatio
+#   Type:    Unity.VisualScripting.GetVariable  (Object scope)
+#   Name:    "prevRatio"
+#   Default: 1.0
+#   Output:  value (float)  → Nodes 5 & 7 condition ports
+#
+# Node 5 — Branch A  (half-depletion edge trigger)
+#   Type:    Unity.VisualScripting.Branch
+#   Condition built from two sub-nodes:
+#     5a. LessOrEqual:  DepletionRatio ≤ 0.5  → bool
+#     5b. Greater:      prevRatio      > 0.5  → bool
+#     5c. And:          5a AND 5b             → bool (feeds Branch)
+#
+# Node 6 — Custom Event Trigger: OnHalfDepleted
+#   Type:    Unity.VisualScripting.TriggerCustomEvent
+#   Name:    "OnHalfDepleted"
+#   Target:  Self
+#   Args:    (none)
+#
+# Node 7 — Branch B  (critical-depletion edge trigger)
+#   Type:    Unity.VisualScripting.Branch
+#   Condition built from two sub-nodes:
+#     7a. LessOrEqual:  DepletionRatio ≤ 0.2  → bool
+#     7b. Greater:      prevRatio      > 0.2  → bool
+#     7c. And:          7a AND 7b             → bool (feeds Branch)
+#
+# Node 8 — Custom Event Trigger: OnCriticallyDepleted
+#   Type:    Unity.VisualScripting.TriggerCustomEvent
+#   Name:    "OnCriticallyDepleted"
+#   Target:  Self
+#   Args:    (none)
+#
+# Node 9 — Set Variable: prevRatio
+#   Type:    Unity.VisualScripting.SetVariable  (Object scope)
+#   Name:    "prevRatio"
+#   Value:   DepletionRatio (from Node 3 output)
+#   Wire:    into the exit trigger of BOTH Node 6 and Node 8,
+#            and directly from Node 5 False and Node 7 False paths.
+#
+# ============================================================
+# CUSTOM EVENT LISTENERS (wire in a separate graph or C#)
+# ============================================================
+#
+# Custom Event: "OnHalfDepleted"
+#   Suggested response: spawn dust/smoke particle at transform.position
+#
+# Custom Event: "OnCriticallyDepleted"
+#   Suggested response: enable pulsing red OutlineEffect on the mesh;
+#                       optionally play a low-resource audio cue via
+#                       AudioManager.Instance.
+#
+# ============================================================
+# MACHINE SETUP
+# ============================================================
+# Component:  Script Machine
+# Source:     Graph  (assign this asset)
+# Attach to:  root GameObject of each GatherableSupply prefab
+#             alongside the existing DepletionVisuals component.
+# ============================================================

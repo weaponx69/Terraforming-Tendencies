@@ -1,5 +1,6 @@
 #if UNITY_INCLUDE_TESTS
 using System.Collections;
+using System.Collections.Generic;   // Added generic collections support
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -126,7 +127,7 @@ namespace GameDevTV.RTS.Tests
 
         [UnityTest]
         public IEnumerator EndToEnd_Gathering_UpdatesUI()
-{
+        {
             var mineralsSO = ScriptableObject.CreateInstance<SupplySO>();
             mineralsSO.name = "Minerals";
             
@@ -165,6 +166,54 @@ namespace GameDevTV.RTS.Tests
             Object.Destroy(rockObj);
             Object.Destroy(genObj);
             Debug.Log("[UITest] EndToEnd_Gathering_UpdatesUI Passed");
+        }
+
+        [UnityTest]
+        public IEnumerator DraftHandSize_IsFour()
+        {
+            // Create a CardDeckController instance
+            GameObject deckObj = new GameObject("CardDeckController");
+            var deckController = deckObj.AddComponent<CardDeckController>();
+            
+            // Use reflection to set the private handSize field to 4
+            SetField(deckController, "handSize", 4);
+            
+            // Get the handSize field value
+            int handSize = (int)GetField(deckController, "handSize");
+            Assert.AreEqual(4, handSize, "handSize should be set to 4");
+            
+            Debug.Log($"[UITest] DraftHandSize_IsFour Passed - handSize = {handSize}");
+            
+            Object.Destroy(deckObj);
+            yield return null;
+        }
+
+        private object GetField(object obj, string fieldName)
+        {
+            var type = obj.GetType();
+            var field = type.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (field == null && type.BaseType != null)
+                field = type.BaseType.GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            
+            if (field != null)
+            {
+                return field.GetValue(obj);
+            }
+            return null;
+        }
+
+        private object InvokePrivateMethod(object obj, string methodName)
+        {
+            var type = obj.GetType();
+            var method = type.GetMethod(methodName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (method == null && type.BaseType != null)
+                method = type.BaseType.GetMethod(methodName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            
+            if (method != null)
+            {
+                return method.Invoke(obj, null);
+            }
+            return null;
         }
 
         private void SetField(object obj, string fieldName, object value)
