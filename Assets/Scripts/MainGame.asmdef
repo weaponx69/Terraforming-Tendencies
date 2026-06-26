@@ -9,7 +9,9 @@
         "Unity.TextMeshPro",
         "Unity.InputSystem",
         "Unity.RenderPipelines.Universal.Runtime",
-        "Unity.Cinemachine"
+        "Unity.Cinemachine",
+        "Unity.VisualScripting.Flow",
+        "Unity.VisualScripting.State"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -18,6 +20,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.visualscripting",
+            "expression": "1.7.0",
+            "define": "UNITY_VISUALSCRIPTING_1_7_OR_NEWER"
+        }
+    ],
     "noEngineReferences": false
 }

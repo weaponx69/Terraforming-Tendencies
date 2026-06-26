@@ -4,11 +4,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using UnityEngine;
-#if UNITY_VISUALSCRIPTING_1_7_OR_NEWER
 using Unity.VisualScripting;
-#else
-using Unity.VisualScripting; // resolved by Assets/Scripts/VisualScriptingAttributes.cs (runtime stub)
-#endif
 
 namespace GameDevTV.RTS.Environment
 {
