@@ -6,7 +6,7 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Player
 {
@@ -16,20 +16,16 @@ namespace GameDevTV.RTS.Player
         public static CardDeckManager Instance { get; private set; }
 
         [Header("Deck Configuration")]
-        [Inspectable]
         [field: SerializeField] public CardDeckSO DeckSO { get; set; }
 
         [Header("Runtime State")]
-        [Inspectable]
         [field: SerializeField] public List<CardSO> DrawPool { get; private set; } = new();
 
-        [Inspectable]
         [field: SerializeField] public List<CardSO> Hand { get; private set; } = new();
 
-        [Inspectable]
         [field: SerializeField] public List<CardSO> DiscardPile { get; private set; } = new();
 
-        [Header("Events")]
+        /// <summary>Fired when the hand changes.</summary>
         public event Action<List<CardSO>> OnHandChanged;
         public event Action<CardSO> OnCardPlayed;
         public event Action OnDeckRefreshed;
@@ -157,9 +153,9 @@ namespace GameDevTV.RTS.Player
             }
 
             // Fire unlock event
-            if (card.WrappedUnlockable != null)
+            if (card.WrappedUpgrade != null)
             {
-                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, card.WrappedUnlockable));
+                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, card.WrappedUpgrade));
             }
 
             // Apply direct effect
@@ -182,10 +178,10 @@ namespace GameDevTV.RTS.Player
         public bool CanPlayCard(CardSO card)
         {
             if (card == null) return false;
-            if (card.WrappedUnlockable == null) return false;
+            if (card.WrappedUpgrade == null) return false;
 
             // Check tech tree unlock status
-            var unlockable = card.WrappedUnlockable;
+            var unlockable = card.WrappedUpgrade;
             if (unlockable.TechTree == null) return false;
             if (!unlockable.TechTree.IsUnlocked(Owner.Player1, unlockable)) return false;
             if (unlockable.TechTree.IsResearched(Owner.Player1, unlockable)) return false;

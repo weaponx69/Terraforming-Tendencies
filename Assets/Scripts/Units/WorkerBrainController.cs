@@ -6,7 +6,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using UnityEngine;
 using UnityEngine.AI;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
 {

@@ -12,8 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4a0369403638cad090584fd74b9a06a, type: 3}
   m_Name: MainDeck
   m_EditorClassIdentifier:
-  <AllCards>k__BackingField:
-  - {fileID: 11400000, guid: 00000000000000000000000000000000, type: 2}
+  <AllCards>k__BackingField: []
   <HandSize>k__BackingField: 5
   <MaxHandSize>k__BackingField: 7
   <DrawCost>k__BackingField: 50

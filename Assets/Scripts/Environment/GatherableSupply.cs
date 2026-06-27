@@ -4,7 +4,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using UnityEngine;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Environment
 {

@@ -6,7 +6,7 @@ using UnityEngine.InputSystem.LowLevel;
 using System.Linq;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Commands
 {

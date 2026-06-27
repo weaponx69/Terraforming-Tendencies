@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 using GameDevTV.RTS.Units;
 
 namespace GameDevTV.RTS.TechTree
@@ -31,20 +31,18 @@ namespace GameDevTV.RTS.TechTree
 
         /// <summary>
         /// Builds the draw pool for the given owner.
-        /// Filters to cards whose WrappedUnlockable is unlocked in the tech tree
+        /// Filters to cards whose WrappedUpgrade is unlocked in the tech tree
         /// and not yet researched.
         /// </summary>
         public List<CardSO> BuildDrawPool(Owner owner)
         {
             if (AllCards == null || AllCards.Count == 0) return new List<CardSO>();
 
-            var techTree = WrappedUnlockable != null ? WrappedUnlockable.TechTree : null;
-
             return AllCards
-                .Where(card => card != null && card.WrappedUnlockable != null)
+                .Where(card => card != null && card.WrappedUpgrade != null)
                 .Where(card =>
                 {
-                    var unlockable = card.WrappedUnlockable;
+                    var unlockable = card.WrappedUpgrade;
                     if (unlockable.TechTree == null) return false;
                     if (!unlockable.TechTree.IsUnlocked(owner, unlockable)) return false;
                     if (unlockable.TechTree.IsResearched(owner, unlockable)) return false;

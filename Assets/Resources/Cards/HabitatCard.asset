@@ -15,7 +15,7 @@ MonoBehaviour:
   <CardName>k__BackingField: Habitat
   <Icon>k__BackingField: {fileID: 0}
   <Description>k__BackingField: Unlock Habitat tech. Instantly adds 5 Population.
-  <WrappedUnlockable>k__BackingField: {fileID: 11400000, guid: 3597e650a85c28864ab06f1a87974659, type: 2}
+  <WrappedUpgrade>k__BackingField: {fileID: 11400000, guid: 3597e650a85c28864ab06f1a87974659, type: 2}
   <Rarity>k__BackingField: 1
   <DrawWeight>k__BackingField: 0.8
   <PlayCost>k__BackingField: 75

@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
 {

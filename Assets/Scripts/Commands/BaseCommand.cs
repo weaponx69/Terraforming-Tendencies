@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Linq;
 using GameDevTV.RTS.Player;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Commands
 {

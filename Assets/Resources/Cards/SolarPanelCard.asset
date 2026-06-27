@@ -15,7 +15,7 @@ MonoBehaviour:
   <CardName>k__BackingField: Solar Panel
   <Icon>k__BackingField: {fileID: 0}
   <Description>k__BackingField: Unlock Solar Panel tech. Instantly generates 25 Power.
-  <WrappedUnlockable>k__BackingField: {fileID: 11400000, guid: 9884a756ab958db61b4f24c529adca43, type: 2}
+  <WrappedUpgrade>k__BackingField: {fileID: 11400000, guid: 9884a756ab958db61b4f24c529adca43, type: 2}
   <Rarity>k__BackingField: 0
   <DrawWeight>k__BackingField: 1
   <PlayCost>k__BackingField: 50

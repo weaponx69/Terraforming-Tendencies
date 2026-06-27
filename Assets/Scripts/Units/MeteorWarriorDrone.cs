@@ -1,6 +1,6 @@
 using UnityEngine;
 using GameDevTV.RTS.Environment;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
 {

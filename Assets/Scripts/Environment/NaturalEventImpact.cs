@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Environment
 {

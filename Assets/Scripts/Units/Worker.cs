@@ -9,7 +9,7 @@ using GameDevTV.RTS.Player;
 using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
 {

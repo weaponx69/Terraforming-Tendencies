@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.TechTree
 {
@@ -18,9 +18,9 @@ namespace GameDevTV.RTS.TechTree
         [field: SerializeField] public string Description { get; set; } = "";
 
         [Header("Unlock Link")]
-        [Tooltip("The UnlockableSO this card represents. Must be set for the card to have an effect.")]
+        [Tooltip("The UpgradeSO this card unlocks. Must be set for the card to have an unlock effect.")]
         [Inspectable]
-        [field: SerializeField] public UnlockableSO WrappedUnlockable { get; set; }
+        [field: SerializeField] public UpgradeSO WrappedUpgrade { get; set; }
 
         [Header("Draw Properties")]
         [Inspectable]

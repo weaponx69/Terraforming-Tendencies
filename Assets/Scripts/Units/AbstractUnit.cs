@@ -7,7 +7,7 @@ using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
 using TMPro;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
 {

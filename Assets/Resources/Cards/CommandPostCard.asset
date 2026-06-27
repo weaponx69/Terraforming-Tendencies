@@ -15,7 +15,7 @@ MonoBehaviour:
   <CardName>k__BackingField: Command Post
   <Icon>k__BackingField: {fileID: 0}
   <Description>k__BackingField: Unlock Command Post tech. Required for sector milestones.
-  <WrappedUnlockable>k__BackingField: {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
+  <WrappedUpgrade>k__BackingField: {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
   <Rarity>k__BackingField: 2
   <DrawWeight>k__BackingField: 0.5
   <PlayCost>k__BackingField: 100

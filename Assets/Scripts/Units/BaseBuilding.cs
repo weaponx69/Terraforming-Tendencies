@@ -8,7 +8,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Commands;
 using UnityEngine;
 using UnityEngine.AI;
-using Unity.VisualScripting;
+using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
 {

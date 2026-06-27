@@ -14,6 +14,12 @@
 //   forward-compatibility: if Core is not resolvable for any
 //   reason, this file is the fallback.
 //
+// NAMESPACE NOTE:
+//   Deliberately NOT in Unity.VisualScripting to avoid CS0436
+//   conflicts when the real Unity.VisualScripting.Core assembly
+//   is also referenced.  Files use
+//   GameDevTV.RTS.VisualScriptingStubs.IncludeInSettings instead.
+//
 // REMOVAL:
 //   Delete this file only after confirming that
 //   Unity.VisualScripting.Core is listed in MainGame.asmdef
@@ -24,7 +30,7 @@
 // are invisible to runtime scripts.
 // ============================================================
 
-namespace Unity.VisualScripting
+namespace GameDevTV.RTS.VisualScriptingStubs
 {
     using System;
 
