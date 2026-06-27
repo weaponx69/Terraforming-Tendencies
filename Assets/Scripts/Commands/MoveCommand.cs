@@ -1,11 +1,19 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    /// <summary>
+    /// Move command with formation spreading (Mathf.Cos/Sin).
+    /// Formation math stays in C#. VS reads formation parameters.
+    /// </summary>
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Move Action", menuName = "Units/Commands/Move", order = 100)]
     public class MoveCommand : BaseCommand
     {
+        /// <summary>Multiplier controlling unit spread radius in formation.</summary>
+        [Inspectable]
         [SerializeField] private float radiusMultiplier = 3.5f;
 
         private int unitsOnLayer = 0;

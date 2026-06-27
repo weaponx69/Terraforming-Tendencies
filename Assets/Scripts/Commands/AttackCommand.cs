@@ -1,8 +1,10 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Attack", menuName = "Units/Commands/Attack", order = 99)]
     public class AttackCommand : BaseCommand
     {

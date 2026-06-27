@@ -2,9 +2,15 @@ using UnityEngine;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    /// <summary>
+    /// Active ability with cooldown and resource bonuses.
+    /// Supplies update loops stay in C#. VS reads cooldown state.
+    /// </summary>
+    [IncludeInSettings(true)]
     public class ActiveAbilityCommand : BaseCommand
     {
         private string _description;
@@ -14,14 +20,29 @@ namespace GameDevTV.RTS.Commands
         private int _matsBonus;
         private int _bioBonus;
         private float _waterBonus;
-        private float _cooldown = 10f; // 10 second cooldown
+
+        /// <summary>Cooldown in seconds between activations.</summary>
+        [Inspectable]
+        private float _cooldown = 10f;
+
         private float _lastUsedTime = -999f;
+
+        /// <summary>True if the ability is off cooldown and ready to use.</summary>
+        [Inspectable]
+        public bool IsReady => Time.time - _lastUsedTime >= _cooldown;
+
+        /// <summary>Normalised cooldown progress [0, 1]. 1 = ready.</summary>
+        [Inspectable]
+        public float CooldownProgress =>
+            _cooldown > 0f ? Mathf.Clamp01((Time.time - _lastUsedTime) / _cooldown) : 1f;
 
         public ActiveAbilityCommand()
         {
             RequiresClickToActivate = false;
         }
 
+        /// <summary>Initializes ability parameters. Callable from a Flow Graph.</summary>
+        [Inspectable]
         public void Initialize(string name, string desc, float temp, float atmos, float oxy, int mats, int bio, float water = 0f)
         {
             Name = name;

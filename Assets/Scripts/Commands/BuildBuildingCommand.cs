@@ -6,12 +6,21 @@ using UnityEngine.InputSystem.LowLevel;
 using System.Linq;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    /// <summary>
+    /// Building placement command. Heavy logic (NavMesh sampling, sector snapping,
+    /// Physics.OverlapBox orbital-drop crushing, spiral search) stays in C#.
+    /// VS reads <see cref="Building"/> and supply state.
+    /// </summary>
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Build Building", menuName = "Units/Commands/Build Building")]
     public class BuildBuildingCommand : BaseCommand, IUnlockableCommand
     {
+        /// <summary>The BuildingSO this command constructs.</summary>
+        [Inspectable]
         [field: SerializeField] public BuildingSO Building { get; set; }
 
         public Vector3 SnapToNearestSector(Vector3 point)

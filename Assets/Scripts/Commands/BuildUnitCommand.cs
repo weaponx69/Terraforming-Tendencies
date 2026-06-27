@@ -2,12 +2,15 @@ using UnityEngine;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.TechTree;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Build Unit", menuName = "Buildings/Commands/Build Unit", order = 120)]
     public class BuildUnitCommand : BaseCommand, IUnlockableCommand
     {
+        [Inspectable]
         [field: SerializeField] public AbstractUnitSO Unit { get; private set; }
         
         public override bool RequiresClickToActivate => false;

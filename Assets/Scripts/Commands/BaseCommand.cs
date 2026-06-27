@@ -1,16 +1,28 @@
 using UnityEngine;
 using System.Linq;
 using GameDevTV.RTS.Player;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    /// <summary>
+    /// Base class for all RTS commands. Abstract logic (CanHandle/Handle/IsLocked)
+    /// stays in C#. Inspector fields are decorated for VS Type Options visibility.
+    /// </summary>
+    [IncludeInSettings(true)]
     public abstract class BaseCommand : ScriptableObject, ICommand
     {
+        [Inspectable]
         [field: SerializeField] public string Name { get; set; } = "Command";
+        [Inspectable]
         [field: SerializeField] public Sprite Icon { get; set; }
+        [Inspectable]
         [field: Range(-1, 8)] [field: SerializeField] public int Slot { get; set; }
+        [Inspectable]
         [field: SerializeField] public virtual bool RequiresClickToActivate { get; protected set; } = true;
+        [Inspectable]
         [field: SerializeField] public bool IsSingleUnitCommand { get; private set; }
+        [Inspectable]
         [field: SerializeField] public GameObject GhostPrefab { get; private set; }
         [field: SerializeField] public BuildingRestrictionSO[] Restrictions { get; private set; }
 
