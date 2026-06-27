@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using GameDevTV.RTS.EventBus;
-using GameDevTV.RTS.Events;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
 using UnityEngine;
@@ -11,73 +9,29 @@ namespace GameDevTV.RTS.UI.Containers
     /// <summary>
     /// Persistent bottom-center action bar that mirrors the same commands as the
     /// original ActionsUI panel. Always visible regardless of selection state.
-    /// Self-assembles its own panel and button prefabs at runtime — no scene setup required.
-    /// Subscribes to selection events independently so it syncs automatically.
+    /// Self-assembles its own panel and button prefabs at runtime.
+    ///
+    /// This panel does NOT subscribe to events directly — RuntimeUI.RefreshUI()
+    /// calls SyncSelection() to keep it in sync with the main action panel.
     /// </summary>
     public class BottomBarActionsUI : ActionPanelBase
     {
         [Header("Self-Assembly")]
         [SerializeField] private GameObject buttonPrefab;
-        [SerializeField] private int buttonCount = 8;
-        [SerializeField] private Sprite buttonSprite;
+        [SerializeField] private int buttonCount = 9;
 
         private GameObject panelRoot;
         private bool isBuilt = false;
-        private Owner owner = Owner.Player1;
-
-        private void OnEnable()
-        {
-            if (!Application.isPlaying) return;
-            Bus<UnitSelectedEvent>.OnEvent[owner] += HandleUnitSelected;
-            Bus<UnitDeselectedEvent>.OnEvent[owner] += HandleUnitDeselected;
-            Bus<UnitDeathEvent>.OnEvent[owner] += HandleUnitDeath;
-        }
-
-        private void OnDisable()
-        {
-            if (!Application.isPlaying) return;
-            Bus<UnitSelectedEvent>.OnEvent[owner] -= HandleUnitSelected;
-            Bus<UnitDeselectedEvent>.OnEvent[owner] -= HandleUnitDeselected;
-            Bus<UnitDeathEvent>.OnEvent[owner] -= HandleUnitDeath;
-        }
 
         private void Start()
         {
             BuildPanel();
         }
 
-        private void HandleUnitSelected(UnitSelectedEvent evt)
-        {
-            if (evt.Unit is AbstractCommandable cmd)
-            {
-                var set = new HashSet<AbstractCommandable> { cmd };
-                SyncSelection(set);
-            }
-        }
-
-        private void HandleUnitDeselected(UnitDeselectedEvent evt)
-        {
-            // Re-sync with whatever is still selected
-            var stillSelected = new HashSet<AbstractCommandable>();
-            var allUnits = FindObjectsByType<AbstractCommandable>(FindObjectsSortMode.None);
-            foreach (var u in allUnits)
-            {
-                if (u != null && u.IsSelected && u.Owner == owner)
-                    stillSelected.Add(u);
-            }
-            SyncSelection(stillSelected);
-        }
-
-        private void HandleUnitDeath(UnitDeathEvent evt)
-        {
-            HandleUnitDeselected(new UnitDeselectedEvent(evt.Unit));
-        }
-
         private void BuildPanel()
         {
             if (isBuilt) return;
 
-            // Find the RuntimeUI canvas
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
                 canvas = FindFirstObjectByType<Canvas>();
@@ -98,16 +52,11 @@ namespace GameDevTV.RTS.UI.Containers
             panelRect.anchoredPosition = Vector2.zero;
             panelRect.sizeDelta = Vector2.zero;
 
-            // Add background image
+            // Background
             Image bg = panelRoot.AddComponent<Image>();
             bg.color = new Color(0.1f, 0.12f, 0.15f, 0.85f);
-            if (buttonSprite != null)
-            {
-                bg.sprite = buttonSprite;
-                bg.type = Image.Type.Sliced;
-            }
 
-            // Add horizontal layout
+            // Layout
             HorizontalLayoutGroup hlg = panelRoot.AddComponent<HorizontalLayoutGroup>();
             hlg.spacing = 8f;
             hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -117,7 +66,6 @@ namespace GameDevTV.RTS.UI.Containers
             hlg.childForceExpandHeight = false;
             hlg.padding = new RectOffset(8, 8, 6, 6);
 
-            // Add content size fitter
             ContentSizeFitter csf = panelRoot.AddComponent<ContentSizeFitter>();
             csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -139,12 +87,10 @@ namespace GameDevTV.RTS.UI.Containers
                     btnGo = CreateDefaultButton(panelRoot.transform, i);
                 }
 
-                // Size the button
                 RectTransform btnRect = btnGo.GetComponent<RectTransform>();
                 if (btnRect != null)
                     btnRect.sizeDelta = new Vector2(56, 56);
 
-                // Get UIActionButton
                 UIActionButton actionBtn = btnGo.GetComponent<UIActionButton>();
                 if (actionBtn == null)
                     actionBtn = btnGo.AddComponent<UIActionButton>();
@@ -170,11 +116,6 @@ namespace GameDevTV.RTS.UI.Containers
 
             Image img = btnGo.AddComponent<Image>();
             img.color = new Color(0.2f, 0.25f, 0.3f, 1f);
-            if (buttonSprite != null)
-            {
-                img.sprite = buttonSprite;
-                img.type = Image.Type.Sliced;
-            }
 
             Button btn = btnGo.AddComponent<Button>();
             btn.colors = new ColorBlock
@@ -205,7 +146,7 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
-        /// Sync the bottom bar with the current selection.
+        /// Called by RuntimeUI to sync this panel with the current selection.
         /// </summary>
         public void SyncSelection(HashSet<AbstractCommandable> selectedUnits)
         {
@@ -223,9 +164,6 @@ namespace GameDevTV.RTS.UI.Containers
             }
         }
 
-        /// <summary>
-        /// Override Disable to keep the panel active (just clear buttons).
-        /// </summary>
         public new void Disable()
         {
             base.Disable();

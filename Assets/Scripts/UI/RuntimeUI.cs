@@ -844,6 +844,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             {
                 TryDisable(globalCommanderUI);
                 actionsUI.EnableFor(selectedUnits);
+                bottomBarActionsUI?.SyncSelection(selectedUnits);
 
                 if (selectedUnits.Count == 1)
                 {
@@ -865,6 +866,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 {
                     actionsUI.EnableFor(new HashSet<AbstractCommandable> { globalCommander });
                     actionsUI.gameObject.SetActive(true);
+                    bottomBarActionsUI?.SyncSelection(new HashSet<AbstractCommandable> { globalCommander });
                     
                     if (globalCommanderUI != null)
                     {
