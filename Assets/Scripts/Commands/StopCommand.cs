@@ -1,8 +1,10 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Stop Action", menuName = "Units/Commands/Stop", order = 101)]
     public class StopCommand : BaseCommand
     {

@@ -1,7 +1,9 @@
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Override Commands", menuName = "Units/Commands/Override Commands", order = 110)]
     public class OverrideCommandsCommand : BaseCommand
     {

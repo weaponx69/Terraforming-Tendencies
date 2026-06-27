@@ -1,9 +1,11 @@
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Gather Action", menuName = "Units/Commands/Gather", order = 105)]
     public class GatherCommand : BaseCommand
     {

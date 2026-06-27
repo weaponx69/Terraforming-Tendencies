@@ -1,8 +1,10 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Load Unit", menuName = "Units/Commands/Load Unit", order = 106)]
     public class LoadUnitCommand : BaseCommand
     {

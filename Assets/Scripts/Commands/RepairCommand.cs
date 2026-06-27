@@ -1,8 +1,10 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Repair", menuName = "Units/Commands/Repair")]
     public class RepairCommand : BaseCommand
     {

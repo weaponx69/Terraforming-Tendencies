@@ -1,8 +1,10 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Unload Units", menuName = "Units/Commands/Unload All Units", order = 107)]
     public class UnloadAllUnitsCommand : BaseCommand
     {

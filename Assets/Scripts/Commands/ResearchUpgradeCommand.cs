@@ -4,12 +4,15 @@ using GameDevTV.RTS.Player;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Research Upgrade", menuName = "Tech Tree/Research Upgrade Command", order = 140)]
     public class ResearchUpgradeCommand : BaseCommand
     {
+        [Inspectable]
         [field: SerializeField] public UpgradeSO Upgrade { get; private set; }
 
         public override bool RequiresClickToActivate => false;

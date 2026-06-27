@@ -1,9 +1,11 @@
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Connect Power Command", menuName = "RTS/Commands/Connect Power")]
     public class ConnectPowerCommand : BaseCommand
     {

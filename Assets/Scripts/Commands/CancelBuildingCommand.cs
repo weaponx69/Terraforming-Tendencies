@@ -1,9 +1,11 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
 {
+    [IncludeInSettings(true)]
     [CreateAssetMenu(fileName = "Cancel Building", menuName = "Units/Commands/Cancel Building")]
     public class CancelBuildingCommand : BaseCommand
     {
