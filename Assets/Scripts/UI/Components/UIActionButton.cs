@@ -36,7 +36,9 @@ namespace GameDevTV.RTS.UI.Components
         {
             button.onClick.RemoveAllListeners();
             SetIcon(command.Icon);
-            button.interactable = selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
+            // If selectedUnits is null, make the button interactive (for bottom bar commands)
+            // Otherwise, check if any unit can handle the command
+            button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
             button.onClick.AddListener(onClick);
             isActive = true;
 

@@ -37,6 +37,9 @@ namespace GameDevTV.RTS.UI.Containers
         private bool isBuilt = false;
         private Owner owner = Owner.Player1;
 
+        // Cached template restrictions to avoid searching every time
+        private static BuildingRestrictionSO[] cachedTemplateRestrictions;
+
         private void OnEnable()
         {
             if (!Application.isPlaying) return;
@@ -196,37 +199,37 @@ namespace GameDevTV.RTS.UI.Containers
                 }
             }
 
-            // Create button slots
-            actionButtons = new UIActionButton[buttonCount];
+            // Find existing button children (non-procedural approach)
+            actionButtons = panelRoot.GetComponentsInChildren<UIActionButton>(true);
 
-            // Load default button prefab if none assigned
-            if (buttonPrefab == null)
+            // If no buttons exist, create them manually
+            if (actionButtons == null || actionButtons.Length == 0)
             {
-                buttonPrefab = Resources.Load<GameObject>("UI/Prefabs/Action Button");
-            }
-
-            for (int i = 0; i < buttonCount; i++)
-            {
-                GameObject btnGo;
-                if (buttonPrefab != null)
+                actionButtons = new UIActionButton[buttonCount];
+                for (int i = 0; i < buttonCount; i++)
                 {
-                    btnGo = Instantiate(buttonPrefab, panelRoot.transform);
-                    btnGo.name = $"Action Slot {i}";
-                }
-                else
-                {
-                    btnGo = CreateDefaultButton(panelRoot.transform, i);
-                }
+                    GameObject btnGo = new GameObject($"Action Slot {i}");
+                    btnGo.transform.SetParent(panelRoot.transform, false);
+                    btnGo.layer = LayerMask.NameToLayer("UI");
 
-                RectTransform btnRect = btnGo.GetComponent<RectTransform>();
-                if (btnRect != null)
+                    RectTransform btnRect = btnGo.AddComponent<RectTransform>();
                     btnRect.sizeDelta = new Vector2(52, 52);
 
-                UIActionButton actionBtn = btnGo.GetComponent<UIActionButton>();
-                if (actionBtn == null)
-                    actionBtn = btnGo.AddComponent<UIActionButton>();
+                    Image img = btnGo.AddComponent<Image>();
+                    img.color = new Color(0.2f, 0.25f, 0.3f, 1f);
+                    img.raycastTarget = true;
 
-                actionButtons[i] = actionBtn;
+                    Button btn = btnGo.AddComponent<Button>();
+                    btn.targetGraphic = img;
+
+                    UIActionButton actionBtn = btnGo.AddComponent<UIActionButton>();
+
+                    // Set the icon field via reflection so EnableFor can use it
+                    var iconField = typeof(UIActionButton).GetField("icon", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    iconField?.SetValue(actionBtn, img);
+
+                    actionButtons[i] = actionBtn;
+                }
             }
 
             isBuilt = true;
@@ -235,7 +238,7 @@ namespace GameDevTV.RTS.UI.Containers
             // Do an immediate refresh to populate
             RefreshBar();
 
-            Debug.Log($"[BottomBarActionsUI] Built bottom bar with {buttonCount} slots.");
+            Debug.Log($"[BottomBarActionsUI] Built bottom bar with {actionButtons.Length} slots.");
         }
 
         /// <summary>
@@ -269,8 +272,10 @@ namespace GameDevTV.RTS.UI.Containers
                 {
                     var cmd = uniqueCommands[i];
                     var ctx = new CommandContext(owner, null, new RaycastHit());
-                    actionButtons[i].EnableFor(cmd, new HashSet<AbstractCommandable>(), () =>
+                    actionButtons[i].EnableFor(cmd, null, () =>
                     {
+                        var buildingName = cmd is BuildBuildingCommand bbc ? bbc.Building?.Name : "N/A";
+                        Debug.Log($"[BottomBarActionsUI] Button clicked: {cmd.Name}, Building={buildingName}, Restrictions={cmd.Restrictions?.Length ?? 0}");
                         Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(cmd));
                     });
                 }
@@ -296,8 +301,10 @@ namespace GameDevTV.RTS.UI.Containers
             // 1. Add BuildBuildingCommand for ALL buildings unlocked via draft
             // Find template restrictions from existing BuildBuildingCommand assets
             BuildingRestrictionSO[] templateRestrictions = FindTemplateRestrictionsFromAssets();
+            Debug.Log($"[BottomBarActionsUI] Template restrictions: {(templateRestrictions != null ? templateRestrictions.Length.ToString() : "null")}");
 
             var unlockedBuildingNames = BlueprintDraftManager.GetUnlockedBuildingNames();
+            Debug.Log($"[BottomBarActionsUI] Unlocked buildings: {string.Join(", ", unlockedBuildingNames)}");
             foreach (var buildingName in unlockedBuildingNames)
             {
                 if (string.IsNullOrEmpty(buildingName)) continue;
@@ -313,12 +320,21 @@ namespace GameDevTV.RTS.UI.Containers
                 buildCmd.Icon = buildingSO.Icon;
                 buildCmd.Slot = FindFreeSlot(commands);
 
-                // Copy restrictions from template so AllRestrictionsPass works correctly
+                // Copy restrictions and ghost prefab from template
                 if (templateRestrictions != null)
                 {
                     var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField",
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                     restrictionsField?.SetValue(buildCmd, templateRestrictions);
+
+                    // Copy GhostPrefab from the first template command that has one
+                    var templateCommand = FindFirstTemplateCommand();
+                    if (templateCommand != null)
+                    {
+                        var ghostField = typeof(BaseCommand).GetField("<GhostPrefab>k__BackingField",
+                            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                        ghostField?.SetValue(buildCmd, templateCommand.GhostPrefab);
+                    }
                 }
 
                 commands.Add(buildCmd);
@@ -375,12 +391,54 @@ namespace GameDevTV.RTS.UI.Containers
         /// </summary>
         private BuildingRestrictionSO[] FindTemplateRestrictionsFromAssets()
         {
-            var allCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
-            foreach (var cmd in allCommands)
+            // Return cached restrictions if available
+            if (cachedTemplateRestrictions != null)
             {
-                if (cmd != null && cmd.Restrictions != null && cmd.Restrictions.Length > 0)
+                return cachedTemplateRestrictions;
+            }
+
+            // First try to find from scene buildings' AvailableCommands (runtime objects)
+            var allBuildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var building in allBuildings)
+            {
+                if (building == null || building.Owner != owner) continue;
+                if (building.AvailableCommands != null)
                 {
-                    return cmd.Restrictions;
+                    foreach (var cmd in building.AvailableCommands)
+                    {
+                        if (cmd is BuildBuildingCommand bbc && bbc.Restrictions != null && bbc.Restrictions.Length > 0)
+                        {
+                            cachedTemplateRestrictions = bbc.Restrictions;
+                            return cachedTemplateRestrictions;
+                        }
+                    }
+                }
+            }
+
+            // No template found — restrictions will be null, which means AllRestrictionsPass
+            // will skip collision checks (acceptable for bottom bar commands)
+            Debug.Log("[BottomBarActionsUI] No template restrictions found!");
+            return null;
+        }
+
+        /// <summary>
+        /// Find the first BuildBuildingCommand with a GhostPrefab set (for copying to dynamically created commands).
+        /// </summary>
+        private BuildBuildingCommand FindFirstTemplateCommand()
+        {
+            var allBuildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var building in allBuildings)
+            {
+                if (building == null || building.Owner != owner) continue;
+                if (building.AvailableCommands != null)
+                {
+                    foreach (var cmd in building.AvailableCommands)
+                    {
+                        if (cmd is BuildBuildingCommand bbc && bbc.GhostPrefab != null)
+                        {
+                            return bbc;
+                        }
+                    }
                 }
             }
             return null;
@@ -407,7 +465,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             GameObject btnGo = new GameObject($"Action Slot {index}");
             btnGo.transform.SetParent(parent, false);
-            btnGo.layer = parent.gameObject.layer;
+            btnGo.layer = LayerMask.NameToLayer("UI");
 
             RectTransform rt = btnGo.AddComponent<RectTransform>();
             rt.sizeDelta = new Vector2(52, 52);
