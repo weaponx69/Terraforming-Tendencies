@@ -33,6 +33,8 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private SingleUnitSelectedUI singleUnitSelectedUI;
         [SerializeField] private UnitTransportUI unitTransportUI;
         [SerializeField] private GlobalCommanderUI globalCommanderUI;
+        [SerializeField] private AbilityHandUI abilityHandUI;
+        [SerializeField] private BottomBarActionsUI bottomBarActionsUI;
 
         [SerializeField] private Image iconImage;
 
@@ -869,6 +871,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             TryDisable(singleUnitSelectedUI);
             TryDisable(unitTransportUI);
             TryDisable(globalCommanderUI);
+            // Note: abilityHandUI is NOT disabled here — it persists across selection changes
         }
 
         // Safely call Disable on UI container objects that may have partially-destroyed child components.
