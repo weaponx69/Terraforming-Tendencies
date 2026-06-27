@@ -1,4 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
+using GameDevTV.RTS.Commands;
+using GameDevTV.RTS.EventBus;
+using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Player;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
 using UnityEngine;
@@ -7,37 +12,119 @@ using UnityEngine.UI;
 namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
-    /// Persistent bottom-center action bar that mirrors the same commands as the
-    /// original ActionsUI panel. Always visible regardless of selection state.
-    /// Self-assembles its own panel and button prefabs at runtime.
+    /// Persistent bottom-center action bar that shows ALL unlockable actions from
+    /// the BlueprintDraftManager — all buildings that have been unlocked via draft cards,
+    /// plus any commands from existing units/buildings.
     ///
-    /// This panel does NOT subscribe to events directly — RuntimeUI.RefreshUI()
-    /// calls SyncSelection() to keep it in sync with the main action panel.
+    /// Can either self-assemble its own panel at runtime, or use a pre-assigned panelRoot
+    /// (drag a GameObject into the Inspector) so you can position it visually in the editor.
+    ///
+    /// Refreshes whenever units/buildings are selected, die, or spawn, and also
+    /// on a periodic tick to catch draft completions and construction completions.
     /// </summary>
-    public class BottomBarActionsUI : ActionPanelBase
+    public class BottomBarActionsUI : MonoBehaviour
     {
-        [Header("Self-Assembly")]
+        [Header("Panel Assignment (leave empty to self-assemble)")]
+        [Tooltip("Assign a GameObject to use as the panel root. If empty, the bar will self-assemble at runtime.")]
+        [SerializeField] private GameObject panelRootOverride;
+
+        [Header("Self-Assembly Settings")]
         [SerializeField] private GameObject buttonPrefab;
-        [SerializeField] private int buttonCount = 9;
+        [SerializeField] private int buttonCount = 12;
 
         private GameObject panelRoot;
+        private UIActionButton[] actionButtons;
         private bool isBuilt = false;
+        private Owner owner = Owner.Player1;
 
-        private void Start()
+        private void OnEnable()
+        {
+            if (!Application.isPlaying) return;
+            Bus<UnitSelectedEvent>.OnEvent[owner] += HandleRefresh;
+            Bus<UnitDeselectedEvent>.OnEvent[owner] += HandleRefresh;
+            Bus<UnitDeathEvent>.OnEvent[owner] += HandleRefresh;
+            Bus<BuildingDeathEvent>.OnEvent[owner] += HandleRefresh;
+            Bus<BuildingSpawnEvent>.OnEvent[owner] += HandleRefresh;
+            Bus<UpgradeResearchedEvent>.OnEvent[owner] += HandleRefresh;
+        }
+
+        private void OnDisable()
+        {
+            if (!Application.isPlaying) return;
+            Bus<UnitSelectedEvent>.OnEvent[owner] -= HandleRefresh;
+            Bus<UnitDeselectedEvent>.OnEvent[owner] -= HandleRefresh;
+            Bus<UnitDeathEvent>.OnEvent[owner] -= HandleRefresh;
+            Bus<BuildingDeathEvent>.OnEvent[owner] -= HandleRefresh;
+            Bus<BuildingSpawnEvent>.OnEvent[owner] -= HandleRefresh;
+            Bus<UpgradeResearchedEvent>.OnEvent[owner] -= HandleRefresh;
+
+            // Clean up dynamically created buttons
+            if (actionButtons != null)
+            {
+                for (int i = 0; i < actionButtons.Length; i++)
+                {
+                    if (actionButtons[i] != null)
+                    {
+                        Destroy(actionButtons[i].gameObject);
+                        actionButtons[i] = null;
+                    }
+                }
+                actionButtons = null;
+            }
+        }
+
+        private void Awake()
         {
             BuildPanel();
         }
+
+        public void Initialize()
+        {
+            BuildPanel();
+        }
+
+        private void Update()
+        {
+            if (!Application.isPlaying) return;
+            // Periodic refresh every ~0.5s to catch newly completed buildings
+            if (Time.frameCount % 30 == 0)
+            {
+                RefreshBar();
+            }
+        }
+
+
+        private void HandleRefresh(UnitSelectedEvent evt) { RefreshBar(); }
+        private void HandleRefresh(UnitDeselectedEvent evt) { RefreshBar(); }
+        private void HandleRefresh(UnitDeathEvent evt) { RefreshBar(); }
+        private void HandleRefresh(BuildingDeathEvent evt) { RefreshBar(); }
+        private void HandleRefresh(BuildingSpawnEvent evt) { RefreshBar(); }
+        private void HandleRefresh(UpgradeResearchedEvent evt) { RefreshBar(); }
 
         private void BuildPanel()
         {
             if (isBuilt) return;
 
+            // If a panel root override is assigned, use it directly (for visual positioning in editor)
+            if (panelRootOverride != null)
+            {
+                panelRoot = panelRootOverride;
+                ApplyPanelSetup(panelRoot);
+                BuildButtons();
+                isBuilt = true;
+                panelRoot.SetActive(true);
+                RefreshBar();
+                Debug.Log($"[BottomBarActionsUI] Using pre-assigned panel root: {panelRoot.name}");
+                return;
+            }
+
+            // Otherwise, self-assemble the panel
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
-                canvas = FindFirstObjectByType<Canvas>();
+                canvas = FindAnyObjectByType<Canvas>();
             if (canvas == null)
             {
-                Debug.LogError("[BottomBarActionsUI] No Canvas found in scene. Cannot build bottom bar.");
+                Debug.LogError("[BottomBarActionsUI] No Canvas found.");
                 return;
             }
 
@@ -45,38 +132,82 @@ namespace GameDevTV.RTS.UI.Containers
             panelRoot = new GameObject("Bottom Action Bar");
             panelRoot.transform.SetParent(canvas.transform, false);
 
+            // Set up RectTransform for the self-assembled panel
             RectTransform panelRect = panelRoot.AddComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.2f, 0.02f);
-            panelRect.anchorMax = new Vector2(0.8f, 0.12f);
+            panelRect.anchorMin = new Vector2(0f, 0f);
+            panelRect.anchorMax = new Vector2(1f, 0f);
             panelRect.pivot = new Vector2(0.5f, 0f);
-            panelRect.anchoredPosition = Vector2.zero;
-            panelRect.sizeDelta = Vector2.zero;
+            panelRect.anchoredPosition = new Vector2(0f, 30f);
+            panelRect.sizeDelta = new Vector2(0f, 60f);
 
-            // Background
-            Image bg = panelRoot.AddComponent<Image>();
-            bg.color = new Color(0.1f, 0.12f, 0.15f, 0.85f);
+            ApplyPanelSetup(panelRoot);
 
-            // Layout
-            HorizontalLayoutGroup hlg = panelRoot.AddComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 8f;
-            hlg.childAlignment = TextAnchor.MiddleCenter;
-            hlg.childControlWidth = false;
-            hlg.childControlHeight = false;
-            hlg.childForceExpandWidth = false;
-            hlg.childForceExpandHeight = false;
-            hlg.padding = new RectOffset(8, 8, 6, 6);
+            BuildButtons();
+            isBuilt = true;
+            panelRoot.SetActive(true);
+            RefreshBar();
+            Debug.Log($"[BottomBarActionsUI] Self-assembled bottom bar with {buttonCount} slots.");
+        }
 
-            ContentSizeFitter csf = panelRoot.AddComponent<ContentSizeFitter>();
-            csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        /// <summary>
+        /// Apply standard setup (RectTransform, background, layout) to a panel root.
+        /// Used by both the override path and the self-assemble path.
+        /// </summary>
+        private void ApplyPanelSetup(GameObject targetPanel)
+        {
+            // Add background if not present
+            Image bg = targetPanel.GetComponent<Image>();
+            if (bg == null)
+            {
+                bg = targetPanel.AddComponent<Image>();
+                bg.color = new Color(0.08f, 0.10f, 0.13f, 0.9f);
+            }
+
+            // Add layout group if not present
+            HorizontalLayoutGroup hlg = targetPanel.GetComponent<HorizontalLayoutGroup>();
+            if (hlg == null)
+            {
+                hlg = targetPanel.AddComponent<HorizontalLayoutGroup>();
+                hlg.spacing = 6f;
+                hlg.childAlignment = TextAnchor.MiddleCenter;
+                hlg.childControlWidth = false;
+                hlg.childControlHeight = false;
+                hlg.childForceExpandWidth = false;
+                hlg.childForceExpandHeight = false;
+                hlg.padding = new RectOffset(8, 8, 6, 6);
+            }
+        }
+
+        /// <summary>
+        /// Create button slots under the current panelRoot.
+        /// </summary>
+        private void BuildButtons()
+        {
+            // Clean up existing buttons
+            if (actionButtons != null)
+            {
+                for (int i = 0; i < actionButtons.Length; i++)
+                {
+                    if (actionButtons[i] != null)
+                    {
+                        Destroy(actionButtons[i].gameObject);
+                        actionButtons[i] = null;
+                    }
+                }
+            }
 
             // Create button slots
-            var buttons = new UIActionButton[buttonCount];
+            actionButtons = new UIActionButton[buttonCount];
+
+            // Load default button prefab if none assigned
+            if (buttonPrefab == null)
+            {
+                buttonPrefab = Resources.Load<GameObject>("UI/Prefabs/Action Button");
+            }
 
             for (int i = 0; i < buttonCount; i++)
             {
                 GameObject btnGo;
-
                 if (buttonPrefab != null)
                 {
                     btnGo = Instantiate(buttonPrefab, panelRoot.transform);
@@ -89,20 +220,187 @@ namespace GameDevTV.RTS.UI.Containers
 
                 RectTransform btnRect = btnGo.GetComponent<RectTransform>();
                 if (btnRect != null)
-                    btnRect.sizeDelta = new Vector2(56, 56);
+                    btnRect.sizeDelta = new Vector2(52, 52);
 
                 UIActionButton actionBtn = btnGo.GetComponent<UIActionButton>();
                 if (actionBtn == null)
                     actionBtn = btnGo.AddComponent<UIActionButton>();
 
-                buttons[i] = actionBtn;
+                actionButtons[i] = actionBtn;
             }
 
-            actionButtons = buttons;
             isBuilt = true;
             panelRoot.SetActive(true);
 
-            Debug.Log($"[BottomBarActionsUI] Built bottom bar with {buttonCount} action slots.");
+            // Do an immediate refresh to populate
+            RefreshBar();
+
+            Debug.Log($"[BottomBarActionsUI] Built bottom bar with {buttonCount} slots.");
+        }
+
+        /// <summary>
+        /// Collect ALL unlockable actions — buildings from BlueprintDraftManager plus
+        /// commands from existing units/buildings — and display them.
+        /// </summary>
+        private void RefreshBar()
+        {
+            if (!isBuilt || actionButtons == null) return;
+
+            var allCommands = CollectAllCommands();
+
+            // Deduplicate by command name (same command from multiple buildings = one button)
+            var seen = new HashSet<string>();
+            var uniqueCommands = new List<BaseCommand>();
+            foreach (var cmd in allCommands)
+            {
+                if (cmd != null && !seen.Contains(cmd.Name))
+                {
+                    seen.Add(cmd.Name);
+                    uniqueCommands.Add(cmd);
+                }
+            }
+
+            // Populate buttons
+            for (int i = 0; i < actionButtons.Length; i++)
+            {
+                if (actionButtons[i] == null) continue;
+
+                if (i < uniqueCommands.Count)
+                {
+                    var cmd = uniqueCommands[i];
+                    var ctx = new CommandContext(owner, null, new RaycastHit());
+                    actionButtons[i].EnableFor(cmd, new HashSet<AbstractCommandable>(), () =>
+                    {
+                        Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(cmd));
+                    });
+                }
+                else
+                {
+                    actionButtons[i].Disable();
+                }
+            }
+
+            if (panelRoot != null) panelRoot.SetActive(true);
+        }
+
+        /// <summary>
+        /// Collect all unlockable actions:
+        /// 1. All buildings unlocked via BlueprintDraftManager (from draft cards)
+        /// 2. All commands from existing units/buildings (production, research, etc.)
+        /// </summary>
+        private List<BaseCommand> CollectAllCommands()
+        {
+            var commands = new List<BaseCommand>();
+            var addedBuildingNames = new HashSet<string>();
+
+            // 1. Add BuildBuildingCommand for ALL buildings unlocked via draft
+            // Find template restrictions from existing BuildBuildingCommand assets
+            BuildingRestrictionSO[] templateRestrictions = FindTemplateRestrictionsFromAssets();
+
+            var unlockedBuildingNames = BlueprintDraftManager.GetUnlockedBuildingNames();
+            foreach (var buildingName in unlockedBuildingNames)
+            {
+                if (string.IsNullOrEmpty(buildingName)) continue;
+                if (addedBuildingNames.Contains(buildingName)) continue;
+
+                var buildingSO = BlueprintDraftManager.GetBuildingSOByName(buildingName);
+                if (buildingSO == null) continue;
+
+                // Create a BuildBuildingCommand for this unlocked building
+                var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
+                buildCmd.Name = "Build " + buildingSO.Name;
+                buildCmd.Building = buildingSO;
+                buildCmd.Icon = buildingSO.Icon;
+                buildCmd.Slot = FindFreeSlot(commands);
+
+                // Copy restrictions from template so AllRestrictionsPass works correctly
+                if (templateRestrictions != null)
+                {
+                    var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    restrictionsField?.SetValue(buildCmd, templateRestrictions);
+                }
+
+                commands.Add(buildCmd);
+                addedBuildingNames.Add(buildingName);
+            }
+
+            // 2. Gather commands from all owned units (workers, etc.)
+            var allUnits = FindObjectsByType<AbstractCommandable>();
+            foreach (var unit in allUnits)
+            {
+                if (unit == null) continue;
+                if (unit.Owner != owner) continue;
+
+                if (unit.AvailableCommands != null)
+                {
+                    foreach (var cmd in unit.AvailableCommands)
+                    {
+                        if (cmd == null) continue;
+                        // Skip BuildBuildingCommands — we already added those from the draft
+                        if (cmd is BuildBuildingCommand) continue;
+                        commands.Add(cmd);
+                    }
+                }
+            }
+
+            // 3. Gather non-building commands from owned buildings (production, research, etc.)
+            if (BaseBuilding.ActiveBuildings != null)
+            {
+                foreach (var building in BaseBuilding.ActiveBuildings)
+                {
+                    if (building == null) continue;
+                    if (building.Owner != owner) continue;
+
+                    if (building.AvailableCommands != null)
+                    {
+                        foreach (var cmd in building.AvailableCommands)
+                        {
+                            if (cmd == null) continue;
+                            // Skip BuildBuildingCommands — we already added those from the draft
+                            if (cmd is BuildBuildingCommand) continue;
+                            commands.Add(cmd);
+                        }
+                    }
+                }
+            }
+
+            return commands;
+        }
+
+        /// <summary>
+        /// Find template restrictions from BuildBuildingCommand assets in the project.
+        /// This is needed because dynamically created BuildBuildingCommands need Restrictions
+        /// for AllRestrictionsPass to work correctly.
+        /// </summary>
+        private BuildingRestrictionSO[] FindTemplateRestrictionsFromAssets()
+        {
+            var allCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
+            foreach (var cmd in allCommands)
+            {
+                if (cmd != null && cmd.Restrictions != null && cmd.Restrictions.Length > 0)
+                {
+                    return cmd.Restrictions;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Find the next available slot index for a command.
+        /// </summary>
+        private int FindFreeSlot(List<BaseCommand> commands)
+        {
+            var usedSlots = new HashSet<int>();
+            foreach (var cmd in commands)
+            {
+                if (cmd != null) usedSlots.Add(cmd.Slot);
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                if (!usedSlots.Contains(i)) return i;
+            }
+            return -1;
         }
 
         private GameObject CreateDefaultButton(Transform parent, int index)
@@ -112,7 +410,7 @@ namespace GameDevTV.RTS.UI.Containers
             btnGo.layer = parent.gameObject.layer;
 
             RectTransform rt = btnGo.AddComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(56, 56);
+            rt.sizeDelta = new Vector2(52, 52);
 
             Image img = btnGo.AddComponent<Image>();
             img.color = new Color(0.2f, 0.25f, 0.3f, 1f);
@@ -136,38 +434,19 @@ namespace GameDevTV.RTS.UI.Containers
             RectTransform iconRt = iconGo.AddComponent<RectTransform>();
             iconRt.anchorMin = Vector2.zero;
             iconRt.anchorMax = Vector2.one;
-            iconRt.offsetMin = new Vector2(10, 10);
-            iconRt.offsetMax = new Vector2(-10, -10);
+            iconRt.offsetMin = new Vector2(8, 8);
+            iconRt.offsetMax = new Vector2(-8, -8);
             iconGo.AddComponent<Image>();
 
-            btnGo.AddComponent<UIActionButton>();
+            // Add UIActionButton disabled, wire icon, then enable
+            UIActionButton actionBtn = btnGo.AddComponent<UIActionButton>();
+            actionBtn.enabled = false;
+            Image iconImage = iconGo.GetComponent<Image>();
+            var iconField = typeof(UIActionButton).GetField("icon", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            iconField?.SetValue(actionBtn, iconImage);
+            actionBtn.enabled = true;
 
             return btnGo;
-        }
-
-        /// <summary>
-        /// Called by RuntimeUI to sync this panel with the current selection.
-        /// </summary>
-        public void SyncSelection(HashSet<AbstractCommandable> selectedUnits)
-        {
-            if (!isBuilt) BuildPanel();
-
-            if (selectedUnits != null && selectedUnits.Count > 0)
-            {
-                base.EnableFor(selectedUnits);
-                if (panelRoot != null) panelRoot.SetActive(true);
-            }
-            else
-            {
-                base.Disable();
-                if (panelRoot != null) panelRoot.SetActive(true);
-            }
-        }
-
-        public new void Disable()
-        {
-            base.Disable();
-            if (panelRoot != null) panelRoot.SetActive(true);
         }
     }
 }

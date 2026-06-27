@@ -222,6 +222,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 GameObject bottomBarGo = new GameObject("Bottom Action Bar");
                 bottomBarGo.transform.SetParent(transform, false);
                 bottomBarActionsUI = bottomBarGo.AddComponent<BottomBarActionsUI>();
+                bottomBarActionsUI.Initialize(); // Force immediate build before Start()
 #if UNITY_EDITOR
                 if (!Application.isPlaying) UnityEditor.Undo.RegisterCreatedObjectUndo(bottomBarGo, "Create Bottom Action Bar");
 #endif
@@ -844,7 +845,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             {
                 TryDisable(globalCommanderUI);
                 actionsUI.EnableFor(selectedUnits);
-                bottomBarActionsUI?.SyncSelection(selectedUnits);
 
                 if (selectedUnits.Count == 1)
                 {
@@ -866,7 +866,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 {
                     actionsUI.EnableFor(new HashSet<AbstractCommandable> { globalCommander });
                     actionsUI.gameObject.SetActive(true);
-                    bottomBarActionsUI?.SyncSelection(new HashSet<AbstractCommandable> { globalCommander });
                     
                     if (globalCommanderUI != null)
                     {

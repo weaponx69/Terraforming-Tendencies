@@ -57,7 +57,7 @@ namespace GameDevTV.RTS.UI.Components
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (isActive)
+            if (isActive && tooltip != null)
             {
                 Invoke(nameof(ShowTooltip), tooltip.HoverDelay);
             }
@@ -86,6 +86,8 @@ namespace GameDevTV.RTS.UI.Components
 
         private void SetIcon(Sprite icon)
         {
+            if (this.icon == null) return;
+
             if (icon == null)
             {
                 this.icon.enabled = false;
