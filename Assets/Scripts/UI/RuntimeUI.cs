@@ -216,6 +216,17 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 #endif
             }
 
+            // Self-assemble the bottom bar action panel if not already wired in Inspector
+            if (bottomBarActionsUI == null)
+            {
+                GameObject bottomBarGo = new GameObject("Bottom Action Bar");
+                bottomBarGo.transform.SetParent(transform, false);
+                bottomBarActionsUI = bottomBarGo.AddComponent<BottomBarActionsUI>();
+#if UNITY_EDITOR
+                if (!Application.isPlaying) UnityEditor.Undo.RegisterCreatedObjectUndo(bottomBarGo, "Create Bottom Action Bar");
+#endif
+            }
+
             FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
