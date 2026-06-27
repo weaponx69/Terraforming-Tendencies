@@ -6,19 +6,23 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
     /// <summary>
     /// Self-contained finite state machine for Worker drone behaviour.
-    /// Manages the Gather → Return loop and Build loop directly via NavMeshAgent
-    /// coroutines, independent of the BehaviorGraphAgent.
+    /// All coroutine loops (GatherLoop, BuildLoop, RepairLoop, PipelineBuildLoop)
+    /// and NavMeshAgent pathing stay in C#. VS reads <see cref="CurrentState"/> only.
     /// </summary>
+    [IncludeInSettings(true)]
     [RequireComponent(typeof(NavMeshAgent), typeof(Worker))]
     public class WorkerBrainController : MonoBehaviour
     {
         public enum State { Idle, MovingToSupply, Gathering, MovingToBase, MovingToBuild, Building, MovingToRepair, Repairing, BuildingPipeline }
 
+        /// <summary>Current FSM state. Readable by Flow Graphs for status HUD branching.</summary>
+        [Inspectable]
         public State CurrentState { get; private set; } = State.Idle;
 
         private NavMeshAgent agent;

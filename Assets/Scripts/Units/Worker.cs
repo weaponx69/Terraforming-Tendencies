@@ -9,9 +9,11 @@ using GameDevTV.RTS.Player;
 using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     public class Worker : AbstractUnit, IBuildingBuilder, ITransportable, IRepairer
     {
         public bool IsBuilding => GetCurrentCommand() == UnitCommands.BuildBuilding;

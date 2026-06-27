@@ -8,9 +8,11 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Commands;
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     public class BaseBuilding : AbstractCommandable
     {
         public static readonly List<BaseBuilding> ActiveBuildings = new();

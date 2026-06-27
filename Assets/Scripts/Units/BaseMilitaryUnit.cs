@@ -1,5 +1,8 @@
+using Unity.VisualScripting;
+
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     public class BaseMilitaryUnit : AbstractUnit, ITransportable
     {
         public int TransportCapacityUsage => unitSO.TransportConfig.GetTransportCapacityUsage();

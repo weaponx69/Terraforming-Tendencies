@@ -6,9 +6,11 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     public abstract class AbstractCommandable : MonoBehaviour, ISelectable, IDamageable, IHideable
     {
         public static readonly System.Collections.Generic.List<AbstractCommandable> ActiveCommandables = new();

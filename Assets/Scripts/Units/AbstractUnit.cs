@@ -7,9 +7,11 @@ using Unity.Behavior;
 using UnityEngine;
 using UnityEngine.AI;
 using TMPro;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(NavMeshAgent), typeof(BehaviorGraphAgent))]
     public abstract class AbstractUnit : AbstractCommandable, IMoveable, IAttacker
