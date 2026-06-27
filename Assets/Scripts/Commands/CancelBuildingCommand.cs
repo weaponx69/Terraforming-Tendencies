@@ -1,6 +1,5 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
-using UnityEngine.InputSystem.LowLevel;
 using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Commands
@@ -14,7 +13,7 @@ namespace GameDevTV.RTS.Commands
         public override bool CanHandle(CommandContext context)
         {
             return context.Commandable is IBuildingBuilder
-                && context.Button == MouseButton.Left;
+                && context.Button == UnityEngine.InputSystem.LowLevel.MouseButton.Left;
         }
 
         public override void Handle(CommandContext context)

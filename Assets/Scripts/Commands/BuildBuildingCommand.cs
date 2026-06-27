@@ -69,7 +69,7 @@ namespace GameDevTV.RTS.Commands
             // If the commandable itself is a builder and is already building, abort
             if (context.Commandable is IBuildingBuilder b && b.IsBuilding) return false;
 
-            if (context.Hit.collider != null && context.Button == MouseButton.Right)
+            if (context.Hit.collider != null && context.Button == UnityEngine.InputSystem.LowLevel.MouseButton.Right)
             {
                 return context.Hit.collider.TryGetComponent(out BaseBuilding building)
                     && Building == building.BuildingSO
