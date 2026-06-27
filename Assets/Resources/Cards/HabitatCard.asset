@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_RootAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 250309923b12d9cafba98dbfd9547093, type: 3}
+  m_Name: HabitatCard
+  m_EditorClassIdentifier:
+  <CardName>k__BackingField: Habitat
+  <Icon>k__BackingField: {fileID: 0}
+  <Description>k__BackingField: Unlock Habitat tech. Instantly adds 5 Population.
+  <WrappedUnlockable>k__BackingField: {fileID: 11400000, guid: 3597e650a85c28864ab06f1a87974659, type: 2}
+  <Rarity>k__BackingField: 1
+  <DrawWeight>k__BackingField: 0.8
+  <PlayCost>k__BackingField: 75
+  <EffectType>k__BackingField: 4
+  <EffectAmount>k__BackingField: 5
