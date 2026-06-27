@@ -1,7 +1,9 @@
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Animator))]
     public class HoldGunIK : MonoBehaviour

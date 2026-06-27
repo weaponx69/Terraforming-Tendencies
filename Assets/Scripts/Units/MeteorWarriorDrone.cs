@@ -1,8 +1,10 @@
 using UnityEngine;
 using GameDevTV.RTS.Environment;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     /// <summary>
     /// A specialized military drone that prioritizes destroying environmental threats
     /// like meteors (<see cref="NaturalEventImpact"/>) before attacking other enemies.

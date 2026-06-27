@@ -1,9 +1,11 @@
 using System.Collections;
 using Unity.Behavior;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     public class Grenadier : BaseMilitaryUnit
     {
         [SerializeField] private GameObject grenade;

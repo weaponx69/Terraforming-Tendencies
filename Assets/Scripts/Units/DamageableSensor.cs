@@ -4,9 +4,11 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using UnityEngine;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     [RequireComponent(typeof(SphereCollider))]
     public class DamageableSensor : MonoBehaviour
     {

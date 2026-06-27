@@ -1,8 +1,10 @@
 using UnityEngine;
 using GameDevTV.RTS.Player;
+using Unity.VisualScripting;
 
 namespace GameDevTV.RTS.Units
 {
+    [IncludeInSettings(true)]
     public class OxygenProcessor : BaseBuilding
     {
         [Tooltip("Percentage of oxygen generated per tick (e.g. 0.001)")]
