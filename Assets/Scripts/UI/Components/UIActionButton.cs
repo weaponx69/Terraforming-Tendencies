@@ -44,7 +44,14 @@ namespace GameDevTV.RTS.UI.Components
 
             if (tooltip != null)
             {
-                tooltip.SetText(GetTooltipText(command));
+                try
+                {
+                    tooltip.SetText(GetTooltipText(command));
+                }
+                catch (System.Exception)
+                {
+                    // Tooltip text component may not be properly set up — ignore
+                }
             }
         }
 

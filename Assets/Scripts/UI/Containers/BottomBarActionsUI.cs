@@ -57,6 +57,14 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void Awake()
         {
+            // Ensure this GameObject has a RectTransform (not plain Transform) for Canvas layout
+            if (GetComponent<RectTransform>() == null)
+            {
+                // Can't directly convert Transform to RectTransform, so we log an error
+                Debug.LogError("[BottomBarActionsUI] This GameObject must have a RectTransform, not a plain Transform. UI elements under a Canvas require RectTransform.", this);
+                return;
+            }
+
             if (actionButtons == null || actionButtons.Length == 0)
             {
                 Debug.LogError("[BottomBarActionsUI] No action buttons wired in Inspector! Drag UIActionButton children into the 'Action Buttons' array.", this);
@@ -237,14 +245,34 @@ namespace GameDevTV.RTS.UI.Containers
         /// </summary>
         private Sprite FindIconForBuilding(BuildingSO buildingSO)
         {
+            if (buildingSO == null || string.IsNullOrEmpty(buildingSO.Name)) return null;
+
             var allCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
             foreach (var cmd in allCommands)
             {
-                if (cmd != null && cmd.Building == buildingSO && cmd.Icon != null)
+                if (cmd != null && cmd.Building != null && cmd.Building.Name == buildingSO.Name && cmd.Icon != null)
                 {
                     return cmd.Icon;
                 }
             }
+
+            // Fallback: check runtime building instances' AvailableCommands
+            var allBuildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var building in allBuildings)
+            {
+                if (building == null || building.BuildingSO == null) continue;
+                if (building.BuildingSO.Name != buildingSO.Name) continue;
+                if (building.AvailableCommands == null) continue;
+
+                foreach (var cmd in building.AvailableCommands)
+                {
+                    if (cmd is BuildBuildingCommand bbc && bbc.Icon != null)
+                    {
+                        return bbc.Icon;
+                    }
+                }
+            }
+
             return null;
         }
 

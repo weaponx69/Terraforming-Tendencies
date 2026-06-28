@@ -217,7 +217,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             }
 
             // Wire the bottom bar action panel: use Inspector reference first,
-            // then search children as fallback
+            // then search children as fallback, then create as last resort
             if (bottomBarActionsUI == null)
             {
                 bottomBarActionsUI = GetComponentInChildren<BottomBarActionsUI>(true);
@@ -225,7 +225,28 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 
             if (bottomBarActionsUI == null)
             {
-                Debug.LogWarning("[RuntimeUI] No BottomBarActionsUI found. Add a BottomBarActionsUI component to a child GameObject with wired UIActionButton references.");
+                // Create a proper RectTransform-based hierarchy for the bottom bar
+                GameObject containerGo = new GameObject("Bottom Action Bar Container", typeof(RectTransform));
+                containerGo.transform.SetParent(transform, false);
+                RectTransform containerRt = containerGo.GetComponent<RectTransform>();
+                containerRt.anchorMin = new Vector2(0f, 0f);
+                containerRt.anchorMax = new Vector2(1f, 0f);
+                containerRt.pivot = new Vector2(0.5f, 0f);
+                containerRt.anchoredPosition = new Vector2(0f, 30f);
+                containerRt.sizeDelta = new Vector2(0f, 60f);
+
+                GameObject barGo = new GameObject("Bottom Action Bar", typeof(RectTransform));
+                barGo.transform.SetParent(containerGo.transform, false);
+                RectTransform barRt = barGo.GetComponent<RectTransform>();
+                barRt.anchorMin = Vector2.zero;
+                barRt.anchorMax = Vector2.one;
+                barRt.sizeDelta = Vector2.zero;
+
+                bottomBarActionsUI = barGo.AddComponent<BottomBarActionsUI>();
+                Debug.LogWarning("[RuntimeUI] Created BottomBarActionsUI with RectTransform. Wire UIActionButton children in the Inspector.");
+#if UNITY_EDITOR
+                if (!Application.isPlaying) UnityEditor.Undo.RegisterCreatedObjectUndo(containerGo, "Create Bottom Action Bar");
+#endif
             }
 
             FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
