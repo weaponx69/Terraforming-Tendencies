@@ -160,7 +160,9 @@ namespace GameDevTV.RTS.UI.Containers
                 var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
                 buildCmd.Name = "Build " + buildingSO.Name;
                 buildCmd.Building = buildingSO;
-                buildCmd.Icon = buildingSO.Icon ?? FindIconForBuilding(buildingSO);
+                // Try FindIconForBuilding first (searches assets by name),
+                // then fall back to buildingSO.Icon (may be null on cloned instances)
+                buildCmd.Icon = FindIconForBuilding(buildingSO) ?? buildingSO.Icon;
                 buildCmd.Slot = FindFreeSlot(commands);
 
                 // Copy GhostPrefab from the first template command that has one
