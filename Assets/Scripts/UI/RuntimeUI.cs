@@ -216,16 +216,16 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 #endif
             }
 
-            // Self-assemble the bottom bar action panel if not already wired in Inspector
+            // Wire the bottom bar action panel: use Inspector reference first,
+            // then search children as fallback
             if (bottomBarActionsUI == null)
             {
-                GameObject bottomBarGo = new GameObject("Bottom Action Bar");
-                bottomBarGo.transform.SetParent(transform, false);
-                bottomBarActionsUI = bottomBarGo.AddComponent<BottomBarActionsUI>();
-                bottomBarActionsUI.Initialize(); // Force immediate build before Start()
-#if UNITY_EDITOR
-                if (!Application.isPlaying) UnityEditor.Undo.RegisterCreatedObjectUndo(bottomBarGo, "Create Bottom Action Bar");
-#endif
+                bottomBarActionsUI = GetComponentInChildren<BottomBarActionsUI>(true);
+            }
+
+            if (bottomBarActionsUI == null)
+            {
+                Debug.LogWarning("[RuntimeUI] No BottomBarActionsUI found. Add a BottomBarActionsUI component to a child GameObject with wired UIActionButton references.");
             }
 
             FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
@@ -945,6 +945,13 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 buildingSelectedUI.Disable();
                 unitTransportUI.Disable();
                 singleUnitSelectedUI.EnableFor(commandable);
+
+                // If the selected unit is a GlobalCommander, also show its commands
+                if (commandable is GlobalCommander)
+                {
+                    actionsUI.EnableFor(new HashSet<AbstractCommandable> { commandable });
+                    actionsUI.gameObject.SetActive(true);
+                }
             }
         }
 

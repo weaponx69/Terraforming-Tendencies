@@ -17,15 +17,30 @@ namespace GameDevTV.RTS.Commands
 
         public override bool CanHandle(CommandContext context)
         {
-            return context.Commandable is BaseBuilding && HasEnoughSupplies(context);
+            return (context.Commandable is BaseBuilding || context.Commandable is GlobalCommander) && HasEnoughSupplies(context);
         }
 
         public override void Handle(CommandContext context)
         {
             if (!HasEnoughSupplies(context)) return;
 
-            BaseBuilding building = (BaseBuilding)context.Commandable;
-            building.BuildUnlockable(Unit);
+            if (context.Commandable is BaseBuilding building)
+            {
+                building.BuildUnlockable(Unit);
+            }
+            else if (context.Commandable is GlobalCommander)
+            {
+                // For GlobalCommander, find a BaseBuilding to handle the build
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                foreach (var b in buildings)
+                {
+                    if (b.Owner == context.Owner)
+                    {
+                        b.BuildUnlockable(Unit);
+                        break;
+                    }
+                }
+            }
         }
 
         public override bool IsLocked(CommandContext context)
