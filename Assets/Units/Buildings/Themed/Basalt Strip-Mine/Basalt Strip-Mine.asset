@@ -15,8 +15,8 @@ MonoBehaviour:
   <Name>k__BackingField: Basalt Strip-Mine
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
-  <Icon>k__BackingField: {fileID: 0}
-  <Cost>k__BackingField: {fileID: 0}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 0dffed51983486f3cb8bb1b45c018504, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: 58c9f72c1fa3a844f94d6922d94cb5ff, type: 2}
   <TechTree>k__BackingField: {fileID: 0}
   <unlockRequirements>k__BackingField: []
   health: 100

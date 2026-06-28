@@ -15,7 +15,7 @@ MonoBehaviour:
   <Name>k__BackingField: Subterranean Apartment Block
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
-  <Icon>k__BackingField: {fileID: 0}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 9124fa4005010e6ce94691a96556273f, type: 3}
   <Cost>k__BackingField: {fileID: 0}
   <TechTree>k__BackingField: {fileID: 0}
   <unlockRequirements>k__BackingField: []

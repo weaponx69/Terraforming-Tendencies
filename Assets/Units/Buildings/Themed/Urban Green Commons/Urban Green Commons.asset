@@ -15,7 +15,7 @@ MonoBehaviour:
   <Name>k__BackingField: Urban Green Commons
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
-  <Icon>k__BackingField: {fileID: 0}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 777bcc3dcc41d405fb7134d8fa439c1e, type: 3}
   <Cost>k__BackingField: {fileID: 0}
   <TechTree>k__BackingField: {fileID: 0}
   <unlockRequirements>k__BackingField: []

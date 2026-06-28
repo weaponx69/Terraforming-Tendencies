@@ -15,7 +15,7 @@ MonoBehaviour:
   <Name>k__BackingField: Magnetic Shield Generator
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
-  <Icon>k__BackingField: {fileID: 0}
+  <Icon>k__BackingField: {fileID: 21300000, guid: 02b2044a687f963d3a9d7b3aa1d97063, type: 3}
   <Cost>k__BackingField: {fileID: 0}
   <TechTree>k__BackingField: {fileID: 0}
   <unlockRequirements>k__BackingField: []
