@@ -184,7 +184,7 @@ namespace Unity.AI.Assistant.PlayModeTest
             GameObject[] workers = GameObject.FindGameObjectsWithTag("Worker");
             if (workers == null || workers.Length == 0)
             {
-                var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+                var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Exclude);
                 var workerList = new List<GameObject>();
                 foreach (var go in allGos)
                 {

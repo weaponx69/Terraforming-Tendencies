@@ -12,8 +12,8 @@ namespace Unity.VisualScripting.Generated.PropertyProviders
 {
 	
 	
-	[global::Unity.VisualScripting.SerializedPropertyProviderAttribute(typeof(global::Unity.Cinemachine.AxisState))]
-	public class PropertyProvider_Unity_Cinemachine_AxisState : Unity.VisualScripting.SerializedPropertyProvider<Unity.Cinemachine.AxisState>
+	[global::Unity.VisualScripting.SerializedPropertyProviderAttribute(typeof(global::Unity.InputSystem.InputAxis))]
+	public class PropertyProvider_Unity_InputSystem_InputAxis : Unity.VisualScripting.SerializedPropertyProvider<Unity.InputSystem.InputAxis>
 	{
 	}
 }

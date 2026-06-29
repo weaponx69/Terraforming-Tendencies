@@ -12,8 +12,8 @@ namespace Unity.VisualScripting.Generated.PropertyProviders
 {
 	
 	
-	[global::Unity.VisualScripting.SerializedPropertyProviderAttribute(typeof(global::Unity.Cinemachine.CinemachineOrbitalTransposer.Heading))]
-	public class PropertyProvider_Unity_Cinemachine_CinemachineOrbitalTransposer_Heading : Unity.VisualScripting.SerializedPropertyProvider<Unity.Cinemachine.CinemachineOrbitalTransposer.Heading>
+	[global::Unity.VisualScripting.SerializedPropertyProviderAttribute(typeof(global::Unity.Cinemachine.CinemachineOrbitalFollow.Heading))]
+	public class PropertyProvider_Unity_Cinemachine_CinemachineOrbitalFollow_Heading : Unity.VisualScripting.SerializedPropertyProvider<Unity.Cinemachine.CinemachineOrbitalFollow.Heading>
 	{
 	}
 }

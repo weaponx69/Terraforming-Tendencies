@@ -12,7 +12,7 @@ namespace Unity.VisualScripting.Generated.PropertyProviders
 {
 	
 	
-	[global::Unity.VisualScripting.SerializedPropertyProviderAttribute(typeof(global::Unity.Cinemachine.CinemachineLegacyCameraEvents.OnCameraLiveEvent))]
+	[global::Unity.VisualScripting.SerializedPropertyProviderAttribute(typeof(global::Unity.Cinemachine.CinemachineCameraEvents.OnCameraLiveEvent))]
 	public class PropertyProvider_Unity_Cinemachine_CinemachineLegacyCameraEvents_OnCameraLiveEvent : Unity.VisualScripting.SerializedPropertyProvider<Unity.Cinemachine.CinemachineLegacyCameraEvents.OnCameraLiveEvent>
 	{
 	}

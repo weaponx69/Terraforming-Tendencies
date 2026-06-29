@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Editor
         public static void CreateBottomActionBar()
         {
             // Find the Game scene's RuntimeUI
-            var runtimeUIs = Object.FindObjectsByType<RuntimeUI>(FindObjectsSortMode.None);
+            var runtimeUIs = Object.FindObjectsByType<RuntimeUI>();
             if (runtimeUIs.Length == 0)
             {
                 Debug.LogError("[SetupBottomActionBar] No RuntimeUI found in scene. Open the Game scene first.");
