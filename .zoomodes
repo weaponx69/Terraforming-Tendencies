@@ -1,3 +1,5 @@
+# NOTE: This project uses .zoomodes as the sole custom mode configuration.
+# Do NOT read or reference .roomodes — it is deprecated and will be removed.
 customModes:
   - slug: convert-project-mode
     name: Convert-Project-Mode
