@@ -242,9 +242,26 @@ namespace GameDevTV.RTS.Commands
             if (!BlueprintDraftManager.IsBuildingUnlocked(Building)) return true;
 
             // Check if the player has completed a round for Command Center.
+            // Exception: allow building when no Command Post exists yet (player starts with nothing)
             if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
-                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase) return true;
+                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase)
+                {
+                    // Allow if no player Command Post exists yet
+                    if (BaseBuilding.ActiveBuildings == null) return true;
+                    bool hasExistingCommandPost = false;
+                    foreach (var b in BaseBuilding.ActiveBuildings)
+                    {
+                        if (b != null && b.Owner == context.Owner && b.BuildingSO != null
+                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            hasExistingCommandPost = true;
+                            break;
+                        }
+                    }
+                    if (!hasExistingCommandPost) return false; // Allow first Command Post anytime
+                    return true;
+                }
             }
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
