@@ -167,11 +167,11 @@ namespace GameDevTV.RTS.Units
                 if (hr.IsDiscovered) discoveredResources.Add(hr);
             }
 
-            // Initial building if none exist
-            if (BaseBuilding.ActiveBuildings.Count(b => b.Owner == aiOwner) == 0)
-            {
-                SpawnInitialBase();
-            }
+            // Initial building if none exist — DISABLED: player starts with nothing
+            // if (BaseBuilding.ActiveBuildings.Count(b => b.Owner == aiOwner) == 0)
+            // {
+            //     SpawnInitialBase();
+            // }
         }
 
         private void GrantStartingMaterials()
