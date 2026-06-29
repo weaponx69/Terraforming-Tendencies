@@ -25,44 +25,53 @@ namespace GameDevTV.RTS.UI.Components
         private static readonly string DEPENDENCY_FORMAT_NO_COMMA = "<color=#AC0000>{0}</color>.";
         private static readonly string DEPENDENCY_FORMAT_COMMA = "<color=#AC0000>{0}</color>, ";
 
-        private void Awake()
-        {
-            button = GetComponent<Button>();
-            rectTransform = GetComponent<RectTransform>();
-            Disable();
-        }
+private void Awake()
+{
+    button = GetComponent<Button>();
+    rectTransform = GetComponent<RectTransform>();
+    if (button == null)
+    {
+        Debug.LogWarning($"[UIActionButton] Missing Button component on {name}. The [RequireComponent] attribute should auto-add one.", this);
+    }
+    Disable();
+}
 
-        public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> selectedUnits, UnityAction onClick)
-        {
-            button.onClick.RemoveAllListeners();
-            SetIcon(command.Icon);
-            // If selectedUnits is null, make the button interactive (for bottom bar commands)
-            // Otherwise, check if any unit can handle the command
-            button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
-            button.onClick.AddListener(onClick);
-            isActive = true;
+public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> selectedUnits, UnityAction onClick)
+{
+    if (button == null) return;
 
-            if (tooltip != null)
-            {
-                try
-                {
-                    tooltip.SetText(GetTooltipText(command));
-                }
-                catch (System.Exception)
-                {
-                    // Tooltip text component may not be properly set up — ignore
-                }
-            }
-        }
+    button.onClick.RemoveAllListeners();
+    SetIcon(command.Icon);
+    // If selectedUnits is null, make the button interactive (for bottom bar commands)
+    // Otherwise, check if any unit can handle the command
+    button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
+    button.onClick.AddListener(onClick);
+    isActive = true;
 
-        public void Disable()
+    if (tooltip != null)
+    {
+        try
         {
-            SetIcon(null);
-            button.interactable = false;
-            button.onClick.RemoveAllListeners();
-            isActive = false;
-            CancelInvoke();
+            tooltip.SetText(GetTooltipText(command));
         }
+        catch (System.Exception)
+        {
+            // Tooltip text component may not be properly set up — ignore
+        }
+    }
+}
+
+public void Disable()
+{
+    SetIcon(null);
+    if (button != null)
+    {
+        button.interactable = false;
+        button.onClick.RemoveAllListeners();
+    }
+    isActive = false;
+    CancelInvoke();
+}
 
         public void OnPointerEnter(PointerEventData eventData)
         {
