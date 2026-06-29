@@ -53,13 +53,20 @@ namespace GameDevTV.RTS.UI.Components
         {
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
 
-            // Snap to current value immediately on enable
+            // Snap to current value immediately on enable.
+            // If Integrity data exists for this owner, use it; otherwise default to 100%.
             if (Supplies.Integrity != null && Supplies.Integrity.TryGetValue(_owner, out float cur))
             {
                 _targetFill  = Mathf.Clamp01(cur / 100f);
                 _currentFill = _targetFill;
-                ApplyFill(_currentFill);
             }
+            else
+            {
+                _targetFill  = 1f;
+                _currentFill = 1f;
+            }
+
+            ApplyFill(_currentFill);
         }
 
         private void OnDisable()

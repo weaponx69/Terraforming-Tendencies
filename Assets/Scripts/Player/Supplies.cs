@@ -447,7 +447,13 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            // No commandables found — no structures exist, so integrity is 0%.
             if (!foundAny) return 0f;
+
+            // If no health has been initialized yet (all commandables have 0 MaxHealth),
+            // return NaN would crash the bar — treat as full health.
+            if (totalMaxHP == 0) return 100f;
+
             return ((float)totalCurrentHP / totalMaxHP) * 100f;
         }
 

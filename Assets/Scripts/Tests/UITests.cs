@@ -4,6 +4,7 @@ using System.Collections.Generic;   // Added generic collections support
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 using TMPro;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Player;
@@ -186,6 +187,56 @@ namespace GameDevTV.RTS.Tests
             
             Object.Destroy(deckObj);
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator IntegrityBar_StartsAtMax()
+        {
+            // Setup GameOverManager dependency
+            GameObject gomObj = new GameObject("GameOverManager");
+            var gom = gomObj.AddComponent<GameOverManager>();
+            SetField(gom, "monitoredOwner", Owner.Player1);
+            
+            // Create the integrity bar GameObject
+            GameObject barObj = new GameObject("IntegrityBarTest");
+            barObj.SetActive(false);
+            
+            // Add required child Image for fill
+            GameObject fillObj = new GameObject("Fill");
+            fillObj.transform.SetParent(barObj.transform);
+            var fillImage = fillObj.AddComponent<Image>();
+            fillImage.type = Image.Type.Filled;
+            fillImage.fillMethod = Image.FillMethod.Horizontal;
+            
+            // Add required child Image for background
+            GameObject bgObj = new GameObject("Background");
+            bgObj.transform.SetParent(barObj.transform);
+            bgObj.AddComponent<Image>();
+            
+            // Add required child Text for value label
+            GameObject labelObj = new GameObject("Value Label");
+            labelObj.transform.SetParent(barObj.transform);
+            var valueLabel = labelObj.AddComponent<TextMeshProUGUI>();
+            
+            // Add and configure ColonyIntegrityBar
+            var integrityBar = barObj.AddComponent<ColonyIntegrityBar>();
+            SetField(integrityBar, "fillImage", fillImage);
+            SetField(integrityBar, "backgroundImage", bgObj.GetComponent<Image>());
+            SetField(integrityBar, "valueLabel", valueLabel);
+            
+            barObj.SetActive(true);
+            yield return null;
+            
+            // Assert fill bar starts at 100%
+            Assert.AreEqual(1f, integrityBar.CurrentFillPercent, 0.01f, "Integrity bar should start at 100% fill.");
+            Assert.IsFalse(integrityBar.IsCritical, "Integrity bar should NOT be critical at start.");
+            Assert.AreEqual(1f, fillImage.fillAmount, 0.01f, "Fill image fillAmount should be 1.0 at start.");
+            Assert.AreEqual("100%", valueLabel.text, "Value label should display '100%' at start.");
+            
+            Debug.Log("[UITest] IntegrityBar_StartsAtMax Passed - bar starts at 100%");
+            
+            Object.Destroy(barObj);
+            Object.Destroy(gomObj);
         }
 
         private object GetField(object obj, string fieldName)
