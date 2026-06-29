@@ -32,6 +32,13 @@ namespace GameDevTV.RTS.UI.Components
         private float _currentFill = 1f;
         private Owner _owner;
 
+        // ── Visual Scripting read-only accessors ──────────────────────────
+        /// <summary>Current lerped fill (0–1). Read by the VS Script Machine for pulsing effects.</summary>
+        public float CurrentFillPercent => _currentFill;
+        /// <summary>True when integrity is at or below the critical threshold.</summary>
+        public bool IsCritical => _currentFill <= criticalThreshold;
+
+
         private void Awake()
         {
             _owner = GameOverManager.MonitoredOwner;
