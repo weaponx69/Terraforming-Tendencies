@@ -28,6 +28,11 @@ namespace GameDevTV.RTS.UI.Components
         [Header("Animation")]
         [SerializeField] private float lerpSpeed = 4f;
 
+        [Header("Critical Pulse (replaces VS Graph)")]
+        [SerializeField] private float pulseSpeed = 8f;
+        [SerializeField] [Range(0f, 1f)] private float pulseMinAlpha = 0.3f;
+        [SerializeField] private float pulseMaxAlpha = 1f;
+
         private float _targetFill  = 1f;
         private float _currentFill = 1f;
         private Owner _owner;
@@ -64,13 +69,31 @@ namespace GameDevTV.RTS.UI.Components
 
         private void Update()
         {
-            if (Mathf.Approximately(_currentFill, _targetFill)) return;
+            // ── Fill bar lerp ──────────────────────────────────────────
+            if (!Mathf.Approximately(_currentFill, _targetFill))
+            {
+                _currentFill = Mathf.Lerp(_currentFill, _targetFill, Time.deltaTime * lerpSpeed);
+                if (Mathf.Abs(_currentFill - _targetFill) < 0.001f)
+                    _currentFill = _targetFill;
 
-            _currentFill = Mathf.Lerp(_currentFill, _targetFill, Time.deltaTime * lerpSpeed);
-            if (Mathf.Abs(_currentFill - _targetFill) < 0.001f)
-                _currentFill = _targetFill;
+                ApplyFill(_currentFill);
+            }
 
-            ApplyFill(_currentFill);
+            // ── Critical-state background pulsing ──────────────────────
+            // Replaces the Visual Scripting graph that couldn't serialize properly.
+            if (backgroundImage != null)
+            {
+                if (IsCritical)
+                {
+                    float t = Mathf.Abs(Mathf.Sin(Time.time * pulseSpeed));
+                    float alpha = Mathf.Lerp(pulseMinAlpha, pulseMaxAlpha, t);
+                    backgroundImage.CrossFadeAlpha(alpha, 0f, true);
+                }
+                else
+                {
+                    backgroundImage.CrossFadeAlpha(1f, 0f, true);
+                }
+            }
         }
 
         private void HandleIntegrityChanged(Owner owner, float newValue)
