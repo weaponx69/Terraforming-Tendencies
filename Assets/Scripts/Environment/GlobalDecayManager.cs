@@ -15,23 +15,36 @@ namespace GameDevTV.RTS.Environment
         [SerializeField, Tooltip("If true, the rates set here in the inspector will be used instead of those from the Planet Config.")]
         private bool overridePlanetConfig = false;
 
+        [Header("Global Scaling")]
+        [SerializeField, Range(0f, 5f), Tooltip("Multiplier applied to all decay rates after they are resolved (from PlanetConfig or inspector). 1.0 = normal, 0.25 = quarter speed.")]
+        private float decayRateMultiplier = 1.0f;
+
         [Header("Decay Rates")]
         [SerializeField, Tooltip("How often decay ticks occur (in seconds).")]
-        private float decayTickRate = 1f;
+        private float decayTickRate = 1.0f;
 
-        [SerializeField, Tooltip("Damage dealt to buildings per decay tick when they are not protected by a Life Support node.")]
+        [SerializeField, Tooltip("Damage dealt per second to buildings not protected by a Life Support node.")]
         private float baseDecayRate = 2f;
 
-        [SerializeField, Tooltip("Damage dealt to units per decay tick when they are not protected by a Life Support node.")]
+        [SerializeField, Tooltip("Damage dealt per second to units not protected by a Life Support node.")]
         private float integrityDamageRate = 0.5f;
 
+        // Accumulators for fractional damage — allows dealing <1 damage per tick
+        // without the Mathf.Max(1, ...) floor that made inspector tuning impossible.
+        private float buildingDamageAccumulator;
+        private float unitDamageAccumulator;
+
         private void Start()
-        {
-            if (!overridePlanetConfig && PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
             {
-                baseDecayRate = PlanetGenerator.Instance.Config.BaseDecayRate;
-                integrityDamageRate = PlanetGenerator.Instance.Config.IntegrityDrainRate;
-            }
+                if (!overridePlanetConfig && PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
+                {
+                    baseDecayRate = PlanetGenerator.Instance.Config.BaseDecayRate;
+                    integrityDamageRate = PlanetGenerator.Instance.Config.IntegrityDrainRate;
+                }
+    
+                // Apply global multiplier to final rates
+                baseDecayRate *= decayRateMultiplier;
+                integrityDamageRate *= decayRateMultiplier;
 
             // Spawn invisible decaying starter so integrity starts at 100%.
             SpawnDecayStarter();
@@ -47,11 +60,17 @@ namespace GameDevTV.RTS.Environment
             starter.transform.localScale = Vector3.zero;
         }
 
-private IEnumerator DecayLoop()
+        private IEnumerator DecayLoop()
         {
             while (true)
             {
                 yield return new WaitForSeconds(decayTickRate);
+
+                // Accumulate fractional damage from DPS × tick interval.
+                // This allows tuning decayTickRate and damage rates independently without
+                // the Mathf.Max(1, ...) floor that previously made inspector values ineffective.
+                buildingDamageAccumulator += baseDecayRate * decayTickRate;
+                unitDamageAccumulator += integrityDamageRate * decayTickRate;
 
                 var lifeSupportNodes = LifeSupportNode.ActiveNodes;
                 var allCommandables = AbstractCommandable.ActiveCommandables;
@@ -95,16 +114,25 @@ private IEnumerator DecayLoop()
                         if (target is BaseBuilding building && (building.Progress.State == BuildingProgress.BuildingState.Paused || building.Progress.State == BuildingProgress.BuildingState.Building))
                             continue;
 
-                        // Use baseDecayRate for buildings and integrityDamageRate for units.
-                        float damageRate = (target is BaseBuilding) ? baseDecayRate : integrityDamageRate;
-                        int damage = Mathf.Max(1, Mathf.RoundToInt(damageRate * decayTickRate));
+                        // Use baseDecayRate for buildings and integrityDamageRate for units (DPS values).
+                        // Accumulate fractional damage so we can deal <1 damage/tick without clamping.
+                        int damage = (target is BaseBuilding)
+                            ? Mathf.FloorToInt(buildingDamageAccumulator)
+                            : Mathf.FloorToInt(unitDamageAccumulator);
 
-                        int hpBefore = target.CurrentHealth;
-                        target.TakeDamage(damage);
-                        decayedCount++;
-                        Debug.Log($"[GlobalDecayManager] Decayed '{target.name}' (Owner:{target.Owner}) HP {hpBefore}\u2192{target.CurrentHealth} (dmg:{damage})");
+                        if (damage > 0)
+                        {
+                            int hpBefore = target.CurrentHealth;
+                            target.TakeDamage(damage);
+                            decayedCount++;
+                            Debug.Log($"[GlobalDecayManager] Decayed '{target.name}' (Owner:{target.Owner}) HP {hpBefore}\u2192{target.CurrentHealth} (dmg:{damage})");
+                        }
                     }
                 }
+
+                // Keep fractional remainders for the next tick
+                buildingDamageAccumulator -= Mathf.Floor(buildingDamageAccumulator);
+                unitDamageAccumulator -= Mathf.Floor(unitDamageAccumulator);
 
                 // Recalculate colony integrity from actual commandable health and push to the UI bar.
                 Owner monitoredOwner = GameOverManager.MonitoredOwner;
