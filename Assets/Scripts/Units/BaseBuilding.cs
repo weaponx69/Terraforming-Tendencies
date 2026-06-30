@@ -414,10 +414,7 @@ namespace GameDevTV.RTS.Units
             if (hasCompletedConstruction) return;
             hasCompletedConstruction = true;
 
-            if (CurrentHealth == 0)
-            {
-                CurrentHealth = MaxHealth;
-            }
+            CurrentHealth = MaxHealth;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
 
