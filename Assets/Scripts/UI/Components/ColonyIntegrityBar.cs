@@ -39,6 +39,12 @@ namespace GameDevTV.RTS.UI.Components
         {
             _owner = GameOverManager.MonitoredOwner;
             Debug.Log($"[ColonyIntegrityBar] Awake | _owner={_owner} | fillImage={(fillImage == null ? "NULL" : fillImage.gameObject.name)}");
+
+            if (fillImage != null && fillImage.sprite == null)
+            {
+                Texture2D tex = Texture2D.whiteTexture;
+                fillImage.sprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            }
         }
 
         private void OnEnable()
@@ -100,8 +106,8 @@ namespace GameDevTV.RTS.UI.Components
             if (fillImage != null)
             {
                 // Force the Image into Filled mode, Vertical from Bottom.
-                // As fillAmount drops from 1 -> 0, the colored region shrinks
-                // from the TOP downward. The bottom stays fixed.
+                // As fillAmount drops from 1 -> 0, the colored region stays
+                // fixed at the bottom and shrinks from the TOP downward.
                 fillImage.type = Image.Type.Filled;
                 fillImage.fillMethod = Image.FillMethod.Vertical;
                 fillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
