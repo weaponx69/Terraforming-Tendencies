@@ -6,11 +6,6 @@ using GameDevTV.RTS.Units;
 
 namespace GameDevTV.RTS.UI.Components
 {
-    /// <summary>
-    /// Left-side vertical bar displaying colony structural integrity (0–100%).
-    /// Subscribes to Supplies.OnIntegrityChanged and drives a Filled Image.
-    /// Color transitions: green → orange → red as integrity drops.
-    /// </summary>
     public class ColonyIntegrityBar : MonoBehaviour
     {
         [Header("Bar References")]
@@ -19,16 +14,16 @@ namespace GameDevTV.RTS.UI.Components
         [SerializeField] private TextMeshProUGUI valueLabel;
 
         [Header("Color Thresholds")]
-        [SerializeField] private Color healthyColor  = new Color(0.22f, 0.85f, 0.40f, 1f); // green
-        [SerializeField] private Color warningColor  = new Color(1.00f, 0.65f, 0.00f, 1f); // orange
-        [SerializeField] private Color criticalColor = new Color(0.90f, 0.15f, 0.15f, 1f); // red
+        [SerializeField] private Color healthyColor  = new Color(0.22f, 0.85f, 0.40f, 1f);
+        [SerializeField] private Color warningColor  = new Color(1.00f, 0.65f, 0.00f, 1f);
+        [SerializeField] private Color criticalColor = new Color(0.90f, 0.15f, 0.15f, 1f);
         [SerializeField] [Range(0f, 1f)] private float warningThreshold  = 0.50f;
         [SerializeField] [Range(0f, 1f)] private float criticalThreshold = 0.25f;
 
         [Header("Animation")]
         [SerializeField] private float lerpSpeed = 4f;
 
-        [Header("Critical Pulse (replaces VS Graph)")]
+        [Header("Critical Pulse")]
         [SerializeField] private float pulseSpeed = 8f;
         [SerializeField] [Range(0f, 1f)] private float pulseMinAlpha = 0.3f;
         [SerializeField] private float pulseMaxAlpha = 1f;
@@ -37,24 +32,19 @@ namespace GameDevTV.RTS.UI.Components
         private float _currentFill = 1f;
         private Owner _owner;
 
-        // ── Visual Scripting read-only accessors ──────────────────────────
-        /// <summary>Current lerped fill (0–1). Read by the VS Script Machine for pulsing effects.</summary>
         public float CurrentFillPercent => _currentFill;
-        /// <summary>True when integrity is at or below the critical threshold.</summary>
         public bool IsCritical => _currentFill <= criticalThreshold;
-
 
         private void Awake()
         {
             _owner = GameOverManager.MonitoredOwner;
+            Debug.Log($"[ColonyIntegrityBar] Awake | _owner={_owner} | fillImage={(fillImage == null ? "NULL" : fillImage.gameObject.name)}");
         }
 
         private void OnEnable()
         {
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
 
-            // Snap to current value immediately on enable.
-            // If Integrity data exists for this owner, use it; otherwise default to 100%.
             if (Supplies.Integrity != null && Supplies.Integrity.TryGetValue(_owner, out float cur))
             {
                 _targetFill  = Mathf.Clamp01(cur / 100f);
@@ -65,7 +55,6 @@ namespace GameDevTV.RTS.UI.Components
                 _targetFill  = 1f;
                 _currentFill = 1f;
             }
-
             ApplyFill(_currentFill);
         }
 
@@ -76,7 +65,6 @@ namespace GameDevTV.RTS.UI.Components
 
         private void Update()
         {
-            // ── Fill bar lerp ──────────────────────────────────────────
             if (!Mathf.Approximately(_currentFill, _targetFill))
             {
                 _currentFill = Mathf.Lerp(_currentFill, _targetFill, Time.deltaTime * lerpSpeed);
@@ -86,8 +74,6 @@ namespace GameDevTV.RTS.UI.Components
                 ApplyFill(_currentFill);
             }
 
-            // ── Critical-state background pulsing ──────────────────────
-            // Replaces the Visual Scripting graph that couldn't serialize properly.
             if (backgroundImage != null)
             {
                 if (IsCritical)
@@ -113,12 +99,24 @@ namespace GameDevTV.RTS.UI.Components
         {
             if (fillImage != null)
             {
+                // Force the Image into Filled mode, Vertical from Bottom.
+                // As fillAmount drops from 1 -> 0, the colored region shrinks
+                // from the TOP downward. The bottom stays fixed.
+                fillImage.type = Image.Type.Filled;
+                fillImage.fillMethod = Image.FillMethod.Vertical;
+                fillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
                 fillImage.fillAmount = fill;
                 fillImage.color = GetColorForFill(fill);
+            }
+            else
+            {
+                Debug.LogError("[ColonyIntegrityBar] fillImage is NULL!");
             }
 
             if (valueLabel != null)
                 valueLabel.SetText($"{fill * 100f:F0}%");
+
+            Debug.Log($"[ColonyIntegrityBar] fill={fill:F3} fillAmount={fillImage?.fillAmount}");
         }
 
         private Color GetColorForFill(float fill)

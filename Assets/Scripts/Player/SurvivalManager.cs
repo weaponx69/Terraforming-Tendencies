@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.Player
             StartCoroutine(SurvivalLoop());
         }
 
-        private IEnumerator SurvivalLoop()
+private IEnumerator SurvivalLoop()
         {
             while (true)
             {
@@ -39,9 +39,8 @@ namespace GameDevTV.RTS.Player
                     Supplies.UpdateBiomass(monitoredOwner, currentBiomass - drain);
                 }
 
-                // Recalculate Integrity based on total unit/building health
-                float calculatedIntegrity = Supplies.CalculateIntegrity(monitoredOwner);
-                Supplies.UpdateIntegrity(monitoredOwner, calculatedIntegrity);
+                // Integrity is recalculated from actual commandable health by GlobalDecayManager.
+                // SurvivalManager does not modify integrity to avoid overwriting that calculation.
             }
         }
     }

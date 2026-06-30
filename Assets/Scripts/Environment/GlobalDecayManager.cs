@@ -4,6 +4,8 @@ using UnityEngine;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Player;
+
 
 namespace GameDevTV.RTS.Environment
 {
@@ -21,10 +23,21 @@ namespace GameDevTV.RTS.Environment
                 integrityDamageRate = PlanetGenerator.Instance.Config.IntegrityDrainRate;
             }
 
+            // Spawn invisible decaying starter so integrity starts at 100%.
+            SpawnDecayStarter();
+
             StartCoroutine(DecayLoop());
         }
 
-        private IEnumerator DecayLoop()
+        private void SpawnDecayStarter()
+        {
+            if (GameObject.Find("DecayStarter") != null) return;
+            GameObject starter = new GameObject("DecayStarter", typeof(DecayStarter));
+            starter.transform.position = new Vector3(-1000f, -1000f, -1000f);
+            starter.transform.localScale = Vector3.zero;
+        }
+
+private IEnumerator DecayLoop()
         {
             while (true)
             {
@@ -32,6 +45,7 @@ namespace GameDevTV.RTS.Environment
 
                 var lifeSupportNodes = LifeSupportNode.ActiveNodes;
                 var allCommandables = AbstractCommandable.ActiveCommandables;
+                int decayedCount = 0;
 
                 for (int i = allCommandables.Count - 1; i >= 0; i--)
                 {
@@ -71,16 +85,22 @@ namespace GameDevTV.RTS.Environment
                         if (target is BaseBuilding building && (building.Progress.State == BuildingProgress.BuildingState.Paused || building.Progress.State == BuildingProgress.BuildingState.Building))
                             continue;
 
-                        // Use baseDecayRate for buildings and integrityDamageRate for units?
+                        // Use baseDecayRate for buildings and integrityDamageRate for units.
                         float damageRate = (target is BaseBuilding) ? baseDecayRate : integrityDamageRate;
-                        int damage = Mathf.RoundToInt(damageRate * decayTickRate);
-                        
-                        if (damage > 0)
-                        {
-                            target.TakeDamage(damage);
-                        }
+                        int damage = Mathf.Max(1, Mathf.RoundToInt(damageRate * decayTickRate));
+
+                        int hpBefore = target.CurrentHealth;
+                        target.TakeDamage(damage);
+                        decayedCount++;
+                        Debug.Log($"[GlobalDecayManager] Decayed '{target.name}' (Owner:{target.Owner}) HP {hpBefore}\u2192{target.CurrentHealth} (dmg:{damage})");
                     }
                 }
+
+                // Recalculate colony integrity from actual commandable health and push to the UI bar.
+                Owner monitoredOwner = GameOverManager.MonitoredOwner;
+                float integrity = Supplies.CalculateIntegrity(monitoredOwner);
+                Supplies.UpdateIntegrity(monitoredOwner, integrity);
+                Debug.Log($"[GlobalDecayManager] Tick done | decayed:{decayedCount} commandable(s) | integrity:{integrity:F1}%");
             }
         }
     }

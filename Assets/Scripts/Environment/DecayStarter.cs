@@ -4,79 +4,45 @@ using GameDevTV.RTS.Commands;
 
 namespace GameDevTV.RTS.Environment
 {
-    /// <summary>
-    /// An invisible, decaying starter commandable that gives the player a time window
-    /// to place their first real building at the start of the game.
-    /// Auto-spawns at startup, decays naturally via GlobalDecayManager
-    /// (has no LifeSupportNode). Self-destructs at 0 HP, at which point the
-    /// player must already have their own structures or the game will end.
-    /// </summary>
     public class DecayStarter : AbstractCommandable
     {
-        [SerializeField] private int maxHealth = 500;
-        [SerializeField] private int health = 500;
+        private float _nextTick;
 
-        private bool _hasStarted;
-
-        // Auto-spawn at game start without modifying PlanetGenerator
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void SpawnOnStart()
+        public static void EnsureSpawned()
         {
-            GameObject go = new GameObject("DecayStarter", typeof(DecayStarter));
+            if (GameObject.Find("DecayStarter") != null) return;
+            var go = new GameObject("DecayStarter", typeof(DecayStarter));
+            go.AddComponent<LifeSupportNode>().Radius = 0.001f;
             go.transform.position = new Vector3(-1000f, -1000f, -1000f);
             go.transform.localScale = Vector3.zero;
-            Object.DontDestroyOnLoad(go);
         }
 
-        protected override void Awake()
+        private void Awake()
         {
-            // Set health before base.Awake() so InitializeIfNeeded sees it
-            MaxHealth = maxHealth;
-            CurrentHealth = health;
-
-            // Null out references we don't want to use
-            VisionTransform = null;
-            selectionIndicator = null;
+            MaxHealth = 500;
+            CurrentHealth = 500;
+            Owner = Owner.Player1;
             _availableCommands = System.Array.Empty<BaseCommand>();
-
-            // Skip base.Awake() — no UnitSO, no renderer/particle discovery needed
+            _nextTick = Time.time + 0.1f;
         }
 
-        protected override void Start()
+private void Update()
         {
-            // Intentionally skip base.Start() — no curved world shader,
-            // no vision cone, no upgrade event bus subscription needed.
-            _hasStarted = true;
-        }
+            if (Time.time < _nextTick) return;
+            _nextTick = Time.time + 0.1f;
 
-        public void Die()
-        {
-            if (gameObject != null)
+            TakeDamage(5);
+            float ratio = (float)CurrentHealth / MaxHealth;
+            GameDevTV.RTS.Player.Supplies.UpdateIntegrity(Owner, ratio * 100f);
+
+            Debug.Log($"[DecayStarter] Tick t={Time.time:F2}s | HP: {CurrentHealth}/{MaxHealth} | Integrity→ {ratio * 100f:F1}% | Owner: {Owner}");
+
+            if (CurrentHealth <= 0)
                 Destroy(gameObject);
         }
 
-        protected override void OnDestroy()
-        {
-            // Intentionally skip base.OnDestroy() — no bus subscription to clean up.
-        }
-
-        private void Update()
-        {
-            // Self-destruct when HP reaches 0
-            if (_hasStarted && CurrentHealth <= 0)
-            {
-                Destroy(gameObject);
-            }
-        }
-
-        public override void Select()
-        {
-            // Cannot be selected
-        }
-
-        public override void Deselect()
-        {
-            // Cannot be selected
-        }
+        public void Die() { if (gameObject != null) Destroy(gameObject); }
+        public override void Select() { }
+        public override void Deselect() { }
     }
 }
