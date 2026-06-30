@@ -11,13 +11,23 @@ namespace GameDevTV.RTS.Environment
 {
     public class GlobalDecayManager : MonoBehaviour
     {
+        [Header("Override Options")]
+        [SerializeField, Tooltip("If true, the rates set here in the inspector will be used instead of those from the Planet Config.")]
+        private bool overridePlanetConfig = false;
+
+        [Header("Decay Rates")]
+        [SerializeField, Tooltip("How often decay ticks occur (in seconds).")]
         private float decayTickRate = 1f;
+
+        [SerializeField, Tooltip("Damage dealt to buildings per decay tick when they are not protected by a Life Support node.")]
         private float baseDecayRate = 2f;
+
+        [SerializeField, Tooltip("Damage dealt to units per decay tick when they are not protected by a Life Support node.")]
         private float integrityDamageRate = 0.5f;
 
         private void Start()
         {
-            if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
+            if (!overridePlanetConfig && PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
             {
                 baseDecayRate = PlanetGenerator.Instance.Config.BaseDecayRate;
                 integrityDamageRate = PlanetGenerator.Instance.Config.IntegrityDrainRate;

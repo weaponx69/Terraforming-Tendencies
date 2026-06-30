@@ -23,6 +23,13 @@ namespace GameDevTV.RTS.Commands
         [Inspectable]
         [field: SerializeField] public BuildingSO Building { get; set; }
 
+        /// <summary>
+        /// Returns true if this building is a command-type building (Command Center, Command Post, etc.)
+        /// that should auto-place without requiring a worker selection.
+        /// </summary>
+        public bool IsCommandBuilding =>
+            Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+
         public Vector3 SnapToNearestSector(Vector3 point)
         {
             if (Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))

@@ -165,13 +165,32 @@ namespace GameDevTV.RTS.UI.Containers
                 buildCmd.Icon = FindIconForBuilding(buildingSO) ?? buildingSO.Icon;
                 buildCmd.Slot = FindFreeSlot(commands);
 
-                // Copy GhostPrefab from the first template command that has one
-                var templateCommand = FindFirstTemplateCommand();
-                if (templateCommand != null)
+                // Command centers auto-place without requiring a click/ghost placement
+                if (buildCmd.IsCommandBuilding)
                 {
-                    var ghostField = typeof(BaseCommand).GetField("<GhostPrefab>k__BackingField",
-                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                    ghostField?.SetValue(buildCmd, templateCommand.GhostPrefab);
+                    SetRequiresClickToActivate(buildCmd, false);
+                }
+                else
+                {
+                    // Copy GhostPrefab and Restrictions from a template command
+                    var templateCommand = FindFirstTemplateCommand();
+                    if (templateCommand != null)
+                    {
+                        CopyGhostAndRestrictions(buildCmd, templateCommand);
+                    }
+                    else
+                    {
+                        // Fallback: find GhostPrefab and Restrictions from any BuildBuildingCommand asset in Resources
+                        var allBuildCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
+                        foreach (var cmd in allBuildCommands)
+                        {
+                            if (cmd != null && cmd.GhostPrefab != null)
+                            {
+                                CopyGhostAndRestrictions(buildCmd, cmd);
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 commands.Add(buildCmd);
@@ -276,6 +295,36 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Copy GhostPrefab and Restrictions from a template command to a target command via reflection.
+        /// </summary>
+        private static void CopyGhostAndRestrictions(BuildBuildingCommand target, BuildBuildingCommand template)
+        {
+            if (template.GhostPrefab != null)
+            {
+                var ghostField = typeof(BaseCommand).GetField("<GhostPrefab>k__BackingField",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                ghostField?.SetValue(target, template.GhostPrefab);
+            }
+
+            if (template.Restrictions != null && template.Restrictions.Length > 0)
+            {
+                var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                restrictionsField?.SetValue(target, template.Restrictions);
+            }
+        }
+
+        /// <summary>
+        /// Set RequiresClickToActivate on a command via reflection.
+        /// </summary>
+        private static void SetRequiresClickToActivate(BaseCommand cmd, bool value)
+        {
+            var field = typeof(BaseCommand).GetField("<RequiresClickToActivate>k__BackingField",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            field?.SetValue(cmd, value);
         }
 
         /// <summary>

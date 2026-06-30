@@ -1,4 +1,4 @@
-﻿#define AI_GENERATORS_SHOW_DISCLAIMER
+#define AI_GENERATORS_SHOW_DISCLAIMER
 using System;
 using Unity.AI.Assistant.UI.Editor.Scripts.Utils;
 using Unity.AI.Toolkit;
@@ -58,7 +58,7 @@ namespace Unity.AI.Assistant.UI.Editor
             button.AddToClassList("mui-action-button");
             button.Q<Label>()?.AddToClassList("mui-action-button-label");
 
-            var buttonImage = button.Q<Image>();
+            var buttonImage = button.Q<UnityEngine.UIElements.Image>();
             if (buttonImage != null)
             {
                 button.SetupImage("open-generator-window-image", "arrow-square-in");

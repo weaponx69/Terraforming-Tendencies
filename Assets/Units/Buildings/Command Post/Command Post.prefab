@@ -66,7 +66,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: b1ef2fa16faec654da7102aa095d466e, type: 2}
+  - {fileID: 2100000, guid: b35c532178876e94f917ff0196f65258, type: 2}
   - {fileID: 2100000, guid: 5c5c4adf8f7dd504fab07d2190b1a92a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
@@ -99,6 +99,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1374989911307791933, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: Radius
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: navMeshObstacle
       value: 
@@ -115,6 +123,10 @@ PrefabInstance:
       propertyPath: <MaxHealth>k__BackingField
       value: 200
       objectReference: {fileID: 0}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: <BuildingSO>k__BackingField
+      value: 
+      objectReference: {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: <MainRenderer>k__BackingField
       value: 
@@ -147,6 +159,10 @@ PrefabInstance:
       propertyPath: '_availableCommands.Array.data[4]'
       value: 
       objectReference: {fileID: 11400000, guid: a370b5140082823179256e8c044a9ac2, type: 2}
+    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
+      propertyPath: <Progress>k__BackingField.<State>k__BackingField
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 1589499662120937400, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: m_Name
       value: Command Post

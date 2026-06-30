@@ -127,7 +127,7 @@ namespace Unity.AI.MCP.Editor.Settings
             if (m_DisclaimerSection == null)
                 return;
 
-            var infoIcon = m_DisclaimerSection.Q<Image>("disclaimerInfoIcon");
+            var infoIcon = m_DisclaimerSection.Q<UnityEngine.UIElements.Image>("disclaimerInfoIcon");
             if (infoIcon != null)
                 infoIcon.image = EditorGUIUtility.IconContent("console.infoicon.sml").image;
 
@@ -337,7 +337,7 @@ namespace Unity.AI.MCP.Editor.Settings
                 var copyIcon = EditorGUIUtility.IconContent("Clipboard");
                 if (copyIcon?.image != null)
                 {
-                    var iconImage = new Image { image = copyIcon.image };
+                    var iconImage = new UnityEngine.UIElements.Image { image = copyIcon.image };
                     iconImage.AddToClassList("umcp-copy-icon");
                     copyButton.Add(iconImage);
                 }

@@ -245,7 +245,20 @@ namespace GameDevTV.RTS.Units
             
             if (MainRenderer == null)
             {
-                MainRenderer = GetComponentInChildren<MeshRenderer>();
+                foreach (var mr in GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string nameLower = mr.gameObject.name.ToLower();
+                    if (!nameLower.Contains("vision") && !nameLower.Contains("indicator") && !nameLower.Contains("selection"))
+                    {
+                        MainRenderer = mr;
+                        break;
+                    }
+                }
+
+                if (MainRenderer == null)
+                {
+                    MainRenderer = GetComponentInChildren<MeshRenderer>();
+                }
             }
 
             if (MainRenderer != null && primaryMaterial == null)

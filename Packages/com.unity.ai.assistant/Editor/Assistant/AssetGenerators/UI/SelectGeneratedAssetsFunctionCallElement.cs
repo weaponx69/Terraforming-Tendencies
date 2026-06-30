@@ -174,7 +174,7 @@ namespace Unity.AI.Assistant.Editor.Backend.Socket.Tools
 
                     if (tex != null)
                     {
-                        var img = new Image { image = tex };
+                        var img = new UnityEngine.UIElements.Image { image = tex };
                         img.AddToClassList("asset-image");
                         item.Add(img);
                     }

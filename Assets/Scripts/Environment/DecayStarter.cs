@@ -17,8 +17,9 @@ namespace GameDevTV.RTS.Environment
             go.transform.localScale = Vector3.zero;
         }
 
-        private void Awake()
+        protected override void Awake()
         {
+            base.Awake();
             MaxHealth = 500;
             CurrentHealth = 500;
             Owner = Owner.Player1;
@@ -26,7 +27,7 @@ namespace GameDevTV.RTS.Environment
             _nextTick = Time.time + 0.1f;
         }
 
-private void Update()
+        private void Update()
         {
             if (Time.time < _nextTick) return;
             _nextTick = Time.time + 0.1f;
@@ -41,7 +42,7 @@ private void Update()
                 Destroy(gameObject);
         }
 
-        public void Die() { if (gameObject != null) Destroy(gameObject); }
+        public override void Die() { base.Die(); }
         public override void Select() { }
         public override void Deselect() { }
     }
