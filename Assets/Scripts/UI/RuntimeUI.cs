@@ -225,6 +225,11 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
 
             if (bottomBarActionsUI == null)
             {
+                bottomBarActionsUI = UnityEngine.Object.FindAnyObjectByType<BottomBarActionsUI>();
+            }
+
+            if (bottomBarActionsUI == null)
+            {
                 // Create a proper RectTransform-based hierarchy for the bottom bar
                 GameObject containerGo = new GameObject("Bottom Action Bar Container", typeof(RectTransform));
                 containerGo.transform.SetParent(transform, false);

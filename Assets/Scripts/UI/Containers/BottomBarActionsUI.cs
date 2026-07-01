@@ -98,7 +98,7 @@ namespace GameDevTV.RTS.UI.Containers
         /// Collect ALL unlockable actions and populate the wired buttons.
         /// Same pattern as ActionPanelBase.RefreshButtons but collects from all sources.
         /// </summary>
-        private void RefreshBar()
+        public void RefreshBar()
         {
             if (!isBuilt || actionButtons == null) return;
 
@@ -165,30 +165,22 @@ namespace GameDevTV.RTS.UI.Containers
                 buildCmd.Icon = FindIconForBuilding(buildingSO) ?? buildingSO.Icon;
                 buildCmd.Slot = FindFreeSlot(commands);
 
-                // Command centers auto-place without requiring a click/ghost placement
-                if (buildCmd.IsCommandBuilding)
+                // Copy GhostPrefab and Restrictions from a template command
+                var templateCommand = FindFirstTemplateCommand();
+                if (templateCommand != null)
                 {
-                    SetRequiresClickToActivate(buildCmd, false);
+                    CopyGhostAndRestrictions(buildCmd, templateCommand);
                 }
                 else
                 {
-                    // Copy GhostPrefab and Restrictions from a template command
-                    var templateCommand = FindFirstTemplateCommand();
-                    if (templateCommand != null)
+                    // Fallback: find GhostPrefab and Restrictions from any BuildBuildingCommand asset in Resources
+                    var allBuildCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
+                    foreach (var cmd in allBuildCommands)
                     {
-                        CopyGhostAndRestrictions(buildCmd, templateCommand);
-                    }
-                    else
-                    {
-                        // Fallback: find GhostPrefab and Restrictions from any BuildBuildingCommand asset in Resources
-                        var allBuildCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
-                        foreach (var cmd in allBuildCommands)
+                        if (cmd != null && cmd.GhostPrefab != null)
                         {
-                            if (cmd != null && cmd.GhostPrefab != null)
-                            {
-                                CopyGhostAndRestrictions(buildCmd, cmd);
-                                break;
-                            }
+                            CopyGhostAndRestrictions(buildCmd, cmd);
+                            break;
                         }
                     }
                 }

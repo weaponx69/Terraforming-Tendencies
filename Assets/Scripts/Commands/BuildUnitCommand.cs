@@ -17,7 +17,21 @@ namespace GameDevTV.RTS.Commands
 
         public override bool CanHandle(CommandContext context)
         {
-            return (context.Commandable is BaseBuilding || context.Commandable is GlobalCommander) && HasEnoughSupplies(context);
+            if (!HasEnoughSupplies(context)) return false;
+
+            bool canSelfHandle = (context.Commandable is BaseBuilding || context.Commandable is GlobalCommander);
+            if (canSelfHandle) return true;
+
+            // Allow routing fallback to any owned building
+            var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var b in buildings)
+            {
+                if (b != null && b.Owner == context.Owner)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public override void Handle(CommandContext context)
@@ -27,16 +41,18 @@ namespace GameDevTV.RTS.Commands
             if (context.Commandable is BaseBuilding building)
             {
                 building.BuildUnlockable(Unit);
+                building.RemoveBuildUnitCommand(Unit);
             }
-            else if (context.Commandable is GlobalCommander)
+            else
             {
-                // For GlobalCommander, find a BaseBuilding to handle the build
+                // Find an owned BaseBuilding (e.g. Command Center) to handle the unit training
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 foreach (var b in buildings)
                 {
                     if (b.Owner == context.Owner)
                     {
                         b.BuildUnlockable(Unit);
+                        b.RemoveBuildUnitCommand(Unit);
                         break;
                     }
                 }

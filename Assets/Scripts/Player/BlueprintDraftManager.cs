@@ -141,6 +141,11 @@ namespace GameDevTV.RTS.Player
             return unlockedBuildings.Contains(building.Name);
         }
 
+        public static void LockBuilding(string name)
+        {
+            unlockedBuildings.Remove(name);
+        }
+
         public static void UnlockBuilding(string name)
         {
             unlockedBuildings.Add(name);

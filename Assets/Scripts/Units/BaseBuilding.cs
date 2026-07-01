@@ -85,6 +85,9 @@ namespace GameDevTV.RTS.Units
             {
                 if (Progress.State != BuildingProgress.BuildingState.Completed) return false;
                 
+                bool isCommandPost = BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                if (isCommandPost) return true;
+
                 bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
                 if (needsPower)
                 {
@@ -279,11 +282,6 @@ namespace GameDevTV.RTS.Units
             isBuildingInitialized = true;
         }
 
-        protected override void Awake()
-        {
-            // base.Awake() will call our overridden InitializeIfNeeded()
-            base.Awake();
-        }
 
         protected override void OnEnable()
         {
@@ -417,6 +415,8 @@ namespace GameDevTV.RTS.Units
             CurrentHealth = MaxHealth;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
+
+
 
             if (MainRenderer != null && primaryMaterial != null)
             {
@@ -980,7 +980,8 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                     }
 
                     float elapsed = 0f;
-                    bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
+                    bool isCommandPost = BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    bool needsPower = !isCommandPost && BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
                     GameDevTV.RTS.Environment.PowerNode pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
 
                     while (elapsed < buildTime)
@@ -1094,6 +1095,8 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                                 // // Debug.LogWarning($"[BaseBuilding] Disabled NavMeshAgent on {instance.name} because no NavMesh was found for type {agentTypeID} at spawn location.");
                             }
                         }
+
+
                     }
                     else if (SOBeingBuilt is UpgradeSO upgrade)
                     {
@@ -1109,6 +1112,28 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                 OnQueueUpdated?.Invoke(buildingQueue.ToArray());
                 productionCoroutine = null;
             }
+        }
+
+        public void RemoveBuildUnitCommand(AbstractUnitSO unitSO)
+        {
+            var list = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(overrideCommands ?? _availableCommands);
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                if (list[i] is GameDevTV.RTS.Commands.BuildUnitCommand buc && buc.Unit == unitSO)
+                {
+                    list.RemoveAt(i);
+                    break;
+                }
+            }
+            overrideCommands = list.ToArray();
+            
+            // Draw a card since a consumable unit card was played/constructed
+            if (GameDevTV.RTS.Player.CardDeckController.Instance != null)
+            {
+                GameDevTV.RTS.Player.CardDeckController.Instance.DrawCard();
+            }
+            // Trigger refresh in UI globally and safely
+            GameDevTV.RTS.EventBus.Bus<GameDevTV.RTS.Events.UpgradeResearchedEvent>.Raise(Owner, new GameDevTV.RTS.Events.UpgradeResearchedEvent(Owner, null));
         }
 
         protected override void OnDestroy()
@@ -1164,18 +1189,15 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
         {
             get
             {
-                if (overrideCommands != null)
-                {
-                    return overrideCommands;
-                }
+                BaseCommand[] baseCmds = base.AvailableCommands;
 
                 bool isCommandPost = BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
                 if (isCommandPost && Owner == Owner.Player1)
                 {
-                    return GetAugmentedCommands(base.AvailableCommands);
+                    return GetAugmentedCommands(baseCmds);
                 }
 
-                return base.AvailableCommands;
+                return baseCmds;
             }
         }
 

@@ -209,6 +209,7 @@ namespace GameDevTV.RTS.Units
 
         private void HandleUpgradeResearched(UpgradeResearchedEvent evt)
         {
+            if (UnitSO == null || evt.Upgrade == null) return;
             if (evt.Owner == Owner && UnitSO.Upgrades.Contains(evt.Upgrade))
             {
                 int oldHealth = UnitSO.Health;

@@ -110,21 +110,70 @@ namespace GameDevTV.RTS.Commands
                 targetPos = navHit.position;
             }
 
-            // If the unit issuing the command isn't a builder (e.g. Command Center or Global Commander), find the nearest idle drone
-            if (builder == null)
+            // Check if this is the player's very first Command Post
+            bool isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+            bool isFirstCommandPost = false;
+            if (isCommandPost)
             {
-                float closestDist = float.MaxValue;
-                Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
-                
-                foreach (var w in workers)
+                int existingCount = 0;
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                foreach (var b in buildings)
                 {
-                    if (w.Owner == context.Owner && !w.IsBuilding)
+                    if (b != null && b.Owner == context.Owner && b.BuildingSO != null 
+                        && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
                     {
-                        float dist = Vector3.Distance(w.transform.position, targetPos);
-                        if (dist < closestDist)
+                        // Check if it's a player-placed building (which Unity names with "(Clone)")
+                        if (b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                         {
-                            closestDist = dist;
-                            builder = w;
+                            existingCount++;
+                        }
+                    }
+                }
+                if (existingCount == 0)
+                {
+                    isFirstCommandPost = true;
+                }
+            }
+
+            if (isFirstCommandPost)
+            {
+                builder = null;
+            }
+            else
+            {
+                // If the unit issuing the command isn't a builder (e.g. Command Center or Global Commander), find the nearest idle drone
+                if (builder == null)
+                {
+                    float closestDist = float.MaxValue;
+                    Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+                    
+                    foreach (var w in workers)
+                    {
+                        if (w.Owner == context.Owner && !w.IsBuilding)
+                        {
+                            float dist = Vector3.Distance(w.transform.position, targetPos);
+                            if (dist < closestDist)
+                            {
+                                closestDist = dist;
+                                builder = w;
+                            }
+                        }
+                    }
+
+                    // Fallback: If all workers are busy building, pick the closest worker regardless of IsBuilding state
+                    if (builder == null)
+                    {
+                        foreach (var w in workers)
+                        {
+                            if (w.Owner == context.Owner)
+                            {
+                                float dist = Vector3.Distance(w.transform.position, targetPos);
+                                if (dist < closestDist)
+                                {
+                                    closestDist = dist;
+                                    builder = w;
+                                }
+                            }
                         }
                     }
                 }
@@ -132,10 +181,10 @@ namespace GameDevTV.RTS.Commands
 
             if (builder == null)
             {
-                bool isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+                isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
                 if (!isCommandPost)
                 {
-                    // // Debug.LogWarning("Only Command Centers can be orbital dropped! You must build a worker first.");
+                    Debug.LogWarning($"[BuildBuildingCommand] Silent failure: Only Command Centers can be orbital dropped! You must build a worker first. Building name: {Building?.Name}");
                     return;
                 }
 
@@ -146,6 +195,13 @@ namespace GameDevTV.RTS.Commands
                     newBuilding.enabled = true;
                     newBuilding.Owner = context.Owner;
                     newBuilding.CompleteConstruction();
+                }
+
+                // Consume blueprint immediately on placement
+                BlueprintDraftManager.LockBuilding(Building.Name);
+                if (CardDeckController.Instance != null)
+                {
+                    CardDeckController.Instance.DrawCard();
                 }
 
                 // Crush any rocks/supplies underneath the orbital drop!
@@ -182,7 +238,22 @@ namespace GameDevTV.RTS.Commands
                 if (pass)
                 {
                     builder.Build(Building, targetPos);
+
+                    // Consume blueprint immediately on placement
+                    BlueprintDraftManager.LockBuilding(Building.Name);
+                    if (CardDeckController.Instance != null)
+                    {
+                        CardDeckController.Instance.DrawCard();
+                    }
                 }
+                else
+                {
+                    Debug.LogWarning($"[BuildBuildingCommand] Silent failure: AllRestrictionsPass failed at {targetPos} for building {Building.Name}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"[BuildBuildingCommand] Silent failure: Insufficient resources to build {Building.Name}");
             }
         }
 
@@ -198,21 +269,41 @@ namespace GameDevTV.RTS.Commands
             // If we strictly check IsFullyOnNavMesh, players can never place buildings!
             if (Restrictions != null)
             {
+                bool isCommandPost = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+
                 foreach (BuildingRestrictionSO restriction in Restrictions)
                 {
-                    int hits = restriction.HitDetectionStyle switch
+                    Collider[] colliders = restriction.HitDetectionStyle switch
                     {
-                        BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask).Length,
-                        BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask).Length,
-                        _ => 0
+                        BuildingRestrictionSO.OverlapStyle.Sphere => Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask),
+                        BuildingRestrictionSO.OverlapStyle.Box => Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask),
+                        _ => System.Array.Empty<Collider>()
                     };
 
-                    if (hits > 0)
+                    int activeHits = 0;
+                    foreach (var col in colliders)
+                    {
+                        if (col == null) continue;
+
+                        var bld = col.GetComponentInParent<BaseBuilding>();
+                        if (bld != null)
+                        {
+                            if (bld.Progress.State == BuildingProgress.BuildingState.Destroyed) continue;
+                            
+                            // If placing a Command Post, ignore any editor pre-placed buildings (e.g. Universal Command Center)
+                            if (isCommandPost && !bld.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+                        }
+
+                        activeHits++;
+                    }
+
+                    if (activeHits > 0)
                     {
                         // Command posts crush supplies, so ignore those restrictions
-                        bool isCommandPost = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
                         bool isSuppliesRestriction = (restriction.LayerMask.value & LayerMask.GetMask("Supplies")) != 0;
-                        
                         if (isCommandPost && isSuppliesRestriction) continue;
                         
                         return false;
@@ -262,8 +353,12 @@ namespace GameDevTV.RTS.Commands
                         if (b != null && b.Owner == context.Owner && b.BuildingSO != null
                             && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
                         {
-                            hasExistingCommandPost = true;
-                            break;
+                            // Filter for player-placed runtime buildings (whose GameObject names contain "(Clone)")
+                            if (b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                hasExistingCommandPost = true;
+                                break;
+                            }
                         }
                     }
                     if (!hasExistingCommandPost) return false; // Allow first Command Post anytime

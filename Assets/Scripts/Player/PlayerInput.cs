@@ -243,7 +243,6 @@ namespace GameDevTV.RTS.Player
                     }
                 }
             }
-
             if (!activeCommand.RequiresClickToActivate)
             {
                 ActivateAction(new RaycastHit());

@@ -122,10 +122,8 @@ namespace GameDevTV.RTS.Environment
 
                         if (damage > 0)
                         {
-                            int hpBefore = target.CurrentHealth;
                             target.TakeDamage(damage);
                             decayedCount++;
-                            Debug.Log($"[GlobalDecayManager] Decayed '{target.name}' (Owner:{target.Owner}) HP {hpBefore}\u2192{target.CurrentHealth} (dmg:{damage})");
                         }
                     }
                 }
@@ -138,7 +136,6 @@ namespace GameDevTV.RTS.Environment
                 Owner monitoredOwner = GameOverManager.MonitoredOwner;
                 float integrity = Supplies.CalculateIntegrity(monitoredOwner);
                 Supplies.UpdateIntegrity(monitoredOwner, integrity);
-                Debug.Log($"[GlobalDecayManager] Tick done | decayed:{decayedCount} commandable(s) | integrity:{integrity:F1}%");
             }
         }
     }

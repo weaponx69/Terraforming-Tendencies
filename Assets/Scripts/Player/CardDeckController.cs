@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameDevTV.RTS.Environment;
 using UnityEngine;
+using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Units;
 
 namespace GameDevTV.RTS.Player
 {
@@ -22,6 +23,7 @@ namespace GameDevTV.RTS.Player
 
         [Header("Deck Configuration")]
         [SerializeField] private List<BlueprintCardSO> masterDeck = new();
+        public List<BlueprintCardSO> MasterDeck => masterDeck;
         [SerializeField] private int handSize = 4;
 
         private List<BlueprintCardSO> drawPile = new();
@@ -56,6 +58,36 @@ namespace GameDevTV.RTS.Player
         }
 
         // ── Public API ──────────────────────────────────────────────────────────────
+
+        public void DrawCard()
+        {
+            if (masterDeck == null || masterDeck.Count == 0) return;
+
+            // Filter out building cards that are already unlocked
+            var unlockedBuildings = BlueprintDraftManager.GetUnlockedBuildingNames();
+            var validCards = masterDeck.Where(c => {
+                if (!c.IsGateMet()) return false;
+                if (c is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
+                {
+                    if (unlockedBuildings.Contains(unlockCard.buildingToUnlock.Name))
+                        return false;
+                }
+                return true;
+            }).ToList();
+
+            if (validCards.Count == 0)
+            {
+                Debug.LogWarning("[CardDeckController] No valid cards left to draw!");
+                return;
+            }
+
+            var chosen = validCards[UnityEngine.Random.Range(0, validCards.Count)];
+            Debug.Log($"[CardDeckController] Automatically drawing and playing card: {chosen.cardName}");
+            chosen.Apply();
+
+            // Refresh UI actions bar
+            GameDevTV.RTS.EventBus.Bus<GameDevTV.RTS.Events.UpgradeResearchedEvent>.Raise(Owner.Player1, new GameDevTV.RTS.Events.UpgradeResearchedEvent(Owner.Player1, null));
+        }
 
         /// <summary>Trigger a draft immediately (use from Inspector button or milestone code).</summary>
         public void TriggerDraft()
