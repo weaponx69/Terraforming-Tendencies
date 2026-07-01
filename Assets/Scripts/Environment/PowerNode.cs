@@ -58,6 +58,17 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        [Header("Temporary Startup Power")]
+        [SerializeField] private float temporaryPowerDuration = 90f; // 90 seconds
+        private float temporaryPowerEndTime;
+        private bool hasTemporaryPower = false;
+
+        public void StartTemporaryPower()
+        {
+            hasTemporaryPower = true;
+            temporaryPowerEndTime = Time.time + temporaryPowerDuration;
+        }
+
         /// <summary>
         /// Effective power state: true if grid-powered OR has battery backup.
         /// Read by Flow Graphs to branch on power-loss events.
@@ -67,6 +78,18 @@ namespace GameDevTV.RTS.Environment
         {
             get
             {
+                if (hasTemporaryPower)
+                {
+                    if (Time.time < temporaryPowerEndTime)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        hasTemporaryPower = false;
+                    }
+                }
+
                 if (isGridPowered) return true;
                 if (TryGetComponent(out BatteryNode battery) && battery.HasCharge) return true;
                 return false;
@@ -84,8 +107,13 @@ namespace GameDevTV.RTS.Environment
         private void Start()
         {
             PowerGridManager.RegisterNode(this);
-            // Optionally, we could try to auto-connect to very close nodes here,
-            // but manual connection is preferred per Option 3.
+            
+            // Command Post starting backup power cells
+            if (Building != null && Building.BuildingSO != null && 
+                Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                StartTemporaryPower();
+            }
         }
 
         private void OnDestroy()

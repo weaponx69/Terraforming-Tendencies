@@ -106,7 +106,7 @@ namespace GameDevTV.RTS.Player
             if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
             if (owner != monitoredOwner) return;
             if (value > 0f) return;
-            if (Time.timeSinceLevelLoad < 30f) return;
+            if (!AnyCommandPostsExist()) return;
 
             TriggerGameOver(GameOverReason.LifeSupport);
         }
@@ -116,8 +116,8 @@ namespace GameDevTV.RTS.Player
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
             
-            // Wait for colony to bootstrap
-            if (Time.timeSinceLevelLoad < 30f) return;
+            // Wait for the first Command Post to be placed before activating any loss checks
+            if (!AnyCommandPostsExist()) return;
 
             // 1. Authoritative Win Check
             bool oxygenComplete = Supplies.Oxygen != null
@@ -292,6 +292,22 @@ namespace GameDevTV.RTS.Player
                 if (b != null && (b.Owner == monitoredOwner || b.Owner == aiOwner))
                 {
                     if (b.QueueSize > 0) return true; 
+                }
+            }
+            return false;
+        }
+
+        private static bool AnyCommandPostsExist()
+        {
+            BaseBuilding[] buildings = Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var b in buildings)
+            {
+                if (b != null && b.BuildingSO != null && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    if (b.name.Contains("(Clone)"))
+                    {
+                        return true;
+                    }
                 }
             }
             return false;

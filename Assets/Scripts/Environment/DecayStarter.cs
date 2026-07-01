@@ -27,20 +27,7 @@ namespace GameDevTV.RTS.Environment
             _nextTick = Time.time + 0.1f;
         }
 
-        private void Update()
-        {
-            if (Time.time < _nextTick) return;
-            _nextTick = Time.time + 0.1f;
-
-            TakeDamage(5);
-            float ratio = (float)CurrentHealth / MaxHealth;
-            GameDevTV.RTS.Player.Supplies.UpdateIntegrity(Owner, ratio * 100f);
-
-            Debug.Log($"[DecayStarter] Tick t={Time.time:F2}s | HP: {CurrentHealth}/{MaxHealth} | Integrity→ {ratio * 100f:F1}% | Owner: {Owner}");
-
-            if (CurrentHealth <= 0)
-                Destroy(gameObject);
-        }
+        // Update loop removed. GlobalDecayManager authoritatively governs decay and colony integrity.
 
         public override void Die() { base.Die(); }
         public override void Select() { }
