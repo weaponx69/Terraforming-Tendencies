@@ -220,6 +220,27 @@ namespace GameDevTV.RTS.Player
 
         public static Supplies Instance { get; private set; }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void InitSceneEvents()
+        {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            _materials = null;
+            _biomass = null;
+            _power = null;
+            _population = null;
+            _populationLimit = null;
+            _oxygen = null;
+            _integrity = null;
+            _temperature = null;
+            _atmosphere = null;
+            _water = null;
+        }
+
         private static void EnsureInitialized()
         {
             if (_materials != null) return;
@@ -250,15 +271,8 @@ namespace GameDevTV.RTS.Player
                 _water[owner] = 0f;
             }
         }
-
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                // // Debug.LogWarning($"[Supplies] Multiple instances detected. Destroying duplicate on {gameObject.name}");
-                Destroy(this);
-                return;
-            }
             Instance = this;
 
             // Re-initialize to ensure instance settings (startingMaterials) are applied

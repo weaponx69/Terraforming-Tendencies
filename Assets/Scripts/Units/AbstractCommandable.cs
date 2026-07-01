@@ -141,6 +141,8 @@ namespace GameDevTV.RTS.Units
 
         public void TakeDamage(int damage)
         {
+            if (this is GlobalCommander) return; // The Universal Command Center (GlobalCommander) is completely invulnerable
+
             int lastHealth = CurrentHealth;
             CurrentHealth = Mathf.Clamp(CurrentHealth - damage, 0, CurrentHealth);
 

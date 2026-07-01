@@ -24,12 +24,6 @@ namespace GameDevTV.RTS.Environment
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                // // Debug.LogWarning($"[PlanetGenerator] Multiple instances detected. Destroying duplicate on {gameObject.name}");
-                Destroy(this);
-                return;
-            }
             Instance = this;
         }
 

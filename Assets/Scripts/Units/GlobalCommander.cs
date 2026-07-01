@@ -16,6 +16,11 @@ namespace GameDevTV.RTS.Units
             // The global commander is always owned by Player 1
             Owner = Owner.Player1;
             gameObject.name = "Universal Command Center";
+            
+            // Set stats to make it invulnerable and fully operational under any condition
+            MaxHealth = 99999;
+            CurrentHealth = 99999;
+            
             BuildAugmentedCommands();
         }
 

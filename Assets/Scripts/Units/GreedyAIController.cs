@@ -132,7 +132,7 @@ namespace GameDevTV.RTS.Units
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
+            Instance = this;
             
             Bus<ResourceDiscoveredEvent>.OnEvent[Owner.Unowned] += HandleResourceDiscovered;
             Bus<BuildingSpawnEvent>.OnEvent[aiOwner] += HandleBuildingSpawn;

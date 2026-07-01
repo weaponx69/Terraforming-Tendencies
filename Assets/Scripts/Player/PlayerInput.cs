@@ -741,6 +741,10 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 {
                     abstractCommandables.Add(commander);
                 }
+                else
+                {
+                    throw new System.InvalidOperationException("[PlayerInput] GlobalCommander is missing! The invulnerable starting base (Universal Command Center) has been destroyed or was not initialized.");
+                }
             }
 
             for (int i = 0; i < abstractCommandables.Count; i++)
@@ -755,6 +759,7 @@ GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                     }
                 }
             }
+
 
             if (activeCommand != null && !activeCommand.StaysActive)
             {
