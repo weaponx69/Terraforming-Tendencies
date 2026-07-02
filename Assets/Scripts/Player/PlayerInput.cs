@@ -237,23 +237,25 @@ namespace GameDevTV.RTS.Player
                             RaycastHit simulatedHit = new RaycastHit();
                             simulatedHit.point = nearestUnoccupied.Center;
                             
-                            ActivateAction(simulatedHit);
-                            return;
+                            // ActivateAction(simulatedHit);
+                            // return;
                         }
                     }
                 }
             }
+
+            // if this thing does not require a click to activate...
+            // Should probably say requires placement click to activate
             if (!activeCommand.RequiresClickToActivate)
             {
                 ActivateAction(new RaycastHit());
             }
             else 
             {
-GameObject prefabToInstantiate = activeCommand.GhostPrefab;
+                GameObject prefabToInstantiate = activeCommand.GhostPrefab;
                 
-                // If this is a building command, completely ignore the assigned GhostPrefab and just use 
-                // the actual building prefab. This guarantees the preview shape matches the final shape!
-                if (activeCommand is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Prefab != null)
+                // Fall back to the solid building prefab only if no custom ghost prefab was specified
+                if (prefabToInstantiate == null && activeCommand is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Prefab !=null)
                 {
                     prefabToInstantiate = bbc.Building.Prefab;
                 }
