@@ -38,7 +38,6 @@ namespace GameDevTV.RTS.UI.Components
         private void Awake()
         {
             _owner = GameOverManager.MonitoredOwner;
-            Debug.Log($"[ColonyIntegrityBar] Awake | _owner={_owner} | fillImage={(fillImage == null ? "NULL" : fillImage.gameObject.name)}");
 
             if (fillImage != null && fillImage.sprite == null)
             {
@@ -121,8 +120,6 @@ namespace GameDevTV.RTS.UI.Components
 
             if (valueLabel != null)
                 valueLabel.SetText($"{fill * 100f:F0}%");
-
-            Debug.Log($"[ColonyIntegrityBar] fill={fill:F3} fillAmount={fillImage?.fillAmount}");
         }
 
         private Color GetColorForFill(float fill)
