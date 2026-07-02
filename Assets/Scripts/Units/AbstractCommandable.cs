@@ -146,6 +146,15 @@ namespace GameDevTV.RTS.Units
             int lastHealth = CurrentHealth;
             CurrentHealth = Mathf.Clamp(CurrentHealth - damage, 0, CurrentHealth);
 
+            // Spawn floating damage number above the commandable
+            if (damage > 0)
+            {
+                Vector3 spawnPos = transform.position + Vector3.up * (GetComponent<Collider>() != null
+                    ? GetComponent<Collider>().bounds.extents.y + 0.5f
+                    : 2f);
+                GameDevTV.RTS.UI.Components.DamageNumberUI.Spawn(spawnPos, damage);
+            }
+
             OnHealthUpdated?.Invoke(this, lastHealth, CurrentHealth);
             if (CurrentHealth == 0)
             {
