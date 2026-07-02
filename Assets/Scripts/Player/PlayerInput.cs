@@ -266,7 +266,12 @@ namespace GameDevTV.RTS.Player
 
                     if (ghostInstance.TryGetComponent(out BaseBuilding bb))
                     {
-                        bb.InitializeAsGhost(null, Owner.Player1);
+                        // Pass PlacementMaterial so InitializeAsGhost can swap to the ghost
+                        // material even if GhostPrefab points to the solid building prefab.
+                        Material ghostMat = activeCommand is BuildBuildingCommand bbc2 && bbc2.Building != null
+                            ? bbc2.Building.PlacementMaterial
+                            : null;
+                        bb.InitializeAsGhost(ghostMat, Owner.Player1);
                     }
 
                     ghostRenderer = ghostInstance.GetComponentInChildren<Renderer>();

@@ -165,18 +165,13 @@ namespace GameDevTV.RTS.UI.Containers
                 buildCmd.Icon = FindIconForBuilding(buildingSO) ?? buildingSO.Icon;
                 buildCmd.Slot = FindFreeSlot(commands);
 
-                // Assign the building's own prefab as the ghost/preview during placement.
-                // This was previously copied from a single template (the root cause of all ghosts
-                // showing the same model), so now each building correctly uses its own prefab.
-                if (buildingSO.Prefab != null)
-                {
-                    buildCmd.GhostPrefab = buildingSO.Prefab;
-                }
+                // Assign the ghost prefab for placement preview from the template BuildBuildingCommand
+                // asset in Resources. Each command asset already has GhostPrefab correctly set to its
+                // own ghost variant prefab. Falls back to the solid Prefab only if no template is found.
+                buildCmd.GhostPrefab = FindGhostPrefabForBuilding(buildingSO) ?? buildingSO.Prefab;
 
                 // Copy Restrictions from an existing template command so dynamically-created
                 // commands still enforce placement rules (e.g. flat ground, no overlap).
-                // GhostPrefab is deliberately NOT copied from the template — each building
-                // uses its own prefab as shown above.
                 CopyRestrictionsFromTemplate(buildCmd);
 
                 commands.Add(buildCmd);
@@ -261,9 +256,31 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
+        /// Find the GhostPrefab from the template BuildBuildingCommand asset for this building.
+        /// Each command asset in Resources/Commands already has GhostPrefab correctly assigned
+        /// to its own ghost variant prefab. This avoids adding new fields to BuildingSO or
+        /// copying ghosts from unrelated templates.
+        /// </summary>
+        private GameObject FindGhostPrefabForBuilding(BuildingSO buildingSO)
+        {
+            if (buildingSO == null || string.IsNullOrEmpty(buildingSO.Name)) return null;
+
+            var allCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
+            foreach (var cmd in allCommands)
+            {
+                if (cmd != null && cmd.Building != null && cmd.Building.Name == buildingSO.Name && cmd.GhostPrefab != null)
+                {
+                    return cmd.GhostPrefab;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Copy Restrictions from any pre-existing BuildBuildingCommand asset or scene-building
-        /// command that has them set. GhostPrefab is NEVER copied — each building uses its own
-        /// prefab as the ghost (set in CollectAllCommands above).
+        /// command that has them set. GhostPrefab is NOT copied here — it's assigned in
+        /// CollectAllCommands from the building's own template command asset via FindGhostPrefabForBuilding.
         /// </summary>
         private static void CopyRestrictionsFromTemplate(BuildBuildingCommand target)
         {
