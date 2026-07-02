@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Commands
         [Inspectable]
         [field: SerializeField] public bool IsSingleUnitCommand { get; private set; }
         [Inspectable]
-        [field: SerializeField] public GameObject GhostPrefab { get; private set; }
+        [field: SerializeField] public GameObject GhostPrefab { get; internal set; }
         [field: SerializeField] public BuildingRestrictionSO[] Restrictions { get; private set; }
 
         public abstract bool CanHandle(CommandContext context);

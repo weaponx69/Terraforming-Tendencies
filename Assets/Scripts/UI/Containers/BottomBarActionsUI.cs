@@ -165,25 +165,19 @@ namespace GameDevTV.RTS.UI.Containers
                 buildCmd.Icon = FindIconForBuilding(buildingSO) ?? buildingSO.Icon;
                 buildCmd.Slot = FindFreeSlot(commands);
 
-                // Copy GhostPrefab and Restrictions from a template command
-                var templateCommand = FindFirstTemplateCommand();
-                if (templateCommand != null)
+                // Assign the building's own prefab as the ghost/preview during placement.
+                // This was previously copied from a single template (the root cause of all ghosts
+                // showing the same model), so now each building correctly uses its own prefab.
+                if (buildingSO.Prefab != null)
                 {
-                    CopyGhostAndRestrictions(buildCmd, templateCommand);
+                    buildCmd.GhostPrefab = buildingSO.Prefab;
                 }
-                else
-                {
-                    // Fallback: find GhostPrefab and Restrictions from any BuildBuildingCommand asset in Resources
-                    var allBuildCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
-                    foreach (var cmd in allBuildCommands)
-                    {
-                        if (cmd != null && cmd.GhostPrefab != null)
-                        {
-                            CopyGhostAndRestrictions(buildCmd, cmd);
-                            break;
-                        }
-                    }
-                }
+
+                // Copy Restrictions from an existing template command so dynamically-created
+                // commands still enforce placement rules (e.g. flat ground, no overlap).
+                // GhostPrefab is deliberately NOT copied from the template — each building
+                // uses its own prefab as shown above.
+                CopyRestrictionsFromTemplate(buildCmd);
 
                 commands.Add(buildCmd);
                 addedBuildingNames.Add(buildingName);
@@ -231,29 +225,6 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
-        /// Find the first BuildBuildingCommand with a GhostPrefab set (for copying to dynamically created commands).
-        /// </summary>
-        private BuildBuildingCommand FindFirstTemplateCommand()
-        {
-            var allBuildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
-            foreach (var building in allBuildings)
-            {
-                if (building == null || building.Owner != owner) continue;
-                if (building.AvailableCommands != null)
-                {
-                    foreach (var cmd in building.AvailableCommands)
-                    {
-                        if (cmd is BuildBuildingCommand bbc && bbc.GhostPrefab != null)
-                        {
-                            return bbc;
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
         /// Find an icon for a building by looking for existing BuildBuildingCommand assets.
         /// </summary>
         private Sprite FindIconForBuilding(BuildingSO buildingSO)
@@ -290,17 +261,44 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
-        /// Copy GhostPrefab and Restrictions from a template command to a target command via reflection.
+        /// Copy Restrictions from any pre-existing BuildBuildingCommand asset or scene-building
+        /// command that has them set. GhostPrefab is NEVER copied — each building uses its own
+        /// prefab as the ghost (set in CollectAllCommands above).
         /// </summary>
-        private static void CopyGhostAndRestrictions(BuildBuildingCommand target, BuildBuildingCommand template)
+        private static void CopyRestrictionsFromTemplate(BuildBuildingCommand target)
         {
-            if (template.GhostPrefab != null)
+            // Look for a template with Restrictions in scene building commands first
+            var allBuildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            foreach (var building in allBuildings)
             {
-                var ghostField = typeof(BaseCommand).GetField("<GhostPrefab>k__BackingField",
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                ghostField?.SetValue(target, template.GhostPrefab);
+                if (building == null || building.AvailableCommands == null) continue;
+                foreach (var cmd in building.AvailableCommands)
+                {
+                    if (cmd is BuildBuildingCommand bbc && bbc.Restrictions != null && bbc.Restrictions.Length > 0)
+                    {
+                        CopyRestrictions(target, bbc);
+                        return;
+                    }
+                }
             }
 
+            // Fallback: find any BuildBuildingCommand asset in Resources with Restrictions
+            var allCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
+            foreach (var cmd in allCommands)
+            {
+                if (cmd.Restrictions != null && cmd.Restrictions.Length > 0)
+                {
+                    CopyRestrictions(target, cmd);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Copy Restrictions array from a template command to a target command via reflection.
+        /// </summary>
+        private static void CopyRestrictions(BuildBuildingCommand target, BuildBuildingCommand template)
+        {
             if (template.Restrictions != null && template.Restrictions.Length > 0)
             {
                 var restrictionsField = typeof(BaseCommand).GetField("<Restrictions>k__BackingField",

@@ -250,10 +250,10 @@ namespace GameDevTV.RTS.Player
             {
                 ActivateAction(new RaycastHit());
             }
-            else 
+            else
             {
                 GameObject prefabToInstantiate = activeCommand.GhostPrefab;
-                
+
                 // Fall back to the solid building prefab only if no custom ghost prefab was specified
                 if (prefabToInstantiate == null && activeCommand is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Prefab !=null)
                 {
