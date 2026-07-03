@@ -4,18 +4,17 @@ using System.Linq;
 using UnityEngine;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.EventBus;
+using GameDevTV.RTS.Events;
 
 namespace GameDevTV.RTS.Player
 {
     /// <summary>
-    /// Holds the master deck of Blueprint Cards and drives the draft sequence.
+    /// Manages the player's deck and 5-card hand. The hand is shown in the
+    /// bottom action bar. Playing a card removes it and draws a replacement
+    /// from the deck. If the deck runs out, the discard pile reshuffles.
     ///
-    /// Wire in Inspector:
-    ///   - masterDeck : all BlueprintCardSO assets for this run
-    ///   - handSize   : how many cards to offer (default 3)
-    ///
-    /// The draft is triggered automatically when a sector is unlocked (via SectorManager).
-    /// It can also be triggered manually via TriggerDraft() for testing.
+    /// Auto-spawns on scene load — no manual scene setup needed.
     /// </summary>
     public class CardDeckController : MonoBehaviour
     {
@@ -24,13 +23,29 @@ namespace GameDevTV.RTS.Player
         [Header("Deck Configuration")]
         [SerializeField] private List<BlueprintCardSO> masterDeck = new();
         public List<BlueprintCardSO> MasterDeck => masterDeck;
-        [SerializeField] private int handSize = 4;
+        [SerializeField] private int handSize = 5;
 
         private List<BlueprintCardSO> drawPile = new();
         private List<BlueprintCardSO> discardPile = new();
+        private List<BlueprintCardSO> hand = new();
+
+        /// <summary>The player's current hand of cards (max handSize).</summary>
+        public IReadOnlyList<BlueprintCardSO> Hand => hand;
+
+        /// <summary>Fired when the hand changes (card played, drawn, etc.).</summary>
+        public static event Action OnHandChanged;
 
         /// <summary>Fired when the draft phase begins. Carries the offered hand.</summary>
         public static event Action<List<BlueprintCardSO>> OnDraftStarted;
+
+        // ── Auto-initialization ──────────────────────────────────────────────
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void AutoSpawn()
+        {
+            GameObject go = new GameObject("CardDeckController");
+            DontDestroyOnLoad(go);
+            go.AddComponent<CardDeckController>();
+        }
 
         private void Awake()
         {
@@ -50,111 +65,124 @@ namespace GameDevTV.RTS.Player
         private void Start()
         {
             ShuffleDeck();
+            FillHand();
         }
 
-        // ── Public API ──────────────────────────────────────────────────────────────
+        // ── Hand Management ──────────────────────────────────────────────────
 
+        /// <summary>
+        /// Fill the hand to handSize by drawing from the draw pile.
+        /// If the draw pile runs out, reshuffle the discard pile.
+        /// </summary>
+        public void FillHand()
+        {
+            if (masterDeck == null || masterDeck.Count == 0) return;
+
+            while (hand.Count < handSize)
+            {
+                if (drawPile.Count == 0)
+                {
+                    if (discardPile.Count == 0) break; // No cards left at all
+                    Reshuffle();
+                }
+
+                // Filter by climate gates
+                var valid = drawPile.Where(c => c != null && c.IsGateMet()).ToList();
+                if (valid.Count == 0) break;
+
+                // Move top valid card from drawPile to hand
+                BlueprintCardSO drawn = valid[0];
+                drawPile.Remove(drawn);
+                hand.Add(drawn);
+            }
+
+            OnHandChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Play the card at the given hand index: apply its effect,
+        /// remove from hand, discard it, and draw a replacement.
+        /// </summary>
+        public void PlayCard(int handIndex)
+        {
+            if (handIndex < 0 || handIndex >= hand.Count) return;
+            if (hand[handIndex] == null) return;
+
+            BlueprintCardSO played = hand[handIndex];
+            Debug.Log($"[CardDeckController] Playing card: '{played.cardName}' (index {handIndex})");
+
+            // Apply the card's effect
+            played.Apply();
+
+            // Move played card to discard
+            hand.RemoveAt(handIndex);
+            discardPile.Add(played);
+
+            // Draw a replacement
+            FillHand();
+
+            // Refresh UI
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        /// <summary>Old DrawCard kept for backward compatibility — now draws into the hand instead of auto-applying.</summary>
         public void DrawCard()
         {
-            if (masterDeck == null || masterDeck.Count == 0)
-            {
-                Debug.LogWarning($"[CardDeckController] DrawCard called but masterDeck is {(masterDeck == null ? "NULL" : "empty")}! Has {masterDeck?.Count} cards.");
-                return;
-            }
-
-            Debug.Log($"[CardDeckController] DrawCard called. masterDeck has {masterDeck.Count} cards total.");
-
-            // Filter only by climate gates — do NOT filter by unlock state.
-            // Cards are consumable actions; drawing them should always work
-            // regardless of which buildings are currently unlocked.
-            var validCards = masterDeck.Where(c => c.IsGateMet()).ToList();
-
-            Debug.Log($"[CardDeckController] After climate gate filtering: {validCards.Count} valid cards.");
-            foreach (var c in validCards)
-            {
-                Debug.Log($"[CardDeckController]   Valid card: '{c.cardName}' (type: {c.GetType().Name})");
-            }
-
-            if (validCards.Count == 0)
-            {
-                Debug.LogWarning("[CardDeckController] No valid cards left to draw! All cards failed climate gates.");
-                return;
-            }
-
-            var chosen = validCards[UnityEngine.Random.Range(0, validCards.Count)];
-            Debug.Log($"[CardDeckController] DRAW RESULT: '{chosen.cardName}' (type: {chosen.GetType().Name})");
-            chosen.Apply();
-
-            // Refresh UI actions bar
-            GameDevTV.RTS.EventBus.Bus<GameDevTV.RTS.Events.UpgradeResearchedEvent>.Raise(Owner.Player1, new GameDevTV.RTS.Events.UpgradeResearchedEvent(Owner.Player1, null));
+            FillHand();
         }
+
+        // ── Draft UI ─────────────────────────────────────────────────────────
 
         /// <summary>Trigger a draft immediately (use from Inspector button or milestone code).</summary>
         public void TriggerDraft()
         {
-            var hand = GetCuratedHand();
-            if (hand == null || hand.Count == 0) return;
+            var curatedHand = GetCuratedHand();
+            if (curatedHand == null || curatedHand.Count == 0) return;
 
             Time.timeScale = 0f;
-            OnDraftStarted?.Invoke(hand);
+            OnDraftStarted?.Invoke(curatedHand);
         }
 
         /// <summary>Called by the UI when the player selects a card.</summary>
         public void SelectCard(BlueprintCardSO chosen, List<BlueprintCardSO> fullHand)
         {
-            // Move drawn cards from draw pile to discard
             foreach (var card in fullHand)
             {
                 drawPile.Remove(card);
                 if (card != chosen)
-                    discardPile.Add(card); // Unchosen cards go to discard
+                    discardPile.Add(card);
             }
-            // Chosen card is consumed
             discardPile.Add(chosen);
-
-            BlueprintDraftManager.CompleteDraft(chosen); // Applies effect + unpauses + fires OnDraftCompleted
+            BlueprintDraftManager.CompleteDraft(chosen);
         }
 
-        // ── Draft Curation ──────────────────────────────────────────────────────────
+        // ── Draft Curation ───────────────────────────────────────────────────
 
-        /// <summary>
-        /// Build a curated draft hand:
-        /// - 3 cards from the master deck, filtered by what's relevant in explored sectors
-        /// - Guarantees at least 1 scouting card if sectors remain locked
-        /// - Emergency Caches is always a 4th extra option
-        /// </summary>
         private List<BlueprintCardSO> GetCuratedHand()
         {
             if (masterDeck == null || masterDeck.Count == 0) return null;
 
-            // Find the Emergency Caches card (guaranteed 4th option)
             BlueprintCardSO emergencyCaches = masterDeck.FirstOrDefault(c =>
                 c is ScoutingCardSO s && s.scoutingType == ScoutingCardSO.ScoutingType.EmergencyCaches);
 
-            // Filter the deck to only include valid cards for current game state
             var curatedPool = masterDeck
-                .Where(c => c != emergencyCaches) // Exclude emergency card from normal pool
-                .Where(c => c.IsGateMet())        // Climate gates, discovery prerequisites
+                .Where(c => c != emergencyCaches)
+                .Where(c => c.IsGateMet())
                 .ToList();
 
             if (curatedPool.Count == 0)
             {
-                // Fallback: if nothing is valid, just use emergency caches
                 var fallbackHand = new List<BlueprintCardSO>();
                 if (emergencyCaches != null) fallbackHand.Add(emergencyCaches);
                 return fallbackHand;
             }
 
-            // Shuffle the curated pool
             curatedPool = curatedPool.OrderBy(_ => UnityEngine.Random.value).ToList();
-
-            // Separate scouting cards from other types
             var scoutingCards = curatedPool.Where(c => c is ScoutingCardSO).ToList();
             var otherCards = curatedPool.Where(c => !(c is ScoutingCardSO)).ToList();
 
             var hand = new List<BlueprintCardSO>();
 
-            // If sectors remain locked, guarantee at least 1 scouting card
             bool hasLockedSectors = SectorManager.Instance != null &&
                                     SectorManager.Instance.GetNextLockedSectorIndex() >= 0;
 
@@ -164,7 +192,6 @@ namespace GameDevTV.RTS.Player
                 scoutingCards.RemoveAt(0);
             }
 
-            // Fill remaining slots from the mixed pool
             var mixedPool = scoutingCards.Concat(otherCards).OrderBy(_ => UnityEngine.Random.value).ToList();
             int slotsRemaining = handSize - hand.Count;
             for (int i = 0; i < slotsRemaining && i < mixedPool.Count; i++)
@@ -172,7 +199,6 @@ namespace GameDevTV.RTS.Player
                 hand.Add(mixedPool[i]);
             }
 
-            // Add Emergency Caches as guaranteed 4th option
             if (emergencyCaches != null && !hand.Contains(emergencyCaches))
             {
                 hand.Add(emergencyCaches);
@@ -181,7 +207,7 @@ namespace GameDevTV.RTS.Player
             return hand;
         }
 
-        // ── Private Helpers ─────────────────────────────────────────────────────────
+        // ── Private Helpers ──────────────────────────────────────────────────
 
         private void HandleSectorUnlocked()
         {
@@ -196,7 +222,6 @@ namespace GameDevTV.RTS.Player
 
         private void Reshuffle()
         {
-            // Combine remaining draw pile and discards, then reshuffle
             drawPile.AddRange(discardPile);
             discardPile.Clear();
             drawPile = drawPile.OrderBy(_ => UnityEngine.Random.value).ToList();
