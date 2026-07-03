@@ -363,19 +363,22 @@ namespace GameDevTV.RTS.UI.Containers
             cardBio.biomassAmount = 150;
             runtimePool.Add(cardBio);
 
-            // 6. Drone Assembly
-            var cardDrone = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
-            cardDrone.cardName = "Mining Drone";
-            cardDrone.cardDescription = "Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.";
-            var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
-            if (miningDroneSO != null)
+            // 6. Drone Assembly (5 copies so the player gets drones consistently)
+            for (int d = 0; d < 5; d++)
             {
-                cardDrone.unitPrefab = miningDroneSO.Prefab;
-            }
+                var cardDrone = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
+                cardDrone.cardName = "Mining Drone";
+                cardDrone.cardDescription = "Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.";
+                var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+                if (miningDroneSO != null)
+                {
+                    cardDrone.unitPrefab = miningDroneSO.Prefab;
+                }
 #if UNITY_EDITOR
-            if (cardDrone.unitPrefab == null) cardDrone.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Mining Drone/Mining Drone.prefab");
+                if (cardDrone.unitPrefab == null) cardDrone.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Mining Drone/Mining Drone.prefab");
 #endif
-            runtimePool.Add(cardDrone);
+                runtimePool.Add(cardDrone);
+            }
 
             // 7. Gather Speed Buff (Repair Drone removed — only Mining Drones)
             var cardSpeed = ScriptableObject.CreateInstance<PassiveBuffCardSO>();

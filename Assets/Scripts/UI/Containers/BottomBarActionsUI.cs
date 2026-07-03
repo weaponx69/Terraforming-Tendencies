@@ -101,8 +101,8 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
-            // Show up to 5 cards (or however many buttons we have)
-            int maxButtons = Mathf.Min(actionButtons.Length, 5);
+            // Show up to 10 cards (or however many buttons are wired)
+            int maxButtons = Mathf.Min(actionButtons.Length, 10);
 
             for (int i = 0; i < actionButtons.Length; i++)
             {

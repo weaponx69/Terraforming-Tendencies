@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Player
         [Header("Deck Configuration")]
         [SerializeField] private List<BlueprintCardSO> masterDeck = new();
         public List<BlueprintCardSO> MasterDeck => masterDeck;
-        [SerializeField] private int handSize = 5;
+        [SerializeField] private int handSize = 10;
 
         private List<BlueprintCardSO> drawPile = new();
         private List<BlueprintCardSO> discardPile = new();
