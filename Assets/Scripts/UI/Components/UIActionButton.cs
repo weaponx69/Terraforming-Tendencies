@@ -114,7 +114,7 @@ public void Disable()
                 GameObject labelGO = new GameObject("Label", typeof(TextMeshProUGUI));
                 labelGO.transform.SetParent(transform, false);
                 label = labelGO.GetComponent<TextMeshProUGUI>();
-                label.fontSize = 10;
+                label.fontSize = 14;
                 label.alignment = TextAlignmentOptions.Center;
                 label.color = Color.white;
                 RectTransform rt = label.GetComponent<RectTransform>();
@@ -190,6 +190,12 @@ public void Disable()
                         ? string.Format(DEPENDENCY_FORMAT_NO_COMMA, dependencies[i].Name)
                         : string.Format(DEPENDENCY_FORMAT_COMMA, dependencies[i].Name);
                 }
+            }
+
+            // Handle PlayCardCommand — show card name as tooltip
+            if (command is PlayCardCommand)
+            {
+                return command.Name;
             }
 
             return tooltipText;

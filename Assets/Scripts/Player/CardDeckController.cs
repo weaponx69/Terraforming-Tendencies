@@ -66,6 +66,45 @@ namespace GameDevTV.RTS.Player
         {
             ShuffleDeck();
             FillHand();
+            GuaranteeStartingCards();
+        }
+
+        // ── Guaraunteed starting cards ───────────────────────────────────────
+        // After the initial FillHand, ensure Mining Drone and Solar Panel are in
+        // the hand. If not, swap them with the last cards in hand.
+        private void GuaranteeStartingCards()
+        {
+            if (masterDeck == null || masterDeck.Count == 0) return;
+
+            // Find the Mining Drone card in the deck
+            BlueprintCardSO droneCard = null;
+            BlueprintCardSO solarCard = null;
+            foreach (var c in masterDeck)
+            {
+                if (c is SpawnUnitCardSO spawn && spawn.cardName == "Mining Drone")
+                    droneCard = c;
+                if (c is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null &&
+                    unlock.buildingToUnlock.Name == "Solar Panel")
+                    solarCard = c;
+            }
+
+            // Ensure drone is in hand
+            if (droneCard != null && !hand.Contains(droneCard))
+            {
+                if (hand.Count >= handSize) hand.RemoveAt(hand.Count - 1);
+                hand.Add(droneCard);
+                drawPile.Remove(droneCard);
+            }
+
+            // Ensure solar panel is in hand
+            if (solarCard != null && !hand.Contains(solarCard))
+            {
+                if (hand.Count >= handSize) hand.RemoveAt(hand.Count - 1);
+                hand.Add(solarCard);
+                drawPile.Remove(solarCard);
+            }
+
+            OnHandChanged?.Invoke();
         }
 
         // ── Hand Management ──────────────────────────────────────────────────
