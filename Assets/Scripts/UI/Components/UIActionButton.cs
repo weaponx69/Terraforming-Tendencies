@@ -4,6 +4,7 @@ using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -15,6 +16,7 @@ namespace GameDevTV.RTS.UI.Components
     public class UIActionButton : MonoBehaviour, IUIElement<BaseCommand, IEnumerable<AbstractCommandable>, UnityAction>, IPointerEnterHandler, IPointerExitHandler
     {
         [SerializeField] private Image icon;
+        [SerializeField] private TextMeshProUGUI label;
         [SerializeField] private Tooltip tooltip;
 
         private bool isActive;
@@ -42,6 +44,7 @@ public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> sele
 
     button.onClick.RemoveAllListeners();
     SetIcon(command.Icon);
+    SetLabel(command.Name);
     // If selectedUnits is null, make the button interactive (for bottom bar commands)
     // Otherwise, check if any unit can handle the command
     button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
@@ -64,6 +67,7 @@ public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> sele
 public void Disable()
 {
     SetIcon(null);
+    SetLabel(null);
     if (button != null)
     {
         button.interactable = false;
@@ -99,6 +103,30 @@ public void Disable()
                     rectTransform.position.x + rectTransform.rect.width / 2f,
                     rectTransform.position.y + rectTransform.rect.height / 2f
                 );
+            }
+        }
+
+        private void SetLabel(string text)
+        {
+            // Create a label at runtime if none is wired in the Inspector
+            if (label == null)
+            {
+                GameObject labelGO = new GameObject("Label", typeof(TextMeshProUGUI));
+                labelGO.transform.SetParent(transform, false);
+                label = labelGO.GetComponent<TextMeshProUGUI>();
+                label.fontSize = 10;
+                label.alignment = TextAlignmentOptions.Center;
+                label.color = Color.white;
+                RectTransform rt = label.GetComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0, 0);
+                rt.anchorMax = new Vector2(1, 0);
+                rt.offsetMin = new Vector2(0, -20);
+                rt.offsetMax = new Vector2(0, 0);
+            }
+
+            if (label != null)
+            {
+                label.text = text ?? "";
             }
         }
 
