@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.EventBus;
+using GameDevTV.RTS.Events;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -9,6 +11,8 @@ namespace GameDevTV.RTS.Environment
     /// Periodically unleashes waves of "natural events" (meteor strikes, etc.) against
     /// the terraforming colony. Each event either targets a random player-owned structure
     /// or a random spot on the current planet. Waves escalate over time.
+    ///
+    /// Auto-initializes when the first player building is constructed — no manual scene setup needed.
     /// </summary>
     public class NaturalEventManager : MonoBehaviour
     {
@@ -40,12 +44,39 @@ namespace GameDevTV.RTS.Environment
         public int CurrentWave { get; private set; }
 
         private Coroutine waveRoutine;
+        private bool hasStarted;
 
-        private void Start()
+        // ── Auto-initialization ──────────────────────────────────────────────
+        // Spawns the manager on scene load (via RuntimeInitializeOnLoadMethod),
+        // then waits for the first player building to be constructed before
+        // beginning the assault waves.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void SubscribeToFirstBuilding()
         {
-            if (autoStart)
+            // This callback survives scene reloads, so the event bus subscription
+            // inside it is established before any scene object exists.
+            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += OnFirstBuildingSpawned;
+        }
+
+        private static void OnFirstBuildingSpawned(BuildingSpawnEvent evt)
+        {
+            // Unsubscribe immediately so this only fires once
+            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= OnFirstBuildingSpawned;
+
+            if (FindAnyObjectByType<NaturalEventManager>() != null) return;
+
+            GameObject go = new GameObject("NaturalEventManager");
+            var manager = go.AddComponent<NaturalEventManager>();
+            manager.BeginAssault();
+            Debug.Log("[NaturalEventManager] Auto-spawned after first building. Waves will begin after firstWaveDelay.");
+        }
+
+        private void Awake()
+        {
+            // Ensure only one instance exists
+            if (FindObjectsByType<NaturalEventManager>(FindObjectsInactive.Exclude).Length > 1)
             {
-                BeginAssault();
+                Destroy(gameObject);
             }
         }
 
@@ -91,18 +122,49 @@ namespace GameDevTV.RTS.Environment
 
         private void SpawnEvent()
         {
-            if (eventPrefabs == null || eventPrefabs.Length == 0)
+            Vector3 targetPos = GetTargetPosition();
+
+            if (eventPrefabs != null && eventPrefabs.Length > 0)
             {
-                Debug.LogWarning("[NaturalEventManager] No event prefabs assigned.", this);
-                return;
+                GameObject prefab = eventPrefabs[Random.Range(0, eventPrefabs.Length)];
+                if (prefab != null)
+                {
+                    Instantiate(prefab, targetPos, Quaternion.identity);
+                    return;
+                }
             }
 
-            Vector3 targetPos = GetTargetPosition();
-            GameObject prefab = eventPrefabs[Random.Range(0, eventPrefabs.Length)];
-            if (prefab != null)
-            {
-                Instantiate(prefab, targetPos, Quaternion.identity);
-            }
+            // Fallback: create a simple meteor from a sphere primitive
+            CreateFallbackMeteor(targetPos);
+        }
+
+        /// <summary>
+        /// Creates a simple sphere meteor at runtime when no prefab is assigned.
+        /// </summary>
+        private void CreateFallbackMeteor(Vector3 targetPos)
+        {
+            GameObject meteor = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            meteor.name = "Meteor (fallback)";
+            meteor.transform.position = targetPos;
+            meteor.transform.localScale = Vector3.one * 2f;
+
+            // Add the impact component
+            var impact = meteor.AddComponent<NaturalEventImpact>();
+            // Reflect to set serialized fields since they're private
+            SetPrivateField(impact, "damageRadius", 5f);
+            SetPrivateField(impact, "damageAmount", 25);
+            SetPrivateField(impact, "maxHealth", 50);
+            SetPrivateField(impact, "currentHealth", 50);
+            SetPrivateField(impact, "fallHeight", 40f);
+            SetPrivateField(impact, "fallSpeed", 35f);
+        }
+
+        private static void SetPrivateField(object obj, string fieldName, object value)
+        {
+            var field = obj.GetType().GetField(fieldName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+                field.SetValue(obj, value);
         }
 
         private Vector3 GetTargetPosition()
