@@ -58,17 +58,10 @@ namespace GameDevTV.RTS.Player
         {
             if (masterDeck == null || masterDeck.Count == 0) return;
 
-            // Filter out building cards that are already unlocked
-            var unlockedBuildings = BlueprintDraftManager.GetUnlockedBuildingNames();
-            var validCards = masterDeck.Where(c => {
-                if (!c.IsGateMet()) return false;
-                if (c is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
-                {
-                    if (unlockedBuildings.Contains(unlockCard.buildingToUnlock.Name))
-                        return false;
-                }
-                return true;
-            }).ToList();
+            // Filter only by climate gates — do NOT filter by unlock state.
+            // Cards are consumable actions; drawing them should always work
+            // regardless of which buildings are currently unlocked.
+            var validCards = masterDeck.Where(c => c.IsGateMet()).ToList();
 
             if (validCards.Count == 0)
             {
@@ -77,7 +70,7 @@ namespace GameDevTV.RTS.Player
             }
 
             var chosen = validCards[UnityEngine.Random.Range(0, validCards.Count)];
-            Debug.Log($"[CardDeckController] Automatically drawing and playing card: {chosen.cardName}");
+            Debug.Log($"[CardDeckController] Drawing card: {chosen.cardName}");
             chosen.Apply();
 
             // Refresh UI actions bar
