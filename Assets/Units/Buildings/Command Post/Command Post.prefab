@@ -133,7 +133,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: _availableCommands.Array.size
-      value: 5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: <CurrentHealth>k__BackingField
@@ -141,23 +141,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: '_availableCommands.Array.data[0]'
-      value: 
+      value:
       objectReference: {fileID: 11400000, guid: b0a82efc1c269c841a10f51737b9c172, type: 2}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: '_availableCommands.Array.data[1]'
-      value: 
-      objectReference: {fileID: 11400000, guid: ac42e8f50d8e2cffe85c89075d65a911, type: 2}
-    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
-      propertyPath: '_availableCommands.Array.data[2]'
-      value: 
-      objectReference: {fileID: 11400000, guid: 9e1c2a8f8d6b41228e932b11cd58fb9c, type: 2}
-    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
-      propertyPath: '_availableCommands.Array.data[3]'
-      value: 
-      objectReference: {fileID: 11400000, guid: df7069dfd83dca0a8b1c6cd49dcd95e3, type: 2}
-    - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
-      propertyPath: '_availableCommands.Array.data[4]'
-      value: 
+      value:
       objectReference: {fileID: 11400000, guid: a370b5140082823179256e8c044a9ac2, type: 2}
     - target: {fileID: 1422532545010619854, guid: 185b24646dbb3ff8cad3cc5bbe8d527e, type: 3}
       propertyPath: <Progress>k__BackingField.<State>k__BackingField

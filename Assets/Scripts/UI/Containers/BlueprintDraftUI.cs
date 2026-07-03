@@ -265,7 +265,7 @@ namespace GameDevTV.RTS.UI.Containers
             runtimePool.Clear();
             runtimePool.AddRange(poolOfCards);
 
-            // 1. Solar Panel Blueprint
+            // 1. Solar Panel Blueprint (3 copies in the deck so the player doesn't run out)
             var cardSolar = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
             cardSolar.cardName = "Solar Array Project";
             cardSolar.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
@@ -274,6 +274,20 @@ namespace GameDevTV.RTS.UI.Containers
             if (cardSolar.buildingToUnlock == null) cardSolar.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/SolarPanel/SolarPanel.asset");
 #endif
             runtimePool.Add(cardSolar);
+
+            // Solar Panel copy 2
+            var cardSolar2 = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardSolar2.cardName = "Solar Array Project";
+            cardSolar2.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
+            cardSolar2.buildingToUnlock = cardSolar.buildingToUnlock;
+            runtimePool.Add(cardSolar2);
+
+            // Solar Panel copy 3
+            var cardSolar3 = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cardSolar3.cardName = "Solar Array Project";
+            cardSolar3.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
+            cardSolar3.buildingToUnlock = cardSolar.buildingToUnlock;
+            runtimePool.Add(cardSolar3);
 
             // 2. Oxygen Processor Blueprint
             var cardOxygen = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
@@ -363,21 +377,7 @@ namespace GameDevTV.RTS.UI.Containers
 #endif
             runtimePool.Add(cardDrone);
 
-            // 7. Repair Drone
-            var cardRepair = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
-            cardRepair.cardName = "Automated Repair Crawler";
-            cardRepair.cardDescription = "Deploy a specialized Repair Drone to automatically rebuild pipelines and repair bases.";
-            var repairDroneSO = Resources.Load<AbstractUnitSO>("Units/RepairDrone");
-            if (repairDroneSO != null)
-            {
-                cardRepair.unitPrefab = repairDroneSO.Prefab;
-            }
-#if UNITY_EDITOR
-            if (cardRepair.unitPrefab == null) cardRepair.unitPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Units/Repair Drone/Repair Drone.prefab");
-#endif
-            runtimePool.Add(cardRepair);
-
-            // 8. Gather Speed Buff
+            // 7. Gather Speed Buff (Repair Drone removed — only Mining Drones)
             var cardSpeed = ScriptableObject.CreateInstance<PassiveBuffCardSO>();
             cardSpeed.cardName = "High-Power Induction Drills";
             cardSpeed.cardDescription = "Upgrade mining tools. All mining droids gather minerals and deposits +30% faster permanently.";
@@ -421,6 +421,14 @@ namespace GameDevTV.RTS.UI.Containers
             AddThemedBuildingCard("Genetically Modified Algae Spreader", "Sows oxygen-producing algae pools. REQUIRES Temp >= -15C, Atmos >= 0.15 atm, Oxy >= 1.0%, Water >= 10%.", "Genetically Modified Algae Spreader", 210, 3f, 0f, 0, 0, -15f, float.MaxValue, 1.0f, float.MaxValue, 0.15f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 10.0f);
             AddThemedBuildingCard("Greenery Dome", "Advanced glass canopy housing local flora. REQUIRES Temp >= -10C, Atmos >= 0.20 atm, Oxy >= 2.0%, Water >= 20%.", "Greenery Dome", 280, 4f, 0f, 0, 6, -10f, float.MaxValue, 2.0f, float.MaxValue, 0.20f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 20.0f);
             AddThemedBuildingCard("Biosphere Center", "Coordinates global ecological cycles from a protected water deposit. REQUIRES Water >= 30%.", "Biosphere Center", 500, 6f, 0f, 0, 10, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon, 30.0f);
+
+            // Populate the CardDeckController's masterDeck so DrawCard() has cards to draw from
+            if (CardDeckController.Instance != null)
+            {
+                CardDeckController.Instance.MasterDeck.Clear();
+                CardDeckController.Instance.MasterDeck.AddRange(runtimePool);
+                Debug.Log($"[BlueprintDraftUI] Populated CardDeckController with {runtimePool.Count} cards.");
+            }
         }
 
         private void AddThemedBuildingCard(

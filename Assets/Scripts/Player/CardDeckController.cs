@@ -56,21 +56,33 @@ namespace GameDevTV.RTS.Player
 
         public void DrawCard()
         {
-            if (masterDeck == null || masterDeck.Count == 0) return;
+            if (masterDeck == null || masterDeck.Count == 0)
+            {
+                Debug.LogWarning($"[CardDeckController] DrawCard called but masterDeck is {(masterDeck == null ? "NULL" : "empty")}! Has {masterDeck?.Count} cards.");
+                return;
+            }
+
+            Debug.Log($"[CardDeckController] DrawCard called. masterDeck has {masterDeck.Count} cards total.");
 
             // Filter only by climate gates — do NOT filter by unlock state.
             // Cards are consumable actions; drawing them should always work
             // regardless of which buildings are currently unlocked.
             var validCards = masterDeck.Where(c => c.IsGateMet()).ToList();
 
+            Debug.Log($"[CardDeckController] After climate gate filtering: {validCards.Count} valid cards.");
+            foreach (var c in validCards)
+            {
+                Debug.Log($"[CardDeckController]   Valid card: '{c.cardName}' (type: {c.GetType().Name})");
+            }
+
             if (validCards.Count == 0)
             {
-                Debug.LogWarning("[CardDeckController] No valid cards left to draw!");
+                Debug.LogWarning("[CardDeckController] No valid cards left to draw! All cards failed climate gates.");
                 return;
             }
 
             var chosen = validCards[UnityEngine.Random.Range(0, validCards.Count)];
-            Debug.Log($"[CardDeckController] Drawing card: {chosen.cardName}");
+            Debug.Log($"[CardDeckController] DRAW RESULT: '{chosen.cardName}' (type: {chosen.GetType().Name})");
             chosen.Apply();
 
             // Refresh UI actions bar
