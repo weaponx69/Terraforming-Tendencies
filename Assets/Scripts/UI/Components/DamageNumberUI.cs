@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.UI.Components
         [SerializeField] private float randomOffsetRange = 0.5f;
 
         [Header("Text Style")]
-        [SerializeField] private int fontSize = 36;
+        [SerializeField] private float fontSize = 3f;
         [SerializeField] private Color damageColor = Color.red;
         [SerializeField] private Color criticalColor = new Color(1f, 0.5f, 0f); // Orange
         [SerializeField] private int criticalThreshold = 10;
@@ -46,7 +46,6 @@ namespace GameDevTV.RTS.UI.Components
 
             Canvas canvas = canvasGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            canvas.GetComponent<Transform>().localScale = Vector3.one * 0.01f; // Scale down to world-space
 
             // Add CanvasGroup for fading
             canvasGroup = canvasGO.AddComponent<CanvasGroup>();
@@ -61,9 +60,9 @@ namespace GameDevTV.RTS.UI.Components
             label.fontStyle = FontStyles.Bold;
             label.color = damageColor;
 
-            // Set rect transform size
+            // Set rect transform size (in world units)
             RectTransform rect = label.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(200, 100);
+            rect.sizeDelta = new Vector2(4, 2);
             rect.anchoredPosition = Vector2.zero;
 
             // Ensure it renders on top
