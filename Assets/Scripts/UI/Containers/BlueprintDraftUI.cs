@@ -364,12 +364,15 @@ namespace GameDevTV.RTS.UI.Containers
             runtimePool.Add(cardBio);
 
             // 6. Drone Assembly (5 copies so the player gets drones consistently)
+            var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+            Sprite droneIcon = null;
+            if (miningDroneSO != null) droneIcon = miningDroneSO.Icon;
             for (int d = 0; d < 5; d++)
             {
                 var cardDrone = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
                 cardDrone.cardName = "Mining Drone";
                 cardDrone.cardDescription = "Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.";
-                var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
+                cardDrone.icon = droneIcon;
                 if (miningDroneSO != null)
                 {
                     cardDrone.unitPrefab = miningDroneSO.Prefab;
