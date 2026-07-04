@@ -91,8 +91,10 @@ namespace GameDevTV.RTS.UI.Containers
         private void HandleRefresh(UpgradeResearchedEvent evt) { RefreshBar(); }
 
         /// <summary>
-        /// Refresh the bottom bar to show the player's current 5-card hand.
-        /// Each button corresponds to one card in the hand.
+        /// Refresh the bottom bar to show the player's current 10-card hand.
+        /// Cards from the hand take priority. For any slot where the hand
+        /// has no card, we fall through to show unlocked building commands
+        /// from the GlobalCommander (e.g., Solar Panel after its card is played).
         /// </summary>
         public void RefreshBar()
         {
@@ -100,6 +102,10 @@ namespace GameDevTV.RTS.UI.Containers
 
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
+
+            // Gather unlocked building commands from GlobalCommander as fallback
+            var globalCmdr = Object.FindAnyObjectByType<GlobalCommander>();
+            BaseCommand[] globalCommands = globalCmdr?.AvailableCommands;
 
             // Show up to 10 cards (or however many buttons are wired)
             int maxButtons = Mathf.Min(actionButtons.Length, 10);
@@ -152,8 +158,57 @@ namespace GameDevTV.RTS.UI.Containers
                 }
                 else
                 {
+                    // No card in this hand slot — populate with a GlobalCommander
+                    // unlocked building command that isn't already shown by a hand card.
                     actionButtons[i].Disable();
                 }
+            }
+
+            // ── Fallback: fill any empty slots with unlocked building commands ──
+            if (globalCommands != null)
+            {
+                // Collect building names already shown by hand cards (UnlockBuildingCardSO)
+                var alreadyShown = new HashSet<string>();
+                // Track which button indices are already populated
+                var filledSlots = new HashSet<int>();
+                for (int h = 0; h < hand.Count && h < maxButtons; h++)
+                {
+                    filledSlots.Add(h);
+                    if (hand[h] is UnlockBuildingCardSO uc && uc.buildingToUnlock != null)
+                        alreadyShown.Add(uc.buildingToUnlock.Name);
+                }
+
+                // Find an empty button for each GlobalCommander building not already in hand
+                foreach (var cmd in globalCommands)
+                {
+                    if (cmd is BuildBuildingCommand bbc && bbc.Building != null
+                        && !alreadyShown.Contains(bbc.Building.Name))
+                    {
+                        // Find the first button slot that is NOT already filled
+                        int slot = 0;
+                        while (slot < actionButtons.Length && filledSlots.Contains(slot))
+                        {
+                            slot++;
+                        }
+                        if (slot >= actionButtons.Length) break;
+
+                        var fbBbc = ScriptableObject.CreateInstance<BuildBuildingCommand>();
+                        fbBbc.Name = cmd.Name;
+                        fbBbc.Icon = cmd.Icon;
+                        fbBbc.Slot = slot;
+                        fbBbc.Building = bbc.Building;
+                        fbBbc.GhostPrefab = bbc.GhostPrefab ?? bbc.Building?.Prefab;
+
+                        actionButtons[slot].EnableFor(fbBbc, null, () =>
+                        {
+                            Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(fbBbc));
+                        });
+
+                        filledSlots.Add(slot);
+                        alreadyShown.Add(bbc.Building.Name);
+                    }
+                }
+            }
             }
         }
 

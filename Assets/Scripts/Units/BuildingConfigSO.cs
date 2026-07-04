@@ -29,6 +29,14 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private int biomassGeneration = 0;
         [SerializeField] private float powerGeneration = 0f;
 
+        [Header("Climate Generation (Per Second)")]
+        [Tooltip("Temperature added per second while operating (e.g., GHG Factory).")]
+        [SerializeField] private float temperatureGeneration = 0f;
+        [Tooltip("Atmosphere added per second while operating (e.g., Atmospheric Condenser).")]
+        [SerializeField] private float atmosphereGeneration = 0f;
+        [Tooltip("Water added per second while operating (e.g., Water Ice Aquifer).")]
+        [SerializeField] private float waterGeneration = 0f;
+
         [Header("Colony Housing")]
         [SerializeField] private int housingCapacity = 0;
 
@@ -42,5 +50,8 @@ namespace GameDevTV.RTS.Units
         public int BiomassGeneration { get => biomassGeneration; set => biomassGeneration = value; }
         public float PowerGeneration { get => powerGeneration; set => powerGeneration = value; }
         public int HousingCapacity { get => housingCapacity; set => housingCapacity = value; }
+        public float TemperatureGeneration { get => temperatureGeneration; set => temperatureGeneration = value; }
+        public float AtmosphereGeneration { get => atmosphereGeneration; set => atmosphereGeneration = value; }
+        public float WaterGeneration { get => waterGeneration; set => waterGeneration = value; }
     }
 }

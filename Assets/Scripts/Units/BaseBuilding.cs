@@ -723,14 +723,21 @@ namespace GameDevTV.RTS.Units
                         Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
                     }
 
-                    // Passive temperature + atmosphere generation for GHG Factory
-                    if (BuildingSO != null && BuildingSO.Name.Contains("GHG Factory"))
+                    // Passive climate generation (config-driven — replaces old hardcoded GHG Factory check)
+                    if (config.TemperatureGeneration > 0f)
                     {
                         float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
-                        Supplies.UpdateTemperature(Owner, curTemp + 1.0f);
-
+                        Supplies.UpdateTemperature(Owner, curTemp + config.TemperatureGeneration);
+                    }
+                    if (config.AtmosphereGeneration > 0f)
+                    {
                         float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
-                        Supplies.UpdateAtmosphere(Owner, curAtmos + 0.02f);
+                        Supplies.UpdateAtmosphere(Owner, curAtmos + config.AtmosphereGeneration);
+                    }
+                    if (config.WaterGeneration > 0f)
+                    {
+                        float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner, out float w) ? w : 0f;
+                        Supplies.UpdateWater(Owner, curWater + config.WaterGeneration);
                     }
 
                     // Upkeep is managed globally via PowerGridManager.RecalculateGrids()

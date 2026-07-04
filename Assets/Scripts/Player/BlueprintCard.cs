@@ -71,9 +71,15 @@ namespace GameDevTV.RTS.Player
         public int materialsAmount = 0;
         public int biomassAmount = 0;
         public int oxygenAmount = 0;
+        public float temperatureAmount = 0f;
+        public float atmosphereAmount = 0f;
+        public float waterAmount = 0f;
 
         public override string GetCardGoal()
         {
+            if (temperatureAmount > 0f) return "TEMPERATURE";
+            if (atmosphereAmount > 0f) return "ATMOSPHERE";
+            if (waterAmount > 0f) return "WATER";
             if (biomassAmount > 0) return "BIOMASS";
             if (oxygenAmount > 0) return "OXYGEN";
             if (materialsAmount > 0) return "MATERIALS";
@@ -82,6 +88,33 @@ namespace GameDevTV.RTS.Player
 
         public override void Apply()
         {
+            if (temperatureAmount > 0f)
+            {
+                float cur = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
+                float target = cur + temperatureAmount;
+                Supplies.UpdateTemperature(Owner.Player1, target);
+                if (ClimateManager.Instance != null)
+                    ClimateManager.Instance.SetTemperatureTarget(target);
+                Debug.Log($"[Blueprint] Temperature surge: +{temperatureAmount}°C (target {target}°C, ticking up)");
+            }
+            if (atmosphereAmount > 0f)
+            {
+                float cur = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
+                float target = cur + atmosphereAmount;
+                Supplies.UpdateAtmosphere(Owner.Player1, target);
+                if (ClimateManager.Instance != null)
+                    ClimateManager.Instance.SetAtmosphereTarget(target);
+                Debug.Log($"[Blueprint] Atmosphere injection: +{atmosphereAmount} atm (target {target} atm, ticking up)");
+            }
+            if (waterAmount > 0f)
+            {
+                float cur = Supplies.Water.TryGetValue(Owner.Player1, out float w) ? w : 0f;
+                float target = cur + waterAmount;
+                Supplies.UpdateWater(Owner.Player1, target);
+                if (ClimateManager.Instance != null)
+                    ClimateManager.Instance.SetWaterTarget(target);
+                Debug.Log($"[Blueprint] Water deposit: +{waterAmount}% (target {target}%, ticking up)");
+            }
             if (materialsAmount > 0)
             {
                 int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;

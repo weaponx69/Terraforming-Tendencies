@@ -276,7 +276,7 @@ namespace GameDevTV.RTS.UI.Containers
             Debug.Log($"[BlueprintDraftUI] Command Post card created. buildingToUnlock={(cmdPostCard.buildingToUnlock != null ? cmdPostCard.buildingToUnlock.Name : "NULL")}");
             runtimePool.Add(cmdPostCard);
 
-            // 1. Solar Panel Blueprint (3 copies in the deck so the player doesn't run out)
+            // 1. Solar Panel Blueprint (5 copies so they stay in rotation longer)
             var cardSolar = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
             cardSolar.cardName = "Solar Array Project";
             cardSolar.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
@@ -284,21 +284,17 @@ namespace GameDevTV.RTS.UI.Containers
 #if UNITY_EDITOR
             if (cardSolar.buildingToUnlock == null) cardSolar.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/SolarPanel/SolarPanel.asset");
 #endif
-            runtimePool.Add(cardSolar);
-
-            // Solar Panel copy 2
-            var cardSolar2 = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
-            cardSolar2.cardName = "Solar Array Project";
-            cardSolar2.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
-            cardSolar2.buildingToUnlock = cardSolar.buildingToUnlock;
-            runtimePool.Add(cardSolar2);
-
-            // Solar Panel copy 3
-            var cardSolar3 = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
-            cardSolar3.cardName = "Solar Array Project";
-            cardSolar3.cardDescription = "Unlocks the ability to construct Solar Panels to generate massive clean grid Power.";
-            cardSolar3.buildingToUnlock = cardSolar.buildingToUnlock;
-            runtimePool.Add(cardSolar3);
+            for (int s = 0; s < 5; s++)
+            {
+                var copy = s == 0 ? cardSolar : ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+                if (s > 0)
+                {
+                    copy.cardName = cardSolar.cardName;
+                    copy.cardDescription = cardSolar.cardDescription;
+                    copy.buildingToUnlock = cardSolar.buildingToUnlock;
+                }
+                runtimePool.Add(copy);
+            }
 
             // 2. Oxygen Processor Blueprint
             var cardOxygen = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
@@ -394,27 +390,42 @@ namespace GameDevTV.RTS.UI.Containers
                 runtimePool.Add(cardDrone);
             }
 
-            // 7. Gather Speed Buff (Repair Drone removed — only Mining Drones)
-            var cardSpeed = ScriptableObject.CreateInstance<PassiveBuffCardSO>();
-            cardSpeed.cardName = "High-Power Induction Drills";
-            cardSpeed.cardDescription = "Upgrade mining tools. All mining droids gather minerals and deposits +30% faster permanently.";
-            cardSpeed.buffType = PassiveBuffCardSO.BuffType.GatherSpeed;
-            cardSpeed.multiplier = 1.3f;
-            runtimePool.Add(cardSpeed);
+            // 7. Climate Boost Cards — direct temperature, atmosphere, and water injections
+            var cardTemp = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardTemp.cardName = "Thermal Surge Injectors";
+            cardTemp.cardDescription = "Pump superheated gases into the atmosphere. Instantly raises global temperature by +8°C.";
+            cardTemp.temperatureAmount = 8f;
+            runtimePool.Add(cardTemp);
 
-            // 9. Power Gen Buff
-            var cardPower = ScriptableObject.CreateInstance<PassiveBuffCardSO>();
-            cardPower.cardName = "Photovoltaic Tuning Upgrades";
-            cardPower.cardDescription = "Install resonance tuners onto solar collectors. All Solar Panels generate +20% grid Power permanently.";
-            cardPower.buffType = PassiveBuffCardSO.BuffType.PowerGeneration;
-            cardPower.multiplier = 1.20f;
-            runtimePool.Add(cardPower);
+            var cardAtmos = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardAtmos.cardName = "Atmospheric Compression";
+            cardAtmos.cardDescription = "Release compressed gas reserves. Instantly raises global atmosphere by +0.12 atm.";
+            cardAtmos.atmosphereAmount = 0.12f;
+            runtimePool.Add(cardAtmos);
+
+            var cardAtmos2 = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardAtmos2.cardName = "CO₂ Comet Redirect";
+            cardAtmos2.cardDescription = "Redirect a carbon-rich comet into the upper atmosphere. Instantly raises global atmosphere by +0.15 atm.";
+            cardAtmos2.atmosphereAmount = 0.15f;
+            runtimePool.Add(cardAtmos2);
+
+            var cardWater = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardWater.cardName = "Subsurface Water Surge";
+            cardWater.cardDescription = "Trigger controlled geothermal venting to release deep subterranean water. Instantly raises global water by +6%.";
+            cardWater.waterAmount = 6f;
+            runtimePool.Add(cardWater);
+
+            var cardWater2 = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
+            cardWater2.cardName = "Cometary Ice Harvest";
+            cardWater2.cardDescription = "Capture and melt a small icy body in orbit. Instantly raises global water by +8%.";
+            cardWater2.waterAmount = 8f;
+            runtimePool.Add(cardWater2);
 
             // Utility & Mining Deck
             AddThemedBuildingCard("Basalt Strip-Mine", "Unlocks the Basalt Strip-Mine building, providing solid planetary foundations.", "Basalt Strip-Mine", 120, 2f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
             AddThemedBuildingCard("Deep-Core Mining Laser", "Unlocks active fire mining laser. REQUIRES Temperature >= -40C.", "Deep-Core Mining Laser", 200, 5f, 0f, 0, 0, -40f, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Water Ice Aquifer", "Extracts subterranean ice reservoirs. REQUIRES Temperature >= -20C.", "Water Ice Aquifer", 150, 3f, 0f, 0, 5, -20f, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Geothermal Generator", "Converts thermal vents into clean energy. REQUIRES Temperature >= -10C.", "Geothermal Generator", 250, 0f, 15f, 0, 0, -10f, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
+            AddThemedBuildingCard("Water Ice Aquifer", "Extracts subterranean ice reservoirs. REQUIRES Temperature >= -20C.", "Water Ice Aquifer", 150, 3f, 0f, 0, 5, -20f, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 0f, 0f, 0.5f);
+            AddThemedBuildingCard("Geothermal Generator", "Converts thermal vents into clean energy. REQUIRES Temperature >= -10C.", "Geothermal Generator", 250, 0f, 15f, 0, 0, -10f, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 0.2f, 0f, 0f);
             AddThemedBuildingCard("Lava Tube Outpost", "Establishes a shelter inside a protective lava tube feature.", "Lava Tube Outpost", 180, 2f, 0f, 12, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.LavaTube, templateBuilding, defaultIcon);
 
             // Urban & Residential Deck
@@ -425,15 +436,15 @@ namespace GameDevTV.RTS.UI.Containers
             AddThemedBuildingCard("Sector Command Center", "Coordinates regional supply lines from a fault line feature.", "Sector Command Center", 400, 5f, 0f, 20, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.FaultLine, templateBuilding, defaultIcon);
 
             // Science & Terraforming Deck
-            AddThemedBuildingCard("GHG Factory", "Vaporizes chemicals to heat the planet. Generates heavy greenhouse gases.", "GHG Factory", 150, 4f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Atmospheric Condenser", "Extracts gases from thin air. REQUIRES Atmosphere >= 0.05 atm.", "Atmospheric Condenser", 180, 3f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Carbon Dioxide Import Laser", "Attracts cometary ice to enrich atmosphere. REQUIRES Atmosphere >= 0.10 atm.", "Carbon Dioxide Import Laser", 250, 6f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, 0.10f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Subglacial Water Extractor", "Drills deep into subglacial water deposits to pump biomass media.", "Subglacial Water Extractor", 220, 4f, 0f, 0, 4, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon);
+            AddThemedBuildingCard("GHG Factory", "Vaporizes chemicals to heat the planet. Generates heavy greenhouse gases.", "GHG Factory", 150, 4f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 1.0f, 0.02f, 0f);
+            AddThemedBuildingCard("Atmospheric Condenser", "Extracts gases from thin air. REQUIRES Atmosphere >= 0.05 atm.", "Atmospheric Condenser", 180, 3f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 0f, 0.02f, 0f);
+            AddThemedBuildingCard("Carbon Dioxide Import Laser", "Attracts cometary ice to enrich atmosphere. REQUIRES Atmosphere >= 0.10 atm.", "Carbon Dioxide Import Laser", 250, 6f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, 0.10f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 0f, 0.03f, 0f);
+            AddThemedBuildingCard("Subglacial Water Extractor", "Drills deep into subglacial water deposits to pump biomass media.", "Subglacial Water Extractor", 220, 4f, 0f, 0, 4, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 0f, 0f, 0.3f);
             AddThemedBuildingCard("Magnetic Shield Generator", "Protects regional grids from solar wind from an elevated fault line.", "Magnetic Shield Generator", 350, 0f, 25f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.FaultLine, templateBuilding, defaultIcon);
-            AddThemedBuildingCard("Terraformed Lake", "Creates a visual water body on the planet surface. REQUIRES Temp >= -15C, Atmos >= 0.05 atm, Water >= 5%.", "Terraformed Lake", 150, 2f, 0f, 0, 2, -15f, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 5.0f);
+            AddThemedBuildingCard("Terraformed Lake", "Creates a visual water body on the planet surface. REQUIRES Temp >= -15C, Atmos >= 0.05 atm, Water >= 5%.", "Terraformed Lake", 150, 2f, 0f, 0, 2, -15f, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 5.0f, float.MaxValue, 0f, 0f, 0.2f);
 
             // Ecological & Biosphere Deck
-            AddThemedBuildingCard("Methanogenic Microbe Spreader", "Spreads methane-producing microbes. REQUIRES Temp >= -30C and Atmos >= 0.05 atm.", "Methanogenic Microbe Spreader", 130, 2f, 0f, 0, 0, -30f, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
+            AddThemedBuildingCard("Methanogenic Microbe Spreader", "Spreads methane-producing microbes. REQUIRES Temp >= -30C and Atmos >= 0.05 atm.", "Methanogenic Microbe Spreader", 130, 2f, 0f, 0, 0, -30f, float.MaxValue, float.MinValue, float.MaxValue, 0.05f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, float.MinValue, float.MaxValue, 0.3f, 0f, 0f);
             AddThemedBuildingCard("Lichen Nursery", "Cultivates rock-decomposing lichens. REQUIRES Temp >= -25C and Atmos >= 0.10 atm.", "Lichen Nursery", 140, 2f, 0f, 0, 3, -25f, float.MaxValue, float.MinValue, float.MaxValue, 0.10f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
             AddThemedBuildingCard("Genetically Modified Algae Spreader", "Sows oxygen-producing algae pools. REQUIRES Temp >= -15C, Atmos >= 0.15 atm, Oxy >= 1.0%, Water >= 10%.", "Genetically Modified Algae Spreader", 210, 3f, 0f, 0, 0, -15f, float.MaxValue, 1.0f, float.MaxValue, 0.15f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 10.0f);
             AddThemedBuildingCard("Greenery Dome", "Advanced glass canopy housing local flora. REQUIRES Temp >= -10C, Atmos >= 0.20 atm, Oxy >= 2.0%, Water >= 20%.", "Greenery Dome", 280, 4f, 0f, 0, 6, -10f, float.MaxValue, 2.0f, float.MaxValue, 0.20f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 20.0f);
@@ -468,7 +479,10 @@ namespace GameDevTV.RTS.UI.Containers
             BuildingSO templateBuilding,
             Sprite defaultIcon,
             float minWater = float.MinValue,
-            float maxWater = float.MaxValue
+            float maxWater = float.MaxValue,
+            float tempGen = 0f,
+            float atmosGen = 0f,
+            float waterGen = 0f
         )
         {
             BuildingSO bldSO = null;
@@ -505,6 +519,9 @@ namespace GameDevTV.RTS.UI.Containers
                 config.PowerGeneration = powerGen;
                 config.HousingCapacity = housingCap;
                 config.BiomassGeneration = biomassGen;
+                config.TemperatureGeneration = tempGen;
+                config.AtmosphereGeneration = atmosGen;
+                config.WaterGeneration = waterGen;
                 bldSO.BuildingConfig = config;
             }
             else if (bldSO.Cost == null)
