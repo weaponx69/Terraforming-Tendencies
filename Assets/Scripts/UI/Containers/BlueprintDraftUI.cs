@@ -535,6 +535,14 @@ namespace GameDevTV.RTS.UI.Containers
                 }
                 bldSO.Cost = cost;
             }
+            else if (bldSO.BuildingConfig != null)
+            {
+                // Ensure pre-existing config reflects the card's climate generation values
+                var cfg = bldSO.BuildingConfig;
+                if (tempGen > 0f) cfg.TemperatureGeneration = tempGen;
+                if (atmosGen > 0f) cfg.AtmosphereGeneration = atmosGen;
+                if (waterGen > 0f) cfg.WaterGeneration = waterGen;
+            }
 
             var card = ScriptableObject.CreateInstance<TerraformingCardSO>();
             card.cardName = cardName;
