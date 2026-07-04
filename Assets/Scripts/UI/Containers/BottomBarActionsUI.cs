@@ -209,7 +209,6 @@ namespace GameDevTV.RTS.UI.Containers
                     }
                 }
             }
-            }
         }
 
         /// <summary>
