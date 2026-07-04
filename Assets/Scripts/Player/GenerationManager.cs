@@ -388,11 +388,9 @@ namespace GameDevTV.RTS.Player
                     Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
                 }
 
-                // Unlock the next sector so the player can build a Command Post in it!
-                if (SectorManager.Instance != null)
-                {
-                    SectorManager.Instance.UnlockNextSector();
-                }
+                // Sector unlocking is now handled entirely through exploration cards
+                // (Orbital Scan, Survey Drone). The player must play a scouting card to
+                // explore and unlock the next sector before building a Command Post there.
 
                 // Explicitly unlock the Command Post blueprint for the expansion phase
                 BlueprintDraftManager.UnlockBuilding("Command Post");

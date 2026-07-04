@@ -66,6 +66,10 @@ This document serves as a persistent memory bank for AI context, detailing the c
   * **Global Drone Card Routing (Worker Selection Lockout Fix):** Updated `CanHandle()` and `Handle()` in `BuildUnitCommand.cs` to automatically route drone training requests to the player's Command Post even if a non-production unit (like a worker drone) is currently selected. Previously, clicking the "Train Mining Drone" card on the persistent bottom bar while having a worker drone selected evaluated `CanHandle` on the worker, which failed and did nothing. Drones can now be trained globally at any time.
 * **GlobalDecayManager Console Spam Removal:** Removed all constant `Debug.Log` statements inside the main decay loop and damage triggers in `GlobalDecayManager.cs` to keep the console clean and free of redundant, repetitive output during gameplay.
 * **GHG Factory & Themed Building Passive Climate Generation Fix:** Resolved a critical bug where the GHG Factory (and several other themed buildings) stopped generating temperature/atmosphere/water passively. The root cause was that the `BuildingConfigSO` asset files for themed buildings (e.g., `GHG FactoryConfig.asset`) were created before the `temperatureGeneration`, `atmosphereGeneration`, and `waterGeneration` fields existed on `BuildingConfigSO`, so they defaulted to `0` at runtime. The [`UpkeepRoutine`](Assets/Scripts/Units/BaseBuilding.cs:726) checks `if (config.TemperatureGeneration > 0f)`, which evaluated to `false` for all pre-existing configs. Fixed by setting the correct climate generation values on the config assets: GHG Factory (`temperatureGeneration: 1`, `atmosphereGeneration: 0.02`), Atmospheric Condenser (`atmosphereGeneration: 0.02`), Carbon Dioxide Import Laser (`atmosphereGeneration: 0.03`), Geothermal Generator (`temperatureGeneration: 0.2`), Water Ice Aquifer (`waterGeneration: 0.5`), Subglacial Water Extractor (`waterGeneration: 0.3`), and Methanogenic Microbe Spreader (`temperatureGeneration: 0.3`). Also added a defensive code path in [`AddThemedBuildingCard()`](Assets/Scripts/UI/Containers/BlueprintDraftUI.cs:538) to propagate card-level climate generation values to pre-existing `BuildingSO` configs at runtime, preventing future regressions.
+* **Exploration Cards & Command Post Sector Lock Re-architecture:** Reworked the sector expansion flow so that sector unlocks are driven by player-chosen exploration cards rather than automation. **Three changes:**
+  1. **Removed auto-unlock from `StartNextGeneration()`** ([`GenerationManager.cs:391`](Assets/Scripts/Player/GenerationManager.cs:391)): The expansion phase no longer automatically calls `UnlockNextSector()`. Sector unlocking is now entirely player-driven through exploration cards.
+  2. **Added exploration cards to the deck** ([`BlueprintDraftUI.cs:424`](Assets/Scripts/UI/Containers/BlueprintDraftUI.cs:424)): Created four `ScoutingCardSO` instances — **Orbital Scan** (instantly explores + unlocks the next sector), **Pipeline Boost** (2x scouting speed for 60s), **Survey Drone** (deploys probe to scout and unlock), and **Emergency Caches** (+300 Materials safety net). Cards gate themselves via `IsGateMet()` so they only appear when locked sectors remain.
+  3. **Lock Command Post when no unoccupied sectors** ([`BuildBuildingCommand.IsLocked()`](Assets/Scripts/Commands/BuildBuildingCommand.cs:377)): During the expansion phase, if a Command Post is selected but there are no unlocked-and-unoccupied sectors available, the card is locked and cannot be played. The player must play an exploration card first to unlock a new sector.
 
 #### 7. Errors Encountered & Resolutions
 * Fixed CS0111: Type 'PlanetGenerator' already defines a member called 'ScatterResources' by removing the empty stub.
@@ -515,10 +519,28 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
       * *Cost:* 280 Materials | *Upkeep:* 4 Power | *Biomass Gen:* +6
       * *Gate:* Temperature $\ge -10^{\circ}\text{C}$ & Atmosphere $\ge 0.20\text{ atm}$ & Oxygen $\ge 2.0\%$
       * *Description:* Advanced glass canopy housing local flora.
-    29. **Biosphere Center**
-        *Cost:* 500 Materials | *Upkeep:* 6 Power | *Biomass Gen:* +10
-        *Gate:* Water Deposit sector feature
-        *Description:* Coordinates global ecological cycles from a protected water deposit.
+   29. **Biosphere Center**
+       *Cost:* 500 Materials | *Upkeep:* 6 Power | *Biomass Gen:* +10
+       *Gate:* Water Deposit sector feature
+       *Description:* Coordinates global ecological cycles from a protected water deposit.
+
+##### Exploration & Scouting Cards (ScoutingCardSO)
+*These cards are created at runtime by [`BlueprintDraftUI.InitializeDefaultPool()`](Assets/Scripts/UI/Containers/BlueprintDraftUI.cs:424) as `ScoutingCardSO` instances. Their purpose is to gate sector expansion behind player-chosen cards rather than automation. The [`ScoutingCardSO`](Assets/Scripts/Player/BlueprintCard.cs:387) class has its own `IsGateMet()` that hides Orbital Scan/Pipeline Boost/Survey Drone when no locked sectors remain.*
+
+30. **Orbital Scan**
+   * *Type:* Exploration
+   * *Description:* Deploy satellites to instantly explore and unlock the next sector for colonization. Calls [`ExplorationManager.InstantExplore()`](Assets/Scripts/Environment/ExplorationManager.cs:73) which marks the next locked sector as explored and then unlocks it.
+31. **Pipeline Boost**
+   * *Type:* Exploration
+   * *Description:* Boost exploration pipeline pressure, doubling sector scouting speed for 60 seconds. Calls [`ExplorationManager.BoostExplorationSpeed(2f, 60f)`](Assets/Scripts/Environment/ExplorationManager.cs:116).
+32. **Survey Drone**
+   * *Type:* Exploration
+   * *Description:* Deploy an automated survey drone to scout ahead and unlock the next sector. Calls [`ExplorationManager.DeploySurveyDrone()`](Assets/Scripts/Environment/ExplorationManager.cs:128) which delegates to `InstantExplore()`.
+33. **Emergency Caches**
+   * *Type:* Materials (always available safety net)
+   * *Description:* Scavenge emergency supply caches for +300 Materials. Always available regardless of sector state.
+
+*All four cards were added on 2026-07-04 to fix a progression deadlock where no exploration cards existed in the deck. Previously, [`UnlockNextSector()`](Assets/Scripts/Environment/SectorManager.cs:213) required sectors to be explored first but there was no way to explore them, and [`BuildBuildingCommand.IsLocked()`](Assets/Scripts/Commands/BuildBuildingCommand.cs:377) did not check for available sectors, allowing the Command Post to be built in an already-occupied sector.*
 
 #### 25. Building Operational State & Power Upkeep Fixes
 * **Battery Removal & Solar Array Spawning on Command Post:** Removed the dynamic `BatteryNode` component addition on the Command Post in `BaseBuilding.InitializeIfNeeded()`. To prevent new Command Posts from immediately shutting down due to zero starting grid power, player-owned Command Posts now automatically spawn and connect a 4-Solar-Panel array (generating 20 total power) upon completing construction. This ensures sustainable, permanent power from completion.

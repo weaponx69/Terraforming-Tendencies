@@ -421,6 +421,32 @@ namespace GameDevTV.RTS.UI.Containers
             cardWater2.waterAmount = 8f;
             runtimePool.Add(cardWater2);
 
+            // 8. Exploration Cards — scouting cards that explore/unlock the next sector
+            var cardOrbitalScan = ScriptableObject.CreateInstance<ScoutingCardSO>();
+            cardOrbitalScan.cardName = "Orbital Scan";
+            cardOrbitalScan.cardDescription = "Deploy satellites to instantly explore and unlock the next sector for colonization.";
+            cardOrbitalScan.scoutingType = ScoutingCardSO.ScoutingType.OrbitalScan;
+            runtimePool.Add(cardOrbitalScan);
+
+            var cardPipelineBoost = ScriptableObject.CreateInstance<ScoutingCardSO>();
+            cardPipelineBoost.cardName = "Pipeline Boost";
+            cardPipelineBoost.cardDescription = "Boost exploration pipeline pressure, doubling sector scouting speed for 60 seconds.";
+            cardPipelineBoost.scoutingType = ScoutingCardSO.ScoutingType.PipelineBoost;
+            runtimePool.Add(cardPipelineBoost);
+
+            var cardSurveyDrone = ScriptableObject.CreateInstance<ScoutingCardSO>();
+            cardSurveyDrone.cardName = "Survey Drone";
+            cardSurveyDrone.cardDescription = "Deploy an automated survey drone to scout ahead and unlock the next sector.";
+            cardSurveyDrone.scoutingType = ScoutingCardSO.ScoutingType.SurveyDrone;
+            runtimePool.Add(cardSurveyDrone);
+
+            var cardEmergencyCaches = ScriptableObject.CreateInstance<ScoutingCardSO>();
+            cardEmergencyCaches.cardName = "Emergency Caches";
+            cardEmergencyCaches.cardDescription = "Scavenge emergency supply caches for +300 Materials.";
+            cardEmergencyCaches.scoutingType = ScoutingCardSO.ScoutingType.EmergencyCaches;
+            cardEmergencyCaches.materialsAmount = 300;
+            runtimePool.Add(cardEmergencyCaches);
+
             // Utility & Mining Deck
             AddThemedBuildingCard("Basalt Strip-Mine", "Unlocks the Basalt Strip-Mine building, providing solid planetary foundations.", "Basalt Strip-Mine", 120, 2f, 0f, 0, 0, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);
             AddThemedBuildingCard("Deep-Core Mining Laser", "Unlocks active fire mining laser. REQUIRES Temperature >= -40C.", "Deep-Core Mining Laser", 200, 5f, 0f, 0, 0, -40f, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon);

@@ -364,6 +364,23 @@ namespace GameDevTV.RTS.Commands
                     if (!hasExistingCommandPost) return false; // Allow first Command Post anytime
                     return true;
                 }
+
+                // During expansion phase, check if there's an unoccupied sector to place the Command Post in.
+                // The player must play an exploration card (Orbital Scan, Survey Drone) to unlock a new sector first.
+                var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
+                if (sectorMgr != null && sectorMgr.Sectors.Count > 0)
+                {
+                    bool hasUnoccupiedSector = false;
+                    foreach (var sector in sectorMgr.Sectors)
+                    {
+                        if (!sector.IsOccupied && !sector.IsLocked)
+                        {
+                            hasUnoccupiedSector = true;
+                            break;
+                        }
+                    }
+                    if (!hasUnoccupiedSector) return true; // Lock if no unoccupied sectors available
+                }
             }
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
