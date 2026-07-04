@@ -1,5 +1,6 @@
 using UnityEngine;
 using GameDevTV.RTS.Player;
+using UnityEngine.Internal;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -14,6 +15,18 @@ namespace GameDevTV.RTS.Environment
     public class ExplorationManager : MonoBehaviour
     {
         public static ExplorationManager Instance { get; private set; }
+
+        /// <summary>
+        /// Auto-spawn the ExplorationManager when the game starts.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void AutoSpawn()
+        {
+            if (FindFirstObjectByType<ExplorationManager>() != null) return;
+            var go = new GameObject("ExplorationManager (auto)");
+            go.AddComponent<ExplorationManager>();
+            DontDestroyOnLoad(go);
+        }
 
         [Header("Exploration Settings")]
         [Tooltip("Base time (seconds) for passive exploration to complete.")]
