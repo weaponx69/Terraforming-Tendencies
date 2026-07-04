@@ -552,3 +552,10 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
 * **Bottom Bar Evolution:** The `BottomBarActionsUI` was created to be a near **1:1 duplicate** of `ActionsUI` but made **persistent and universal** — so the entire game could be played from the bottom bar without needing to select units first. Actions should appear in the bottom bar automatically as long as they are **viable** (unlocked, affordable, and not restricted).
 * **Key Constraint — One Source of Truth:** The bottom bar and the selection-based ActionsUI should ultimately reflect the **same set of viable commands**. The bottom bar is not a separate system — it is the ActionsUI made globally available. If a command works from the selection-based UI, it should also work identically from the bottom bar, and vice versa.
 * **Avoiding Duplicate Command Sources:** Both UIs should ideally draw from the **same command instances** rather than creating independent dynamic copies. When they create separate instances (as happens with `BuildBuildingCommand` for buildings), all properties including `GhostPrefab` must be populated identically on both sides. Inconsistencies between the two sources (e.g., GhostPrefab set in one but not the other) are bugs.
+
+#### 29. Card Hand = Bottom Action Bar
+* **The bottom action bar IS the player's hand.** There is no separate hand panel or card UI. If a card is not visible in the bottom bar, it is not in the player's hand.
+* **Hand size:** 10 cards maximum. The bottom bar has 12 wired slots, so up to 10 cards are displayed.
+* **Guaranteed starting cards:** Command Post, Mining Drone, and Solar Panel are always in the opening hand. They are inserted at the front of the hand, with the remaining slots filled randomly from the deck.
+* **Play-and-draw:** Using a card removes it from the hand and draws a replacement from the deck. If the deck is empty, the discard pile is reshuffled.
+* **Deck population:** The deck is populated by `BlueprintDraftUI.InitializeDefaultPool()` which creates all card instances at runtime. The `CardDeckController.masterDeck` is filled from this pool.

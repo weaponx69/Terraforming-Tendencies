@@ -62,49 +62,79 @@ namespace GameDevTV.RTS.Player
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
         }
 
-        private void Start()
+        // Don't fill the hand in Start() — BlueprintDraftUI may not have
+        // populated the deck yet. Instead, RebuildDeck() is called by
+        // BlueprintDraftUI after it finishes InitializeDefaultPool().
+        private void Start() { }
+
+        /// <summary>
+        /// Called by BlueprintDraftUI after the deck is populated.
+        /// Shuffles the deck, fills the hand, and guarantees starting cards.
+        /// </summary>
+        public void RebuildDeck()
         {
             ShuffleDeck();
             FillHand();
             GuaranteeStartingCards();
         }
 
-        // ── Guaraunteed starting cards ───────────────────────────────────────
-        // After the initial FillHand, ensure Mining Drone and Solar Panel are in
-        // the hand. If not, swap them with the last cards in hand.
+        // ── Guaranteed starting cards ───────────────────────────────────────
+        // After the initial FillHand, ensure Command Post, Mining Drone, and
+        // Solar Panel are in the hand. If not, swap them with the last cards.
         private void GuaranteeStartingCards()
         {
-            if (masterDeck == null || masterDeck.Count == 0) return;
+            if (masterDeck == null || masterDeck.Count == 0)
+            {
+                Debug.LogError("[CardDeckController] GuaranteeStartingCards: masterDeck is empty!");
+                return;
+            }
 
-            // Find the Mining Drone card in the deck
+            Debug.Log($"[CardDeckController] Searching {masterDeck.Count} cards for guaranteed starters...");
+
+            BlueprintCardSO cmdPostCard = null;
             BlueprintCardSO droneCard = null;
             BlueprintCardSO solarCard = null;
             foreach (var c in masterDeck)
             {
-                if (c is SpawnUnitCardSO spawn && spawn.cardName == "Mining Drone")
-                    droneCard = c;
-                if (c is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null &&
-                    unlock.buildingToUnlock.Name == "Solar Panel")
-                    solarCard = c;
+                if (c is UnlockBuildingCardSO unlock)
+                {
+                    string buildingName = unlock.buildingToUnlock != null ? unlock.buildingToUnlock.Name : "NULL";
+                    Debug.Log($"[CardDeckController]   Unlock card: '{unlock.cardName}' -> building '{buildingName}'");
+                    // Match "Command Post" exactly — not "Sector Command Center" or other "Command" buildings
+                    if (unlock.buildingToUnlock != null && unlock.buildingToUnlock.Name == "Command Post")
+                        cmdPostCard = c;
+                    if (unlock.buildingToUnlock != null && unlock.buildingToUnlock.Name == "Solar Panel")
+                        solarCard = c;
+                }
+                if (c is SpawnUnitCardSO spawn)
+                {
+                    Debug.Log($"[CardDeckController]   Spawn card: '{spawn.cardName}'");
+                    if (spawn.cardName == "Mining Drone")
+                        droneCard = c;
+                }
             }
 
-            // Ensure drone is in hand
-            if (droneCard != null && !hand.Contains(droneCard))
-            {
-                if (hand.Count >= handSize) hand.RemoveAt(hand.Count - 1);
-                hand.Add(droneCard);
-                drawPile.Remove(droneCard);
-            }
+            Debug.Log($"[CardDeckController] Found: cmdPost={(cmdPostCard != null ? cmdPostCard.cardName : "NULL")} drone={(droneCard != null ? droneCard.cardName : "NULL")} solar={(solarCard != null ? solarCard.cardName : "NULL")}");
 
-            // Ensure solar panel is in hand
-            if (solarCard != null && !hand.Contains(solarCard))
-            {
-                if (hand.Count >= handSize) hand.RemoveAt(hand.Count - 1);
-                hand.Add(solarCard);
-                drawPile.Remove(solarCard);
-            }
+            // Push each guaranteed card into the hand (at the front)
+            EnsureInHand(cmdPostCard);
+            EnsureInHand(droneCard);
+            EnsureInHand(solarCard);
+
+            Debug.Log($"[CardDeckController] Hand after guarantee: {hand.Count} cards. First={(hand.Count > 0 ? hand[0].cardName : "empty")}");
 
             OnHandChanged?.Invoke();
+
+            // Force the bottom bar to refresh so the cards appear immediately
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        private void EnsureInHand(BlueprintCardSO card)
+        {
+            if (card == null || hand.Contains(card)) return;
+            if (hand.Count >= handSize) hand.RemoveAt(hand.Count - 1);
+            hand.Insert(0, card);
+            drawPile.Remove(card);
         }
 
         // ── Hand Management ──────────────────────────────────────────────────

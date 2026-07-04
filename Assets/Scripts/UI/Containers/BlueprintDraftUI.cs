@@ -265,6 +265,17 @@ namespace GameDevTV.RTS.UI.Containers
             runtimePool.Clear();
             runtimePool.AddRange(poolOfCards);
 
+            // 0. Command Post Blueprint — always available in the opening hand
+            var cmdPostCard = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            cmdPostCard.cardName = "Command Post";
+            cmdPostCard.cardDescription = "Deploy a new Command Post to expand your colony's operational range.";
+            cmdPostCard.buildingToUnlock = Resources.Load<BuildingSO>("Buildings/Command Post/Command Post");
+#if UNITY_EDITOR
+            if (cmdPostCard.buildingToUnlock == null) cmdPostCard.buildingToUnlock = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingSO>("Assets/Resources/Buildings/Command Post/Command Post.asset");
+#endif
+            Debug.Log($"[BlueprintDraftUI] Command Post card created. buildingToUnlock={(cmdPostCard.buildingToUnlock != null ? cmdPostCard.buildingToUnlock.Name : "NULL")}");
+            runtimePool.Add(cmdPostCard);
+
             // 1. Solar Panel Blueprint (3 copies in the deck so the player doesn't run out)
             var cardSolar = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
             cardSolar.cardName = "Solar Array Project";
@@ -428,12 +439,13 @@ namespace GameDevTV.RTS.UI.Containers
             AddThemedBuildingCard("Greenery Dome", "Advanced glass canopy housing local flora. REQUIRES Temp >= -10C, Atmos >= 0.20 atm, Oxy >= 2.0%, Water >= 20%.", "Greenery Dome", 280, 4f, 0f, 0, 6, -10f, float.MaxValue, 2.0f, float.MaxValue, 0.20f, float.MaxValue, SectorManager.SectorFeature.None, templateBuilding, defaultIcon, 20.0f);
             AddThemedBuildingCard("Biosphere Center", "Coordinates global ecological cycles from a protected water deposit. REQUIRES Water >= 30%.", "Biosphere Center", 500, 6f, 0f, 0, 10, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, SectorManager.SectorFeature.WaterDeposit, templateBuilding, defaultIcon, 30.0f);
 
-            // Populate the CardDeckController's masterDeck so DrawCard() has cards to draw from
+            // Populate the CardDeckController's masterDeck and rebuild the hand
             if (CardDeckController.Instance != null)
             {
                 CardDeckController.Instance.MasterDeck.Clear();
                 CardDeckController.Instance.MasterDeck.AddRange(runtimePool);
-                Debug.Log($"[BlueprintDraftUI] Populated CardDeckController with {runtimePool.Count} cards.");
+                Debug.Log($"[BlueprintDraftUI] Populated CardDeckController with {runtimePool.Count} cards. Rebuilding hand...");
+                CardDeckController.Instance.RebuildDeck();
             }
         }
 
