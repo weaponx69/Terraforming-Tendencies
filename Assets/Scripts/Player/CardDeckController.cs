@@ -69,28 +69,20 @@ namespace GameDevTV.RTS.Player
 
         /// <summary>
         /// Called by BlueprintDraftUI after the deck is populated.
-        /// Shuffles the deck, fills the hand, and guarantees starting cards.
+        /// 1. Clears the hand.
+        /// 2. Direct-adds the three guaranteed starter cards (Command Post, Solar Panel,
+        ///    Mining Drone) using hand.Add() so they are seated at indices 0, 1, 2.
+        /// 3. Fills the remaining slots (3 through 9) with random cards from the draw pile.
+        /// No shifting or eviction occurs.
         /// </summary>
         public void RebuildDeck()
         {
             ShuffleDeck();
-            FillHand();
-            GuaranteeStartingCards();
-        }
 
-        // ── Guaranteed starting cards ───────────────────────────────────────
-        // After the initial FillHand, ensure Command Post, Mining Drone, and
-        // Solar Panel are in the hand. If not, swap them with the last cards.
-        private void GuaranteeStartingCards()
-        {
-            if (masterDeck == null || masterDeck.Count == 0)
-            {
-                Debug.LogError("[CardDeckController] GuaranteeStartingCards: masterDeck is empty!");
-                return;
-            }
+            // 1. Clear the hand
+            hand.Clear();
 
-            Debug.Log($"[CardDeckController] Searching {masterDeck.Count} cards for guaranteed starters...");
-
+            // 2. Find the three guaranteed starter cards in the master deck
             BlueprintCardSO cmdPostCard = null;
             BlueprintCardSO droneCard = null;
             BlueprintCardSO solarCard = null;
@@ -98,9 +90,6 @@ namespace GameDevTV.RTS.Player
             {
                 if (c is UnlockBuildingCardSO unlock)
                 {
-                    string buildingName = unlock.buildingToUnlock != null ? unlock.buildingToUnlock.Name : "NULL";
-                    Debug.Log($"[CardDeckController]   Unlock card: '{unlock.cardName}' -> building '{buildingName}'");
-                    // Match "Command Post" exactly — not "Sector Command Center" or other "Command" buildings
                     if (unlock.buildingToUnlock != null && unlock.buildingToUnlock.Name == "Command Post")
                         cmdPostCard = c;
                     if (unlock.buildingToUnlock != null && unlock.buildingToUnlock.Name == "Solar Panel")
@@ -108,33 +97,29 @@ namespace GameDevTV.RTS.Player
                 }
                 if (c is SpawnUnitCardSO spawn)
                 {
-                    Debug.Log($"[CardDeckController]   Spawn card: '{spawn.cardName}'");
                     if (spawn.cardName == "Mining Drone")
                         droneCard = c;
                 }
             }
 
-            Debug.Log($"[CardDeckController] Found: cmdPost={(cmdPostCard != null ? cmdPostCard.cardName : "NULL")} drone={(droneCard != null ? droneCard.cardName : "NULL")} solar={(solarCard != null ? solarCard.cardName : "NULL")}");
+            // 3. Direct-add the guaranteed cards in the desired slot order.
+            //    Command Post → index 0, Solar Panel → index 1, Mining Drone → index 2.
+            if (cmdPostCard != null) { hand.Add(cmdPostCard); drawPile.Remove(cmdPostCard); }
+            if (solarCard != null)   { hand.Add(solarCard);   drawPile.Remove(solarCard); }
+            if (droneCard != null)   { hand.Add(droneCard);   drawPile.Remove(droneCard); }
 
-            // Push each guaranteed card into the hand (at the front)
-            EnsureInHand(cmdPostCard);
-            EnsureInHand(droneCard);
-            EnsureInHand(solarCard);
+            Debug.Log($"[CardDeckController] Seeded {hand.Count} guaranteed starter(s). " +
+                      $"CmdPost={(cmdPostCard != null ? "YES" : "NULL")} " +
+                      $"Solar={(solarCard != null ? "YES" : "NULL")} " +
+                      $"Drone={(droneCard != null ? "YES" : "NULL")}");
 
-            Debug.Log($"[CardDeckController] Hand after guarantee: {hand.Count} cards. First={(hand.Count > 0 ? hand[0].cardName : "empty")}");
+            // 4. Fill remaining slots (7 cards → indices 3 through 9)
+            FillHand();
 
             OnHandChanged?.Invoke();
 
             // Force the bottom bar to refresh so the cards appear immediately
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
-        }
-
-        private void EnsureInHand(BlueprintCardSO card)
-        {
-            if (card == null || hand.Contains(card)) return;
-            if (hand.Count >= handSize) hand.RemoveAt(hand.Count - 1);
-            hand.Insert(0, card);
-            drawPile.Remove(card);
         }
 
         // ── Hand Management ──────────────────────────────────────────────────

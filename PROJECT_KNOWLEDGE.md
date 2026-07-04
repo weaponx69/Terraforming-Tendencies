@@ -559,3 +559,13 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
 * **Guaranteed starting cards:** Command Post, Mining Drone, and Solar Panel are always in the opening hand. They are inserted at the front of the hand, with the remaining slots filled randomly from the deck.
 * **Play-and-draw:** Using a card removes it from the hand and draws a replacement from the deck. If the deck is empty, the discard pile is reshuffled.
 * **Deck population:** The deck is populated by `BlueprintDraftUI.InitializeDefaultPool()` which creates all card instances at runtime. The `CardDeckController.masterDeck` is filled from this pool.
+
+#### 30. RTS Memory Cleaner & Monitor Tool
+* **Purpose:** A custom Editor Window utility (`MemoryCleanerWindow.cs` inside `Assets/Scripts/Editor/`) designed to help developers monitor memory usage, warn about leaks, and clean dangling assets directly inside the Unity Editor during active development.
+* **Key Features:**
+  * **Managed Memory Tracking:** Displays real-time C# managed memory usage (in MB).
+  * **Memory Warning Banner:** Automatically scans and alerts the developer if it detects runtime-instantiated materials (`(Instance)`) or temporary clones/ghost objects (`(Clone)` or `Ghost`) that survived a Play Mode session into Edit Mode.
+  * **Force Garbage Collection:** Invokes `GC.Collect()` and `GC.WaitForPendingFinalizers()` to immediately flush unused managed objects.
+  * **Asset Unloading:** Invokes `Resources.UnloadUnusedAssets()` and `EditorUtility.UnloadUnusedAssetsImmediate()` to reclaim GPU and RAM from unreferenced texture, model, and material assets.
+  * **Playmode Leak Pruning:** Automatically identifies and cleans up survived playmode clones or dangling runtime materials with a single click.
+  * **Menu Path:** Accessible via **Tools ➔ RTS Memory Cleaner** in the Unity Editor menu bar.
