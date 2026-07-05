@@ -539,6 +539,29 @@ if (SectorManager.Instance != null)
         {
             if (evt.Resource == null) return;
             discoveredResources.Add(evt.Resource);
+
+            // Immediately assign idle drones to this newly discovered resource
+            var supply = evt.Resource.GetComponent<GatherableSupply>();
+            if (supply == null || supply.Amount <= 0) return;
+
+            var idleDrones = UnityEngine.Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
+                .Where(w => w != null && w.Owner == aiOwner && !assignedTargets.ContainsKey(w))
+                .ToList();
+
+            foreach (var drone in idleDrones)
+            {
+                if (assignedTargets.ContainsKey(drone)) continue;
+
+                BaseBuilding home = activeCommandPosts
+                    .Where(cp => cp != null)
+                    .OrderBy(cp => (cp.transform.position - drone.transform.position).sqrMagnitude)
+                    .FirstOrDefault();
+
+                assignedTargets[drone] = supply;
+                drone.GetComponent<WorkerBrainController>()?.SetHomeBase(home != null ? home.transform : null);
+                drone.Gather(supply);
+                break; // Assign one drone per discovered resource
+            }
         }
 
         // ── Base development: build support structures (Oxygen Processors) ───────
