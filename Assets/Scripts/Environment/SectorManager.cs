@@ -272,7 +272,7 @@ namespace GameDevTV.RTS.Environment
             Debug.Log($"[SectorManager] Sector {index} explored (scouted).");
         }
 
-        /// <summary>Reveal all hidden nodes in a sector (make them visible).</summary>
+        /// <summary>Reveal all hidden nodes in a sector (make them visible in scene).</summary>
         public void RevealNodesInSector(int index)
         {
             if (index < 0 || index >= Sectors.Count) return;
@@ -280,6 +280,22 @@ namespace GameDevTV.RTS.Environment
             foreach (var node in sector.Nodes)
             {
                 node.isRevealed = true;
+                node.SetVisualVisible(true);
+            }
+
+            // Also force-discover any HiddenResource components in this sector
+            var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include);
+            Vector3 secMin = sector.Center - new Vector3(50f, 0, 50f);
+            Vector3 secMax = sector.Center + new Vector3(50f, 0, 50f);
+            foreach (var hr in hiddenResources)
+            {
+                if (hr == null || hr.IsDiscovered) continue;
+                Vector3 pos = hr.transform.position;
+                if (pos.x >= secMin.x && pos.x <= secMax.x &&
+                    pos.z >= secMin.z && pos.z <= secMax.z)
+                {
+                    hr.ForceDiscover();
+                }
             }
         }
 

@@ -460,40 +460,249 @@ namespace GameDevTV.RTS.Environment
                         }
                     }
 
+                    // Spawn 3D visual markers for all nodes
+                    SpawnNodeVisuals();
+
+                    // Reveal/hide based on sector state
+                    UpdateAllNodeVisibility();
+
                     Debug.Log($"[PlanetGenerator] Placed sector resource nodes across {SectorManager.Instance.Sectors.Count} sectors.");
+                }
+
+                /// <summary>
+                /// Spawn a 3D visual marker for each sector node in the scene.
+                /// For resource nodes (Minerals, Gas, Iron, Regolith), also spawn a GatherableSupply
+                /// so drones can actually mine them.
+                /// </summary>
+                private void SpawnNodeVisuals()
+                {
+                    var markerRoot = new GameObject("SectorNodeMarkers");
+                    markerRoot.transform.parent = transform;
+
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        foreach (var node in sector.Nodes)
+                        {
+                            if (node.visualGO != null) continue;
+
+                            // Snap position to ground
+                            Vector3 spawnPos = node.position;
+                            if (Physics.Raycast(spawnPos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
+                            {
+                                spawnPos.y = hit.point.y + 0.2f;
+                            }
+
+                            // For resource nodes, spawn actual gatherable prefabs so drones can mine them
+                            if (node.type == SectorNode.NodeType.Minerals ||
+                                node.type == SectorNode.NodeType.Gas ||
+                                node.type == SectorNode.NodeType.Iron ||
+                                node.type == SectorNode.NodeType.Regolith)
+                            {
+                                SpawnGatherableAtNode(node, spawnPos);
+                            }
+
+                            // Determine color and shape per node type
+                            Color color;
+                            PrimitiveType shape;
+                            Vector3 scale;
+                            switch (node.type)
+                            {
+                                case SectorNode.NodeType.Minerals:
+                                    color = new Color(0.3f, 0.6f, 1f);  // Blue
+                                    shape = PrimitiveType.Cylinder;
+                                    scale = Vector3.one * 0.3f;
+                                    break;
+                                case SectorNode.NodeType.Gas:
+                                    color = new Color(0.2f, 1f, 0.3f);  // Green
+                                    shape = PrimitiveType.Sphere;
+                                    scale = Vector3.one * 0.4f;
+                                    break;
+                                case SectorNode.NodeType.Iron:
+                                    color = new Color(0.7f, 0.7f, 0.7f); // Grey
+                                    shape = PrimitiveType.Cube;
+                                    scale = new Vector3(0.4f, 0.2f, 0.4f);
+                                    break;
+                                case SectorNode.NodeType.Regolith:
+                                    color = new Color(0.6f, 0.4f, 0.2f); // Brown
+                                    shape = PrimitiveType.Cube;
+                                    scale = new Vector3(0.5f, 0.15f, 0.5f);
+                                    break;
+                                case SectorNode.NodeType.Feature:
+                                    color = new Color(1f, 0.5f, 0f);    // Orange
+                                    shape = PrimitiveType.Cylinder;
+                                    scale = new Vector3(0.6f, 0.5f, 0.6f);
+                                    break;
+                                case SectorNode.NodeType.Nexus:
+                                    color = new Color(1f, 0f, 1f);      // Magenta
+                                    shape = PrimitiveType.Sphere;
+                                    scale = Vector3.one * 0.5f;
+                                    break;
+                                default:
+                                    color = Color.white;
+                                    shape = PrimitiveType.Sphere;
+                                    scale = Vector3.one * 0.3f;
+                                    break;
+                            }
+
+                            var go = GameObject.CreatePrimitive(shape);
+                            go.name = $"Node_{node.type}_{sector.Center}";
+                            go.transform.position = spawnPos;
+                            go.transform.localScale = scale;
+                            go.transform.parent = markerRoot.transform;
+
+                            // Assign color material
+                            var renderer = go.GetComponent<MeshRenderer>();
+                            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                            mat.color = color;
+                            renderer.material = mat;
+
+                            node.visualGO = go;
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// Spawn an actual GatherableSupply prefab at the node position so drones can mine it.
+                /// </summary>
+                private void SpawnGatherableAtNode(SectorNode node, Vector3 position)
+                {
+                    if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
+
+                    GameObject prefab = null;
+                    SupplySO supplySO = null;
+                    string resourceType = "";
+
+                    switch (node.type)
+                    {
+                        case SectorNode.NodeType.Minerals:
+                            // Find a crystal/mineral prefab
+                            foreach (var p in Config.ResourcePrefabs)
+                            {
+                                if (p != null && p.name.ToLower().Contains("crystal"))
+                                {
+                                    prefab = p;
+                                    break;
+                                }
+                            }
+                            if (prefab == null && Config.ResourcePrefabs.Length > 0)
+                                prefab = Config.ResourcePrefabs[0];
+                            supplySO = MineralsSupplySO;
+                            resourceType = "Minerals";
+                            break;
+
+                        case SectorNode.NodeType.Gas:
+                            foreach (var p in Config.ResourcePrefabs)
+                            {
+                                if (p != null && p.name.ToLower().Contains("gas"))
+                                {
+                                    prefab = p;
+                                    break;
+                                }
+                            }
+                            if (prefab == null && Config.ResourcePrefabs.Length > 0)
+                                prefab = Config.ResourcePrefabs[0];
+                            supplySO = GasSupplySO;
+                            resourceType = "Gas";
+                            break;
+
+                        case SectorNode.NodeType.Iron:
+                            // Use rock prefabs for Iron
+                            if (Config.SurfaceFeaturePrefabs != null)
+                            {
+                                foreach (var p in Config.SurfaceFeaturePrefabs)
+                                {
+                                    if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
+                                    {
+                                        prefab = p;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (prefab == null && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
+                                prefab = Config.ResourcePrefabs[0];
+                            supplySO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
+                            resourceType = "Iron";
+                            break;
+
+                        case SectorNode.NodeType.Regolith:
+                            if (Config.SurfaceFeaturePrefabs != null)
+                            {
+                                foreach (var p in Config.SurfaceFeaturePrefabs)
+                                {
+                                    if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
+                                    {
+                                        prefab = p;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (prefab == null && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
+                                prefab = Config.ResourcePrefabs[0];
+                            supplySO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
+                            resourceType = "Regolith";
+                            break;
+                    }
+
+                    if (prefab == null || supplySO == null) return;
+
+                    var gatherable = Instantiate(prefab, position, Quaternion.identity);
+                    gatherable.transform.parent = transform;
+
+                    // Add GatherableSupply component if not present
+                    if (!gatherable.TryGetComponent<GatherableSupply>(out var gs))
+                    {
+                        gs = gatherable.AddComponent<GatherableSupply>();
+                    }
+                    gs.Supply = supplySO;
+                    gs.Amount = supplySO != null ? supplySO.MaxAmount : 100;
+
+                    // Add HiddenResource so it's invisible until sector is explored
+                    if (!gatherable.TryGetComponent<HiddenResource>(out var hr))
+                    {
+                        hr = gatherable.AddComponent<HiddenResource>();
+                    }
+                    hr.ResourceTypeName = resourceType;
+
+                    // Start hidden
+                    gs.SetVisible(false);
+                    gs.ToggleColliders(false);
+                }
+
+                /// <summary>
+                /// Update visibility of all node markers based on their sector's explore state.
+                /// </summary>
+                private void UpdateAllNodeVisibility()
+                {
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        bool isUnlocked = !sector.IsLocked;
+                        foreach (var node in sector.Nodes)
+                        {
+                            node.SetVisualVisible(isUnlocked && node.isRevealed);
+                        }
+                    }
                 }
 
                 public void ReplenishResources()
                 {
-                    // Destroy all existing resources
-                    var existingSupplies = GetComponentsInChildren<GatherableSupply>(true);
-                    foreach (var gs in existingSupplies)
-                    {
-                        if (gs != null && gs.gameObject != null)
-                        {
-                            Destroy(gs.gameObject);
-                        }
-                    }
-
-                    ScatterResources();
-                    ScatterFuelResources();
-
+                    // Resources are node-based now — they persist across generations.
+                    // Only reset node visibility and refresh sector discoveries.
                     if (SectorManager.Instance != null)
                     {
                         SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
                     }
 
-                    Debug.Log("[PlanetGenerator] Resources replenished for new generation.");
+                    Debug.Log("[PlanetGenerator] Resources are node-based — not scattering new ones.");
                 }
 
                 /// <summary>
                 /// Replenish resources ONLY within the bounds of a newly explored sector.
-                /// Does NOT destroy existing resources — only adds new ones in the sector.
-                /// Used when a sector is explored for the first time.
+                /// Resources are now pre-placed as nodes at planet generation, so this is a no-op.
                 /// </summary>
                 public void ReplenishResourcesInSector(SectorManager.Sector sector)
                 {
-                    if (Config == null || sector == null) return;
+                    // No-op — resources are node-based and pre-placed at generation.
+                    // The sector's nodes are revealed by SectorManager.RevealNodesInSector().
 
                     float cellSize = CellSize;
                     float worldWidth = Config.MapWidth * cellSize;

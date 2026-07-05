@@ -192,7 +192,7 @@ namespace GameDevTV.RTS.UI.Containers
             // Resource nodes
             foreach (var node in resourceNodes)
             {
-                if (node.type == SectorNode.NodeType.ClimateBonus || node.type == SectorNode.NodeType.Nexus) continue;
+                if (node.type == SectorNode.NodeType.Nexus) continue;
                 var item = Instantiate(listItemPrefab, resourceListContainer);
                 item.SetActive(true);
                 string label = node.labelOverride;
