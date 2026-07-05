@@ -27,9 +27,9 @@ namespace GameDevTV.RTS.Environment
         public string labelOverride;     // Custom label (e.g., "Lava Tube Detected")
         public int connectedSectorIndex; // For Nexus: which sector this leads to
         public string flavorText;        // Description shown in discovery UI
-        public GameObject visualGO;      // 3D marker in the scene
-        public GameObject questionMarkGO; // "?" floating text
-        public List<SectorNode> connections = new List<SectorNode>(); // Nodes this connects to
+        [System.NonSerialized] public GameObject visualGO;      // 3D marker in the scene (runtime only)
+        [System.NonSerialized] public GameObject questionMarkGO; // "?" floating text (runtime only)
+        [System.NonSerialized] public List<SectorNode> connections = new List<SectorNode>(); // Built at runtime
 
         public SectorNode(NodeType type, Vector3 position, string flavorText = "", string labelOverride = "")
         {

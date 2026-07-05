@@ -340,6 +340,12 @@ namespace GameDevTV.RTS.Environment
                     ScatterFlora();
                 }
 
+                // Ensure sectors are initialized before placing nodes
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count == 0)
+                {
+                    SectorManager.Instance.InitializeSectors();
+                }
+
                 // Place resource nodes per sector (replaces old random scatter)
                 PlaceSectorResourceNodes();
 
@@ -362,7 +368,12 @@ namespace GameDevTV.RTS.Environment
                 /// </summary>
                 private void PlaceSectorResourceNodes()
                 {
-                    if (SectorManager.Instance == null || SectorManager.Instance.Sectors.Count == 0) return;
+                    if (SectorManager.Instance == null || SectorManager.Instance.Sectors.Count == 0)
+                    {
+                        Debug.LogError("[PlanetGenerator] Cannot place nodes — no sectors available!");
+                        return;
+                    }
+                    Debug.Log($"[PlanetGenerator] Placing nodes in {SectorManager.Instance.Sectors.Count} sectors...");
 
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
@@ -536,17 +547,28 @@ namespace GameDevTV.RTS.Environment
                     var questionMarkRoot = new GameObject("QuestionMarks");
                     questionMarkRoot.transform.parent = transform;
 
+                    int totalDots = 0;
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        foreach (var node in sector.Nodes)
+                        {
+                            totalDots++;
+                        }
+                    }
+                    Debug.Log($"[PlanetGenerator] Spawning {totalDots} node visuals across {SectorManager.Instance.Sectors.Count} sectors...");
+
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
                         foreach (var node in sector.Nodes)
                         {
                             if (node.visualGO != null) continue;
 
-                            // Snap position to ground
+                            // Snap position to ground — float well above terrain
                             Vector3 spawnPos = node.position;
+                            spawnPos.y = 1.5f; // Default above terrain
                             if (Physics.Raycast(spawnPos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
                             {
-                                spawnPos.y = hit.point.y + 0.15f;
+                                spawnPos.y = hit.point.y + 0.5f; // Float above ground
                             }
 
                             // For resource nodes, spawn actual gatherable prefabs so drones can mine them
@@ -572,11 +594,12 @@ namespace GameDevTV.RTS.Environment
                                 default: dotColor = Color.white; dotSize = 0.1f; break;
                             }
 
-                            // Use a flat cylinder (disc) for the dot
+                            // Use a flat cylinder (disc) for the dot — larger so visible
                             var dot = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                             dot.name = $"Node_{node.type}";
                             dot.transform.position = spawnPos;
-                            dot.transform.localScale = new Vector3(dotSize, 0.05f, dotSize);
+                            float visSize = Mathf.Max(dotSize, 0.4f); // Minimum visible size
+                            dot.transform.localScale = new Vector3(visSize, 0.1f, visSize);
                             dot.transform.parent = markerRoot.transform;
                             var dotRenderer = dot.GetComponent<MeshRenderer>();
                             var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -585,16 +608,17 @@ namespace GameDevTV.RTS.Environment
 
                             node.visualGO = dot;
 
-                            // --- "?" floating label ---
+                            // --- "?" floating label (larger, more visible) ---
                             var qmGo = new GameObject($"QuestionMark_{node.type}");
-                            qmGo.transform.position = spawnPos + Vector3.up * 0.5f;
+                            qmGo.transform.position = spawnPos + Vector3.up * 1.5f;
                             qmGo.transform.parent = questionMarkRoot.transform;
                             var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
                             qmText.text = "?";
-                            qmText.fontSize = 1.5f;
+                            qmText.fontSize = 3f;
                             qmText.alignment = TMPro.TextAlignmentOptions.Center;
                             qmText.color = Color.yellow;
-                            qmText.transform.localScale = Vector3.one * 0.3f;
+                            qmText.fontStyle = TMPro.FontStyles.Bold;
+                            qmText.transform.localScale = Vector3.one * 0.4f;
                             node.questionMarkGO = qmGo;
                         }
                     }
@@ -705,21 +729,6 @@ namespace GameDevTV.RTS.Environment
                     // Start hidden
                     gs.SetVisible(false);
                     gs.ToggleColliders(false);
-                }
-
-                /// <summary>
-                /// Update visibility of all node markers based on their sector's explore state.
-                /// </summary>
-                private void UpdateAllNodeVisibility()
-                {
-                    foreach (var sector in SectorManager.Instance.Sectors)
-                    {
-                        bool isUnlocked = !sector.IsLocked;
-                        foreach (var node in sector.Nodes)
-                        {
-                            node.SetVisualVisible(isUnlocked && node.isRevealed);
-                        }
-                    }
                 }
 
                 public void ReplenishResources()
