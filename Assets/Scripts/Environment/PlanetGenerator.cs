@@ -588,7 +588,8 @@ namespace GameDevTV.RTS.Environment
                             dot.transform.position = spawnPos;
                             float visSize = Mathf.Max(dotSize, 0.4f); // Minimum visible size
                             dot.transform.localScale = new Vector3(visSize, 0.1f, visSize);
-                            dot.transform.parent = markerRoot.transform;
+                            dot.transform.parent = transform; // Parent to PlanetGenerator so AI can find it
+                            dot.layer = LayerMask.NameToLayer("Supplies"); // Set to Supplies layer
                             var dotRenderer = dot.GetComponent<MeshRenderer>();
                             var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                             dotMat.color = dotColor;
