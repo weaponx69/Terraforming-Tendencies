@@ -1,5 +1,8 @@
 
 ### Terraforming Tendencies - Project Knowledge & Architecture Notes
+
+> **Design Note — Spoke & Hub Text Adventure Philosophy:**
+> The Universal Command Center (UCC) is the central hub. Sectors are the spokes radiating outward. The game loop: start at UCC → explore outward along sector spokes → discover nodes → return resources to UCC → upgrade → push further out. This maps naturally to a text adventure / roguelike structure. The sector nodes, discovery UI flavor text, and chain exploration already support this. Future design should lean into this: make the game equally playable as a text-driven experience where the player reads node descriptions, makes strategic choices from the UCC hub, and watches the colony grow. The 3D RTS layer is the visual reward — the strategic depth comes from the spoke-and-hub expansion decisions.
 This document serves as a persistent memory bank for AI context, detailing the core systems, recent architectural decisions, and current state of the game's economy.
 
 #### [DEPRECATED] Hero Drone & Hybrid Control System
