@@ -329,6 +329,33 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
+            // Check sector feature requirement for themed buildings
+            string bldName = Building.Name;
+            var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
+            bool requiresFeature = bldName.Contains("Lava Tube") || bldName.Contains("Subterranean") ||
+                                   bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield") ||
+                                   bldName.Contains("Subglacial") || bldName.Contains("Biosphere");
+            if (requiresFeature && sectorMgr != null)
+            {
+                var nearestSector = sectorMgr.GetNearestSector(new Vector3(point.x, 0, point.z));
+                if (nearestSector != null)
+                {
+                    bool hasFeature = false;
+                    if (bldName.Contains("Lava Tube") || bldName.Contains("Subterranean"))
+                        hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.LavaTube;
+                    else if (bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield"))
+                        hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.FaultLine;
+                    else if (bldName.Contains("Subglacial") || bldName.Contains("Biosphere"))
+                        hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.WaterDeposit;
+
+                    if (!hasFeature && nearestSector.IsExplored)
+                    {
+                        Debug.LogWarning($"[BuildBuildingCommand] {bldName} requires {nearestSector.Feature} but sector has {nearestSector.Feature}. Cannot place here.");
+                        return false;
+                    }
+                }
+            }
+
             return true;
         }
 

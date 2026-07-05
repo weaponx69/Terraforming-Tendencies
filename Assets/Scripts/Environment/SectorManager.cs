@@ -20,7 +20,9 @@ namespace GameDevTV.RTS.Environment
             public BaseBuilding OccupyingBuilding;
             public bool IsLocked = true;
             public bool IsExplored = false;
+            public bool IsDiscovered = false;   // "???" state — partial visibility showing node markers
             public SectorFeature Feature = SectorFeature.None;
+            public List<SectorNode> Nodes = new List<SectorNode>();  // Pre-placed nodes in this sector
         }
 
         public List<Sector> Sectors = new List<Sector>();
@@ -234,6 +236,31 @@ namespace GameDevTV.RTS.Environment
             Debug.Log("[SectorManager] All sectors are already unlocked!");
         }
 
+        /// <summary>Mark a sector as discovered (partial visibility — shows "???" markers).</summary>
+        public void DiscoverSector(int index)
+        {
+            if (index < 0 || index >= Sectors.Count) return;
+            if (Sectors[index].IsDiscovered) return;
+            if (!Sectors[index].IsLocked) return;  // Already unlocked, no need for discovery state
+
+            Sectors[index].IsDiscovered = true;
+            Debug.Log($"[SectorManager] Sector {index} discovered — showing markers!");
+        }
+
+        /// <summary>Mark a specific sector as explored (fully revealed) and unlock it.</summary>
+        public void FullyExploreSector(int index)
+        {
+            if (index < 0 || index >= Sectors.Count) return;
+            if (Sectors[index].IsExplored) return;
+
+            Sectors[index].IsDiscovered = true;
+            Sectors[index].IsExplored = true;
+            Sectors[index].IsLocked = false;
+            ActiveSector = Sectors[index];
+            OnSectorExplored?.Invoke(index);
+            Debug.Log($"[SectorManager] Sector {index} fully explored and unlocked!");
+        }
+
         /// <summary>Mark a specific sector as explored. Fires OnSectorExplored event.</summary>
         public void ExploreSector(int index)
         {
@@ -243,6 +270,28 @@ namespace GameDevTV.RTS.Environment
             Sectors[index].IsExplored = true;
             OnSectorExplored?.Invoke(index);
             Debug.Log($"[SectorManager] Sector {index} explored (scouted).");
+        }
+
+        /// <summary>Reveal all hidden nodes in a sector (make them visible).</summary>
+        public void RevealNodesInSector(int index)
+        {
+            if (index < 0 || index >= Sectors.Count) return;
+            var sector = Sectors[index];
+            foreach (var node in sector.Nodes)
+            {
+                node.isRevealed = true;
+            }
+        }
+
+        /// <summary>
+        /// Check if a sector has a specific feature (e.g., LavaTube) that has been revealed.
+        /// </summary>
+        public bool SectorHasFeature(int sectorIndex, SectorFeature feature)
+        {
+            if (sectorIndex < 0 || sectorIndex >= Sectors.Count) return false;
+            var sector = Sectors[sectorIndex];
+            if (!sector.IsExplored) return false;
+            return sector.Feature == feature;
         }
 
         /// <summary>Explore the next locked sector. Returns the index, or -1 if none remain.</summary>

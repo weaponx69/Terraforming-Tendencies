@@ -81,7 +81,7 @@ namespace GameDevTV.RTS.Environment
 
         /// <summary>
         /// Instantly explore the next locked sector (Orbital Scan card).
-        /// Skips the timer — immediate exploration + unlock.
+        /// Chain exploration: reveals nodes, checks nexus for next sector, grants bonuses.
         /// </summary>
         public void InstantExplore()
         {
@@ -94,11 +94,27 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            SectorManager.Instance.ExploreSector(nextIndex);
-            ReplenishNewSector(nextIndex);     // Add resources FIRST so the draft sees them
-            SectorManager.Instance.UnlockNextSector(); // Triggers draft via OnSectorUnlocked
+            // 1. Fully explore this sector (unlock it)
+            SectorManager.Instance.FullyExploreSector(nextIndex);
 
-            Debug.Log($"[ExplorationManager] Orbital Scan: Sector {nextIndex} instantly explored and unlocked!");
+            // 2. Reveal all pre-placed nodes in the sector
+            SectorManager.Instance.RevealNodesInSector(nextIndex);
+
+            // 3. Discover resources for this sector
+            ReplenishNewSector(nextIndex);
+
+            // 4. Chain: check nexus connection → discover next sector ("???" markers)
+            int nextSectorIndex = nextIndex + 1;
+            if (nextSectorIndex < SectorManager.Instance.Sectors.Count)
+            {
+                SectorManager.Instance.DiscoverSector(nextSectorIndex);
+                Debug.Log($"[ExplorationManager] Nexus signal detected! Sector {nextSectorIndex} shows markers.");
+            }
+
+            // 5. Grant random climate bonus rewards
+            GrantExplorationBonuses(nextIndex);
+
+            Debug.Log($"[ExplorationManager] Orbital Scan: Sector {nextIndex} explored and unlocked!");
         }
 
         /// <summary>
@@ -155,21 +171,53 @@ namespace GameDevTV.RTS.Environment
             int nextIndex = SectorManager.Instance.GetNextLockedSectorIndex();
             if (nextIndex < 0) return;
 
-            SectorManager.Instance.ExploreSector(nextIndex);
-            ReplenishNewSector(nextIndex);     // Add resources FIRST so the draft sees them
-            SectorManager.Instance.UnlockNextSector(); // Triggers draft via OnSectorUnlocked
+            // Same chain flow as InstantExplore
+            SectorManager.Instance.FullyExploreSector(nextIndex);
+            SectorManager.Instance.RevealNodesInSector(nextIndex);
+            ReplenishNewSector(nextIndex);
 
+            int nextSectorIndex = nextIndex + 1;
+            if (nextSectorIndex < SectorManager.Instance.Sectors.Count)
+            {
+                SectorManager.Instance.DiscoverSector(nextSectorIndex);
+            }
+
+            GrantExplorationBonuses(nextIndex);
             OnSectorExplored?.Invoke(nextIndex);
             Debug.Log($"[ExplorationManager] Sector {nextIndex} exploration complete!");
         }
 
         private void ReplenishNewSector(int sectorIndex)
         {
-            if (PlanetGenerator.Instance != null && SectorManager.Instance != null)
+            // Nodes are pre-placed at planet generation. We just need to discover
+            // any HiddenResource components in the unlocked sector.
+            if (SectorManager.Instance != null)
             {
-                var sector = SectorManager.Instance.Sectors[sectorIndex];
-                PlanetGenerator.Instance.ReplenishResourcesInSector(sector);
+                SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
             }
+        }
+
+        /// <summary>
+        /// Grant random climate bonus rewards when a sector is explored.
+        /// Uses ExplorationNodeDatabase for weighted random selection.
+        /// </summary>
+        private void GrantExplorationBonuses(int sectorIndex)
+        {
+            if (ExplorationNodeDatabase.Instance == null) return;
+
+            int bonusCount = Random.Range(1, 4); // 1-3 bonuses
+            var bonuses = ExplorationNodeDatabase.Instance.GetRandomNodes(bonusCount);
+
+            // Apply all bonuses
+            foreach (var bonus in bonuses)
+            {
+                bonus.ApplyReward();
+            }
+
+            // Show discovery UI with all sector nodes and bonuses
+            var sector = SectorManager.Instance.Sectors[sectorIndex];
+            var resourceNodes = new System.Collections.Generic.List<SectorNode>(sector.Nodes);
+            UI.Containers.ExplorationDiscoveryUI.Instance.Show(sectorIndex, resourceNodes, bonuses);
         }
     }
 }

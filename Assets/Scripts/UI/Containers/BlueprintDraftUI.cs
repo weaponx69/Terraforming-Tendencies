@@ -390,36 +390,11 @@ namespace GameDevTV.RTS.UI.Containers
                 runtimePool.Add(cardDrone);
             }
 
-            // 7. Climate Boost Cards — direct temperature, atmosphere, and water injections
-            var cardTemp = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
-            cardTemp.cardName = "Thermal Surge Injectors";
-            cardTemp.cardDescription = "Pump superheated gases into the atmosphere. Instantly raises global temperature by +8°C.";
-            cardTemp.temperatureAmount = 8f;
-            runtimePool.Add(cardTemp);
-
-            var cardAtmos = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
-            cardAtmos.cardName = "Atmospheric Compression";
-            cardAtmos.cardDescription = "Release compressed gas reserves. Instantly raises global atmosphere by +0.12 atm.";
-            cardAtmos.atmosphereAmount = 0.12f;
-            runtimePool.Add(cardAtmos);
-
-            var cardAtmos2 = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
-            cardAtmos2.cardName = "CO₂ Comet Redirect";
-            cardAtmos2.cardDescription = "Redirect a carbon-rich comet into the upper atmosphere. Instantly raises global atmosphere by +0.15 atm.";
-            cardAtmos2.atmosphereAmount = 0.15f;
-            runtimePool.Add(cardAtmos2);
-
-            var cardWater = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
-            cardWater.cardName = "Subsurface Water Surge";
-            cardWater.cardDescription = "Trigger controlled geothermal venting to release deep subterranean water. Instantly raises global water by +6%.";
-            cardWater.waterAmount = 6f;
-            runtimePool.Add(cardWater);
-
-            var cardWater2 = ScriptableObject.CreateInstance<ResourceShipmentCardSO>();
-            cardWater2.cardName = "Cometary Ice Harvest";
-            cardWater2.cardDescription = "Capture and melt a small icy body in orbit. Instantly raises global water by +8%.";
-            cardWater2.waterAmount = 8f;
-            runtimePool.Add(cardWater2);
+            // 7. (Removed) Climate Boost Cards — now only found as exploration rewards
+            // Thermal Surge Injectors, Atmospheric Compression, CO₂ Comet Redirect,
+            // Subsurface Water Surge, and Cometary Ice Harvest are assigned as
+            // ExplorationNodeSO rewards in ExplorationNodeDatabase and granted
+            // when exploration cards (Orbital Scan, Survey Drone) are played.
 
             // 8. Exploration Cards — scouting cards that explore/unlock the next sector
             var cardOrbitalScan = ScriptableObject.CreateInstance<ScoutingCardSO>();

@@ -340,8 +340,8 @@ namespace GameDevTV.RTS.Environment
                     ScatterFlora();
                 }
 
-                ScatterResources();
-                ScatterFuelResources();
+                // Place resource nodes per sector (replaces old random scatter)
+                PlaceSectorResourceNodes();
 
                 BakeAllNavMeshes();
                 ApplyCurvedWorldShader(gameObject);
@@ -354,6 +354,113 @@ namespace GameDevTV.RTS.Environment
                 {
                     OnPlanetGenerated?.Invoke();
                 }
+                }
+
+                /// <summary>
+                /// Place resource, feature, and nexus nodes in each sector.
+                /// These are recorded as SectorNode entries and spawned as hidden GatherableSupply objects.
+                /// </summary>
+                private void PlaceSectorResourceNodes()
+                {
+                    if (SectorManager.Instance == null || SectorManager.Instance.Sectors.Count == 0) return;
+
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        int sectorIndex = SectorManager.Instance.Sectors.IndexOf(sector);
+                        float secW = (Config.MapWidth * CellSize) / Config.SectorsX;
+                        float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
+                        Vector3 sectorMin = sector.Center - new Vector3(secW * 0.4f, 0, secH * 0.4f);
+                        Vector3 sectorMax = sector.Center + new Vector3(secW * 0.4f, 0, secH * 0.4f);
+                        float exclusionRadius = 5f;
+
+                        System.Func<Vector3> randomPos = () =>
+                        {
+                            float rx = Random.Range(sectorMin.x, sectorMax.x);
+                            float rz = Random.Range(sectorMin.z, sectorMax.z);
+                            return new Vector3(rx, 0, rz);
+                        };
+
+                        // 2 Minerals
+                        for (int i = 0; i < 2; i++)
+                        {
+                            Vector3 pos = randomPos();
+                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
+                        }
+
+                        // 2 Gas
+                        for (int i = 0; i < 2; i++)
+                        {
+                            Vector3 pos = randomPos();
+                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, pos, "Vaporous gases seep from fissures in the ground.", "Gas"));
+                        }
+
+                        // 1-2 Iron
+                        int ironCount = Random.Range(1, 3);
+                        for (int i = 0; i < ironCount; i++)
+                        {
+                            Vector3 pos = randomPos();
+                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, pos, "A rich iron ore deposit, suitable for smelting.", "Iron"));
+                        }
+
+                        // 1-2 Regolith
+                        int regCount = Random.Range(1, 3);
+                        for (int i = 0; i < regCount; i++)
+                        {
+                            Vector3 pos = randomPos();
+                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, pos, "Loose regolith, useful for construction.", "Regolith"));
+                        }
+
+                        // Feature node (based on sector's assigned feature)
+                        string featureLabel = "";
+                        string featureFlavor = "";
+                        switch (sector.Feature)
+                        {
+                            case SectorManager.SectorFeature.LavaTube:
+                                featureLabel = "Lava Tube";
+                                featureFlavor = "A vast lava tube network — ideal for sheltered colony expansion.";
+                                break;
+                            case SectorManager.SectorFeature.FaultLine:
+                                featureLabel = "Fault Line";
+                                featureFlavor = "A deep geological fault line — potential for geothermal energy.";
+                                break;
+                            case SectorManager.SectorFeature.WaterDeposit:
+                                featureLabel = "Water Deposit";
+                                featureFlavor = "Subterranean water ice detected — a vital resource for the colony.";
+                                break;
+                            case SectorManager.SectorFeature.Volcano:
+                                featureLabel = "Volcanic Vent";
+                                featureFlavor = "An active volcanic vent — rich in minerals and thermal energy.";
+                                break;
+                        }
+                        if (!string.IsNullOrEmpty(featureLabel))
+                        {
+                            var featureNode = new SectorNode(SectorNode.NodeType.Feature, sector.Center + new Vector3(Random.Range(-5f, 5f), 0, Random.Range(-5f, 5f)), featureFlavor, featureLabel);
+                            sector.Nodes.Add(featureNode);
+                        }
+
+                        // Nexus node (connects to next sector)
+                        int nextSector = sectorIndex + 1;
+                        if (nextSector < SectorManager.Instance.Sectors.Count)
+                        {
+                            Vector3 nexusPos = sector.Center + new Vector3(secW * 0.3f, 0, 0);
+                            var nexusNode = new SectorNode(SectorNode.NodeType.Nexus, nexusPos, "A strange signal emanates from this point... leading to the next sector.", "Nexus Signal");
+                            nexusNode.connectedSectorIndex = nextSector;
+                            sector.Nodes.Add(nexusNode);
+                        }
+
+                        // For Sector 0: reveal nodes immediately since it starts unlocked
+                        if (sectorIndex == 0)
+                        {
+                            foreach (var node in sector.Nodes)
+                                node.isRevealed = true;
+                        }
+                    }
+
+                    Debug.Log($"[PlanetGenerator] Placed sector resource nodes across {SectorManager.Instance.Sectors.Count} sectors.");
                 }
 
                 public void ReplenishResources()
