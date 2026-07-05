@@ -247,56 +247,31 @@ namespace GameDevTV.RTS.Environment
             Debug.Log($"[SectorManager] Sector {index} discovered — showing markers!");
         }
 
-        /// <summary>Mark a specific sector as explored (fully revealed) and unlock it.</summary>
-        public void FullyExploreSector(int index)
+        /// <summary>
+        /// Mark a specific sector as having its first node explored.
+        /// This is called by ExplorationManager when a node in a locked sector is explored.
+        /// </summary>
+        public void OnFirstNodeExploredInSector(int index)
         {
             if (index < 0 || index >= Sectors.Count) return;
-            if (Sectors[index].IsExplored) return;
+            if (!Sectors[index].IsLocked) return;
 
-            Sectors[index].IsDiscovered = true;
-            Sectors[index].IsExplored = true;
             Sectors[index].IsLocked = false;
+            Sectors[index].IsExplored = true;
+            Sectors[index].IsDiscovered = true;
             ActiveSector = Sectors[index];
             OnSectorExplored?.Invoke(index);
-            Debug.Log($"[SectorManager] Sector {index} fully explored and unlocked!");
+            DiscoverResourcesInUnlockedSectors();
+            Debug.Log($"[SectorManager] Sector {index} unlocked via node exploration!");
         }
 
-        /// <summary>Mark a specific sector as explored. Fires OnSectorExplored event.</summary>
+        /// <summary>Mark a specific sector as explored.</summary>
         public void ExploreSector(int index)
         {
             if (index < 0 || index >= Sectors.Count) return;
             if (Sectors[index].IsExplored) return;
-
             Sectors[index].IsExplored = true;
             OnSectorExplored?.Invoke(index);
-            Debug.Log($"[SectorManager] Sector {index} explored (scouted).");
-        }
-
-        /// <summary>Reveal all hidden nodes in a sector (make them visible in scene).</summary>
-        public void RevealNodesInSector(int index)
-        {
-            if (index < 0 || index >= Sectors.Count) return;
-            var sector = Sectors[index];
-            foreach (var node in sector.Nodes)
-            {
-                node.isRevealed = true;
-                node.SetVisualVisible(true);
-            }
-
-            // Also force-discover any HiddenResource components in this sector
-            var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include);
-            Vector3 secMin = sector.Center - new Vector3(50f, 0, 50f);
-            Vector3 secMax = sector.Center + new Vector3(50f, 0, 50f);
-            foreach (var hr in hiddenResources)
-            {
-                if (hr == null || hr.IsDiscovered) continue;
-                Vector3 pos = hr.transform.position;
-                if (pos.x >= secMin.x && pos.x <= secMax.x &&
-                    pos.z >= secMin.z && pos.z <= secMax.z)
-                {
-                    hr.ForceDiscover();
-                }
-            }
         }
 
         /// <summary>

@@ -452,32 +452,89 @@ namespace GameDevTV.RTS.Environment
                             sector.Nodes.Add(nexusNode);
                         }
 
-                        // For Sector 0: reveal nodes immediately since it starts unlocked
-                        if (sectorIndex == 0)
-                        {
-                            foreach (var node in sector.Nodes)
-                                node.isRevealed = true;
-                        }
                     }
 
-                    // Spawn 3D visual markers for all nodes
+                    // Build connection graph between nodes
+                    BuildNodeConnections();
+
+                    // Spawn visual markers (small dots + "?" labels)
                     SpawnNodeVisuals();
 
-                    // Reveal/hide based on sector state
+                    // Set Sector 0's first node as explored (entry point from UCC)
+                    if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
+                    {
+                        SectorManager.Instance.Sectors[0].Nodes[0].OnExplored();
+                    }
+
+                    // Update visibility based on node states
                     UpdateAllNodeVisibility();
 
                     Debug.Log($"[PlanetGenerator] Placed sector resource nodes across {SectorManager.Instance.Sectors.Count} sectors.");
                 }
 
                 /// <summary>
-                /// Spawn a 3D visual marker for each sector node in the scene.
-                /// For resource nodes (Minerals, Gas, Iron, Regolith), also spawn a GatherableSupply
-                /// so drones can actually mine them.
+                /// Build a connection graph between nodes.
+                /// Each node connects to its 2-3 nearest neighbors within the same sector.
+                /// Cross-sector connections link the last node of sector N to the first of sector N+1.
+                /// </summary>
+                private void BuildNodeConnections()
+                {
+                    for (int s = 0; s < SectorManager.Instance.Sectors.Count; s++)
+                    {
+                        var nodes = SectorManager.Instance.Sectors[s].Nodes;
+                        if (nodes.Count < 2) continue;
+
+                        // Connect each node to its nearest neighbors
+                        foreach (var node in nodes)
+                        {
+                            // Find 2-3 nearest nodes
+                            var sorted = new System.Collections.Generic.List<SectorNode>(nodes);
+                            sorted.Sort((a, b) =>
+                                Vector3.Distance(node.position, a.position)
+                                    .CompareTo(Vector3.Distance(node.position, b.position)));
+
+                            int connectionsToAdd = UnityEngine.Random.Range(2, 4);
+                            int added = 0;
+                            foreach (var neighbor in sorted)
+                            {
+                                if (neighbor == node) continue;
+                                if (node.connections.Contains(neighbor)) continue;
+                                if (added >= connectionsToAdd) break;
+
+                                node.connections.Add(neighbor);
+                                neighbor.connections.Add(node);
+                                added++;
+                            }
+                        }
+
+                        // Cross-sector connection: link last node of sector s to first node of sector s+1
+                        if (s + 1 < SectorManager.Instance.Sectors.Count)
+                        {
+                            var nextNodes = SectorManager.Instance.Sectors[s + 1].Nodes;
+                            if (nextNodes.Count > 0 && nodes.Count > 0)
+                            {
+                                SectorNode lastNode = nodes[nodes.Count - 1];
+                                SectorNode firstNext = nextNodes[0];
+                                if (!lastNode.connections.Contains(firstNext))
+                                {
+                                    lastNode.connections.Add(firstNext);
+                                    firstNext.connections.Add(lastNode);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                /// <summary>
+                /// Spawn small dot markers for each node + "?" labels for discovered-but-unexplored nodes.
+                /// Also spawns gatherable supplies at resource nodes.
                 /// </summary>
                 private void SpawnNodeVisuals()
                 {
                     var markerRoot = new GameObject("SectorNodeMarkers");
                     markerRoot.transform.parent = transform;
+                    var questionMarkRoot = new GameObject("QuestionMarks");
+                    questionMarkRoot.transform.parent = transform;
 
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
@@ -489,7 +546,7 @@ namespace GameDevTV.RTS.Environment
                             Vector3 spawnPos = node.position;
                             if (Physics.Raycast(spawnPos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
                             {
-                                spawnPos.y = hit.point.y + 0.2f;
+                                spawnPos.y = hit.point.y + 0.15f;
                             }
 
                             // For resource nodes, spawn actual gatherable prefabs so drones can mine them
@@ -501,62 +558,44 @@ namespace GameDevTV.RTS.Environment
                                 SpawnGatherableAtNode(node, spawnPos);
                             }
 
-                            // Determine color and shape per node type
-                            Color color;
-                            PrimitiveType shape;
-                            Vector3 scale;
+                            // --- Dot marker (small flat circle) ---
+                            Color dotColor;
+                            float dotSize;
                             switch (node.type)
                             {
-                                case SectorNode.NodeType.Minerals:
-                                    color = new Color(0.3f, 0.6f, 1f);  // Blue
-                                    shape = PrimitiveType.Cylinder;
-                                    scale = Vector3.one * 0.3f;
-                                    break;
-                                case SectorNode.NodeType.Gas:
-                                    color = new Color(0.2f, 1f, 0.3f);  // Green
-                                    shape = PrimitiveType.Sphere;
-                                    scale = Vector3.one * 0.4f;
-                                    break;
-                                case SectorNode.NodeType.Iron:
-                                    color = new Color(0.7f, 0.7f, 0.7f); // Grey
-                                    shape = PrimitiveType.Cube;
-                                    scale = new Vector3(0.4f, 0.2f, 0.4f);
-                                    break;
-                                case SectorNode.NodeType.Regolith:
-                                    color = new Color(0.6f, 0.4f, 0.2f); // Brown
-                                    shape = PrimitiveType.Cube;
-                                    scale = new Vector3(0.5f, 0.15f, 0.5f);
-                                    break;
-                                case SectorNode.NodeType.Feature:
-                                    color = new Color(1f, 0.5f, 0f);    // Orange
-                                    shape = PrimitiveType.Cylinder;
-                                    scale = new Vector3(0.6f, 0.5f, 0.6f);
-                                    break;
-                                case SectorNode.NodeType.Nexus:
-                                    color = new Color(1f, 0f, 1f);      // Magenta
-                                    shape = PrimitiveType.Sphere;
-                                    scale = Vector3.one * 0.5f;
-                                    break;
-                                default:
-                                    color = Color.white;
-                                    shape = PrimitiveType.Sphere;
-                                    scale = Vector3.one * 0.3f;
-                                    break;
+                                case SectorNode.NodeType.Minerals:   dotColor = new Color(0.3f, 0.6f, 1f); dotSize = 0.15f; break;
+                                case SectorNode.NodeType.Gas:        dotColor = new Color(0.2f, 1f, 0.3f); dotSize = 0.15f; break;
+                                case SectorNode.NodeType.Iron:       dotColor = new Color(0.7f, 0.7f, 0.7f); dotSize = 0.15f; break;
+                                case SectorNode.NodeType.Regolith:   dotColor = new Color(0.6f, 0.4f, 0.2f); dotSize = 0.15f; break;
+                                case SectorNode.NodeType.Feature:    dotColor = new Color(1f, 0.5f, 0f); dotSize = 0.2f; break;
+                                case SectorNode.NodeType.Nexus:      dotColor = new Color(1f, 0f, 1f); dotSize = 0.2f; break;
+                                default: dotColor = Color.white; dotSize = 0.1f; break;
                             }
 
-                            var go = GameObject.CreatePrimitive(shape);
-                            go.name = $"Node_{node.type}_{sector.Center}";
-                            go.transform.position = spawnPos;
-                            go.transform.localScale = scale;
-                            go.transform.parent = markerRoot.transform;
+                            // Use a flat cylinder (disc) for the dot
+                            var dot = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                            dot.name = $"Node_{node.type}";
+                            dot.transform.position = spawnPos;
+                            dot.transform.localScale = new Vector3(dotSize, 0.05f, dotSize);
+                            dot.transform.parent = markerRoot.transform;
+                            var dotRenderer = dot.GetComponent<MeshRenderer>();
+                            var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                            dotMat.color = dotColor;
+                            dotRenderer.material = dotMat;
 
-                            // Assign color material
-                            var renderer = go.GetComponent<MeshRenderer>();
-                            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                            mat.color = color;
-                            renderer.material = mat;
+                            node.visualGO = dot;
 
-                            node.visualGO = go;
+                            // --- "?" floating label ---
+                            var qmGo = new GameObject($"QuestionMark_{node.type}");
+                            qmGo.transform.position = spawnPos + Vector3.up * 0.5f;
+                            qmGo.transform.parent = questionMarkRoot.transform;
+                            var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
+                            qmText.text = "?";
+                            qmText.fontSize = 1.5f;
+                            qmText.alignment = TMPro.TextAlignmentOptions.Center;
+                            qmText.color = Color.yellow;
+                            qmText.transform.localScale = Vector3.one * 0.3f;
+                            node.questionMarkGO = qmGo;
                         }
                     }
                 }
@@ -696,126 +735,27 @@ namespace GameDevTV.RTS.Environment
                 }
 
                 /// <summary>
-                /// Replenish resources ONLY within the bounds of a newly explored sector.
-                /// Resources are now pre-placed as nodes at planet generation, so this is a no-op.
+                /// No-op — resources are node-based and pre-placed at planet generation.
                 /// </summary>
                 public void ReplenishResourcesInSector(SectorManager.Sector sector)
                 {
-                    // No-op — resources are node-based and pre-placed at generation.
-                    // The sector's nodes are revealed by SectorManager.RevealNodesInSector().
+                    // No-op
+                }
 
-                    float cellSize = CellSize;
-                    float worldWidth = Config.MapWidth * cellSize;
-                    float worldHeight = Config.MapHeight * cellSize;
-                    float secW = worldWidth / Config.SectorsX;
-                    float secH = worldHeight / Config.SectorsY;
-
-                    Vector3 sectorMin = sector.Center - new Vector3(secW * 0.5f, 0, secH * 0.5f);
-                    Vector3 sectorMax = sector.Center + new Vector3(secW * 0.5f, 0, secH * 0.5f);
-
-                    float exclusionRadius = 5f;
-                    Vector3 center = sector.Center;
-
-                    // Count existing resources in this sector
-                    int existingCount = 0;
-                    var existingSupplies = GetComponentsInChildren<GatherableSupply>(true);
-                    foreach (var gs in existingSupplies)
+                /// <summary>
+                /// Update visibility of dots and "?" labels based on node states.
+                /// </summary>
+                private void UpdateAllNodeVisibility()
+                {
+                    foreach (var sector in SectorManager.Instance.Sectors)
                     {
-                        if (gs == null) continue;
-                        Vector3 pos = gs.transform.position;
-                        if (pos.x >= sectorMin.x && pos.x <= sectorMax.x &&
-                            pos.z >= sectorMin.z && pos.z <= sectorMax.z)
+                        foreach (var node in sector.Nodes)
                         {
-                            existingCount++;
+                            // Dot visible if explored OR discovered
+                            node.SetVisualVisible(node.isExplored || node.isDiscovered);
+                            // "?" visible only when discovered but not yet explored
+                            node.SetQuestionMarkVisible(node.isDiscovered && !node.isExplored);
                         }
-                    }
-
-                    // Guarantee minimum 2-4 deposits with at least 2 resource types
-                    int minDeposits = 2;
-                    int maxNewDeposits = Mathf.Max(0, minDeposits - existingCount) + 2;
-
-                    int spawnedCount = 0;
-                    int maxAttempts = maxNewDeposits * 20;
-                    float minSpacing = 5f;
-                    var spawnedPositions = new System.Collections.Generic.List<Vector3>();
-
-                    for (int i = 0; i < maxAttempts && spawnedCount < maxNewDeposits; i++)
-                    {
-                        float randomX = Random.Range(sectorMin.x, sectorMax.x);
-                        float randomZ = Random.Range(sectorMin.z, sectorMax.z);
-                        Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
-
-                        if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
-
-                        bool tooClose = false;
-                        foreach (Vector3 pos in spawnedPositions)
-                        {
-                            if (Vector3.Distance(pos, spawnPos) < minSpacing)
-                            {
-                                tooClose = true;
-                                break;
-                            }
-                        }
-                        if (tooClose) continue;
-                        spawnedPositions.Add(spawnPos);
-
-                        // Alternate between Minerals/Gas and Iron/Regolith
-                        GameObject prefab;
-                        SupplySO so;
-                        string resourceType;
-                        if (spawnedCount % 2 == 0 && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
-                        {
-                            prefab = Config.ResourcePrefabs[Random.Range(0, Config.ResourcePrefabs.Length)];
-                            so = prefab.name.ToLower().Contains("gas") ? GasSupplySO : MineralsSupplySO;
-                            resourceType = prefab.name.ToLower().Contains("gas") ? "Gas" : "Minerals";
-                        }
-                        else
-                        {
-                            // Use rock prefabs for Iron/Regolith
-                            var rockPrefabs = new System.Collections.Generic.List<GameObject>();
-                            if (Config.SurfaceFeaturePrefabs != null)
-                            {
-                                foreach (var p in Config.SurfaceFeaturePrefabs)
-                                {
-                                    if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
-                                        rockPrefabs.Add(p);
-                                }
-                            }
-                            if (rockPrefabs.Count == 0 && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
-                            {
-                                prefab = Config.ResourcePrefabs[0];
-                            }
-                            else if (rockPrefabs.Count == 0)
-                            {
-                                continue;
-                            }
-                            else
-                            {
-                                prefab = rockPrefabs[Random.Range(0, rockPrefabs.Count)];
-                            }
-
-                            SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
-                            SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
-                            so = Random.value > 0.5f ? ironSO : regolithSO;
-                            resourceType = (so != null && so.name.ToLower().Contains("regolith")) ? "Regolith" : "Iron";
-                        }
-
-                        Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-                        GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
-                        EnsureGatherableSupply(instance, so);
-
-                        if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
-                        {
-                            var hr = instance.AddComponent<HiddenResource>();
-                            hr.ResourceTypeName = resourceType;
-                        }
-
-                        spawnedCount++;
-                    }
-
-                    if (spawnedCount > 0)
-                    {
-                        Debug.Log($"[PlanetGenerator] Replenished {spawnedCount} new resource nodes in explored sector at {sector.Center}.");
                     }
                 }
 

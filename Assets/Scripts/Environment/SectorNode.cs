@@ -1,12 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// Represents a discoverable node within a sector.
-    /// Nodes are pre-placed at planet generation and hidden until the sector is explored.
-    /// Types include: resource deposits, sector features, nexus connections.
-    /// Each node has a 3D visual marker spawned at its position.
+    /// Represents a discoverable node within a sector that connects to other nodes.
+    /// Nodes form a graph: exploring one node reveals its connections.
     /// </summary>
     [System.Serializable]
     public class SectorNode
@@ -23,11 +22,14 @@ namespace GameDevTV.RTS.Environment
 
         public NodeType type;
         public Vector3 position;
-        public bool isRevealed;
-        public string labelOverride;       // Custom label shown when revealed (e.g., "Lava Tube Detected")
-        public int connectedSectorIndex;   // For Nexus nodes: which sector this connects to
-        public string flavorText;          // Description shown in discovery UI
-        public GameObject visualGO;        // 3D marker object in the scene (spawned by PlanetGenerator)
+        public bool isExplored;          // Player has explored this node
+        public bool isDiscovered;        // "?" state — connected to an explored node but not yet explored
+        public string labelOverride;     // Custom label (e.g., "Lava Tube Detected")
+        public int connectedSectorIndex; // For Nexus: which sector this leads to
+        public string flavorText;        // Description shown in discovery UI
+        public GameObject visualGO;      // 3D marker in the scene
+        public GameObject questionMarkGO; // "?" floating text
+        public List<SectorNode> connections = new List<SectorNode>(); // Nodes this connects to
 
         public SectorNode(NodeType type, Vector3 position, string flavorText = "", string labelOverride = "")
         {
@@ -35,15 +37,41 @@ namespace GameDevTV.RTS.Environment
             this.position = position;
             this.flavorText = flavorText;
             this.labelOverride = labelOverride;
-            this.isRevealed = false;
+            this.isExplored = false;
+            this.isDiscovered = false;
             this.connectedSectorIndex = -1;
             this.visualGO = null;
+            this.questionMarkGO = null;
         }
 
-        /// <summary>Show or hide the 3D visual marker.</summary>
         public void SetVisualVisible(bool visible)
         {
             if (visualGO != null) visualGO.SetActive(visible);
+        }
+
+        public void SetQuestionMarkVisible(bool visible)
+        {
+            if (questionMarkGO != null) questionMarkGO.SetActive(visible);
+        }
+
+        /// <summary>
+        /// When this node is explored, discover all connected nodes (show "?" on them).
+        /// </summary>
+        public void OnExplored()
+        {
+            isExplored = true;
+            isDiscovered = false;
+            SetVisualVisible(true);
+            SetQuestionMarkVisible(false);
+
+            foreach (var conn in connections)
+            {
+                if (conn != null && !conn.isExplored)
+                {
+                    conn.isDiscovered = true;
+                    conn.SetQuestionMarkVisible(true);
+                }
+            }
         }
     }
 }

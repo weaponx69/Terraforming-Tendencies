@@ -175,54 +175,55 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
-        /// Show the discovery UI with sector info, resource nodes, and bonus rewards.
+        /// Show the discovery UI for a single explored node, its connections, and bonus rewards.
         /// </summary>
-        public void Show(int sectorIndex, List<SectorNode> resourceNodes, ExplorationNodeSO[] bonuses)
+        public void Show(int sectorIndex, List<SectorNode> exploredNodes, ExplorationNodeSO[] bonuses)
         {
             if (panel == null) Initialize();
 
             panel.SetActive(true);
-            titleText.text = $"Sector {sectorIndex} Explored!";
-            sectorInfoText.text = $"New territory mapped and resources identified.";
+            titleText.text = $"Node Explored!";
+            sectorInfoText.text = $"Sector {sectorIndex} — new discoveries mapped.";
 
             // Clear previous items
             foreach (Transform child in resourceListContainer) Destroy(child.gameObject);
             foreach (Transform child in bonusListContainer) Destroy(child.gameObject);
 
-            // Resource nodes
-            foreach (var node in resourceNodes)
+            // Show the explored node + its connections
+            foreach (var node in exploredNodes)
             {
-                if (node.type == SectorNode.NodeType.Nexus) continue;
+                if (node == null) continue;
+
+                // Explored node
+                string label = node.labelOverride;
+                if (string.IsNullOrEmpty(label)) label = node.type.ToString();
+
                 var item = Instantiate(listItemPrefab, resourceListContainer);
                 item.SetActive(true);
-                string label = node.labelOverride;
-                if (string.IsNullOrEmpty(label))
-                    label = node.type.ToString();
-                item.GetComponent<TMPro.TextMeshProUGUI>().text = $"• {label}";
-            }
+                item.GetComponent<TMPro.TextMeshProUGUI>().text = $"★ {label} — {node.flavorText}";
+                item.GetComponent<TMPro.TextMeshProUGUI>().color = Color.green;
 
-            // Feature node
-            foreach (var node in resourceNodes)
-            {
-                if (node.type == SectorNode.NodeType.Feature)
+                // Show connections as "?" markers
+                foreach (var conn in node.connections)
                 {
-                    var item = Instantiate(listItemPrefab, resourceListContainer);
-                    item.SetActive(true);
-                    string label = node.labelOverride;
-                    if (string.IsNullOrEmpty(label))
-                        label = "Special Feature";
-                    item.GetComponent<TMPro.TextMeshProUGUI>().text = $"★ {label}";
-                    item.GetComponent<TMPro.TextMeshProUGUI>().color = new Color(1f, 0.5f, 0f);
+                    if (conn == null || conn.isExplored) continue;
+                    string connLabel = conn.labelOverride;
+                    if (string.IsNullOrEmpty(connLabel)) connLabel = conn.type.ToString();
+                    var connItem = Instantiate(listItemPrefab, resourceListContainer);
+                    connItem.SetActive(true);
+                    connItem.GetComponent<TMPro.TextMeshProUGUI>().text = $"  ? {connLabel} (unexplored)";
+                    connItem.GetComponent<TMPro.TextMeshProUGUI>().color = Color.yellow;
                 }
             }
 
             // Bonus rewards
             foreach (var bonus in bonuses)
             {
-                var item = Instantiate(listItemPrefab, bonusListContainer);
-                item.SetActive(true);
-                item.GetComponent<TMPro.TextMeshProUGUI>().text = $"• {bonus.nodeName}: {bonus.description}";
-                item.GetComponent<TMPro.TextMeshProUGUI>().color = new Color(1f, 0.8f, 0.3f);
+                if (bonus == null) continue;
+                var bonusItem = Instantiate(listItemPrefab, bonusListContainer);
+                bonusItem.SetActive(true);
+                bonusItem.GetComponent<TMPro.TextMeshProUGUI>().text = $"• {bonus.nodeName}: {bonus.description}";
+                bonusItem.GetComponent<TMPro.TextMeshProUGUI>().color = new Color(1f, 0.8f, 0.3f);
             }
 
             // Pause the game while showing discovery
