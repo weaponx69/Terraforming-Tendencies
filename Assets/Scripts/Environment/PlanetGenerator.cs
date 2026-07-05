@@ -334,11 +334,8 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
-                ScatterSurfaceFeatures();
-                if (SpawnFloraOnStart)
-                {
-                    ScatterFlora();
-                }
+                // Remove old scattered resources — only node-based resources should exist
+                ClearOldScatteredResources();
 
                 // Ensure sectors are initialized before placing nodes
                 if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count == 0)
@@ -350,11 +347,11 @@ namespace GameDevTV.RTS.Environment
                 PlaceSectorResourceNodes();
 
                 BakeAllNavMeshes();
-                ApplyCurvedWorldShader(gameObject);
-
-                GameObject updater = new GameObject("CurvedWorldUpdater");
-                updater.transform.parent = transform;
-                updater.AddComponent<CurvedWorldUpdater>();
+                // Curved world shader disabled — flat terrain looks better for node-based exploration
+                // ApplyCurvedWorldShader(gameObject);
+                // GameObject updater = new GameObject("CurvedWorldUpdater");
+                // updater.transform.parent = transform;
+                // updater.AddComponent<CurvedWorldUpdater>();
 
                 if (OnPlanetGenerated != null)
                 {
@@ -380,8 +377,8 @@ namespace GameDevTV.RTS.Environment
                         int sectorIndex = SectorManager.Instance.Sectors.IndexOf(sector);
                         float secW = (Config.MapWidth * CellSize) / Config.SectorsX;
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
-                        Vector3 sectorMin = sector.Center - new Vector3(secW * 0.4f, 0, secH * 0.4f);
-                        Vector3 sectorMax = sector.Center + new Vector3(secW * 0.4f, 0, secH * 0.4f);
+                        Vector3 sectorMin = sector.Center - new Vector3(secW * 0.45f, 0, secH * 0.45f);
+                        Vector3 sectorMax = sector.Center + new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         float exclusionRadius = 5f;
 
                         System.Func<Vector3> randomPos = () =>
@@ -571,15 +568,6 @@ namespace GameDevTV.RTS.Environment
                                 spawnPos.y = hit.point.y + 0.5f; // Float above ground
                             }
 
-                            // For resource nodes, spawn actual gatherable prefabs so drones can mine them
-                            if (node.type == SectorNode.NodeType.Minerals ||
-                                node.type == SectorNode.NodeType.Gas ||
-                                node.type == SectorNode.NodeType.Iron ||
-                                node.type == SectorNode.NodeType.Regolith)
-                            {
-                                SpawnGatherableAtNode(node, spawnPos);
-                            }
-
                             // --- Dot marker (small flat circle) ---
                             Color dotColor;
                             float dotSize;
@@ -606,129 +594,69 @@ namespace GameDevTV.RTS.Environment
                             dotMat.color = dotColor;
                             dotRenderer.material = dotMat;
 
+                            // For resource nodes, make the dot itself gatherable
+                            if (node.type == SectorNode.NodeType.Minerals ||
+                                node.type == SectorNode.NodeType.Gas ||
+                                node.type == SectorNode.NodeType.Iron ||
+                                node.type == SectorNode.NodeType.Regolith)
+                            {
+                                SupplySO supplySO = null;
+                                string resourceType = "";
+                                switch (node.type)
+                                {
+                                    case SectorNode.NodeType.Minerals: supplySO = MineralsSupplySO; resourceType = "Minerals"; break;
+                                    case SectorNode.NodeType.Gas: supplySO = GasSupplySO; resourceType = "Gas"; break;
+                                    case SectorNode.NodeType.Iron: supplySO = Resources.Load<SupplySO>("Gatherable Supplies/Iron"); resourceType = "Iron"; break;
+                                    case SectorNode.NodeType.Regolith: supplySO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith"); resourceType = "Regolith"; break;
+                                }
+                                if (supplySO != null)
+                                {
+                                    var gs = dot.AddComponent<GatherableSupply>();
+                                    gs.Supply = supplySO;
+                                    gs.Amount = supplySO.MaxAmount;
+                                    gs.SetVisible(false);
+                                    gs.ToggleColliders(false);
+
+                                    var hr = dot.AddComponent<HiddenResource>();
+                                    hr.ResourceTypeName = resourceType;
+                                }
+                            }
+
                             node.visualGO = dot;
 
-                            // --- "?" floating label (larger, more visible) ---
+                            // --- "?" floating label (much bigger) ---
                             var qmGo = new GameObject($"QuestionMark_{node.type}");
-                            qmGo.transform.position = spawnPos + Vector3.up * 1.5f;
+                            qmGo.transform.position = spawnPos + Vector3.up * 2.5f;
                             qmGo.transform.parent = questionMarkRoot.transform;
                             var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
                             qmText.text = "?";
-                            qmText.fontSize = 3f;
+                            qmText.fontSize = 8f;
                             qmText.alignment = TMPro.TextAlignmentOptions.Center;
                             qmText.color = Color.yellow;
                             qmText.fontStyle = TMPro.FontStyles.Bold;
-                            qmText.transform.localScale = Vector3.one * 0.4f;
+                            qmText.transform.localScale = Vector3.one * 0.8f;
                             node.questionMarkGO = qmGo;
                         }
                     }
                 }
 
                 /// <summary>
-                /// Spawn an actual GatherableSupply prefab at the node position so drones can mine it.
+                /// Destroy all old scattered GatherableSupply objects left from previous generation.
                 /// </summary>
-                private void SpawnGatherableAtNode(SectorNode node, Vector3 position)
+                private void ClearOldScatteredResources()
                 {
-                    if (Config == null || Config.ResourcePrefabs == null || Config.ResourcePrefabs.Length == 0) return;
-
-                    GameObject prefab = null;
-                    SupplySO supplySO = null;
-                    string resourceType = "";
-
-                    switch (node.type)
+                    var oldSupplies = GetComponentsInChildren<GatherableSupply>(true);
+                    int count = 0;
+                    foreach (var gs in oldSupplies)
                     {
-                        case SectorNode.NodeType.Minerals:
-                            // Find a crystal/mineral prefab
-                            foreach (var p in Config.ResourcePrefabs)
-                            {
-                                if (p != null && p.name.ToLower().Contains("crystal"))
-                                {
-                                    prefab = p;
-                                    break;
-                                }
-                            }
-                            if (prefab == null && Config.ResourcePrefabs.Length > 0)
-                                prefab = Config.ResourcePrefabs[0];
-                            supplySO = MineralsSupplySO;
-                            resourceType = "Minerals";
-                            break;
-
-                        case SectorNode.NodeType.Gas:
-                            foreach (var p in Config.ResourcePrefabs)
-                            {
-                                if (p != null && p.name.ToLower().Contains("gas"))
-                                {
-                                    prefab = p;
-                                    break;
-                                }
-                            }
-                            if (prefab == null && Config.ResourcePrefabs.Length > 0)
-                                prefab = Config.ResourcePrefabs[0];
-                            supplySO = GasSupplySO;
-                            resourceType = "Gas";
-                            break;
-
-                        case SectorNode.NodeType.Iron:
-                            // Use rock prefabs for Iron
-                            if (Config.SurfaceFeaturePrefabs != null)
-                            {
-                                foreach (var p in Config.SurfaceFeaturePrefabs)
-                                {
-                                    if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
-                                    {
-                                        prefab = p;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (prefab == null && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
-                                prefab = Config.ResourcePrefabs[0];
-                            supplySO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
-                            resourceType = "Iron";
-                            break;
-
-                        case SectorNode.NodeType.Regolith:
-                            if (Config.SurfaceFeaturePrefabs != null)
-                            {
-                                foreach (var p in Config.SurfaceFeaturePrefabs)
-                                {
-                                    if (p != null && !p.name.ToLower().Contains("crystal") && !p.name.ToLower().Contains("mineral"))
-                                    {
-                                        prefab = p;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (prefab == null && Config.ResourcePrefabs != null && Config.ResourcePrefabs.Length > 0)
-                                prefab = Config.ResourcePrefabs[0];
-                            supplySO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
-                            resourceType = "Regolith";
-                            break;
+                        if (gs != null && gs.gameObject != null)
+                        {
+                            DestroyImmediate(gs.gameObject);
+                            count++;
+                        }
                     }
-
-                    if (prefab == null || supplySO == null) return;
-
-                    var gatherable = Instantiate(prefab, position, Quaternion.identity);
-                    gatherable.transform.parent = transform;
-
-                    // Add GatherableSupply component if not present
-                    if (!gatherable.TryGetComponent<GatherableSupply>(out var gs))
-                    {
-                        gs = gatherable.AddComponent<GatherableSupply>();
-                    }
-                    gs.Supply = supplySO;
-                    gs.Amount = supplySO != null ? supplySO.MaxAmount : 100;
-
-                    // Add HiddenResource so it's invisible until sector is explored
-                    if (!gatherable.TryGetComponent<HiddenResource>(out var hr))
-                    {
-                        hr = gatherable.AddComponent<HiddenResource>();
-                    }
-                    hr.ResourceTypeName = resourceType;
-
-                    // Start hidden
-                    gs.SetVisible(false);
-                    gs.ToggleColliders(false);
+                    if (count > 0)
+                        Debug.Log($"[PlanetGenerator] Cleaned up {count} old scattered resources.");
                 }
 
                 public void ReplenishResources()
