@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Environment
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoSpawn()
         {
-            if (FindFirstObjectByType<ExplorationNodeDatabase>() != null) return;
+            if (FindAnyObjectByType<ExplorationNodeDatabase>() != null) return;
             var go = new GameObject("ExplorationNodeDatabase (auto)");
             go.AddComponent<ExplorationNodeDatabase>();
             DontDestroyOnLoad(go);

@@ -22,7 +22,7 @@ namespace GameDevTV.RTS.Environment
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoSpawn()
         {
-            if (FindFirstObjectByType<ExplorationManager>() != null) return;
+            if (FindAnyObjectByType<ExplorationManager>() != null) return;
             var go = new GameObject("ExplorationManager (auto)");
             go.AddComponent<ExplorationManager>();
             DontDestroyOnLoad(go);
