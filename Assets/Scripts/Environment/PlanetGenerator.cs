@@ -471,7 +471,13 @@ namespace GameDevTV.RTS.Environment
                     // Set Sector 0's first node as explored (entry point from UCC)
                     if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
                     {
-                        SectorManager.Instance.Sectors[0].Nodes[0].OnExplored();
+                        var firstNode = SectorManager.Instance.Sectors[0].Nodes[0];
+                        Debug.Log($"[PlanetGenerator] First node has {firstNode.connections.Count} connections before OnExplored()");
+                        string connInfo = firstNode.connections.Count > 0
+                            ? $"explored={firstNode.connections[0].isExplored} discovered={firstNode.connections[0].isDiscovered}"
+                            : "NONE";
+                        firstNode.OnExplored();
+                        Debug.Log($"[PlanetGenerator] After OnExplored: {firstNode.connections.Count} connections. First connection: {connInfo}");
                     }
 
                     // Update visibility based on node states
@@ -594,6 +600,15 @@ namespace GameDevTV.RTS.Environment
                             var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                             dotMat.color = dotColor;
                             dotRenderer.material = dotMat;
+
+                            // Make the collider larger and wider for easier clicking
+                            var capCol = dot.GetComponent<CapsuleCollider>();
+                            if (capCol != null)
+                            {
+                                capCol.radius = Mathf.Max(visSize * 0.8f, 0.5f); // Wide click radius
+                                capCol.height = 0.5f; // Tall enough to click
+                                capCol.center = new Vector3(0, 0.25f, 0); // Center it above ground
+                            }
 
                             // For resource nodes, make the dot itself gatherable
                             if (node.type == SectorNode.NodeType.Minerals ||
