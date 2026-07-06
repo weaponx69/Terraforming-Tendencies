@@ -29,6 +29,8 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 1136247005689152321
       type: {class: 'TypedVariableModel`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
       data:
@@ -131,7 +133,7 @@ MonoBehaviour:
   - rid: 1136247005689152450
   - rid: 1136247005849583635
   - rid: 1136247005849583867
-  m_VersionTimestamp: 639187477283761450
+  m_VersionTimestamp: 639189009249405460
   m_SerializedVersion: 3
   m_DebugInfo: {fileID: -5199378790562436584}
   m_RuntimeGraph: {fileID: 1784358714962989877}
@@ -202,7 +204,7 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Wait For Any
     Story: 
     RuntimeTypeString: Unity.Behavior.WaitForAnyComposite, Unity.Behavior, Version=0.0.0.0,
@@ -222,9 +224,9 @@ MonoBehaviour:
     Timestamp: 639187477251821900
   - Asset: {fileID: 11400000, guid: 00380bad6fca0ac4ebcbb05060a5bcb1, type: 2}
     Timestamp: 639187477251955450
-  m_BlackboardMissingManagedRef: 0
-  m_GraphMissingManagedRef: 0
-  m_HasMissingTypeInManagedRef: 0
+  m_BlackboardMissingManagedRef: 1
+  m_GraphMissingManagedRef: 1
+  m_HasMissingTypeInManagedRef: 1
   m_EnumDependencyCache:
     Entries:
     - EnumTypeId: GameDevTV.RTS.Units.UnitCommands, MainGame
@@ -1677,7 +1679,7 @@ MonoBehaviour:
         - rid: 2513105450736288160
         - rid: 2513105450736288160
         m_Child:
-          rid: 2513105450736288176
+          rid: -2
     - rid: 2513105450736288168
       type: {class: RunSubgraph, ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1783,18 +1785,6 @@ MonoBehaviour:
           rid: 2513105450736288081
         ComparisonValue:
           rid: 2513105450736288082
-    - rid: 2513105450736288176
-      type: {class: StopAgentAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
-      data:
-        ID:
-          m_Value0: 4993272424723556460
-          m_Value1: 13211928268600793786
-        Graph:
-          rid: 1136247006267441393
-        m_Parent:
-          rid: 2513105450736288167
-        Agent:
-          rid: 1136247006267441410
     - rid: 2513105450736288177
       type: {class: MoveToTargetGameObjectAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
       data:
@@ -1864,6 +1854,8 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 1136247005849583933
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:

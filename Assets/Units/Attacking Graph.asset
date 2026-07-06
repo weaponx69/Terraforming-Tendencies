@@ -28,6 +28,8 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 1136246444492850060
       type: {class: 'TypedVariableModel`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
       data:
@@ -105,6 +107,8 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 1136247005849583870
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -167,7 +171,7 @@ MonoBehaviour:
   - rid: 1136246527933284851
   - rid: 1136246527933284852
   - rid: 1136246527933284890
-  m_VersionTimestamp: 639187477251821900
+  m_VersionTimestamp: 639189009249404680
   m_SerializedVersion: 3
   m_DebugInfo: {fileID: 4485949449868393563}
   m_RuntimeGraph: {fileID: 7068402386676417086}
@@ -229,7 +233,7 @@ MonoBehaviour:
           mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Conditional Branch
     Story: 
     RuntimeTypeString: Unity.Behavior.BranchingConditionComposite, Unity.Behavior,
@@ -261,15 +265,15 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   m_Blackboards: []
   m_MainBlackboardAuthoringAsset: {fileID: -6881026759224001220}
   m_CommandBuffer:
     m_Commands: []
   m_SubgraphsInfo: []
-  m_BlackboardMissingManagedRef: 0
-  m_GraphMissingManagedRef: 0
-  m_HasMissingTypeInManagedRef: 0
+  m_BlackboardMissingManagedRef: 1
+  m_GraphMissingManagedRef: 1
+  m_HasMissingTypeInManagedRef: 1
   m_EnumDependencyCache:
     Entries: []
   references:
@@ -1032,16 +1036,16 @@ MonoBehaviour:
         m_Parent:
           rid: 2513105450736287745
         m_Children:
-        - rid: 2513105450736287749
-        - rid: 2513105450736287750
+        - rid: -2
+        - rid: -2
         m_RegisteredObservers: []
         m_Conditions:
         - rid: 2513105450736287751
         m_RequiresAllConditions: 0
         True:
-          rid: 2513105450736287749
+          rid: -2
         False:
-          rid: 2513105450736287750
+          rid: -2
         m_CurrentChild:
           rid: -2
         m_ObserverType: 0
@@ -1058,38 +1062,6 @@ MonoBehaviour:
         Graph:
           rid: 1136247005689152473
         Variable:
-          rid: 1136247005689152484
-    - rid: 2513105450736287749
-      type: {class: AttackTargetAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
-      data:
-        ID:
-          m_Value0: 6793690096216889743
-          m_Value1: 8007556355458061763
-        Graph:
-          rid: 1136247005689152473
-        m_Parent:
-          rid: 2513105450736287746
-        Self:
-          rid: 1136247005689152481
-        Target:
-          rid: 1136247005689152483
-        AttackConfig:
-          rid: 1136247005689152482
-        NearbyEnemies:
-          rid: 1136247005689152485
-    - rid: 2513105450736287750
-      type: {class: MoveToTargetLocationAction, ns: GameDevTV.RTS.Behavior, asm: MainGame}
-      data:
-        ID:
-          m_Value0: 417413205503531127
-          m_Value1: 17532292894620110504
-        Graph:
-          rid: 1136247005689152473
-        m_Parent:
-          rid: 2513105450736287746
-        Agent:
-          rid: 1136247005689152481
-        TargetLocation:
           rid: 1136247005689152484
     - rid: 2513105450736287751
       type: {class: VariableComparisonCondition, ns: Unity.Behavior, asm: Unity.Behavior}
