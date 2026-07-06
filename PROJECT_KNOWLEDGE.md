@@ -605,3 +605,55 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
   * **Asset Unloading:** Invokes `Resources.UnloadUnusedAssets()` and `EditorUtility.UnloadUnusedAssetsImmediate()` to reclaim GPU and RAM from unreferenced texture, model, and material assets.
   * **Playmode Leak Pruning:** Automatically identifies and cleans up survived playmode clones or dangling runtime materials with a single click.
   * **Menu Path:** Accessible via **Tools ➔ RTS Memory Cleaner** in the Unity Editor menu bar.
+
+#### 31. PlayerInput & ActionsUI Event-Driven Architecture
+**Core Principle:** `PlayerInput` does NOT select what action buttons appear in the UI action container. There is a strict separation of concerns between UI display and input execution.
+
+##### 1. ActionsUI Determines What Buttons to Show
+[`ActionsUI.RefreshButtons()`](Scripts/UI/Containers/ActionsUI.cs:60) directly queries the **selected unit's `AvailableCommands`** property (from [`AbstractCommandable.AvailableCommands`](Scripts/Units/AbstractCommandable.cs:20)):
+- Takes the first selected unit's `AvailableCommands` as the base set.
+- Filters them through `command.IsAvailable()` to check costs/restrictions/gates.
+- Intersects with `AvailableCommands` from all other selected units (only shows commands all units share).
+- Assigns each surviving command to a slot-based UI button using `command.Slot`.
+
+##### 2. ActionsUI Raises `CommandSelectedEvent` on Click
+When a UI button is clicked, [`ActionsUI.HandleClick()`](Scripts/UI/Containers/ActionsUI.cs:98) raises a [`CommandSelectedEvent`](Scripts/Events/CommandSelectedEvent.cs) via the event bus:
+```csharp
+Bus<CommandSelectedEvent>.Raise(Owner.Player1, new CommandSelectedEvent(action));
+```
+
+##### 3. PlayerInput Listens for and Executes the Command
+[`PlayerInput.Awake()`](Scripts/Player/PlayerInput.cs:65) subscribes to `CommandSelectedEvent`. [`PlayerInput.HandleActionSelected()`](Scripts/Player/PlayerInput.cs:93) sets `activeCommand` and either:
+- **Executes immediately** if `command.RequiresClickToActivate == false` (e.g., training a unit).
+- **Shows a placement ghost** if `command.GhostPrefab != null` (e.g., building placement).
+
+##### 4. Left-Click & Right-Click Execution
+- **Left-click** ([`HandleLeftClick()`](Scripts/Player/PlayerInput.cs:283)): If `activeCommand` is set, calls [`ActivateAction()`](Scripts/Player/PlayerInput.cs:303) which iterates selected units and calls `activeCommand.Handle(context)`.
+- **Right-click** ([`HandleRightClick()`](Scripts/Player/PlayerInput.cs:223)): Iterates selected units via [`GetAvailableCommands()`](Scripts/Player/PlayerInput.cs:261), finds the first `CanHandle()` == true, and executes `command.Handle(context)`.
+
+##### 5. RuntimeUI Orchestrates UI Refresh
+[`RuntimeUI`](Scripts/UI/RuntimeUI.cs) subscribes to selection/death/spawn/upgrade events and calls `actionsUI.EnableFor(selectedUnits)` to refresh buttons whenever selection or game state changes.
+
+##### 6. The Complete Flow
+```
+User clicks UI button
+  -> ActionsUI raises CommandSelectedEvent
+    -> PlayerInput.HandleActionSelected() receives it
+      -> Sets activeCommand, shows ghost, or executes instantly
+
+User left-clicks on map (with active command)
+  -> PlayerInput.HandleLeftClick()
+    -> ActivateAction() calls activeCommand.Handle(context)
+
+User right-clicks on map (with units selected)
+  -> PlayerInput.HandleRightClick()
+    -> Iterates GetAvailableCommands() for each selected unit
+    -> Finds first CanHandle() == true
+    -> Calls command.Handle(context)
+```
+
+##### 7. Architectural Rule for AI Agents
+- **DO NOT** make `PlayerInput` control which UI buttons appear. It only reacts to `CommandSelectedEvent`.
+- **DO NOT** modify `ActionsUI` to ask `PlayerInput` what to show. Query the selected unit's `AvailableCommands` instead.
+- **To add a new command/action:** Create a `BaseCommand` ScriptableObject, assign it to the unit's `AvailableCommands` array, and wire its `Slot` number to an available UI slot.
+- **To add a new UI action button slot:** Increase the `actionButtons` array size on the `ActionsUI` component.
