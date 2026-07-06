@@ -120,6 +120,28 @@ namespace GameDevTV.RTS.Player
             if (cameraTarget == null) return;
             if (hasCameraBeenFocused) return;
             
+            // Prioritize centering on the starting sector (Sector 0) center
+            var sectorManager = GameDevTV.RTS.Environment.SectorManager.Instance;
+            if (sectorManager != null)
+            {
+                if (sectorManager.Sectors.Count == 0)
+                {
+                    sectorManager.InitializeSectors();
+                }
+                if (sectorManager.Sectors.Count > 0)
+                {
+                    var startingSector = sectorManager.Sectors[0];
+                    if (startingSector != null)
+                    {
+                        Vector3 targetPos = startingSector.Center;
+                        targetPos.y = cameraTarget.position.y;
+                        cameraTarget.position = targetPos;
+                        hasCameraBeenFocused = true;
+                        return;
+                    }
+                }
+            }
+
             // Prioritize centering on the base if one exists
             var baseBuilding = BaseBuilding.ActiveBuildings.FirstOrDefault(b => b.Owner == Owner.Player1);
             if (baseBuilding != null)
@@ -271,6 +293,7 @@ namespace GameDevTV.RTS.Player
                 if (prefabToInstantiate != null)
                 {
                     ghostInstance = Instantiate(prefabToInstantiate);
+                    ghostInstance.name = "Ghost_" + prefabToInstantiate.name;
 
                     if (ghostInstance.TryGetComponent(out BaseBuilding bb))
                     {

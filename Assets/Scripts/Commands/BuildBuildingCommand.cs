@@ -240,6 +240,7 @@ namespace GameDevTV.RTS.Commands
                     {
                         if (b != null && b.Owner == owner && b.BuildingSO != null
                             && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
+                            && !b.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase)
                             && b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                         {
                             if (b.Progress.State != BuildingProgress.BuildingState.Destroyed
@@ -273,13 +274,16 @@ namespace GameDevTV.RTS.Commands
                     {
                         if (col == null) continue;
 
-                        var bld = col.GetComponentInParent<BaseBuilding>();
-                        if (bld != null)
+                        var commandable = col.GetComponentInParent<AbstractCommandable>();
+                        if (commandable != null)
                         {
-                            if (bld.Progress.State == BuildingProgress.BuildingState.Destroyed) continue;
-                            
-                            // If placing a Command Post, ignore any editor pre-placed buildings (e.g. Universal Command Center)
-                            if (isCommandBldgRestriction && !bld.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            // If placing a Command Post, ignore any editor pre-placed buildings (e.g. Universal Command Center / UCC starting base)
+                            if (isCommandBldgRestriction && !commandable.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            if (commandable is BaseBuilding bld && bld.Progress.State == BuildingProgress.BuildingState.Destroyed)
                             {
                                 continue;
                             }
@@ -338,7 +342,6 @@ namespace GameDevTV.RTS.Commands
 
                     if (!hasFeature && nearestSector.IsExplored)
                     {
-                        Debug.LogWarning($"[BuildBuildingCommand] {bldName} requires {nearestSector.Feature} but sector has {nearestSector.Feature}. Cannot place here.");
                         return false;
                     }
                 }
@@ -358,15 +361,16 @@ namespace GameDevTV.RTS.Commands
             // Exception: allow building when no Command Post exists yet (player starts with nothing)
             if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
-                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase)
+                // Allow the first player-placed Command Post anytime if none exist in the world yet.
+                // This prevents softlocking on campaigns/start where the starting base is not yet active.
+                bool hasExistingCommandPost = false;
+                if (BaseBuilding.ActiveBuildings != null)
                 {
-                    // Allow if no player Command Post exists yet
-                    if (BaseBuilding.ActiveBuildings == null) return true;
-                    bool hasExistingCommandPost = false;
                     foreach (var b in BaseBuilding.ActiveBuildings)
                     {
                         if (b != null && b.Owner == context.Owner && b.BuildingSO != null
-                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
+                            && !b.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase))
                         {
                             // Filter for player-placed runtime buildings (whose GameObject names contain "(Clone)")
                             if (b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
@@ -376,7 +380,18 @@ namespace GameDevTV.RTS.Commands
                             }
                         }
                     }
-                    if (!hasExistingCommandPost) return false; // Allow first Command Post anytime
+                }
+                
+                if (!hasExistingCommandPost)
+                {
+                    // If no player Command Post exists, they can always place it (it is unlocked)
+                    return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
+                }
+
+                // If they already have a player Command Post, restrict building more:
+                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase)
+                {
+                    // Only allow building new Command Posts during the expansion phase
                     return true;
                 }
 

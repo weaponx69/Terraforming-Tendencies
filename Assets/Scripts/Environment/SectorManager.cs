@@ -28,6 +28,10 @@ namespace GameDevTV.RTS.Environment
         public List<Sector> Sectors = new List<Sector>();
         public Sector ActiveSector { get; set; }
 
+        private float secW;
+        private float secH;
+        private List<GameObject> borderInstances = new List<GameObject>();
+
         /// <summary>Fired whenever a previously locked sector becomes unlocked.</summary>
         public static event Action OnSectorUnlocked;
 
@@ -77,8 +81,8 @@ namespace GameDevTV.RTS.Environment
 
             Sectors.Clear();
 
-            float secW = worldWidth / config.SectorsX;
-            float secH = worldHeight / config.SectorsY;
+            secW = worldWidth / config.SectorsX;
+            secH = worldHeight / config.SectorsY;
 
             for (int y = 0; y < config.SectorsY; y++)
             {
@@ -117,6 +121,7 @@ namespace GameDevTV.RTS.Environment
                 DiscoverySystem.RevealResourceType("Gas");
 
                 DiscoverResourcesInUnlockedSectors();
+                UpdateSectorBorders();
                 OnSectorUnlocked?.Invoke();
             }
             Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector 0 is unlocked.");
@@ -247,6 +252,7 @@ namespace GameDevTV.RTS.Environment
                     ActiveSector = Sectors[i];
                     Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
                     DiscoverResourcesInUnlockedSectors();
+                    UpdateSectorBorders();
                     OnSectorUnlocked?.Invoke();
                     return; // Only unlock one at a time
                 }
@@ -280,6 +286,7 @@ namespace GameDevTV.RTS.Environment
             ActiveSector = Sectors[index];
             OnSectorExplored?.Invoke(index);
             DiscoverResourcesInUnlockedSectors();
+            UpdateSectorBorders();
             Debug.Log($"[SectorManager] Sector {index} unlocked via node exploration!");
         }
 
@@ -337,6 +344,75 @@ namespace GameDevTV.RTS.Environment
                 if (Sectors[i].IsLocked && !Sectors[i].IsExplored) return i;
             }
             return -1;
+        }
+
+        public void UpdateSectorBorders()
+        {
+            // Clean up old borders
+            foreach (var go in borderInstances)
+            {
+                if (go != null) Destroy(go);
+            }
+            borderInstances.Clear();
+
+            if (secW <= 0f || secH <= 0f) return;
+
+            // Create borders for unlocked sectors
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                var sector = Sectors[i];
+                if (sector == null || sector.IsLocked) continue;
+
+                GameObject borderGo = new GameObject("SectorBorder_" + i);
+                borderGo.transform.SetParent(transform);
+                borderInstances.Add(borderGo);
+
+                LineRenderer line = borderGo.AddComponent<LineRenderer>();
+                line.positionCount = 5;
+                line.startWidth = 0.6f;
+                line.endWidth = 0.6f;
+                
+                // Cyan sci-fi holographic style color
+                Color cyanColor = new Color(0f, 0.9f, 0.9f, 0.8f);
+                line.startColor = cyanColor;
+                line.endColor = cyanColor;
+
+                // Simple additive/sprite shader
+                Shader defaultShader = Shader.Find("Sprites/Default");
+                if (defaultShader != null)
+                {
+                    line.material = new Material(defaultShader);
+                }
+
+                line.useWorldSpace = true;
+                line.loop = true;
+
+                // Compute corner coordinates
+                float minX = sector.Center.x - secW / 2f;
+                float maxX = sector.Center.x + secW / 2f;
+                float minZ = sector.Center.z - secH / 2f;
+                float maxZ = sector.Center.z + secH / 2f;
+
+                Vector3[] corners = new Vector3[5];
+                corners[0] = new Vector3(minX, 0f, minZ);
+                corners[1] = new Vector3(maxX, 0f, minZ);
+                corners[2] = new Vector3(maxX, 0f, maxZ);
+                corners[3] = new Vector3(minX, 0f, maxZ);
+                corners[4] = new Vector3(minX, 0f, minZ);
+
+                // Sample heights to stick the lines to the terrain
+                for (int j = 0; j < 5; j++)
+                {
+                    float y = 0.5f; // fallback slightly above zero
+                    if (Physics.Raycast(new Vector3(corners[j].x, 100f, corners[j].z), Vector3.down, out RaycastHit hit, 200f, LayerMask.GetMask("Default", "Terrain")))
+                    {
+                        y = hit.point.y + 0.2f; // float slightly above ground to prevent z-fighting
+                    }
+                    corners[j].y = y;
+                }
+
+                line.SetPositions(corners);
+            }
         }
 
         private void OnDrawGizmos()
