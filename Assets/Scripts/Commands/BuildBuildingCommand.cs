@@ -92,7 +92,7 @@ namespace GameDevTV.RTS.Commands
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Owner == context.Owner && b.BuildingSO != null 
+                    if (b != null && b.Owner == context.Owner && b.BuildingSO != null
                         && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
                     {
                         // Check if it's a player-placed building (which Unity names with "(Clone)")
@@ -103,9 +103,10 @@ namespace GameDevTV.RTS.Commands
                     }
                 }
 
-                // If starting base (GlobalCommander) is already in the scene, this is not the first Command Post
-                var commander = FindAnyObjectByType<GlobalCommander>();
-                if (existingCount == 0 && commander == null)
+                // First Command Post if no player-placed Command Post exists yet.
+                // GlobalCommander (Universal Command Center) is the editor-placed starting base,
+                // not a player Command Post, so we ignore it for this check.
+                if (existingCount == 0)
                 {
                     isFirstCommandPost = true;
                 }
@@ -224,7 +225,8 @@ namespace GameDevTV.RTS.Commands
 
         public bool AllRestrictionsPass(Vector3 point, Owner owner)
         {
-            // If this is a Command Post, prevent placing multiple Command Posts in the same sector
+            // If this is a Command Post, prevent placing multiple Command Posts in the same sector.
+            // Ignore GlobalCommander (editor-placed starting base) — only count player-built "(Clone)" buildings.
             bool isCommandBldg = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
             if (isCommandBldg)
             {
@@ -232,19 +234,13 @@ namespace GameDevTV.RTS.Commands
                 var sector = sectorManager?.GetNearestSector(point);
                 if (sector != null)
                 {
-                    // 1. Check if GlobalCommander (starting base) is in this sector
-                    var commander = FindAnyObjectByType<GlobalCommander>();
-                    if (commander != null && sectorManager.GetNearestSector(commander.transform.position) == sector)
-                    {
-                        return false;
-                    }
-
-                    // 2. Check if any player-placed BaseBuilding Command Post is in this sector (completed or under construction)
+                    // Check if any player-built Command Post is already in this sector (completed or under construction)
                     var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
                     foreach (var b in buildings)
                     {
                         if (b != null && b.Owner == owner && b.BuildingSO != null
-                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
+                            && b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                         {
                             if (b.Progress.State != BuildingProgress.BuildingState.Destroyed
                                 && sectorManager.GetNearestSector(b.transform.position) == sector)
