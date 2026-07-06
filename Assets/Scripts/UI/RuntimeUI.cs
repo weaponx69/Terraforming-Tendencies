@@ -871,6 +871,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             {
                 TryDisable(globalCommanderUI);
                 actionsUI.EnableFor(selectedUnits);
+                actionsUI.gameObject.SetActive(true);
 
                 if (selectedUnits.Count == 1)
                 {
@@ -971,13 +972,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
                 buildingSelectedUI.Disable();
                 unitTransportUI.Disable();
                 singleUnitSelectedUI.EnableFor(commandable);
-
-                // If the selected unit is a GlobalCommander, also show its commands
-                if (commandable is GlobalCommander)
-                {
-                    actionsUI.EnableFor(new HashSet<AbstractCommandable> { commandable });
-                    actionsUI.gameObject.SetActive(true);
-                }
             }
         }
 

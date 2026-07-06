@@ -31,6 +31,7 @@ namespace GameDevTV.RTS.Units
         [field: SerializeField] public Owner Owner { get; set; }
         [field: SerializeField] public bool IsVisible { get; private set; } = true;
         public Transform Transform => this == null ? null : transform;
+        [UnityEngine.Serialization.FormerlySerializedAs("<AvailableCommands>k__BackingField")]
         [SerializeField] protected BaseCommand[] _availableCommands;
         protected BaseCommand[] overrideCommands;
         public virtual BaseCommand[] AvailableCommands

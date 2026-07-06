@@ -319,10 +319,7 @@ namespace GameDevTV.RTS.Player
             HandleCheats();
         }
 
-        private void LateUpdate()
-        {
-            HandleHeroCameraFollow();
-        }
+
 
 
 
