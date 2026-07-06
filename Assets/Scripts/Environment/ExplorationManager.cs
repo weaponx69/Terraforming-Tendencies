@@ -45,7 +45,9 @@ namespace GameDevTV.RTS.Environment
         public static event System.Action<float> OnExplorationProgressChanged;
 
         /// <summary>Fired when a sector has been explored.</summary>
+#pragma warning disable CS0067
         public static event System.Action<int> OnSectorExplored;
+#pragma warning restore CS0067
 
         private float explorationTimer;
         private float boostedMultiplier = 1f;

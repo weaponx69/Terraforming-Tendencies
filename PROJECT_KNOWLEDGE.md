@@ -657,3 +657,21 @@ User right-clicks on map (with units selected)
 - **DO NOT** modify `ActionsUI` to ask `PlayerInput` what to show. Query the selected unit's `AvailableCommands` instead.
 - **To add a new command/action:** Create a `BaseCommand` ScriptableObject, assign it to the unit's `AvailableCommands` array, and wire its `Slot` number to an available UI slot.
 - **To add a new UI action button slot:** Increase the `actionButtons` array size on the `ActionsUI` component.
+
+#### 32. Unit Command UI Restoration & Serialization Fix
+* **The Problem:** In a previous refactor, the auto-property `AvailableCommands` on `AbstractCommandable` was changed to a standard property backed by a private field named `_availableCommands`. This broke loading unit commands from all unit prefab assets (e.g., `Mining Drone.prefab`, `Construction Drone.prefab`, `Probe.prefab`) because Unity's serialized data for existing prefabs saved the list under the compiler's auto-generated backing field name `<AvailableCommands>k__BackingField`. Consequently, all units loaded with 0 available commands, leaving the `ActionsUI` panel blank.
+* **The Solution:** Added `[UnityEngine.Serialization.FormerlySerializedAs("<AvailableCommands>k__BackingField")]` to the `_availableCommands` field inside [`AbstractCommandable.cs`](Assets/Scripts/Units/AbstractCommandable.cs). This instructs Unity's deserializer to map the legacy auto-property backing field name directly into `_availableCommands`.
+* **UI Activation:** Updated [`RuntimeUI.cs`](Assets/Scripts/UI/RuntimeUI.cs) to call `actionsUI.gameObject.SetActive(true)` unconditionally when any unit selection is active (`selectedUnits.Count > 0`). This restores selection-driven command button visibility in the Actions container (rather than restricting them exclusively to the `GlobalCommander`).
+
+#### 33. Command Post Placement, Fog of War, and Resource-Crushing Rules
+* **The Problem:** 
+  1. Snapping player-placed Command Post buildings to the exact sector center forced them to spawn directly on top of resource nodes and debris, crushing them instantly.
+  2. Because Sector 0's occupancy logic didn't account for the pre-placed starting base (`GlobalCommander`), Sector 0 was marked as unoccupied at startup. This made clicking "Build Command Post" automatically snap to Sector 0's center, instantly dropping a new base over starting resources.
+  3. `BuildBuildingCommand.Handle()` instantly completed the first Command Post from orbit, clearing the fog of war and removing resources on placement click.
+* **The Solution:**
+  1. Disabled snapping player-placed command buildings to sector centers in [`BuildBuildingCommand.cs`](Assets/Scripts/Commands/BuildBuildingCommand.cs). They can now be placed freely in unoccupied areas.
+  2. Modified [`SectorManager.cs`](Assets/Scripts/Environment/SectorManager.cs) to detect the `GlobalCommander` as an occupying structure, so Sector 0 is properly marked occupied on start, directing future Command Post placement camera snaps to Sector 1.
+  3. Updated [`BuildBuildingCommand.cs`](Assets/Scripts/Commands/BuildBuildingCommand.cs) to only treat a Command Post as `isFirstCommandPost` (orbital drop) if NO `GlobalCommander` exists in the scene. 
+  4. Updated [`BaseBuilding.cs`](Assets/Scripts/Units/BaseBuilding.cs) to disable `VisionTransform` (fog of war reveal) during construction/ghost states, enabling it only upon calling `CompleteConstruction()`.
+  5. Moved the resource-crushing `OverlapBox` logic from `BuildBuildingCommand.Handle()` to `BaseBuilding.CompleteConstruction()`, ensuring underlying resource nodes are only cleared when construction is finished.
+

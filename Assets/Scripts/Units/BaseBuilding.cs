@@ -428,6 +428,35 @@ namespace GameDevTV.RTS.Units
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
 
+            // Turn on vision when completed
+            if (VisionTransform != null)
+            {
+                VisionTransform.gameObject.SetActive(Owner == Owner.Player1);
+            }
+
+            // Crush any rocks/supplies underneath when construction is completed!
+            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+            if (isCommandPost)
+            {
+                Collider hitbox = GetComponent<Collider>();
+                if (hitbox != null)
+                {
+                    Collider[] crushed = Physics.OverlapBox(
+                        hitbox.bounds.center,
+                        hitbox.bounds.extents,
+                        Quaternion.identity,
+                        LayerMask.GetMask("Supplies")
+                    );
+                    foreach (var rock in crushed)
+                    {
+                        if (rock != null)
+                        {
+                            Destroy(rock.gameObject);
+                        }
+                    }
+                }
+            }
+
 
 
             if (MainRenderer != null && primaryMaterial != null)
@@ -438,15 +467,15 @@ namespace GameDevTV.RTS.Units
             SpawnWaterVisualEffect();
 
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
-            bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
+            bool isLifeSupportBldg = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
             bool isOxygenProcessor = BuildingSO != null && (BuildingSO.Name.Contains("Oxygen", System.StringComparison.OrdinalIgnoreCase));
-            if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isCommandPost || isOxygenProcessor)
+            if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isLifeSupportBldg || isOxygenProcessor)
             {
                 if (!TryGetComponent<LifeSupportNode>(out _))
                 {
                     var node = gameObject.AddComponent<LifeSupportNode>();
-                    node.Radius = isCommandPost ? Mathf.Max(BuildingSO.LifeSupportRadius, 30f) :
-                                  isOxygenProcessor ? Mathf.Max(BuildingSO.LifeSupportRadius, 25f) : 
+                    node.Radius = isLifeSupportBldg ? Mathf.Max(BuildingSO.LifeSupportRadius, 30f) :
+                                  isOxygenProcessor ? Mathf.Max(BuildingSO.LifeSupportRadius, 25f) :
                                   BuildingSO.LifeSupportRadius;
                 }
 
@@ -925,6 +954,12 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
             foreach (Collider c in colliders)
             {
                 c.enabled = false;
+            }
+
+            // Turn off vision range while under construction/ghost
+            if (VisionTransform != null)
+            {
+                VisionTransform.gameObject.SetActive(false);
             }
         }
 

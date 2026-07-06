@@ -39,7 +39,9 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private GameObject[] eventPrefabs;
 
         [Header("Debug")]
+#pragma warning disable CS0414
         [SerializeField] private bool autoStart = false;
+#pragma warning restore CS0414
 
         public int CurrentWave { get; private set; }
 

@@ -32,42 +32,8 @@ namespace GameDevTV.RTS.Commands
 
         public Vector3 SnapToNearestSector(Vector3 point)
         {
-            if (Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
-            {
-                var sector = GameDevTV.RTS.Environment.SectorManager.Instance?.GetNearestSector(point);
-                if (sector != null)
-                {
-                    // Try exact center first
-                    if (AllRestrictionsPass(sector.Center)) return sector.Center;
-
-                    // If center is blocked (e.g. by another building), try to find a valid spot nearby within the sector radius
-                    float maxSearchRadius = GameDevTV.RTS.Environment.PlanetGenerator.Instance.Config.SectorOccupationRadius;
-                    
-                    // Spiral search for a valid spot
-                    for (int ring = 1; ring <= 5; ring++)
-                    {
-                        float currentRadius = (maxSearchRadius / 5f) * ring;
-                        int pointsInRing = ring * 8;
-                        for (int i = 0; i < pointsInRing; i++)
-                        {
-                            float angle = i * (360f / pointsInRing) * Mathf.Deg2Rad;
-                            Vector3 offset = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * currentRadius;
-                            Vector3 candidate = sector.Center + offset;
-
-                            // Adjust to NavMesh height
-                            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
-                            if (UnityEngine.AI.NavMesh.SamplePosition(candidate, out UnityEngine.AI.NavMeshHit navHit, 5f, filter))
-                            {
-                                candidate = navHit.position;
-                            }
-
-                            if (AllRestrictionsPass(candidate)) return candidate;
-                        }
-                    }
-
-                    return sector.Center; // Fallback
-                }
-            }
+            // Do NOT snap player-placed command buildings to the sector center.
+            // This allows placing them anywhere within the sector, avoiding starting resources.
             return point;
         }
 
@@ -93,6 +59,13 @@ namespace GameDevTV.RTS.Commands
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
             {
                 targetPos = navHit.position;
+            }
+
+            // Prevent building in locked sectors
+            var sector = GameDevTV.RTS.Environment.SectorManager.Instance?.GetNearestSector(targetPos);
+            if (sector != null && sector.IsLocked)
+            {
+                return false;
             }
 
             return HasEnoughSupplies(context) && AllRestrictionsPass(targetPos, context.Owner);
@@ -129,7 +102,10 @@ namespace GameDevTV.RTS.Commands
                         }
                     }
                 }
-                if (existingCount == 0)
+
+                // If starting base (GlobalCommander) is already in the scene, this is not the first Command Post
+                var commander = FindAnyObjectByType<GlobalCommander>();
+                if (existingCount == 0 && commander == null)
                 {
                     isFirstCommandPost = true;
                 }
@@ -204,22 +180,6 @@ namespace GameDevTV.RTS.Commands
                     CardDeckController.Instance.DrawCard();
                 }
 
-                // Crush any rocks/supplies underneath the orbital drop!
-                Collider ghostHitbox = Building.Prefab.GetComponent<Collider>();
-                if (ghostHitbox != null)
-                {
-                    Collider[] crushed = Physics.OverlapBox(
-                        targetPos + ghostHitbox.bounds.center - Building.Prefab.transform.position,
-                        ghostHitbox.bounds.extents,
-                        Quaternion.identity,
-                        LayerMask.GetMask("Supplies")
-                    );
-                    foreach (var rock in crushed)
-                    {
-                        Destroy(rock.gameObject);
-                    }
-                }
-
                 if (Building.Cost != null)
                 {
                     Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Minerals, Building.Cost.MineralsSO));
@@ -264,12 +224,44 @@ namespace GameDevTV.RTS.Commands
 
         public bool AllRestrictionsPass(Vector3 point, Owner owner)
         {
+            // If this is a Command Post, prevent placing multiple Command Posts in the same sector
+            bool isCommandBldg = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            if (isCommandBldg)
+            {
+                var sectorManager = GameDevTV.RTS.Environment.SectorManager.Instance;
+                var sector = sectorManager?.GetNearestSector(point);
+                if (sector != null)
+                {
+                    // 1. Check if GlobalCommander (starting base) is in this sector
+                    var commander = FindAnyObjectByType<GlobalCommander>();
+                    if (commander != null && sectorManager.GetNearestSector(commander.transform.position) == sector)
+                    {
+                        return false;
+                    }
+
+                    // 2. Check if any player-placed BaseBuilding Command Post is in this sector (completed or under construction)
+                    var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
+                    foreach (var b in buildings)
+                    {
+                        if (b != null && b.Owner == owner && b.BuildingSO != null
+                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (b.Progress.State != BuildingProgress.BuildingState.Destroyed
+                                && sectorManager.GetNearestSector(b.transform.position) == sector)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+
             // Evaluate restrictions directly to ignore NavMesh holes!
             // The ground is covered in rocks which have NavMeshObstacles. This creates holes in the NavMesh.
             // If we strictly check IsFullyOnNavMesh, players can never place buildings!
             if (Restrictions != null)
             {
-                bool isCommandPost = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                bool isCommandBldgRestriction = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
 
                 foreach (BuildingRestrictionSO restriction in Restrictions)
                 {
@@ -291,7 +283,7 @@ namespace GameDevTV.RTS.Commands
                             if (bld.Progress.State == BuildingProgress.BuildingState.Destroyed) continue;
                             
                             // If placing a Command Post, ignore any editor pre-placed buildings (e.g. Universal Command Center)
-                            if (isCommandPost && !bld.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            if (isCommandBldgRestriction && !bld.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                             {
                                 continue;
                             }
@@ -304,7 +296,7 @@ namespace GameDevTV.RTS.Commands
                     {
                         // Command posts crush supplies, so ignore those restrictions
                         bool isSuppliesRestriction = (restriction.LayerMask.value & LayerMask.GetMask("Supplies")) != 0;
-                        if (isCommandPost && isSuppliesRestriction) continue;
+                        if (isCommandBldgRestriction && isSuppliesRestriction) continue;
                         
                         return false;
                     }

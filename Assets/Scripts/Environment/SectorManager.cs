@@ -160,23 +160,36 @@ namespace GameDevTV.RTS.Environment
             foreach (var sector in Sectors)
             {
                 bool found = false;
-                foreach (var building in BaseBuilding.ActiveBuildings)
-                {
-                    if (building.Owner != GameOverManager.MonitoredOwner) continue;
-                    if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
-                    
-                    // Check if it's a Command Post (using name contains check like in CompleteConstruction)
-                    bool isCommandPost = building.BuildingSO != null && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-                    if (!isCommandPost) continue;
 
-                    if (GetNearestSector(building.transform.position) == sector)
+                // Check if the starting base (GlobalCommander) occupies this sector
+                var commander = FindAnyObjectByType<GlobalCommander>();
+                if (commander != null && GetNearestSector(commander.transform.position) == sector)
+                {
+                    found = true;
+                    if (ActiveSector == null) ActiveSector = sector;
+                }
+
+                if (!found)
+                {
+                    foreach (var building in BaseBuilding.ActiveBuildings)
                     {
-                        found = true;
-                        sector.OccupyingBuilding = building;
-                        if (ActiveSector == null) ActiveSector = sector;
-                        break;
+                        if (building.Owner != GameOverManager.MonitoredOwner) continue;
+                        if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                        
+                        // Check if it's a Command Post (using name contains check like in CompleteConstruction)
+                        bool isCommandPost = building.BuildingSO != null && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                        if (!isCommandPost) continue;
+
+                        if (GetNearestSector(building.transform.position) == sector)
+                        {
+                            found = true;
+                            sector.OccupyingBuilding = building;
+                            if (ActiveSector == null) ActiveSector = sector;
+                            break;
+                        }
                     }
                 }
+
                 sector.IsOccupied = found;
                 if (!found) sector.OccupyingBuilding = null;
             }
