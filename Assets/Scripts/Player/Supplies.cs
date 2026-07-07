@@ -453,6 +453,9 @@ namespace GameDevTV.RTS.Player
             foreach (var c in commandables)
             {
                 if (c == null) continue;
+                // Skip the GlobalCommander (UCC) — it's invulnerable with 99999 HP
+                // and would mask the colony's true health status.
+                if (c is GlobalCommander) continue;
                 if (c.Owner == owner)
                 {
                     totalMaxHP += c.MaxHealth;

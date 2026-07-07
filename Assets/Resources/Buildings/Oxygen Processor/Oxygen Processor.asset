@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   <Name>k__BackingField: Oxygen Processor
   <IsOneTimeUnlock>k__BackingField: 0
-  <BuildTime>k__BackingField: 40
+  <BuildTime>k__BackingField: 5
   <Icon>k__BackingField: {fileID: 21300000, guid: ca66bc91edfb9b988b60086bc688a759, type: 3}
   <Cost>k__BackingField: {fileID: 11400000, guid: 58c9f72c1fa3a844f94d6922d94cb5ff, type: 2}
   <TechTree>k__BackingField: {fileID: 11400000, guid: 3a07828278e4cdb44ab0c2a943ccf22a, type: 2}
   <unlockRequirements>k__BackingField:
   - {fileID: 11400000, guid: f6b38bef630bb884195c6d3f702eefb9, type: 2}
-  health: 100
+  health: 400
   prefab: {fileID: 2595850435611690952, guid: 403ac08500cef5f67a6fa6dc10167531, type: 3}
   upgrades: []
   sightConfig: {fileID: 11400000, guid: f72837298f54f6540bf60aa3b317c6f8, type: 2}
@@ -31,4 +31,4 @@ MonoBehaviour:
   buildingConfig: {fileID: 11400000, guid: c0000000000000000000000000000006, type: 2}
   <PlacementMaterial>k__BackingField: {fileID: 2100000, guid: b1ef2fa16faec654da7102aa095d466e, type: 2}
   <IsLifeSupport>k__BackingField: 1
-  <LifeSupportRadius>k__BackingField: 25
+  <LifeSupportRadius>k__BackingField: 10
