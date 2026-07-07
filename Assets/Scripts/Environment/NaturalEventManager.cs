@@ -55,17 +55,29 @@ namespace GameDevTV.RTS.Environment
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void SubscribeToFirstBuilding()
         {
+            Debug.Log("[NaturalEventManager.DIAG] SubscribeToFirstBuilding() called via RuntimeInitializeOnLoadMethod");
+            
             // This callback survives scene reloads, so the event bus subscription
             // inside it is established before any scene object exists.
+            int subscriberCount = Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1]?.GetInvocationList()?.Length ?? 0;
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += OnFirstBuildingSpawned;
+            Debug.Log($"[NaturalEventManager.DIAG] Subscribed OnFirstBuildingSpawned. Subscribers now: {subscriberCount + 1}");
         }
 
         private static void OnFirstBuildingSpawned(BuildingSpawnEvent evt)
         {
+            Debug.Log($"[NaturalEventManager.DIAG] OnFirstBuildingSpawned received! Building={evt.Building?.name}, Owner={evt.Owner}");
+            
             // Unsubscribe immediately so this only fires once
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= OnFirstBuildingSpawned;
 
-            if (FindAnyObjectByType<NaturalEventManager>() != null) return;
+            var existingManager = FindAnyObjectByType<NaturalEventManager>();
+            if (existingManager != null)
+            {
+                Debug.Log("[NaturalEventManager.DIAG] Manager already exists, starting assault on existing manager.");
+                existingManager.BeginAssault();
+                return;
+            }
 
             GameObject go = new GameObject("NaturalEventManager");
             var manager = go.AddComponent<NaturalEventManager>();

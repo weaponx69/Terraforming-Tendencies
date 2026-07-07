@@ -679,4 +679,5 @@ User right-clicks on map (with units selected)
   8. Appended `"Ghost_"` prefix to the name of instantiated ghosts in [`PlayerInput.cs`](Assets/Scripts/Player/PlayerInput.cs) and filtered out buildings containing `"Ghost"` from count and sector occupancy evaluations in [`BuildBuildingCommand.cs`](Assets/Scripts/Commands/BuildBuildingCommand.cs), preventing placement ghosts from locking card selections.
   9. Implemented runtime glowing cyan sci-fi borders around all active/unlocked sectors using LineRenderers in [`SectorManager.cs`](Assets/Scripts/Environment/SectorManager.cs). The borders automatically conform to the height of the terrain.
   10. Updated `CenterCameraOnMap()` in [`PlayerInput.cs`](Assets/Scripts/Player/PlayerInput.cs) to center the camera on the starting sector (Sector 0) center instead of the mathematical center of the entire map.
+  11. Fixed a bug in [`NaturalEventManager.cs`](Assets/Scripts/Environment/NaturalEventManager.cs) where pre-placed managers in the scene were never starting their wave routines. `OnFirstBuildingSpawned` now properly calls `BeginAssault()` on the existing manager rather than silently returning.
 

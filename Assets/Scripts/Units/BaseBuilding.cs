@@ -348,7 +348,12 @@ namespace GameDevTV.RTS.Units
             if (!hasRaisedSpawnEvent)
             {
                 hasRaisedSpawnEvent = true;
+                Debug.Log($"[BaseBuilding.DIAG] Raising BuildingSpawnEvent. Owner={Owner}, name={gameObject.name}, state={Progress.State}");
                 Bus<BuildingSpawnEvent>.Raise(Owner, new BuildingSpawnEvent(Owner, this));
+            }
+            else
+            {
+                Debug.Log($"[BaseBuilding.DIAG] RaiseSpawnEvent SKIPPED (already raised). Owner={Owner}, name={gameObject.name}");
             }
         }
 
