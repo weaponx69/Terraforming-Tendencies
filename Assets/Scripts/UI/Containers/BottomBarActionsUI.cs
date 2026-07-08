@@ -144,7 +144,18 @@ namespace GameDevTV.RTS.UI.Containers
                         // Non-building cards: use PlayCardCommand which applies the card immediately
                         var playCmd = ScriptableObject.CreateInstance<PlayCardCommand>();
                         playCmd.Name = card.cardName;
-                        playCmd.Icon = card.icon;
+                        
+                        Sprite cardIcon = card.icon;
+                        if (cardIcon == null && card is SpawnUnitCardSO spawnCard && spawnCard.unitPrefab != null)
+                        {
+                            var unit = spawnCard.unitPrefab.GetComponent<AbstractUnit>();
+                            if (unit != null)
+                            {
+                                cardIcon = unit.Icon;
+                            }
+                        }
+                        playCmd.Icon = cardIcon;
+                        
                         playCmd.Slot = i;
                         playCmd.HandIndex = cardIndex;
 

@@ -98,10 +98,12 @@ namespace GameDevTV.RTS.Environment
             // Unsubscribe immediately so this only fires once
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= OnFirstBuildingSpawned;
 
-            var existingManager = FindAnyObjectByType<NaturalEventManager>();
+            var existingManager = FindAnyObjectByType<NaturalEventManager>(FindObjectsInactive.Include);
             if (existingManager != null)
             {
                 Debug.Log("[NaturalEventManager.DIAG] Manager already exists, starting assault on existing manager.");
+                existingManager.gameObject.SetActive(true);
+                existingManager.enabled = true;
                 existingManager.BeginAssault();
                 return;
             }
