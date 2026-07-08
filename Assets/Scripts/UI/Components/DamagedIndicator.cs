@@ -1,26 +1,24 @@
 using UnityEngine;
 using GameDevTV.RTS.Units;
-using GameDevTV.RTS.Environment;
 
 namespace GameDevTV.RTS.UI.Components
 {
     /// <summary>
-    /// Automatically monitors a building's power status and displays a visual indicator 
-    /// (such as a floating icon or text) when the building is unpowered.
+    /// Automatically monitors a building's health status and displays a visual indicator 
+    /// (such as a floating wrench icon or text) when the building is damaged.
     /// </summary>
     [RequireComponent(typeof(BaseBuilding))]
-    public class UnpoweredIndicator : MonoBehaviour
+    public class DamagedIndicator : MonoBehaviour
     {
-        [Tooltip("The GameObject representing the 'unpowered' visual indicator (e.g., a floating sprite/canvas).")]
+        [Tooltip("The GameObject representing the 'damaged' visual indicator (e.g., a floating sprite/canvas).")]
         [SerializeField] private GameObject visualIndicator;
 
         [Tooltip("Height offset above the building's pivot to position the indicator.")]
-        [SerializeField] private float heightOffset = 4f;
+        [SerializeField] private float heightOffset = 4.2f;
 
         private BaseBuilding building;
-        private PowerNode powerNode;
         private BuildingProgress.BuildingState lastState = BuildingProgress.BuildingState.Building;
-        private bool lastPoweredState = false;
+        private int lastHealth = 0;
 
         private void Awake()
         {
@@ -35,51 +33,40 @@ namespace GameDevTV.RTS.UI.Components
                 CreateDefaultIndicator();
             }
 
-            EnsurePowerNodeCached();
+            // Subscribe to health changes for reactive updates
+            building.OnHealthUpdated += HandleHealthUpdated;
 
             lastState = building.Progress.State;
-            lastPoweredState = (powerNode != null && powerNode.IsPowered);
+            lastHealth = building.CurrentHealth;
 
             // Start in the correct state
             UpdateIndicatorState();
         }
 
-        private void EnsurePowerNodeCached()
-        {
-            if (powerNode == null)
-            {
-                powerNode = GetComponent<PowerNode>();
-                if (powerNode != null)
-                {
-                    powerNode.OnPowerStateChanged += HandlePowerStateChanged;
-                }
-            }
-        }
-
         private void OnDestroy()
         {
-            if (powerNode != null)
+            if (building != null)
             {
-                powerNode.OnPowerStateChanged -= HandlePowerStateChanged;
+                building.OnHealthUpdated -= HandleHealthUpdated;
             }
         }
 
-        private void HandlePowerStateChanged(bool isPowered)
+        private void HandleHealthUpdated(AbstractCommandable commandable, int oldHealth, int newHealth)
         {
             UpdateIndicatorState();
         }
 
         private void Update()
         {
-            EnsurePowerNodeCached();
+            if (building == null) return;
 
             BuildingProgress.BuildingState currentState = building.Progress.State;
-            bool currentPowered = (powerNode != null && powerNode.IsPowered);
+            int currentHealth = building.CurrentHealth;
 
-            if (currentState != lastState || currentPowered != lastPoweredState)
+            if (currentState != lastState || currentHealth != lastHealth)
             {
                 lastState = currentState;
-                lastPoweredState = currentPowered;
+                lastHealth = currentHealth;
                 UpdateIndicatorState();
             }
         }
@@ -88,21 +75,13 @@ namespace GameDevTV.RTS.UI.Components
         {
             if (visualIndicator == null) return;
 
-            EnsurePowerNodeCached();
+            // A building is considered 'damaged' if:
+            // 1. It is fully constructed.
+            // 2. Its current health is strictly less than max health.
+            bool isDamaged = building.Progress.State == BuildingProgress.BuildingState.Completed && 
+                             building.CurrentHealth < building.MaxHealth;
 
-            // A building is considered 'unpowered' if:
-            // 1. It is fully constructed (not a ghost/under construction).
-            // 2. Its config requires power (PowerUpkeep > 0).
-            // 3. The PowerNode indicates it is not powered.
-            bool needsPower = building.BuildingSO != null && 
-                              building.BuildingSO.BuildingConfig != null && 
-                              building.BuildingSO.BuildingConfig.PowerUpkeep > 0;
-
-            bool isUnpowered = building.Progress.State == BuildingProgress.BuildingState.Completed && 
-                               needsPower && 
-                               (powerNode == null || !powerNode.IsPowered);
-
-            visualIndicator.SetActive(isUnpowered);
+            visualIndicator.SetActive(isDamaged);
         }
 
         private float GetBuildingHeight()
@@ -154,20 +133,20 @@ namespace GameDevTV.RTS.UI.Components
         private void CreateDefaultIndicator()
         {
             // Create a child container
-            GameObject container = new GameObject("UnpoweredIndicator_Container");
+            GameObject container = new GameObject("DamagedIndicator_Container");
             container.transform.SetParent(transform, false);
             
-            // Set position dynamically above the top of the building
-            container.transform.localPosition = Vector3.up * (GetBuildingHeight() + 2.0f);
+            // Set position dynamically above the top of the building (slightly higher than the unpowered indicator to prevent overlapping)
+            container.transform.localPosition = Vector3.up * (GetBuildingHeight() + 2.6f);
 
             // Set up a billboard Canvas
             Canvas canvas = container.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             
-            // Set a small, polished scale for World Space UI (0.015 is crisp and standard)
+            // Set a small, polished scale for World Space UI
             container.transform.localScale = Vector3.one * 0.015f;
 
-            // Make it face the camera using our existing FaceCamera utility
+            // Make it face the camera
             container.AddComponent<FaceCamera>();
 
             // Create a Text GameObject
@@ -175,16 +154,16 @@ namespace GameDevTV.RTS.UI.Components
             textGO.transform.SetParent(container.transform, false);
             
             var text = textGO.AddComponent<UnityEngine.UI.Text>();
-            text.text = "⚡ NO POWER";
+            text.text = "🔧 REPAIR REQUIRED";
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (text.font == null) text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             text.fontSize = 24;
             text.alignment = TextAnchor.MiddleCenter;
-            text.color = Color.red;
+            text.color = new Color(1f, 0.6f, 0f); // Orange warning color
 
             // Style layout
             RectTransform rect = text.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(200f, 50f);
+            rect.sizeDelta = new Vector2(300f, 50f);
 
             visualIndicator = container;
             visualIndicator.SetActive(false);

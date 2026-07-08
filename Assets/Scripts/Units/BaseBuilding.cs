@@ -364,6 +364,18 @@ namespace GameDevTV.RTS.Units
             // Ensure we are initialized before checking BuildingSO
             InitializeIfNeeded();
 
+            // Automatically attach damaged status indicator programmatically
+            if (gameObject.GetComponent<GameDevTV.RTS.UI.Components.DamagedIndicator>() == null)
+            {
+                gameObject.AddComponent<GameDevTV.RTS.UI.Components.DamagedIndicator>();
+            }
+
+            // Automatically attach unpowered status indicator programmatically
+            if (gameObject.GetComponent<GameDevTV.RTS.UI.Components.UnpoweredIndicator>() == null)
+            {
+                gameObject.AddComponent<GameDevTV.RTS.UI.Components.UnpoweredIndicator>();
+            }
+
             bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
             
             // If this is a Command Post, automatically reveal the entire sector immediately (even as a ghost)
