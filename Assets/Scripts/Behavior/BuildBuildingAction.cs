@@ -90,6 +90,7 @@ namespace GameDevTV.RTS.Behavior
             if (CurrentStatus == Status.Success && completedBuilding != null)
             {
                 completedBuilding.enabled = true;
+                completedBuilding.CompleteConstruction();
             }
         }
 
