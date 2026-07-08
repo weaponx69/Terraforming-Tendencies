@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2dca0a256a88b5ccb872b03be7b1b5c20, type: 3}
+  m_Script: {fileID: 11500000, guid: b5b6b8e9f48745d288f32310e717fa9d, type: 3}
   m_Name: OxygenProcessorCard
   m_EditorClassIdentifier: 
   cardName: Atmosphere Processor
   cardDescription: Unlocks the Oxygen Processor to extract carbon dioxide and enrich colony atmosphere.
-  buildingToUnlock: {fileID: 11400000, guid: 00000000000000000000000000000000, type: 2}
+  buildingToUnlock: {fileID: 11400000, guid: 10f3120128edcf16ea43e76a99ab6451, type: 2}

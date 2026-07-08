@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8dca0a256a88b5ccb872b03be7b1b5c20, type: 3}
+  m_Script: {fileID: 11500000, guid: f9c3573c585d499080d4a7ea55767a62, type: 3}
   m_Name: SurveyDroneCard
   m_EditorClassIdentifier: 
   cardName: Survey Drone

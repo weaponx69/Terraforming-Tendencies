@@ -9,12 +9,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6dca0a256a88b5ccb872b03be7b1b5c20, type: 3}
+  m_Script: {fileID: 11500000, guid: 85eb7fe236bb438cb8a8d47685a60f67, type: 3}
   m_Name: LavaTubeOutpostCard
   m_EditorClassIdentifier: 
   cardName: Lava Tube Outpost
   cardDescription: Establishes a shelter inside a protective lava tube feature.
-  buildingToUnlock: {fileID: 11400000, guid: 00000000000000000000000000000000, type: 2}
+  buildingToUnlock: {fileID: 11400000, guid: bf9c8a859aa5dc291bff4791a514d76c, type: 2}
   minTemperature: -9999.0
   maxTemperature: 9999.0
   minOxygen: -9999.0

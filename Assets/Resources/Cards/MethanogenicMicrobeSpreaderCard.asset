@@ -9,12 +9,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6dca0a256a88b5ccb872b03be7b1b5c20, type: 3}
+  m_Script: {fileID: 11500000, guid: 85eb7fe236bb438cb8a8d47685a60f67, type: 3}
   m_Name: MethanogenicMicrobeSpreaderCard
   m_EditorClassIdentifier: 
   cardName: Methanogenic Microbe Spreader
   cardDescription: Spreads methane-producing microbes. REQUIRES Temp >= -30C and Atmos >= 0.05 atm.
-  buildingToUnlock: {fileID: 11400000, guid: 00000000000000000000000000000000, type: 2}
+  buildingToUnlock: {fileID: 11400000, guid: b998c96e6dc05d6cb9d92912edc86738, type: 2}
   minTemperature: -30.0
   maxTemperature: 9999.0
   minOxygen: -9999.0

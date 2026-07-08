@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4dca0a256a88b5ccb872b03be7b1b5c20, type: 3}
+  m_Script: {fileID: 11500000, guid: 811e5104fe0f4c14bb4bdb84b1320a49, type: 3}
   m_Name: MiningDroneCard
   m_EditorClassIdentifier: 
   cardName: Mining Drone
   cardDescription: Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.
-  unitPrefab: {fileID: 1076983579694789324, guid: 00000000000000000000000000000000, type: 3}
+  unitPrefab: {fileID: 1076983579694789324, guid: 4d0c2e8c3bd76b64097b86828a286bc6, type: 3}

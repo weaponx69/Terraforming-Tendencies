@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3dca0a256a88b5ccb872b03be7b1b5c20, type: 3}
+  m_Script: {fileID: 11500000, guid: c8c198b992204776bbd2180a50b4c665, type: 3}
   m_Name: HeavyAlloysShipmentCard
   m_EditorClassIdentifier: 
   cardName: Heavy Alloys Shipment
