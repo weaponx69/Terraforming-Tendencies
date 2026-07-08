@@ -683,9 +683,13 @@ User right-clicks on map (with units selected)
   12. Fixed a bug in [`BuildBuildingAction.cs`](Assets/Scripts/Behavior/BuildBuildingAction.cs) where humanoid workers/builders controlled by the Behavior Tree would finish building construction but never call `CompleteConstruction()`, leaving the building permanently under construction in the "Building" state. OnEnd now calls `CompleteConstruction()` upon successful completion.
   13. Exposed fallback meteor variables (Damage Radius, Damage Amount, Max Health, Fall Height, and Fall Speed) to the inspector of [`NaturalEventManager.cs`](Assets/Scripts/Environment/NaturalEventManager.cs) so developers can easily tune meteor strike values and curate game flow without code modifications.
   14. Implemented a dynamic card-driven hazard registry system:
-      * Added `hazardEventPrefab` field and property to `BlueprintCardSO` (in [`BlueprintCard.cs`](Assets/Scripts/Player/BlueprintCard.cs)), enabling all blueprint cards to store negative hazards/blowouts in the inspector.
+      * Added `hazardEventPrefab` field and property to `BlueprintCardSO` (in [`BlueprintCardSO.cs`](Assets/Scripts/Player/BlueprintCardSO.cs)), enabling all blueprint cards to store negative hazards/blowouts in the inspector.
       * Updated [`CardDeckController.cs`](Assets/Scripts/Player/CardDeckController.cs) to automatically register a played card's hazard prefab to [`NaturalEventManager`](Assets/Scripts/Environment/NaturalEventManager.cs) when played.
       * Modified [`NaturalEventManager.cs`](Assets/Scripts/Environment/NaturalEventManager.cs) to accumulate registered card hazards at runtime and merge them into the wave spawning pool, dynamically scaling threats based on what cards the player plays.
+  15. Split the grouped classes in `BlueprintCard.cs` into individual C# script files (e.g. [`BlueprintCardSO.cs`](Assets/Scripts/Player/BlueprintCardSO.cs), [`UnlockBuildingCardSO.cs`](Assets/Scripts/Player/UnlockBuildingCardSO.cs), etc.) inside `Assets/Scripts/Player/`. This allows Unity to correctly serialize and link subclasses as persistent `.asset` files in the editor.
+  16. Migrated all 32 code-generated cards into persistent `.asset` files inside the `Assets/Resources/Cards/` directory, resolving the code-generation limits.
+  17. Refactored [`BlueprintDraftUI.cs`](Assets/Scripts/UI/Containers/BlueprintDraftUI.cs) to load all card blueprints dynamically from persistent assets using `Resources.LoadAll<BlueprintCardSO>("Cards")`, simplifying and cleaning up the codebase.
+
 
 
 

@@ -1,0 +1,86 @@
+using UnityEngine;
+using GameDevTV.RTS.Units;
+
+namespace GameDevTV.RTS.Player
+{
+    public class ScoutingCardSO : BlueprintCardSO
+        {
+            public enum ScoutingType
+            {
+                OrbitalScan,      // Instantly reveal next sector
+                PipelineBoost,    // Exploration 2x faster this round
+                SurveyDrone,      // Deploy probe to scout ahead
+                EmergencyCaches   // Flat Materials (always available safety net)
+            }
+    
+            public ScoutingType scoutingType;
+            public int materialsAmount = 0;
+    
+            public override string GetCardGoal()
+            {
+                return scoutingType switch
+                {
+                    ScoutingType.OrbitalScan => "EXPLORATION",
+                    ScoutingType.PipelineBoost => "EXPLORATION",
+                    ScoutingType.SurveyDrone => "EXPLORATION",
+                    ScoutingType.EmergencyCaches => "MATERIALS",
+                    _ => "SCOUTING"
+                };
+            }
+    
+            public override void Apply()
+            {
+                var explorationMgr = Environment.ExplorationManager.Instance;
+    
+                switch (scoutingType)
+                {
+                    case ScoutingType.OrbitalScan:
+                        if (explorationMgr != null)
+                        {
+                            explorationMgr.InstantExplore();
+                        }
+                        else
+                        {
+                            Debug.LogWarning("[Blueprint] Orbital Scan: No ExplorationManager found in scene!");
+                        }
+                        break;
+    
+                    case ScoutingType.PipelineBoost:
+                        if (explorationMgr != null)
+                        {
+                            explorationMgr.BoostExplorationSpeed(2f, 60f);
+                        }
+                        Debug.Log("[Blueprint] Pipeline Boost: Exploration speed doubled for 60 seconds!");
+                        break;
+    
+                    case ScoutingType.SurveyDrone:
+                        if (explorationMgr != null)
+                        {
+                            explorationMgr.DeploySurveyDrone();
+                        }
+                        Debug.Log("[Blueprint] Survey Drone deployed to scout ahead!");
+                        break;
+    
+                    case ScoutingType.EmergencyCaches:
+                        if (materialsAmount > 0)
+                        {
+                            int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
+                            Supplies.Materials[Owner.Player1] = cur + materialsAmount;
+                            Supplies.RaiseMaterialsChanged(Owner.Player1, cur + materialsAmount);
+                            Debug.Log($"[Blueprint] Emergency Caches: +{materialsAmount} Materials from salvage.");
+                        }
+                        break;
+                }
+            }
+    
+            public override bool IsGateMet()
+            {
+                // Scouting cards are always valid as long as locked sectors exist
+                if (scoutingType == ScoutingType.EmergencyCaches) return true;
+    
+                var sectorMgr = Environment.SectorManager.Instance;
+                if (sectorMgr == null) return false;
+                return sectorMgr.GetNextLockedSectorIndex() >= 0;
+            }
+        }
+}
