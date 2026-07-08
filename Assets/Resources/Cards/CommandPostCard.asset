@@ -13,5 +13,9 @@ MonoBehaviour:
   m_Name: CommandPostCard
   m_EditorClassIdentifier: 
   cardName: Command Post
-  cardDescription: Deploy a new Command Post to expand your colony's operational range.
+  cardDescription: Deploy a new Command Post to expand your colony's operational
+    range.
+  icon: {fileID: 0}
+  hazardEventPrefabs:
+  - {fileID: 1125009723413121614, guid: 36b59ac2f00326177ad60b8381efd8bc, type: 3}
   buildingToUnlock: {fileID: 11400000, guid: 2e813987328e67942957464bddd33480, type: 2}

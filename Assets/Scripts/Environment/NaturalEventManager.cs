@@ -117,7 +117,7 @@ namespace GameDevTV.RTS.Environment
             // Ensure only one instance exists
             if (FindObjectsByType<NaturalEventManager>(FindObjectsInactive.Exclude).Length > 1)
             {
-                Destroy(gameObject);
+                Destroy(this);
             }
         }
 

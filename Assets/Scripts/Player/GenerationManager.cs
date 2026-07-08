@@ -94,7 +94,7 @@ namespace GameDevTV.RTS.Player
             }
             else
             {
-                Destroy(gameObject);
+                Destroy(this);
             }
         }
 

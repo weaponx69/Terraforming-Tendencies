@@ -455,7 +455,7 @@ namespace GameDevTV.RTS.Player
                 if (c == null) continue;
                 // Skip the GlobalCommander (UCC) — it's invulnerable with 99999 HP
                 // and would mask the colony's true health status.
-                if (c is GlobalCommander) continue;
+                if (c is GlobalCommander || c.gameObject.name.Contains("Universal Command Center") || c.MaxHealth >= 90000) continue;
                 if (c.Owner == owner)
                 {
                     totalMaxHP += c.MaxHealth;

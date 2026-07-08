@@ -99,6 +99,15 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
+            if (cameraTarget == null)
+            {
+                var camTargetObj = GameObject.Find("Camera Target");
+                if (camTargetObj != null)
+                {
+                    cameraTarget = camTargetObj.GetComponent<Rigidbody>();
+                }
+            }
+
             CenterCameraOnMap();
             globalCommander = FindAnyObjectByType<GlobalCommander>();
         }
