@@ -681,4 +681,11 @@ User right-clicks on map (with units selected)
   10. Updated `CenterCameraOnMap()` in [`PlayerInput.cs`](Assets/Scripts/Player/PlayerInput.cs) to center the camera on the starting sector (Sector 0) center instead of the mathematical center of the entire map.
   11. Fixed a bug in [`NaturalEventManager.cs`](Assets/Scripts/Environment/NaturalEventManager.cs) where pre-placed managers in the scene were never starting their wave routines. `OnFirstBuildingSpawned` now properly calls `BeginAssault()` on the existing manager rather than silently returning.
   12. Fixed a bug in [`BuildBuildingAction.cs`](Assets/Scripts/Behavior/BuildBuildingAction.cs) where humanoid workers/builders controlled by the Behavior Tree would finish building construction but never call `CompleteConstruction()`, leaving the building permanently under construction in the "Building" state. OnEnd now calls `CompleteConstruction()` upon successful completion.
+  13. Exposed fallback meteor variables (Damage Radius, Damage Amount, Max Health, Fall Height, and Fall Speed) to the inspector of [`NaturalEventManager.cs`](Assets/Scripts/Environment/NaturalEventManager.cs) so developers can easily tune meteor strike values and curate game flow without code modifications.
+  14. Implemented a dynamic card-driven hazard registry system:
+      * Added `hazardEventPrefab` field and property to `BlueprintCardSO` (in [`BlueprintCard.cs`](Assets/Scripts/Player/BlueprintCard.cs)), enabling all blueprint cards to store negative hazards/blowouts in the inspector.
+      * Updated [`CardDeckController.cs`](Assets/Scripts/Player/CardDeckController.cs) to automatically register a played card's hazard prefab to [`NaturalEventManager`](Assets/Scripts/Environment/NaturalEventManager.cs) when played.
+      * Modified [`NaturalEventManager.cs`](Assets/Scripts/Environment/NaturalEventManager.cs) to accumulate registered card hazards at runtime and merge them into the wave spawning pool, dynamically scaling threats based on what cards the player plays.
+
+
 

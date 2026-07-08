@@ -38,6 +38,18 @@ namespace GameDevTV.RTS.Environment
         [Tooltip("Random event prefab is chosen from this list. Each needs a NaturalEventImpact component.")]
         [SerializeField] private GameObject[] eventPrefabs;
 
+        [Header("Fallback Meteor Settings")]
+        [Tooltip("Damage radius for fallback meteors.")]
+        [SerializeField] private float fallbackDamageRadius = 5f;
+        [Tooltip("Damage amount for fallback meteors.")]
+        [SerializeField] private int fallbackDamageAmount = 25;
+        [Tooltip("Max health for fallback meteors.")]
+        [SerializeField] private int fallbackMaxHealth = 50;
+        [Tooltip("Fall height for fallback meteors.")]
+        [SerializeField] private float fallbackFallHeight = 40f;
+        [Tooltip("Fall speed for fallback meteors.")]
+        [SerializeField] private float fallbackFallSpeed = 35f;
+
         [Header("Debug")]
 #pragma warning disable CS0414
         [SerializeField] private bool autoStart = false;
@@ -48,6 +60,19 @@ namespace GameDevTV.RTS.Environment
         private Coroutine waveRoutine;
         private bool hasStarted;
 
+        private static List<GameObject> registeredHazards = new List<GameObject>();
+
+        /// <summary>Registers a hazard prefab to the active natural event pool.</summary>
+        public static void RegisterHazard(GameObject hazardPrefab)
+        {
+            if (hazardPrefab == null) return;
+            if (!registeredHazards.Contains(hazardPrefab))
+            {
+                registeredHazards.Add(hazardPrefab);
+                Debug.Log($"[NaturalEventManager] Registered new hazard: {hazardPrefab.name}. Total active hazards: {registeredHazards.Count}");
+            }
+        }
+
         // ── Auto-initialization ──────────────────────────────────────────────
         // Spawns the manager on scene load (via RuntimeInitializeOnLoadMethod),
         // then waits for the first player building to be constructed before
@@ -57,6 +82,8 @@ namespace GameDevTV.RTS.Environment
         {
             Debug.Log("[NaturalEventManager.DIAG] SubscribeToFirstBuilding() called via RuntimeInitializeOnLoadMethod");
             
+            registeredHazards.Clear();
+
             // This callback survives scene reloads, so the event bus subscription
             // inside it is established before any scene object exists.
             int subscriberCount = Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1]?.GetInvocationList()?.Length ?? 0;
@@ -138,9 +165,23 @@ namespace GameDevTV.RTS.Environment
         {
             Vector3 targetPos = GetTargetPosition();
 
-            if (eventPrefabs != null && eventPrefabs.Length > 0)
+            // Build combined pool of default event prefabs + dynamically unlocked card hazards
+            List<GameObject> pool = new List<GameObject>();
+            if (eventPrefabs != null)
             {
-                GameObject prefab = eventPrefabs[Random.Range(0, eventPrefabs.Length)];
+                foreach (var p in eventPrefabs)
+                {
+                    if (p != null) pool.Add(p);
+                }
+            }
+            foreach (var p in registeredHazards)
+            {
+                if (p != null) pool.Add(p);
+            }
+
+            if (pool.Count > 0)
+            {
+                GameObject prefab = pool[Random.Range(0, pool.Count)];
                 if (prefab != null)
                 {
                     Instantiate(prefab, targetPos, Quaternion.identity);
@@ -165,12 +206,12 @@ namespace GameDevTV.RTS.Environment
             // Add the impact component
             var impact = meteor.AddComponent<NaturalEventImpact>();
             // Reflect to set serialized fields since they're private
-            SetPrivateField(impact, "damageRadius", 5f);
-            SetPrivateField(impact, "damageAmount", 25);
-            SetPrivateField(impact, "maxHealth", 50);
-            SetPrivateField(impact, "currentHealth", 50);
-            SetPrivateField(impact, "fallHeight", 40f);
-            SetPrivateField(impact, "fallSpeed", 35f);
+            SetPrivateField(impact, "damageRadius", fallbackDamageRadius);
+            SetPrivateField(impact, "damageAmount", fallbackDamageAmount);
+            SetPrivateField(impact, "maxHealth", fallbackMaxHealth);
+            SetPrivateField(impact, "currentHealth", fallbackMaxHealth);
+            SetPrivateField(impact, "fallHeight", fallbackFallHeight);
+            SetPrivateField(impact, "fallSpeed", fallbackFallSpeed);
         }
 
         private static void SetPrivateField(object obj, string fieldName, object value)

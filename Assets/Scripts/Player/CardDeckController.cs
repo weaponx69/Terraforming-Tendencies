@@ -165,6 +165,12 @@ namespace GameDevTV.RTS.Player
             BlueprintCardSO played = hand[handIndex];
             Debug.Log($"[CardDeckController] Playing card: '{played.cardName}' (index {handIndex})");
 
+            // Register card's hazard if it has one
+            if (played.HazardEventPrefab != null)
+            {
+                NaturalEventManager.RegisterHazard(played.HazardEventPrefab);
+            }
+
             // Apply the card's effect
             played.Apply();
 
