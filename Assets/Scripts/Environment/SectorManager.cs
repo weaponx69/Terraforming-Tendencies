@@ -63,7 +63,6 @@ namespace GameDevTV.RTS.Environment
         public void InitializeSectors()
         {
             if (_hasInitialized) return;
-            _hasInitialized = true;
 
             var pg = PlanetGenerator.Instance;
             if (pg == null) pg = UnityEngine.Object.FindAnyObjectByType<PlanetGenerator>();
@@ -73,6 +72,8 @@ namespace GameDevTV.RTS.Environment
                 Debug.LogWarning("[SectorManager] Cannot initialize sectors: PlanetGenerator or Config is null.");
                 return;
             }
+
+            _hasInitialized = true;
 
             var config = pg.Config;
             float cellSize = pg.CellSize;

@@ -34,6 +34,12 @@ namespace GameDevTV.RTS.Environment
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
             }
 
+            // Fallback: If Config is still null, load the default Planet 1 - Easy config from Resources
+            if (Config == null)
+            {
+                Config = Resources.Load<PlanetConfig>("Planet 1 - Easy");
+            }
+
             if (MineralsSupplySO == null) MineralsSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Minerals");
             if (GasSupplySO == null) GasSupplySO = Resources.Load<SupplySO>("Gatherable Supplies/Gas");
             

@@ -111,7 +111,7 @@ namespace GameDevTV.RTS.UI.Components
             {
                 // Skip indicators, canvas, or sprite renderers to avoid height inflation
                 string nameLower = rend.gameObject.name.ToLower();
-                if (nameLower.Contains("indicator") || nameLower.Contains("selection") || rend is SpriteRenderer || rend is CanvasRenderer)
+                if (nameLower.Contains("indicator") || nameLower.Contains("selection") || rend is SpriteRenderer)
                     continue;
 
                 float localY = transform.InverseTransformPoint(rend.bounds.max).y;
