@@ -143,12 +143,15 @@ namespace GameDevTV.RTS.Environment
 
         private IEnumerator WaveLoop()
         {
+            Debug.Log($"[NaturalEventManager] WaveLoop started. First wave in {firstWaveDelay}s. Time={Time.time:F1}s");
             yield return new WaitForSeconds(firstWaveDelay);
 
             while (true)
             {
                 CurrentWave++;
+                Debug.Log($"[NaturalEventManager] === WAVE {CurrentWave} STARTING === Time={Time.time:F1}s");
                 yield return RunWave(CurrentWave);
+                Debug.Log($"[NaturalEventManager] === WAVE {CurrentWave} COMPLETE === Time={Time.time:F1}s. Next wave in {timeBetweenWaves}s");
                 yield return new WaitForSeconds(timeBetweenWaves);
             }
         }
@@ -156,6 +159,7 @@ namespace GameDevTV.RTS.Environment
         private IEnumerator RunWave(int waveNumber)
         {
             int count = baseEventsPerWave + eventsAddedPerWave * (waveNumber - 1);
+            Debug.Log($"[NaturalEventManager] Wave {waveNumber}: spawning {count} events at {eventInterval}s intervals");
             for (int i = 0; i < count; i++)
             {
                 SpawnEvent();
@@ -166,6 +170,7 @@ namespace GameDevTV.RTS.Environment
         private void SpawnEvent()
         {
             Vector3 targetPos = GetTargetPosition();
+            Debug.Log($"[NaturalEventManager] SpawnEvent target=({targetPos.x:F1}, {targetPos.y:F1}, {targetPos.z:F1})");
 
             // Build combined pool of default event prefabs + dynamically unlocked card hazards
             List<GameObject> pool = new List<GameObject>();
@@ -181,9 +186,12 @@ namespace GameDevTV.RTS.Environment
                 if (p != null) pool.Add(p);
             }
 
+            Debug.Log($"[NaturalEventManager] Event pool has {pool.Count} prefabs ({eventPrefabs?.Length ?? 0} default + {registeredHazards.Count} hazard(s))");
+
             if (pool.Count > 0)
             {
                 GameObject prefab = pool[Random.Range(0, pool.Count)];
+                Debug.Log($"[NaturalEventManager] Spawning event prefab: {(prefab != null ? prefab.name : "NULL")}");
                 if (prefab != null)
                 {
                     Instantiate(prefab, targetPos, Quaternion.identity);
@@ -192,6 +200,7 @@ namespace GameDevTV.RTS.Environment
             }
 
             // Fallback: create a simple meteor from a sphere primitive
+            Debug.Log("[NaturalEventManager] Pool empty or null prefab — creating fallback meteor.");
             CreateFallbackMeteor(targetPos);
         }
 
@@ -200,6 +209,7 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         private void CreateFallbackMeteor(Vector3 targetPos)
         {
+            Debug.Log($"[NaturalEventManager] Creating fallback meteor at ({targetPos.x:F1}, {targetPos.y:F1}, {targetPos.z:F1})");
             GameObject meteor = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             meteor.name = "Meteor (fallback)";
             meteor.transform.position = targetPos;
@@ -214,6 +224,7 @@ namespace GameDevTV.RTS.Environment
             SetPrivateField(impact, "currentHealth", fallbackMaxHealth);
             SetPrivateField(impact, "fallHeight", fallbackFallHeight);
             SetPrivateField(impact, "fallSpeed", fallbackFallSpeed);
+            Debug.Log($"[NaturalEventManager] Fallback meteor created. damageAmount={fallbackDamageAmount}, damageRadius={fallbackDamageRadius}");
         }
 
         private static void SetPrivateField(object obj, string fieldName, object value)
@@ -229,9 +240,13 @@ namespace GameDevTV.RTS.Environment
             List<AbstractCommandable> colony = GetColonyTargets();
             if (colony.Count > 0 && Random.value <= chanceToTargetColony)
             {
-                return colony[Random.Range(0, colony.Count)].transform.position;
+                Vector3 pos = colony[Random.Range(0, colony.Count)].transform.position;
+                Debug.Log($"[NaturalEventManager] Targeting colony at ({pos.x:F1}, {pos.y:F1}, {pos.z:F1}) — {colony.Count} targets available");
+                return pos;
             }
-            return GetRandomPlanetPosition();
+            Vector3 randomPos = GetRandomPlanetPosition();
+            Debug.Log($"[NaturalEventManager] Random planet position: ({randomPos.x:F1}, {randomPos.y:F1}, {randomPos.z:F1}) — colony targets: {colony.Count}");
+            return randomPos;
         }
 
         private List<AbstractCommandable> GetColonyTargets()

@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7113280899847553037}
-  - component: {fileID: 1133470552166001397}
+  - component: {fileID: 660667638671526274}
   m_Layer: 0
   m_Name: CommandPost_Hazzard
   m_TagString: Untagged
@@ -32,7 +32,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1133470552166001397
+--- !u!114 &660667638671526274
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -41,19 +41,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 1125009723413121614}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6848cb58467b3341e9dc912171b0ed07, type: 3}
+  m_Script: {fileID: 11500000, guid: 51ead0acd1d69e85d8078e37b04b90a8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.NaturalEventManager
-  firstWaveDelay: 20
-  timeBetweenWaves: 30
-  baseEventsPerWave: 3
-  eventsAddedPerWave: 1
-  eventInterval: 1.5
-  chanceToTargetColony: 0.6
-  eventPrefabs: []
-  fallbackDamageRadius: 5
-  fallbackDamageAmount: 1
-  fallbackMaxHealth: 1
-  fallbackFallHeight: 0
-  fallbackFallSpeed: 0
-  autoStart: 0
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.NaturalEventImpact
+  damageRadius: 5
+  damageAmount: 25
+  maxHealth: 50
+  currentHealth: 50
+  destructionEffectPrefab: {fileID: 0}
+  fallHeight: 40
+  fallSpeed: 35
+  impactEffectPrefab: {fileID: 0}
+  warningMarkerPrefab: {fileID: 0}
