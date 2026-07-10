@@ -791,6 +791,15 @@ namespace GameDevTV.RTS.Units
                     {
                         float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
                         Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+
+                        float foodGen = config.BiomassGeneration * 0.5f;
+                        // Boost food production by 50% if the Colony Commander is inside working
+                        if (MartianColonist.Instance != null && MartianColonist.Instance.IsInside && MartianColonist.Instance.CurrentBuilding == this)
+                        {
+                            foodGen *= 1.5f;
+                        }
+                        float curFood = Supplies.Food != null && Supplies.Food.TryGetValue(Owner, out float f) ? f : 0f;
+                        Supplies.UpdateFood(Owner, curFood + foodGen);
                     }
 
                     // Passive climate generation (config-driven — replaces old hardcoded GHG Factory check)

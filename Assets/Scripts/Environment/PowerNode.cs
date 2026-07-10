@@ -206,6 +206,9 @@ namespace GameDevTV.RTS.Environment
 
             visualCords[other] = cordGO;
             other.visualCords[this] = cordGO;
+
+            var pt = cordGO.AddComponent<PressurizedTube>();
+            pt.Initialize(this, other, lr);
             
             // Generate tube lying on the ground
             Vector3 startPoint = transform.position + Vector3.up * 0.15f; 

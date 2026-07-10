@@ -153,32 +153,7 @@ namespace GameDevTV.RTS.Environment
                 Instantiate(impactEffectPrefab, impactPoint, Quaternion.identity);
             }
 
-            // Rupture inflatable pressurized tubes (PowerNode connections) in range if they are not solid
-            if (!GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid)
-            {
-                var allPowerNodes = FindObjectsByType<PowerNode>(FindObjectsInactive.Exclude);
-                HashSet<string> severedPairs = new HashSet<string>();
-                foreach (var node in allPowerNodes)
-                {
-                    if (node == null) continue;
-                    foreach (var neighbor in node.ConnectedNodes.ToList())
-                    {
-                        if (neighbor == null) continue;
-                        string key = node.GetInstanceID() < neighbor.GetInstanceID() 
-                            ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
-                            : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
-                        if (severedPairs.Contains(key)) continue;
 
-                        float dist = DistanceToSegment(impactPoint, node.transform.position, neighbor.transform.position);
-                        if (dist <= 4.0f)
-                        {
-                            severedPairs.Add(key);
-                            node.DisconnectFrom(neighbor);
-                            Debug.Log($"[NaturalEventImpact] Inflatable tube between {node.gameObject.name} and {neighbor.gameObject.name} was ruptured by meteor impact!");
-                        }
-                    }
-                }
-            }
 
             if (warningMarker != null) Destroy(warningMarker);
             Destroy(gameObject);

@@ -50,6 +50,17 @@ namespace GameDevTV.RTS.Player
             private set => _biomass = value;
         }
 
+        private static Dictionary<Owner, float> _food;
+        public static Dictionary<Owner, float> Food 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _food;
+            }
+            private set => _food = value;
+        }
+
         private static Dictionary<Owner, float> _power;
         public static Dictionary<Owner, float> Power 
         { 
@@ -145,6 +156,7 @@ namespace GameDevTV.RTS.Player
         public static event Action<Owner, float> OnIntegrityChanged;
         public static event Action<Owner, float> OnPowerChanged;
         public static event Action<Owner, float> OnBiomassChanged;
+        public static event Action<Owner, float> OnFoodChanged;
 
         public static float MineralsToMaterialsRateStatic { get; private set; } = 1f;
         public static float GasToMaterialsRateStatic { get; private set; } = 1f;
@@ -160,11 +172,20 @@ namespace GameDevTV.RTS.Player
         /// <summary>Whether the colony is in panic mode (upkeep paused, all buildings degraded).</summary>
         public static bool IsPanicMode { get; set; } = false;
 
-        public static void RaiseMaterialsChanged(Owner owner, int value)
+        public static void UpdateMaterials(Owner owner, int value)
         {
-            OnMaterialsChanged?.Invoke(owner, value);
+            if (Materials != null && Materials.ContainsKey(owner))
+            {
+                Materials[owner] = Mathf.Max(0, value);
+                RaiseMaterialsChanged(owner, Materials[owner]);
+            }
+        }
 
-            if (value <= 0)
+        public static void RaiseMaterialsChanged(Owner owner, int newValue)
+        {
+            OnMaterialsChanged?.Invoke(owner, newValue);
+
+            if (newValue <= 0)
             {
                 OnMaterialsDepleted?.Invoke();
             }
@@ -200,6 +221,15 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        public static void UpdateFood(Owner owner, float value)
+        {
+            if (Food != null && Food.ContainsKey(owner))
+            {
+                Food[owner] = Mathf.Max(0f, value);
+                OnFoodChanged?.Invoke(owner, Food[owner]);
+            }
+        }
+
         public static void UpdatePopulation(Owner owner, int value)
         {
             if (Population != null && Population.ContainsKey(owner))
@@ -231,6 +261,7 @@ namespace GameDevTV.RTS.Player
         {
             _materials = null;
             _biomass = null;
+            _food = null;
             _power = null;
             _population = null;
             _populationLimit = null;
@@ -247,6 +278,7 @@ namespace GameDevTV.RTS.Player
 
             _materials = new Dictionary<Owner, int>();
             _biomass = new Dictionary<Owner, float>();
+            _food = new Dictionary<Owner, float>();
             _power = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
@@ -261,6 +293,7 @@ namespace GameDevTV.RTS.Player
             {
                 _materials[owner] = (owner == Owner.Player1) ? 1000 : 0;
                 _biomass[owner] = 0f;
+                _food[owner] = (owner == Owner.Player1) ? 50f : 0f;
                 _power[owner] = 0f;
                 _population[owner] = 0;
                 _populationLimit[owner] = 0;
@@ -278,6 +311,7 @@ namespace GameDevTV.RTS.Player
             // Re-initialize to ensure instance settings (startingMaterials) are applied
             _materials = new Dictionary<Owner, int>();
             _biomass = new Dictionary<Owner, float>();
+            _food = new Dictionary<Owner, float>();
             _power = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
@@ -291,6 +325,7 @@ namespace GameDevTV.RTS.Player
             {
                 _materials.Add(owner, (owner == Owner.Player1) ? startingMaterials : 0);
                 _biomass.Add(owner, 0f);
+                _food.Add(owner, (owner == Owner.Player1) ? 50f : 0f);
                 _power.Add(owner, 0f);
                 _population.Add(owner, 0);
                 _populationLimit.Add(owner, 0);

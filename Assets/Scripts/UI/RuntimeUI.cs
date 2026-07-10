@@ -67,6 +67,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnMaterialsChanged += HandleMaterialsChanged;
             Supplies.OnIntegrityChanged += HandleIntegrityChanged;
             Supplies.OnBiomassChanged += HandleBiomassChanged;
+            Supplies.OnFoodChanged += HandleFoodChanged;
             Supplies.OnPowerChanged += HandlePowerChanged;
             Supplies.OnPopulationChanged += HandlePopulationChanged;
             Supplies.OnPopulationLimitChanged += HandlePopulationLimitChanged;
@@ -94,6 +95,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnMaterialsChanged -= HandleMaterialsChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnFoodChanged -= HandleFoodChanged;
             Supplies.OnPowerChanged -= HandlePowerChanged;
             Supplies.OnPopulationChanged -= HandlePopulationChanged;
             Supplies.OnPopulationLimitChanged -= HandlePopulationLimitChanged;
@@ -726,6 +728,7 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             Supplies.OnMaterialsChanged -= HandleMaterialsChanged;
             Supplies.OnIntegrityChanged -= HandleIntegrityChanged;
             Supplies.OnBiomassChanged -= HandleBiomassChanged;
+            Supplies.OnFoodChanged -= HandleFoodChanged;
             Supplies.OnPowerChanged -= HandlePowerChanged;
             Supplies.OnPopulationChanged -= HandlePopulationChanged;
             Supplies.OnPopulationLimitChanged -= HandlePopulationLimitChanged;
@@ -791,7 +794,23 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
         private void HandleBiomassChanged(Owner owner, float newValue)
         {
             if (owner != displayedOwner) return;
-            if (biomassValueText != null) biomassValueText.SetText($"{newValue:F1}%");
+            UpdateBiomassAndFoodUI();
+        }
+
+        private void HandleFoodChanged(Owner owner, float newValue)
+        {
+            if (owner != displayedOwner) return;
+            UpdateBiomassAndFoodUI();
+        }
+
+        private void UpdateBiomassAndFoodUI()
+        {
+            if (biomassValueText != null)
+            {
+                float bio = Supplies.Biomass.TryGetValue(displayedOwner, out float b) ? b : 0f;
+                float food = Supplies.Food.TryGetValue(displayedOwner, out float f) ? f : 0f;
+                biomassValueText.SetText($"{bio:F1}% | Food: {food:F0}");
+            }
         }
 
         private void HandlePowerChanged(Owner owner, float newValue)

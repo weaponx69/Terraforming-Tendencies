@@ -3,6 +3,7 @@ using UnityEngine.AI;
 using System.Collections.Generic;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Player;
 
 namespace GameDevTV.RTS.Units
 {
@@ -28,6 +29,18 @@ namespace GameDevTV.RTS.Units
         private Collider col;
         private BaseBuilding currentBuilding;
         private bool isInside = false;
+
+        [Header("Transit Settings")]
+        private bool isTransit = false;
+        private List<Vector3> transitPoints = new List<Vector3>();
+        private int transitIndex = 0;
+        private BaseBuilding transitTargetBuilding;
+        private float transitSpeed = 8f;
+
+        [Header("Food & Starvation")]
+        private float foodTimer = 0f;
+        private float starvationDamageTimer = 0f;
+        private bool isStarving = false;
 
         private GameObject trackerGo;
         private UnityEngine.UI.Text trackerText;
@@ -99,12 +112,68 @@ namespace GameDevTV.RTS.Units
 
         private void Update()
         {
+            UpdateFoodConsumption();
+
+            if (isTransit)
+            {
+                UpdateTubeTransit();
+                UpdateTrackerText();
+                return;
+            }
+
             if (isInside)
             {
                 // Refill oxygen
                 CurrentOxygen = Mathf.Min(CurrentOxygen + OxygenRefillRate * Time.deltaTime, MaxOxygen);
                 UpdateTrackerText();
                 return;
+            }
+
+            // Target building check for automatic Tube Transit
+            if (agent != null && agent.isActiveAndEnabled && agent.hasPath)
+            {
+                Vector3 dest = agent.destination;
+                BaseBuilding targetBuilding = null;
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                foreach (var b in buildings)
+                {
+                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        if (Vector3.Distance(dest, b.transform.position) <= 4.0f)
+                        {
+                            targetBuilding = b;
+                            break;
+                        }
+                    }
+                }
+
+                if (targetBuilding != null)
+                {
+                    BaseBuilding startBuilding = null;
+                    foreach (var b in buildings)
+                    {
+                        if (b != null && b != targetBuilding && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                        {
+                            if (Vector3.Distance(transform.position, b.transform.position) <= 4.0f)
+                            {
+                                startBuilding = b;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (startBuilding != null)
+                    {
+                        if (startBuilding.TryGetComponent(out PowerNode nodeA) && targetBuilding.TryGetComponent(out PowerNode nodeB))
+                        {
+                            if (nodeA.ConnectedNodes.Contains(nodeB) && nodeA.visualCords.ContainsKey(nodeB))
+                            {
+                                StartTubeTransit(startBuilding, targetBuilding, nodeA.visualCords[nodeB]);
+                                return;
+                            }
+                        }
+                    }
+                }
             }
 
             // Tube path detection: check if walking along any connected PowerNodes (tubes)
@@ -202,6 +271,107 @@ namespace GameDevTV.RTS.Units
             UpdateTrackerText();
         }
 
+        private void UpdateFoodConsumption()
+        {
+            Owner owner = Owner.Player1;
+
+            foodTimer += Time.deltaTime;
+            if (foodTimer >= 15f)
+            {
+                foodTimer = 0f;
+                float currentFood = Supplies.Food.TryGetValue(owner, out float f) ? f : 0f;
+                if (currentFood >= 1f)
+                {
+                    Supplies.UpdateFood(owner, currentFood - 1f);
+                    isStarving = false;
+                }
+                else
+                {
+                    isStarving = true;
+                }
+            }
+
+            if (isStarving)
+            {
+                starvationDamageTimer += Time.deltaTime;
+                if (starvationDamageTimer >= 5f)
+                {
+                    starvationDamageTimer = 0f;
+                    if (commandable != null)
+                    {
+                        commandable.TakeDamage(10);
+                        Debug.Log("[MartianColonist] Starving! Dealt 10 damage.");
+                    }
+                }
+            }
+            else
+            {
+                starvationDamageTimer = 0f;
+            }
+        }
+
+        private void StartTubeTransit(BaseBuilding startBuilding, BaseBuilding targetBuilding, GameObject tubeGO)
+        {
+            if (tubeGO == null) return;
+            var lr = tubeGO.GetComponent<LineRenderer>();
+            if (lr == null) return;
+
+            isTransit = true;
+            transitTargetBuilding = targetBuilding;
+            transitPoints.Clear();
+
+            // Store all 10 points from the LineRenderer
+            for (int i = 0; i < lr.positionCount; i++)
+            {
+                transitPoints.Add(lr.GetPosition(i));
+            }
+            // Reverse path if moving from other side
+            if (Vector3.Distance(transform.position, transitPoints[0]) > Vector3.Distance(transform.position, transitPoints[transitPoints.Count - 1]))
+            {
+                transitPoints.Reverse();
+            }
+
+            transitIndex = 0;
+            
+            // Disable pathfinding and physics
+            if (agent != null && agent.isActiveAndEnabled)
+            {
+                agent.ResetPath();
+                agent.enabled = false;
+            }
+            if (col != null) col.enabled = false;
+
+            // Set visual speed based on tech
+            bool solidTech = GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid;
+            transitSpeed = solidTech ? 12f : 7f;
+
+            Debug.Log($"[MartianColonist] Started tube transit from {startBuilding.gameObject.name} to {targetBuilding.gameObject.name}");
+        }
+
+        private void UpdateTubeTransit()
+        {
+            if (transitPoints == null || transitPoints.Count == 0)
+            {
+                isTransit = false;
+                return;
+            }
+
+            Vector3 targetPt = transitPoints[transitIndex];
+            targetPt.y = transform.position.y; 
+
+            transform.position = Vector3.MoveTowards(transform.position, targetPt, transitSpeed * Time.deltaTime);
+
+            if (Vector3.Distance(transform.position, targetPt) <= 0.15f)
+            {
+                transitIndex++;
+                if (transitIndex >= transitPoints.Count)
+                {
+                    isTransit = false;
+                    EnterBuilding(transitTargetBuilding);
+                }
+            }
+        }
+
         private void UpdateTrackerText()
         {
             if (trackerText == null) return;
@@ -212,8 +382,30 @@ namespace GameDevTV.RTS.Units
             if (isInside && currentBuilding != null)
             {
                 string bName = currentBuilding.BuildingSO != null ? currentBuilding.BuildingSO.Name : currentBuilding.gameObject.name;
-                trackerText.text = $"👨‍🚀 CMD [Sheltered in {bName}] (O2: {o2Percent}%)";
-                trackerText.color = Color.green;
+                if (isStarving)
+                {
+                    trackerText.text = $"👨‍🚀 CMD [Starving in {bName}] (O2: {o2Percent}% ⚠️)";
+                    trackerText.color = Color.red;
+                }
+                else
+                {
+                    trackerText.text = $"👨‍🚀 CMD [Sheltered in {bName}] (O2: {o2Percent}%)";
+                    trackerText.color = Color.green;
+                }
+            }
+            else if (isTransit)
+            {
+                string tType = solidTech ? "Solid" : "Inflatable";
+                if (isStarving)
+                {
+                    trackerText.text = $"👨‍🚀 CMD [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
+                    trackerText.color = Color.red;
+                }
+                else
+                {
+                    trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
+                    trackerText.color = Color.blue;
+                }
             }
             else
             {
@@ -245,13 +437,26 @@ namespace GameDevTV.RTS.Units
                 if (insideTube)
                 {
                     string tType = solidTech ? "Solid" : "Inflatable";
-                    trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
-                    trackerText.color = Color.blue;
+                    if (isStarving)
+                    {
+                        trackerText.text = $"👨‍🚀 CMD [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
+                        trackerText.color = Color.red;
+                    }
+                    else
+                    {
+                        trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
+                        trackerText.color = Color.blue;
+                    }
                 }
                 else
                 {
                     string sType = solidTech ? "Solid Suit" : "Flimsy Suit";
-                    if (o2Percent < 30)
+                    if (isStarving)
+                    {
+                        trackerText.text = $"👨‍🚀 CMD [Starving / {sType}] (O2: {o2Percent}% ⚠️)";
+                        trackerText.color = Color.red;
+                    }
+                    else if (o2Percent < 30)
                     {
                         trackerText.text = $"👨‍🚀 CMD [{sType}] (O2: {o2Percent}% ⚠️)";
                         trackerText.color = Color.red;
