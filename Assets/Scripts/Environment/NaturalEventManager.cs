@@ -18,9 +18,9 @@ namespace GameDevTV.RTS.Environment
     {
         [Header("Wave Timing")]
         [Tooltip("Delay before the very first wave begins.")]
-        [SerializeField] private float firstWaveDelay = 20f;
+        [SerializeField] private float firstWaveDelay = 60f;
         [Tooltip("Rest time between the end of one wave and the start of the next.")]
-        [SerializeField] private float timeBetweenWaves = 30f;
+        [SerializeField] private float timeBetweenWaves = 50f;
 
         [Header("Wave Content")]
         [Tooltip("Number of events in the first wave.")]
@@ -28,7 +28,7 @@ namespace GameDevTV.RTS.Environment
         [Tooltip("Extra events added to each subsequent wave.")]
         [SerializeField] private int eventsAddedPerWave = 1;
         [Tooltip("Delay between individual events within a wave.")]
-        [SerializeField] private float eventInterval = 1.5f;
+        [SerializeField] private float eventInterval = 8.0f;
 
         [Header("Targeting")]
         [Tooltip("Probability that an event homes in on a player structure instead of a random spot.")]

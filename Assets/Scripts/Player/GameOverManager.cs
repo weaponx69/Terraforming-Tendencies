@@ -119,6 +119,14 @@ namespace GameDevTV.RTS.Player
             // Wait for the first Command Post to be placed before activating any loss checks
             if (!AnyCommandPostsExist()) return;
 
+            // Loss Condition: Colony Commander was lost
+            if (MartianColonist.Instance != null && !MartianColonist.Instance.IsAlive)
+            {
+                Debug.Log("[GameOverManager] Colony Commander was lost.");
+                TriggerGameOver(GameOverReason.LifeSupport);
+                return;
+            }
+
             // 1. Authoritative Win Check
             bool oxygenComplete = Supplies.Oxygen != null
                 && Supplies.Oxygen.TryGetValue(monitoredOwner, out float oxygen)

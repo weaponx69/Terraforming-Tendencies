@@ -97,7 +97,10 @@ namespace GameDevTV.RTS.Environment
         }
 
         private void Start()
-{
+        {
+            // Scale down meteor damage globally as requested (e.g., from 25 to 5)
+            damageAmount = Mathf.Max(1, Mathf.RoundToInt(damageAmount * 0.2f));
+
             // The spawn position is the intended impact point on the ground.
             impactPoint = transform.position;
 

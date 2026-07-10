@@ -602,6 +602,30 @@ namespace GameDevTV.RTS.Units
 
                 if (count == 0)
                 {
+                    // 1. Spawn Colony Commander (VIP)
+#if UNITY_EDITOR
+                    var commanderSO = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>("Assets/Units/Rifleman/Rifleman.asset");
+#else
+                    var commanderSO = Resources.Load<AbstractUnitSO>("Units/Rifleman");
+#endif
+                    if (commanderSO != null && commanderSO.Prefab != null)
+                    {
+                        Vector3 spawnPos = transform.position + new Vector3(-5f, 0f, -5f);
+                        if (UnityEngine.AI.NavMesh.SamplePosition(spawnPos, out UnityEngine.AI.NavMeshHit hit, 15f, UnityEngine.AI.NavMesh.AllAreas))
+                        {
+                            spawnPos = hit.position;
+                        }
+                        GameObject instance = Instantiate(commanderSO.Prefab, spawnPos, Quaternion.identity);
+                        if (instance.TryGetComponent(out AbstractCommandable commandable))
+                        {
+                            commandable.Owner = Owner.Player1;
+                        }
+                        var colonist = instance.AddComponent<MartianColonist>();
+                        colonist.EnterBuilding(this);
+                        Debug.Log("[BaseBuilding] Spawned Colony Commander (VIP) for Player 1 inside Command Post.");
+                    }
+
+                    // 2. Spawn starting Mining Drone
                     var miningDroneSO = Resources.Load<AbstractUnitSO>("Units/MiningDrone");
                     if (miningDroneSO == null)
                     {
@@ -622,7 +646,7 @@ namespace GameDevTV.RTS.Units
                         {
                             commandable.Owner = Owner.Player1;
                         }
-                        Debug.Log("[BaseBuilding] Spawned 1 free starting Mining Drone for Player 1 to prevent softlock.");
+                        Debug.Log("[BaseBuilding] Spawned 1 free starting Mining Drone for Player 1.");
                     }
                 }
             }
@@ -1261,6 +1285,16 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
             get
             {
                 BaseCommand[] baseCmds = base.AvailableCommands;
+
+                // Add ExitBuildingCommand if MartianColonist is inside this building
+                if (MartianColonist.Instance != null && MartianColonist.Instance.IsInside && MartianColonist.Instance.CurrentBuilding == this)
+                {
+                    var exitCmd = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ExitBuildingCommand>();
+                    exitCmd.Slot = 7;
+                    var list = new System.Collections.Generic.List<BaseCommand>(baseCmds);
+                    list.Add(exitCmd);
+                    baseCmds = list.ToArray();
+                }
 
                 bool isCommandPost = BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
                 if (isCommandPost && Owner == Owner.Player1)
