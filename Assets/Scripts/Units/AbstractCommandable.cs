@@ -144,6 +144,15 @@ namespace GameDevTV.RTS.Units
         {
             if (this is GlobalCommander) return; // The Universal Command Center (GlobalCommander) is completely invulnerable
 
+            // Upgraded Armored Spacesuits (TubesAreSolid) reduce all damage to the colonist by 50%
+            if (TryGetComponent<MartianColonist>(out var colonist))
+            {
+                if (GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid)
+                {
+                    damage = Mathf.RoundToInt(damage * 0.5f);
+                }
+            }
+
             int lastHealth = CurrentHealth;
             CurrentHealth = Mathf.Clamp(CurrentHealth - damage, 0, CurrentHealth);
 

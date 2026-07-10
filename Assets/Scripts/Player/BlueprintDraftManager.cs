@@ -17,6 +17,12 @@ namespace GameDevTV.RTS.Player
         /// <summary>Whether salvage from destroyed buildings/debris is enabled (Debris Field discovery).</summary>
         public static bool SalvageEnabled { get; set; } = false;
 
+        /// <summary>Whether spacesuits have been unlocked for the colonists.</summary>
+        public static bool HasSpacesuits { get; set; } = true;
+
+        /// <summary>Whether pressurized tubes/suits have been upgraded to solid.</summary>
+        public static bool TubesAreSolid { get; set; } = false;
+
         public static event Action OnDraftCompleted;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -65,6 +71,8 @@ namespace GameDevTV.RTS.Player
             GatherSpeedMultiplier = 1.0f;
             PowerGenMultiplier = 1.0f;
             SalvageEnabled = false;
+            HasSpacesuits = true;
+            TubesAreSolid = false;
         }
 
         public static void RegisterBuildingSO(BuildingSO building)

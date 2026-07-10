@@ -23,6 +23,9 @@ namespace GameDevTV.RTS.Environment
         [Inspectable]
         public List<PowerNode> ConnectedNodes = new List<PowerNode>();
 
+        /// <summary>Visual cord GameObjects mapped by connected neighbor node.</summary>
+        public Dictionary<PowerNode, GameObject> visualCords = new Dictionary<PowerNode, GameObject>();
+
         /// <summary>The building this power node is attached to.</summary>
         [Inspectable]
         public BaseBuilding Building { get; private set; }
@@ -119,21 +122,55 @@ namespace GameDevTV.RTS.Environment
         private void OnDestroy()
         {
             PowerGridManager.UnregisterNode(this);
+            foreach (var kvp in visualCords.ToList())
+            {
+                if (kvp.Value != null)
+                {
+                    Destroy(kvp.Value);
+                }
+                if (kvp.Key != null)
+                {
+                    kvp.Key.visualCords.Remove(this);
+                }
+            }
+            visualCords.Clear();
+
             foreach(var node in ConnectedNodes.ToList())
             {
                 if (node != null)
                 {
                     node.ConnectedNodes.Remove(this);
-                    // Also destroy visual cord if we had a two-way dict of cords
                 }
             }
             PowerGridManager.RecalculateGrids();
         }
 
         /// <summary>
-        /// Connects this power node to another, creating a visual cord and
-        /// recalculating the power grid. Heavy LineRenderer math stays in C#.
-        /// Callable from a Flow Graph to wire power dynamically.
+        /// Severs the connection to another node, cleaning up visual tubes.
+        /// </summary>
+        public void DisconnectFrom(PowerNode other)
+        {
+            if (other == null) return;
+            if (ConnectedNodes.Contains(other)) ConnectedNodes.Remove(other);
+            if (other.ConnectedNodes.Contains(this)) other.ConnectedNodes.Remove(this);
+
+            if (visualCords.TryGetValue(other, out GameObject cord))
+            {
+                if (cord != null) Destroy(cord);
+                visualCords.Remove(other);
+            }
+            if (other.visualCords.TryGetValue(this, out GameObject otherCord))
+            {
+                if (otherCord != null) Destroy(otherCord);
+                other.visualCords.Remove(this);
+            }
+
+            PowerGridManager.RecalculateGrids();
+        }
+
+        /// <summary>
+        /// Connects this power node to another, creating a pressurized tube connection
+        /// and recalculating the power grid.
         /// </summary>
         [Inspectable]
         public void ConnectTo(PowerNode other)
@@ -143,8 +180,10 @@ namespace GameDevTV.RTS.Environment
             if (!other.ConnectedNodes.Contains(this)) other.ConnectedNodes.Add(this);
             
             PowerGridManager.RecalculateGrids();
+
+            if (visualCords.ContainsKey(other)) return; // Avoid double draw
             
-            // Create Visual Cord
+            // Create Visual Cord (Thick Pressurized Tube)
             GameObject cordGO = new GameObject($"PowerCord_{this.name}_{other.name}");
             if (PowerGridManager.Instance != null)
             {
@@ -152,34 +191,39 @@ namespace GameDevTV.RTS.Environment
             }
             var lr = cordGO.AddComponent<LineRenderer>();
             
-            // Set up LineRenderer
+            // Set up LineRenderer as a thick tube
             lr.positionCount = 10;
-            lr.startWidth = 0.5f;
-            lr.endWidth = 0.5f;
+            bool solid = GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid;
+            lr.startWidth = solid ? 1.0f : 0.7f;
+            lr.endWidth = lr.startWidth;
             
             Material mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
             if (mat == null) mat = new Material(Shader.Find("Unlit/Color"));
-            mat.color = Color.black; // Black cord
+
+            // Light-blue transparent glass color for Inflatable, solid gray color for Solid Tubes
+            mat.color = solid ? new Color(0.75f, 0.75f, 0.75f, 1f) : new Color(0.6f, 0.85f, 0.95f, 0.5f);
             lr.material = mat;
+
+            visualCords[other] = cordGO;
+            other.visualCords[this] = cordGO;
             
-            // Generate cord laying on the ground
-            Vector3 startPoint = transform.position + Vector3.up * 0.2f; // Barely above ground
-            Vector3 endPoint = other.transform.position + Vector3.up * 0.2f;
+            // Generate tube lying on the ground
+            Vector3 startPoint = transform.position + Vector3.up * 0.15f; 
+            Vector3 endPoint = other.transform.position + Vector3.up * 0.15f;
             
-            // Add a little bit of noise to make it look like a wire tossed on the ground
             for(int i = 0; i < 10; i++)
             {
                 float t = i / 9f;
                 Vector3 p = Vector3.Lerp(startPoint, endPoint, t);
                 
-                // Add horizontal jitter to inner points to make it look slightly snakey
+                // Add minor horizontal jitter to inner points to make it look organic
                 if (i > 0 && i < 9)
                 {
                     Vector3 direction = (endPoint - startPoint).normalized;
                     if (direction == Vector3.zero) direction = Vector3.forward;
                     Vector3 right = Vector3.Cross(direction, Vector3.up).normalized;
                     if (right == Vector3.zero) right = Vector3.right;
-                    float jitter = Mathf.Sin(t * Mathf.PI * 3f) * 0.3f; // Slight wave
+                    float jitter = Mathf.Sin(t * Mathf.PI * 3f) * 0.15f; // Straighter than wires
                     p += right * jitter;
                 }
                 

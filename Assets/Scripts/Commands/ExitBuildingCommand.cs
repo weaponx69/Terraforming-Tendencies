@@ -30,6 +30,19 @@ namespace GameDevTV.RTS.Commands
             }
         }
 
-        public override bool IsLocked(CommandContext context) => false;
+        public override bool IsLocked(CommandContext context)
+        {
+            float oxygen = 0f;
+            if (GameDevTV.RTS.Player.Supplies.Oxygen != null && 
+                GameDevTV.RTS.Player.Supplies.Oxygen.TryGetValue(context.Owner, out float ox))
+            {
+                oxygen = ox;
+            }
+            
+            bool breathable = oxygen >= 30f;
+            bool hasSpacesuits = GameDevTV.RTS.Player.BlueprintDraftManager.HasSpacesuits;
+
+            return !breathable && !hasSpacesuits;
+        }
     }
 }

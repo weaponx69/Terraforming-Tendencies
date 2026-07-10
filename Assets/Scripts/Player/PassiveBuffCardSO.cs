@@ -5,7 +5,7 @@ namespace GameDevTV.RTS.Player
 {
     public class PassiveBuffCardSO : BlueprintCardSO
         {
-            public enum BuffType { GatherSpeed, PowerGeneration }
+            public enum BuffType { GatherSpeed, PowerGeneration, SolidTubes }
             public BuffType buffType;
             public float multiplier = 1.2f;
     
@@ -13,6 +13,7 @@ namespace GameDevTV.RTS.Player
             {
                 if (buffType == BuffType.GatherSpeed) return "MINING";
                 if (buffType == BuffType.PowerGeneration) return "POWER";
+                if (buffType == BuffType.SolidTubes) return "SOLID TUBES";
                 return "PASSIVE BUFF";
             }
     
@@ -27,6 +28,11 @@ namespace GameDevTV.RTS.Player
                 {
                     BlueprintDraftManager.PowerGenMultiplier *= multiplier;
                     Debug.Log($"[Blueprint] Active power generation multiplier is now: {BlueprintDraftManager.PowerGenMultiplier}");
+                }
+                else if (buffType == BuffType.SolidTubes)
+                {
+                    BlueprintDraftManager.TubesAreSolid = true;
+                    Debug.Log("[Blueprint] Solid Tubes & Suits upgrade researched!");
                 }
             }
         }
