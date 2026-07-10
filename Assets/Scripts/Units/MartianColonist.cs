@@ -280,6 +280,9 @@ namespace GameDevTV.RTS.Units
 
             if (col != null) col.enabled = false;
 
+            // Snap physical position to the center of the building
+            transform.position = building.transform.position;
+
             // Hide visuals
             SetVisualsActive(false);
 
