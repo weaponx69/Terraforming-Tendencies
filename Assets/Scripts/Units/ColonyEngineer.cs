@@ -236,7 +236,8 @@ namespace GameDevTV.RTS.Units
             if (repairTarget == null) return;
 
             float dist = Vector3.Distance(transform.position, repairTarget.transform.position);
-            if (dist <= 2.8f)
+            float maxRepairDist = repairTarget is BaseBuilding ? 6.5f : 3.0f;
+            if (dist <= maxRepairDist)
             {
                 // Stand next to it and repair
                 if (agent != null && agent.isActiveAndEnabled) agent.ResetPath();
