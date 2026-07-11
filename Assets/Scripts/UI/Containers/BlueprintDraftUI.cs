@@ -280,6 +280,12 @@ namespace GameDevTV.RTS.UI.Containers
                 }
             }
 
+            // Dynamically instantiate and register the Deploy Engineer card into the draft deck pool
+            var engineerCard = ScriptableObject.CreateInstance<TrainEngineerCardSO>();
+            engineerCard.cardName = "Deploy Engineer";
+            engineerCard.cardDescription = "Deploy a Colony Engineer who wanders, inspects buildings, and automatically repairs any damaged building or tube.";
+            runtimePool.Add(engineerCard);
+
             // Populate the CardDeckController's masterDeck and rebuild the hand
             if (CardDeckController.Instance != null)
             {

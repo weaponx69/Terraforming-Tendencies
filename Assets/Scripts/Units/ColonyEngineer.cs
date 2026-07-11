@@ -8,21 +8,21 @@ using GameDevTV.RTS.Player;
 namespace GameDevTV.RTS.Units
 {
     /// <summary>
-    /// Represents a human colonist on Mars.
-    /// Can enter buildings to stay safe, and needs oxygen/spacesuit when outside.
+    /// Represents a skilled Colony Engineer who automatically wanders around the base,
+    /// inspecting buildings, and rushes to repair any damaged building or pressurized tube.
     /// </summary>
-    public class MartianColonist : MonoBehaviour
+    public class ColonyEngineer : MonoBehaviour
     {
-        public static MartianColonist Instance { get; private set; }
+        public static List<ColonyEngineer> ActiveEngineers = new List<ColonyEngineer>();
 
         [Header("Survival Settings")]
         public float MaxOxygen = 100f;
         public float CurrentOxygen = 100f;
-        public float OxygenDepletionRate = 12f; // Drains in ~8 seconds without suit/LS
-        public float OxygenRefillRate = 30f;    // Refills quickly inside
+        public float OxygenDepletionRate = 12f;
+        public float OxygenRefillRate = 30f;
 
         [Header("Equipment")]
-        public bool HasSpacesuit = false;
+        public bool HasSpacesuit = true;
 
         private AbstractCommandable commandable;
         private NavMeshAgent agent;
@@ -42,12 +42,18 @@ namespace GameDevTV.RTS.Units
         private float starvationDamageTimer = 0f;
         private bool isStarving = false;
 
+        [Header("Inspection & Repair Loop")]
+        private AbstractCommandable repairTarget;
+        private float wanderTimer = 0f;
+        private float wanderWaitTime = 8f;
+        private bool isWaitingInBuilding = false;
+
         private GameObject trackerGo;
         private UnityEngine.UI.Text trackerText;
 
         private void Awake()
         {
-            Instance = this;
+            ActiveEngineers.Add(this);
             commandable = GetComponent<AbstractCommandable>();
             agent = GetComponent<NavMeshAgent>();
             col = GetComponent<Collider>();
@@ -55,51 +61,38 @@ namespace GameDevTV.RTS.Units
 
         private void Start()
         {
-            // Scale the unit down significantly so it represents a micro-human fitting inside buildings
+            // Scale the unit down
             transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
             
             if (commandable != null)
             {
-                commandable.gameObject.name = "Colony Commander";
-                commandable.Owner = Owner.Player1;
+                commandable.gameObject.name = "Colony Engineer";
             }
 
-            // Sync initial spacesuit tech status from draft manager
-            HasSpacesuit = GameDevTV.RTS.Player.BlueprintDraftManager.HasSpacesuits;
+            // Disable standard military behaviors to make them purely peaceful
+            var military = GetComponent<BaseMilitaryUnit>();
+            if (military != null) military.enabled = false;
 
             CreateTrackerBadge();
-
-            // If already garrisoned on startup, adjust tracker height above the roof
-            if (isInside && trackerGo != null)
-            {
-                trackerGo.transform.localPosition = new Vector3(0f, 30f, 0f);
-            }
+            
+            // Start outside on the surface and begin inspecting/repairing immediately
+            wanderTimer = 1.5f; // Short delay before first inspect action
         }
 
         private void OnDestroy()
         {
-            if (Instance == this)
-            {
-                Instance = null;
-            }
+            ActiveEngineers.Remove(this);
         }
 
         private void CreateTrackerBadge()
         {
-            // Create a billboard world-space canvas that stays active no matter what to show vitals
-            trackerGo = new GameObject("VitalsTracker_UI");
+            trackerGo = new GameObject("EngineerTracker_UI");
             trackerGo.transform.SetParent(transform, false);
-            
-            // Local Y offset adjusted for the 0.2 scale (15.0f local Y is 3.0f world units)
             trackerGo.transform.localPosition = new Vector3(0f, 15f, 0f);
 
             Canvas canvas = trackerGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            
-            // Base UI scale
             trackerGo.transform.localScale = Vector3.one * 0.075f;
-
-            // Make it billboard to face the player camera
             trackerGo.AddComponent<FaceCamera>();
 
             GameObject textGO = new GameObject("Text");
@@ -110,7 +103,7 @@ namespace GameDevTV.RTS.Units
             if (trackerText.font == null) trackerText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             trackerText.fontSize = 24;
             trackerText.alignment = TextAnchor.MiddleCenter;
-            trackerText.color = Color.cyan;
+            trackerText.color = Color.yellow; // Distinct yellow color for engineers!
 
             RectTransform rect = trackerText.GetComponent<RectTransform>();
             rect.sizeDelta = new Vector2(400f, 60f);
@@ -127,15 +120,194 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
+            // High Priority: Scan for any damaged structure
+            CheckForRepairs();
+
+            if (repairTarget != null)
+            {
+                HandleRepairBehavior();
+            }
+            else
+            {
+                HandleInspectionWander();
+            }
+
             if (isInside)
             {
-                // Refill oxygen
                 CurrentOxygen = Mathf.Min(CurrentOxygen + OxygenRefillRate * Time.deltaTime, MaxOxygen);
                 UpdateTrackerText();
                 return;
             }
 
-            // Target building check for automatic Tube Transit
+            // Automatic Tube Transit triggers when moving on path
+            TriggerTubeTransitCheck();
+
+            // Vacuum Oxygen depletion logic
+            UpdateOxygenDecay();
+
+            // Enter building detection
+            DetectEnterBuilding();
+
+            UpdateTrackerText();
+        }
+
+        private void UpdateFoodConsumption()
+        {
+            Owner owner = Owner.Player1;
+            foodTimer += Time.deltaTime;
+            if (foodTimer >= 15f)
+            {
+                foodTimer = 0f;
+                float currentFood = Supplies.Food.TryGetValue(owner, out float f) ? f : 0f;
+                if (currentFood >= 1f)
+                {
+                    Supplies.UpdateFood(owner, currentFood - 1f);
+                    isStarving = false;
+                }
+                else
+                {
+                    isStarving = true;
+                }
+            }
+
+            if (isStarving)
+            {
+                starvationDamageTimer += Time.deltaTime;
+                if (starvationDamageTimer >= 5f)
+                {
+                    starvationDamageTimer = 0f;
+                    if (commandable != null)
+                    {
+                        commandable.TakeDamage(10);
+                    }
+                }
+            }
+            else
+            {
+                starvationDamageTimer = 0f;
+            }
+        }
+
+        private void CheckForRepairs()
+        {
+            // Reset target if it is fully healed or destroyed
+            if (repairTarget != null && (repairTarget == null || repairTarget.CurrentHealth >= repairTarget.MaxHealth))
+            {
+                repairTarget = null;
+            }
+
+            if (repairTarget == null)
+            {
+                // Scan buildings first
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                foreach (var b in buildings)
+                {
+                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed && b.CurrentHealth < b.MaxHealth)
+                    {
+                        repairTarget = b;
+                        isWaitingInBuilding = false;
+                        if (isInside) ExitBuilding();
+                        return;
+                    }
+                }
+
+                // Scan tubes
+                var tubes = FindObjectsByType<PressurizedTube>(FindObjectsInactive.Exclude);
+                foreach (var t in tubes)
+                {
+                    if (t != null && t.CurrentHealth < t.MaxHealth)
+                    {
+                        repairTarget = t;
+                        isWaitingInBuilding = false;
+                        if (isInside) ExitBuilding();
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void HandleRepairBehavior()
+        {
+            if (repairTarget == null) return;
+
+            float dist = Vector3.Distance(transform.position, repairTarget.transform.position);
+            if (dist <= 2.8f)
+            {
+                // Stand next to it and repair
+                if (agent != null && agent.isActiveAndEnabled) agent.ResetPath();
+
+                wanderTimer += Time.deltaTime;
+                if (wanderTimer >= 0.5f)
+                {
+                    wanderTimer = 0f;
+                    if (repairTarget is BaseBuilding building)
+                    {
+                        building.Heal(5);
+                    }
+                    else if (repairTarget is PressurizedTube tube)
+                    {
+                        tube.DamageTube(-5); // Negative damage heals
+                    }
+                }
+            }
+            else
+            {
+                if (isInside)
+                {
+                    ExitBuilding();
+                }
+
+                // Move towards repair site
+                if (agent != null && agent.enabled && !agent.hasPath)
+                {
+                    agent.SetDestination(repairTarget.transform.position);
+                }
+            }
+        }
+
+        private void HandleInspectionWander()
+        {
+            if (isInside)
+            {
+                if (isWaitingInBuilding)
+                {
+                    wanderTimer += Time.deltaTime;
+                    if (wanderTimer >= wanderWaitTime)
+                    {
+                        ExitBuilding();
+                    }
+                }
+                return;
+            }
+
+            // Inspecting/Wandering
+            wanderTimer += Time.deltaTime;
+            if (wanderTimer >= 2f)
+            {
+                wanderTimer = 0f;
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                List<BaseBuilding> completedBuildings = new List<BaseBuilding>();
+                foreach (var b in buildings)
+                {
+                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        completedBuildings.Add(b);
+                    }
+                }
+
+                if (completedBuildings.Count > 0)
+                {
+                    BaseBuilding target = completedBuildings[Random.Range(0, completedBuildings.Count)];
+                    if (agent != null && agent.enabled)
+                    {
+                        agent.SetDestination(target.transform.position);
+                    }
+                }
+            }
+        }
+
+        private void TriggerTubeTransitCheck()
+        {
             if (agent != null && agent.isActiveAndEnabled && agent.hasPath)
             {
                 Vector3 dest = agent.destination;
@@ -175,144 +347,10 @@ namespace GameDevTV.RTS.Units
                             if (nodeA.ConnectedNodes.Contains(nodeB) && nodeA.visualCords.ContainsKey(nodeB))
                             {
                                 StartTubeTransit(startBuilding, targetBuilding, nodeA.visualCords[nodeB]);
-                                return;
                             }
                         }
                     }
                 }
-            }
-
-            // Tube path detection: check if walking along any connected PowerNodes (tubes)
-            bool insideTube = false;
-            var allPowerNodes = FindObjectsByType<PowerNode>(FindObjectsInactive.Exclude);
-            HashSet<string> checkedPairs = new HashSet<string>();
-            foreach (var node in allPowerNodes)
-            {
-                if (node == null) continue;
-                foreach (var neighbor in node.ConnectedNodes)
-                {
-                    if (neighbor == null) continue;
-                    string key = node.GetInstanceID() < neighbor.GetInstanceID() 
-                        ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
-                        : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
-                    if (checkedPairs.Contains(key)) continue;
-                    checkedPairs.Add(key);
-
-                    float distToTube = DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position);
-                    if (distToTube <= 1.5f) // Within tube radius!
-                    {
-                        insideTube = true;
-                        break;
-                    }
-                }
-                if (insideTube) break;
-            }
-
-            bool inLifeSupport = false;
-            var nodes = FindObjectsByType<GameDevTV.RTS.Environment.LifeSupportNode>(FindObjectsInactive.Exclude);
-            foreach (var node in nodes)
-            {
-                if (node != null && Vector3.Distance(transform.position, node.transform.position) <= node.Radius)
-                {
-                    inLifeSupport = true;
-                    break;
-                }
-            }
-
-            // Apply tech level parameters
-            bool solidTech = GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid;
-
-            if (insideTube)
-            {
-                // Inflatable tubes leak slightly (0.3/s), Solid tubes seal perfectly (0.0/s)
-                float depletionRate = solidTech ? 0f : 0.3f;
-                CurrentOxygen = Mathf.Max(CurrentOxygen - depletionRate * Time.deltaTime, 0f);
-                if (CurrentOxygen <= 0f && commandable != null)
-                {
-                    commandable.TakeDamage(Mathf.RoundToInt(20f * Time.deltaTime));
-                }
-
-                // Speed boost inside solid pressurized tubes
-                if (agent != null)
-                {
-                    agent.speed = solidTech ? 12f : 7f; 
-                }
-            }
-            else if (!inLifeSupport)
-            {
-                // Spacesuits are unlocked by default: Flimsy (2.0/s) vs Armored/Solid (0.5/s)
-                float depletionRate = solidTech ? 0.5f : 2.0f;
-                CurrentOxygen = Mathf.Max(CurrentOxygen - depletionRate * Time.deltaTime, 0f);
-                if (CurrentOxygen <= 0f && commandable != null)
-                {
-                    commandable.TakeDamage(Mathf.RoundToInt(20f * Time.deltaTime));
-                }
-                if (agent != null) agent.speed = 5f;
-            }
-            else
-            {
-                // Safe inside Life Support zone
-                CurrentOxygen = Mathf.Min(CurrentOxygen + 5f * Time.deltaTime, MaxOxygen);
-                if (agent != null) agent.speed = 5f;
-            }
-
-            // Enter building detection:
-            if (agent != null && agent.isActiveAndEnabled && agent.hasPath)
-            {
-                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
-                foreach (var b in buildings)
-                {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
-                    {
-                        float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        if (distToBuilding <= 2.2f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
-                        {
-                            EnterBuilding(b);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            UpdateTrackerText();
-        }
-
-        private void UpdateFoodConsumption()
-        {
-            Owner owner = Owner.Player1;
-
-            foodTimer += Time.deltaTime;
-            if (foodTimer >= 15f)
-            {
-                foodTimer = 0f;
-                float currentFood = Supplies.Food.TryGetValue(owner, out float f) ? f : 0f;
-                if (currentFood >= 1f)
-                {
-                    Supplies.UpdateFood(owner, currentFood - 1f);
-                    isStarving = false;
-                }
-                else
-                {
-                    isStarving = true;
-                }
-            }
-
-            if (isStarving)
-            {
-                starvationDamageTimer += Time.deltaTime;
-                if (starvationDamageTimer >= 5f)
-                {
-                    starvationDamageTimer = 0f;
-                    if (commandable != null)
-                    {
-                        commandable.TakeDamage(10);
-                        Debug.Log("[MartianColonist] Starving! Dealt 10 damage.");
-                    }
-                }
-            }
-            else
-            {
-                starvationDamageTimer = 0f;
             }
         }
 
@@ -326,12 +364,10 @@ namespace GameDevTV.RTS.Units
             transitTargetBuilding = targetBuilding;
             transitPoints.Clear();
 
-            // Store all 10 points from the LineRenderer
             for (int i = 0; i < lr.positionCount; i++)
             {
                 transitPoints.Add(lr.GetPosition(i));
             }
-            // Reverse path if moving from other side
             if (Vector3.Distance(transform.position, transitPoints[0]) > Vector3.Distance(transform.position, transitPoints[transitPoints.Count - 1]))
             {
                 transitPoints.Reverse();
@@ -339,7 +375,6 @@ namespace GameDevTV.RTS.Units
 
             transitIndex = 0;
             
-            // Disable pathfinding and physics
             if (agent != null && agent.isActiveAndEnabled)
             {
                 agent.ResetPath();
@@ -347,11 +382,8 @@ namespace GameDevTV.RTS.Units
             }
             if (col != null) col.enabled = false;
 
-            // Set visual speed based on tech
-            bool solidTech = GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid;
+            bool solidTech = BlueprintDraftManager.TubesAreSolid;
             transitSpeed = solidTech ? 12f : 7f;
-
-            Debug.Log($"[MartianColonist] Started tube transit from {startBuilding.gameObject.name} to {targetBuilding.gameObject.name}");
         }
 
         private void UpdateTubeTransit()
@@ -378,101 +410,119 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        private void UpdateOxygenDecay()
+        {
+            bool insideTube = false;
+            var allPowerNodes = FindObjectsByType<PowerNode>(FindObjectsInactive.Exclude);
+            HashSet<string> checkedPairs = new HashSet<string>();
+            foreach (var node in allPowerNodes)
+            {
+                if (node == null) continue;
+                foreach (var neighbor in node.ConnectedNodes)
+                {
+                    if (neighbor == null) continue;
+                    string key = node.GetInstanceID() < neighbor.GetInstanceID() 
+                        ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
+                        : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
+                    if (checkedPairs.Contains(key)) continue;
+                    checkedPairs.Add(key);
+
+                    if (DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position) <= 1.5f)
+                    {
+                        insideTube = true;
+                        break;
+                    }
+                }
+                if (insideTube) break;
+            }
+
+            bool inLifeSupport = false;
+            var nodes = FindObjectsByType<LifeSupportNode>(FindObjectsInactive.Exclude);
+            foreach (var node in nodes)
+            {
+                if (node != null && Vector3.Distance(transform.position, node.transform.position) <= node.Radius)
+                {
+                    inLifeSupport = true;
+                    break;
+                }
+            }
+
+            bool solidTech = BlueprintDraftManager.TubesAreSolid;
+
+            if (insideTube)
+            {
+                float depletionRate = solidTech ? 0f : 0.3f;
+                CurrentOxygen = Mathf.Max(CurrentOxygen - depletionRate * Time.deltaTime, 0f);
+                if (CurrentOxygen <= 0f && commandable != null)
+                {
+                    commandable.TakeDamage(Mathf.RoundToInt(20f * Time.deltaTime));
+                }
+                if (agent != null) agent.speed = solidTech ? 12f : 7f;
+            }
+            else if (!inLifeSupport)
+            {
+                float depletionRate = solidTech ? 0.5f : 2.0f;
+                CurrentOxygen = Mathf.Max(CurrentOxygen - depletionRate * Time.deltaTime, 0f);
+                if (CurrentOxygen <= 0f && commandable != null)
+                {
+                    commandable.TakeDamage(Mathf.RoundToInt(20f * Time.deltaTime));
+                }
+                if (agent != null) agent.speed = 5f;
+            }
+            else
+            {
+                CurrentOxygen = Mathf.Min(CurrentOxygen + 5f * Time.deltaTime, MaxOxygen);
+                if (agent != null) agent.speed = 5f;
+            }
+        }
+
+        private void DetectEnterBuilding()
+        {
+            if (agent != null && agent.isActiveAndEnabled && agent.hasPath)
+            {
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                foreach (var b in buildings)
+                {
+                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
+                        if (distToBuilding <= 2.2f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+                        {
+                            EnterBuilding(b);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         private void UpdateTrackerText()
         {
             if (trackerText == null) return;
 
             int o2Percent = Mathf.RoundToInt((CurrentOxygen / MaxOxygen) * 100f);
-            bool solidTech = GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid;
+            bool solidTech = BlueprintDraftManager.TubesAreSolid;
             
             if (isInside && currentBuilding != null)
             {
                 string bName = currentBuilding.BuildingSO != null ? currentBuilding.BuildingSO.Name : currentBuilding.gameObject.name;
-                if (isStarving)
-                {
-                    trackerText.text = $"👨‍🚀 CMD [Starving in {bName}] (O2: {o2Percent}% ⚠️)";
-                    trackerText.color = Color.red;
-                }
-                else
-                {
-                    trackerText.text = $"👨‍🚀 CMD [Sheltered in {bName}] (O2: {o2Percent}%)";
-                    trackerText.color = Color.green;
-                }
+                string state = isStarving ? "Starving" : (repairTarget != null ? "Resting" : "Inspecting");
+                trackerText.text = $"👨‍🔧 ENG [{state} in {bName}] (O2: {o2Percent}%)";
+                trackerText.color = isStarving ? Color.red : Color.green;
             }
             else if (isTransit)
             {
                 string tType = solidTech ? "Solid" : "Inflatable";
-                if (isStarving)
-                {
-                    trackerText.text = $"👨‍🚀 CMD [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
-                    trackerText.color = Color.red;
-                }
-                else
-                {
-                    trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
-                    trackerText.color = Color.blue;
-                }
+                string state = isStarving ? "Starving" : "Travelling";
+                trackerText.text = $"👨‍🔧 ENG [{state} in {tType} Tube] (O2: {o2Percent}%)";
+                trackerText.color = isStarving ? Color.red : Color.blue;
             }
             else
             {
-                // Check if currently inside a tube to show custom text
-                bool insideTube = false;
-                var allPowerNodes = FindObjectsByType<PowerNode>(FindObjectsInactive.Exclude);
-                HashSet<string> checkedPairs = new HashSet<string>();
-                foreach (var node in allPowerNodes)
-                {
-                    if (node == null) continue;
-                    foreach (var neighbor in node.ConnectedNodes)
-                    {
-                        if (neighbor == null) continue;
-                        string key = node.GetInstanceID() < neighbor.GetInstanceID() 
-                            ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
-                            : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
-                        if (checkedPairs.Contains(key)) continue;
-                        checkedPairs.Add(key);
-
-                        if (DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position) <= 1.5f)
-                        {
-                            insideTube = true;
-                            break;
-                        }
-                    }
-                    if (insideTube) break;
-                }
-
-                if (insideTube)
-                {
-                    string tType = solidTech ? "Solid" : "Inflatable";
-                    if (isStarving)
-                    {
-                        trackerText.text = $"👨‍🚀 CMD [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
-                        trackerText.color = Color.red;
-                    }
-                    else
-                    {
-                        trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
-                        trackerText.color = Color.blue;
-                    }
-                }
-                else
-                {
-                    string sType = solidTech ? "Solid Suit" : "Flimsy Suit";
-                    if (isStarving)
-                    {
-                        trackerText.text = $"👨‍🚀 CMD [Starving / {sType}] (O2: {o2Percent}% ⚠️)";
-                        trackerText.color = Color.red;
-                    }
-                    else if (o2Percent < 30)
-                    {
-                        trackerText.text = $"👨‍🚀 CMD [{sType}] (O2: {o2Percent}% ⚠️)";
-                        trackerText.color = Color.red;
-                    }
-                    else
-                    {
-                        trackerText.text = $"👨‍🚀 CMD [{sType}] (O2: {o2Percent}%)";
-                        trackerText.color = Color.cyan;
-                    }
-                }
+                string state = isStarving ? "Starving" : (repairTarget != null ? "Repairing" : "Moving");
+                string sType = solidTech ? "Solid Suit" : "Flimsy Suit";
+                trackerText.text = $"👨‍🔧 ENG [{state} / {sType}] (O2: {o2Percent}%)";
+                trackerText.color = isStarving ? Color.red : Color.yellow;
             }
         }
 
@@ -481,29 +531,24 @@ namespace GameDevTV.RTS.Units
             if (building == null) return;
             currentBuilding = building;
             isInside = true;
+            isWaitingInBuilding = true;
+            wanderTimer = 0f;
+            wanderWaitTime = Random.Range(6f, 15f);
 
-            // Stop movement
             if (agent != null && agent.isActiveAndEnabled)
             {
                 agent.ResetPath();
                 agent.enabled = false;
             }
-
             if (col != null) col.enabled = false;
 
-            // Snap physical position to the center of the building
             transform.position = building.transform.position;
-
-            // Hide visuals
             SetVisualsActive(false);
 
-            // Move the vital tracker badge higher so it floats above the building's roof mesh (Y 30.0f is 6.0f world units)
             if (trackerGo != null)
             {
                 trackerGo.transform.localPosition = new Vector3(0f, 30f, 0f);
             }
-
-            Debug.Log($"[MartianColonist] Entered building: {building.gameObject.name}");
         }
 
         public void ExitBuilding()
@@ -511,13 +556,14 @@ namespace GameDevTV.RTS.Units
             if (!isInside || currentBuilding == null) return;
 
             isInside = false;
+            isWaitingInBuilding = false;
 
-            // Position outside the building
             Vector3 spawnPos = currentBuilding.transform.position + Vector3.forward * 3f;
             if (NavMesh.SamplePosition(spawnPos, out NavMeshHit hit, 8f, NavMesh.AllAreas))
             {
                 spawnPos = hit.position;
             }
+
             if (agent != null)
             {
                 agent.enabled = true;
@@ -529,17 +575,14 @@ namespace GameDevTV.RTS.Units
             }
             if (col != null) col.enabled = true;
 
-            // Show visuals
             SetVisualsActive(true);
 
-            // Restore lower height offset when walking outside (Y 15.0f is 3.0f world units)
             if (trackerGo != null)
             {
                 trackerGo.transform.localPosition = new Vector3(0f, 15f, 0f);
             }
 
             currentBuilding = null;
-            Debug.Log("[MartianColonist] Exited building onto Martian surface.");
         }
 
         private void SetVisualsActive(bool active)
@@ -548,7 +591,6 @@ namespace GameDevTV.RTS.Units
             foreach (var r in renderers)
             {
                 if (r == null) continue;
-                // Ignore the tracker UI canvas/renderer completely so vitals are always visible!
                 string lowerName = r.gameObject.name.ToLower();
                 if (lowerName.Contains("indicator") || lowerName.Contains("selection") || lowerName.Contains("tracker") || r is SpriteRenderer) continue;
                 r.enabled = active;
@@ -565,9 +607,5 @@ namespace GameDevTV.RTS.Units
             Vector3 closestPoint = a + t * ab;
             return Vector3.Distance(p, closestPoint);
         }
-
-        public bool IsAlive => commandable != null && commandable.CurrentHealth > 0;
-        public bool IsInside => isInside;
-        public BaseBuilding CurrentBuilding => currentBuilding;
     }
 }
