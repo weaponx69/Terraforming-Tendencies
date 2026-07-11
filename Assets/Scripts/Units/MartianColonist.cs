@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
+using Unity.Behavior;
 
 namespace GameDevTV.RTS.Units
 {
@@ -42,6 +43,11 @@ namespace GameDevTV.RTS.Units
         private float starvationDamageTimer = 0f;
         private bool isStarving = false;
 
+        [Header("Autonomous Settings")]
+        private float wanderTimer = 0f;
+        private float wanderWaitTime = 15f;
+        private bool isWaitingInBuilding = false;
+
         private GameObject trackerGo;
         private UnityEngine.UI.Text trackerText;
 
@@ -60,7 +66,14 @@ namespace GameDevTV.RTS.Units
             
             if (commandable != null)
             {
-                commandable.gameObject.name = "Colony Commander";
+                if (commandable.gameObject.name.Contains("Commander"))
+                {
+                    commandable.gameObject.name = "Colony Commander";
+                }
+                else
+                {
+                    commandable.gameObject.name = "Colonist";
+                }
                 commandable.Owner = Owner.Player1;
             }
 
@@ -68,6 +81,10 @@ namespace GameDevTV.RTS.Units
             HasSpacesuit = GameDevTV.RTS.Player.BlueprintDraftManager.HasSpacesuits;
 
             CreateTrackerBadge();
+
+            // Disable background Behavior Graph AI so they don't override manual/custom commands
+            var bgAgent = GetComponent<BehaviorGraphAgent>();
+            if (bgAgent != null) bgAgent.enabled = false;
 
             // If already garrisoned on startup, adjust tracker height above the roof
             if (isInside && trackerGo != null)
@@ -131,8 +148,19 @@ namespace GameDevTV.RTS.Units
             {
                 // Refill oxygen
                 CurrentOxygen = Mathf.Min(CurrentOxygen + OxygenRefillRate * Time.deltaTime, MaxOxygen);
+                HandleAutonomousSupervision();
                 UpdateTrackerText();
                 return;
+            }
+
+            // Emergency: if oxygen is low when outside, prioritize finding the nearest shelter
+            if (CurrentOxygen < 35f)
+            {
+                SeekNearestShelter();
+            }
+            else
+            {
+                HandleAutonomousSupervision();
             }
 
             // Target building check for automatic Tube Transit
@@ -265,7 +293,7 @@ namespace GameDevTV.RTS.Units
                     if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        if (distToBuilding <= 2.2f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+                        if (distToBuilding <= 6.0f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
                         {
                             EnterBuilding(b);
                             break;
@@ -384,18 +412,21 @@ namespace GameDevTV.RTS.Units
 
             int o2Percent = Mathf.RoundToInt((CurrentOxygen / MaxOxygen) * 100f);
             bool solidTech = GameDevTV.RTS.Player.BlueprintDraftManager.TubesAreSolid;
+            bool isCommander = gameObject.name.Contains("Commander");
+            string title = isCommander ? "CMD" : "COL";
+            string emoji = isCommander ? "👨‍🚀" : "👩‍🚀";
             
             if (isInside && currentBuilding != null)
             {
                 string bName = currentBuilding.BuildingSO != null ? currentBuilding.BuildingSO.Name : currentBuilding.gameObject.name;
                 if (isStarving)
                 {
-                    trackerText.text = $"👨‍🚀 CMD [Starving in {bName}] (O2: {o2Percent}% ⚠️)";
+                    trackerText.text = $"{emoji} {title} [Starving in {bName}] (O2: {o2Percent}% ⚠️)";
                     trackerText.color = Color.red;
                 }
                 else
                 {
-                    trackerText.text = $"👨‍🚀 CMD [Sheltered in {bName}] (O2: {o2Percent}%)";
+                    trackerText.text = $"{emoji} {title} [Sheltered in {bName}] (O2: {o2Percent}%)";
                     trackerText.color = Color.green;
                 }
             }
@@ -404,12 +435,12 @@ namespace GameDevTV.RTS.Units
                 string tType = solidTech ? "Solid" : "Inflatable";
                 if (isStarving)
                 {
-                    trackerText.text = $"👨‍🚀 CMD [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
+                    trackerText.text = $"{emoji} {title} [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
                     trackerText.color = Color.red;
                 }
                 else
                 {
-                    trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
+                    trackerText.text = $"{emoji} {title} [Inside {tType} Tube] (O2: {o2Percent}%)";
                     trackerText.color = Color.blue;
                 }
             }
@@ -431,7 +462,9 @@ namespace GameDevTV.RTS.Units
                         if (checkedPairs.Contains(key)) continue;
                         checkedPairs.Add(key);
 
-                        if (DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position) <= 1.5f)
+                        float distToA = Vector3.Distance(transform.position, node.transform.position);
+                        float distToB = Vector3.Distance(transform.position, neighbor.transform.position);
+                        if (distToA > 4.5f && distToB > 4.5f && DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position) <= 1.5f)
                         {
                             insideTube = true;
                             break;
@@ -445,12 +478,12 @@ namespace GameDevTV.RTS.Units
                     string tType = solidTech ? "Solid" : "Inflatable";
                     if (isStarving)
                     {
-                        trackerText.text = $"👨‍🚀 CMD [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
+                        trackerText.text = $"{emoji} {title} [Starving in {tType} Tube] (O2: {o2Percent}% ⚠️)";
                         trackerText.color = Color.red;
                     }
                     else
                     {
-                        trackerText.text = $"👨‍🚀 CMD [Inside {tType} Tube] (O2: {o2Percent}%)";
+                        trackerText.text = $"{emoji} {title} [Inside {tType} Tube] (O2: {o2Percent}%)";
                         trackerText.color = Color.blue;
                     }
                 }
@@ -459,17 +492,17 @@ namespace GameDevTV.RTS.Units
                     string sType = solidTech ? "Solid Suit" : "Flimsy Suit";
                     if (isStarving)
                     {
-                        trackerText.text = $"👨‍🚀 CMD [Starving / {sType}] (O2: {o2Percent}% ⚠️)";
+                        trackerText.text = $"{emoji} {title} [Starving / {sType}] (O2: {o2Percent}% ⚠️)";
                         trackerText.color = Color.red;
                     }
                     else if (o2Percent < 30)
                     {
-                        trackerText.text = $"👨‍🚀 CMD [{sType}] (O2: {o2Percent}% ⚠️)";
+                        trackerText.text = $"{emoji} {title} [{sType}] (O2: {o2Percent}% ⚠️)";
                         trackerText.color = Color.red;
                     }
                     else
                     {
-                        trackerText.text = $"👨‍🚀 CMD [{sType}] (O2: {o2Percent}%)";
+                        trackerText.text = $"{emoji} {title} [{sType}] (O2: {o2Percent}%)";
                         trackerText.color = Color.cyan;
                     }
                 }
@@ -511,6 +544,7 @@ namespace GameDevTV.RTS.Units
             if (!isInside || currentBuilding == null) return;
 
             isInside = false;
+            isWaitingInBuilding = false;
 
             // Position outside the building
             Vector3 spawnPos = currentBuilding.transform.position + Vector3.forward * 3f;
@@ -569,5 +603,87 @@ namespace GameDevTV.RTS.Units
         public bool IsAlive => commandable != null && commandable.CurrentHealth > 0;
         public bool IsInside => isInside;
         public BaseBuilding CurrentBuilding => currentBuilding;
+
+        private void HandleAutonomousSupervision()
+        {
+            if (isInside)
+            {
+                if (!isWaitingInBuilding)
+                {
+                    isWaitingInBuilding = true;
+                    wanderTimer = 0f;
+                    bool isGreenhouse = currentBuilding != null && currentBuilding.BuildingSO != null && currentBuilding.BuildingSO.Name.Contains("Greenhouse");
+                    wanderWaitTime = isGreenhouse ? Random.Range(25f, 50f) : Random.Range(10f, 25f);
+                }
+
+                wanderTimer += Time.deltaTime;
+                if (wanderTimer >= wanderWaitTime)
+                {
+                    ExitBuilding();
+                }
+                return;
+            }
+
+            if (agent != null && agent.enabled && (agent.hasPath || agent.pathPending))
+            {
+                return;
+            }
+
+            wanderTimer += Time.deltaTime;
+            if (wanderTimer >= 2f)
+            {
+                wanderTimer = 0f;
+                isWaitingInBuilding = false;
+
+                var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                List<BaseBuilding> completedBuildings = new List<BaseBuilding>();
+                foreach (var b in buildings)
+                {
+                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        completedBuildings.Add(b);
+                    }
+                }
+
+                if (completedBuildings.Count > 0)
+                {
+                    BaseBuilding target = completedBuildings[Random.Range(0, completedBuildings.Count)];
+                    if (agent != null && agent.enabled)
+                    {
+                        agent.SetDestination(target.transform.position);
+                    }
+                }
+            }
+        }
+
+        private void SeekNearestShelter()
+        {
+            if (agent != null && agent.enabled && agent.hasPath)
+            {
+                return;
+            }
+
+            var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+            BaseBuilding nearest = null;
+            float minDist = float.MaxValue;
+            foreach (var b in buildings)
+            {
+                if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                {
+                    float dist = Vector3.Distance(transform.position, b.transform.position);
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        nearest = b;
+                    }
+                }
+            }
+
+            if (nearest != null && agent != null && agent.enabled)
+            {
+                agent.SetDestination(nearest.transform.position);
+                Debug.Log($"[MartianColonist] Oxygen low ({Mathf.RoundToInt(CurrentOxygen)}%)! Seeking nearest shelter: {nearest.gameObject.name}");
+            }
+        }
     }
 }

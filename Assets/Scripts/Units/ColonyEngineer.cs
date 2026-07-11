@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
+using Unity.Behavior;
 
 namespace GameDevTV.RTS.Units
 {
@@ -72,6 +73,10 @@ namespace GameDevTV.RTS.Units
             // Disable standard military behaviors to make them purely peaceful
             var military = GetComponent<BaseMilitaryUnit>();
             if (military != null) military.enabled = false;
+
+            // Disable background Behavior Graph AI so they don't override manual/custom commands
+            var bgAgent = GetComponent<BehaviorGraphAgent>();
+            if (bgAgent != null) bgAgent.enabled = false;
 
             CreateTrackerBadge();
             
@@ -280,7 +285,12 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
-            // Inspecting/Wandering
+            // Inspecting/Wandering - only search for a new building if not currently moving
+            if (agent != null && agent.enabled && (agent.hasPath || agent.pathPending))
+            {
+                return;
+            }
+
             wanderTimer += Time.deltaTime;
             if (wanderTimer >= 2f)
             {
@@ -427,11 +437,13 @@ namespace GameDevTV.RTS.Units
                     if (checkedPairs.Contains(key)) continue;
                     checkedPairs.Add(key);
 
-                    if (DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position) <= 1.5f)
-                    {
-                        insideTube = true;
-                        break;
-                    }
+                        float distToA = Vector3.Distance(transform.position, node.transform.position);
+                        float distToB = Vector3.Distance(transform.position, neighbor.transform.position);
+                        if (distToA > 4.5f && distToB > 4.5f && DistanceToSegment(transform.position, node.transform.position, neighbor.transform.position) <= 1.5f)
+                        {
+                            insideTube = true;
+                            break;
+                        }
                 }
                 if (insideTube) break;
             }
@@ -486,7 +498,7 @@ namespace GameDevTV.RTS.Units
                     if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        if (distToBuilding <= 2.2f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+                        if (distToBuilding <= 6.0f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
                         {
                             EnterBuilding(b);
                             break;

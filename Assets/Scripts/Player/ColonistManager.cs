@@ -140,11 +140,122 @@ namespace GameDevTV.RTS.Player
                 ui.HideWarningBanner();
             }
 
-            // Grant colonists
+            // Grant colonists to the numeric resources
             int currentPop = Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int p) ? p : 0;
             Supplies.UpdatePopulation(Owner.Player1, currentPop + currentWaveSize);
 
             Debug.Log($"[ColonistManager] {currentWaveSize} Colonists arrived!");
+
+            // Spawn the physical colonists in the scene
+            AbstractUnitSO unitSO = null;
+#if UNITY_EDITOR
+            unitSO = UnityEditor.AssetDatabase.LoadAssetAtPath<AbstractUnitSO>("Assets/Units/Rifleman/Rifleman.asset");
+#endif
+            if (unitSO == null)
+            {
+                unitSO = Resources.Load<AbstractUnitSO>("Units/Rifleman");
+            }
+
+            if (unitSO != null && unitSO.Prefab != null)
+            {
+                Vector3 spawnPos = Vector3.zero;
+                bool foundSpawn = false;
+
+                // 1. Try Completed Spaceport
+                foreach (var building in BaseBuilding.ActiveBuildings)
+                {
+                    if (building != null && building.BuildingSO != null &&
+                        building.BuildingSO.Name.Contains("Spaceport", System.StringComparison.OrdinalIgnoreCase) &&
+                        building.Progress.State == BuildingProgress.BuildingState.Completed &&
+                        building.Owner == Owner.Player1)
+                    {
+                        Vector3 candidatePos = building.transform.position + Vector3.forward * 4f;
+                        if (UnityEngine.AI.NavMesh.SamplePosition(candidatePos, out UnityEngine.AI.NavMeshHit hit, 8f, UnityEngine.AI.NavMesh.AllAreas))
+                        {
+                            spawnPos = hit.position;
+                        }
+                        else
+                        {
+                            spawnPos = building.transform.position;
+                        }
+                        foundSpawn = true;
+                        break;
+                    }
+                }
+
+                // 2. Fallback to Completed Command Post
+                if (!foundSpawn)
+                {
+                    foreach (var building in BaseBuilding.ActiveBuildings)
+                    {
+                        if (building != null && building.BuildingSO != null &&
+                            building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) &&
+                            building.Progress.State == BuildingProgress.BuildingState.Completed &&
+                            building.Owner == Owner.Player1)
+                        {
+                            Vector3 candidatePos = building.transform.position + Vector3.forward * 4f;
+                            if (UnityEngine.AI.NavMesh.SamplePosition(candidatePos, out UnityEngine.AI.NavMeshHit hit, 8f, UnityEngine.AI.NavMesh.AllAreas))
+                            {
+                                spawnPos = hit.position;
+                            }
+                            else
+                            {
+                                spawnPos = building.transform.position;
+                            }
+                            foundSpawn = true;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. Fallback to UCC
+                if (!foundSpawn)
+                {
+                    var UCC = UnityEngine.Object.FindAnyObjectByType<GlobalCommander>(FindObjectsInactive.Exclude);
+                    if (UCC != null)
+                    {
+                        Vector3 candidatePos = UCC.transform.position + Vector3.forward * 4f;
+                        if (UnityEngine.AI.NavMesh.SamplePosition(candidatePos, out UnityEngine.AI.NavMeshHit hit, 8f, UnityEngine.AI.NavMesh.AllAreas))
+                        {
+                            spawnPos = hit.position;
+                        }
+                        else
+                        {
+                            spawnPos = UCC.transform.position;
+                        }
+                        foundSpawn = true;
+                    }
+                }
+
+                // Spawn wave size
+                if (foundSpawn)
+                {
+                    for (int i = 0; i < currentWaveSize; i++)
+                    {
+                        Vector3 staggeredPos = spawnPos + new Vector3(Random.Range(-1.5f, 1.5f), 0f, Random.Range(-1.5f, 1.5f));
+                        if (UnityEngine.AI.NavMesh.SamplePosition(staggeredPos, out UnityEngine.AI.NavMeshHit hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+                        {
+                            staggeredPos = hit.position;
+                        }
+
+                        GameObject instance = Instantiate(unitSO.Prefab, staggeredPos, Quaternion.identity);
+                        instance.name = "Colonist";
+
+                        var abstractUnit = instance.GetComponent<AbstractUnit>();
+                        if (abstractUnit != null)
+                        {
+                            abstractUnit.Owner = Owner.Player1;
+                        }
+
+                        // Attach MartianColonist AI loop
+                        instance.AddComponent<MartianColonist>();
+
+                        // Disable background behavior graph AI
+                        var bgAgent = instance.GetComponent<Unity.Behavior.BehaviorGraphAgent>();
+                        if (bgAgent != null) bgAgent.enabled = false;
+                    }
+                }
+            }
 
             // Scale up next wave
             currentWaveSize += Random.Range(1, 4);
