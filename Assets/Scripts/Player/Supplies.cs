@@ -72,6 +72,17 @@ namespace GameDevTV.RTS.Player
             private set => _power = value;
         }
 
+        private static Dictionary<Owner, float> _energy;
+        public static Dictionary<Owner, float> Energy 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _energy;
+            }
+            private set => _energy = value;
+        }
+
         private static Dictionary<Owner, int> _population;
         public static Dictionary<Owner, int> Population 
         { 
@@ -155,6 +166,7 @@ namespace GameDevTV.RTS.Player
         public static event Action<Owner, float> OnWaterChanged;
         public static event Action<Owner, float> OnIntegrityChanged;
         public static event Action<Owner, float> OnPowerChanged;
+        public static event Action<Owner, float> OnEnergyChanged;
         public static event Action<Owner, float> OnBiomassChanged;
         public static event Action<Owner, float> OnFoodChanged;
 
@@ -194,13 +206,18 @@ namespace GameDevTV.RTS.Player
         public static event Action<Owner, int> OnPopulationChanged;
         public static event Action<Owner, int> OnPopulationLimitChanged;
 
-        public static void UpdatePower(Owner owner, float value)
+        public static void UpdatePower(Owner owner, float amount)
         {
-            if (Power != null && Power.ContainsKey(owner))
-            {
-                Power[owner] = Mathf.Max(0, value);
-                OnPowerChanged?.Invoke(owner, Power[owner]);
-            }
+            EnsureInitialized();
+            Power[owner] = amount;
+            OnPowerChanged?.Invoke(owner, amount);
+        }
+
+        public static void UpdateEnergy(Owner owner, float amount)
+        {
+            EnsureInitialized();
+            Energy[owner] = amount;
+            OnEnergyChanged?.Invoke(owner, amount);
         }
 
         public static void UpdateBiomass(Owner owner, float value)

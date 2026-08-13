@@ -51,6 +51,7 @@ namespace GameDevTV.RTS.Units
 
         private GameObject trackerGo;
         private UnityEngine.UI.Text trackerText;
+        private float logTimer = 0f;
 
         private void Awake()
         {
@@ -128,6 +129,21 @@ namespace GameDevTV.RTS.Units
             // High Priority: Scan for any damaged structure
             CheckForRepairs();
 
+            // Throttled debug log (every 1.5 seconds) to track engineer state
+            logTimer += Time.deltaTime;
+            if (logTimer >= 1.5f)
+            {
+                logTimer = 0f;
+                string stateStr = isInside ? $"Inside {currentBuilding?.gameObject.name}" : "Outside";
+                string agentStr = agent != null 
+                    ? $"enabled={agent.enabled}, hasPath={agent.hasPath}, pending={agent.pathPending}, dest={agent.destination}, remain={agent.remainingDistance:F1}" 
+                    : "null";
+                string targetStr = repairTarget != null 
+                    ? $"Target={repairTarget.gameObject.name} (HP={repairTarget.CurrentHealth}/{repairTarget.MaxHealth}, dist={Vector3.Distance(transform.position, repairTarget.transform.position):F1}m)" 
+                    : "None";
+                Debug.Log($"[Engineer Debug] State={stateStr} | Agent={agentStr} | {targetStr}");
+            }
+
             if (repairTarget != null)
             {
                 HandleRepairBehavior();
@@ -203,30 +219,52 @@ namespace GameDevTV.RTS.Units
 
             if (repairTarget == null)
             {
-                // Scan buildings first
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                var tubes = FindObjectsByType<PressurizedTube>(FindObjectsInactive.Exclude);
+
+                AbstractCommandable bestTarget = null;
+                float bestScore = float.MaxValue; // Lower score is higher priority
+
+                // Score = distance + (healthPct < 30% ? 0 : 150).
+                // Critical structures (< 30% HP) always rank higher than non-critical.
+                // Within each bracket, we naturally select the closest one.
                 foreach (var b in buildings)
                 {
                     if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed && b.CurrentHealth < b.MaxHealth)
                     {
-                        repairTarget = b;
-                        isWaitingInBuilding = false;
-                        if (isInside) ExitBuilding();
-                        return;
+                        float dist = Vector3.Distance(transform.position, b.transform.position);
+                        float healthPct = (float)b.CurrentHealth / b.MaxHealth;
+                        float score = dist + (healthPct < 0.3f ? 0f : 150f);
+
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            bestTarget = b;
+                        }
                     }
                 }
 
-                // Scan tubes
-                var tubes = FindObjectsByType<PressurizedTube>(FindObjectsInactive.Exclude);
                 foreach (var t in tubes)
                 {
                     if (t != null && t.CurrentHealth < t.MaxHealth)
                     {
-                        repairTarget = t;
-                        isWaitingInBuilding = false;
-                        if (isInside) ExitBuilding();
-                        return;
+                        float dist = Vector3.Distance(transform.position, t.transform.position);
+                        float healthPct = (float)t.CurrentHealth / t.MaxHealth;
+                        float score = dist + (healthPct < 0.3f ? 0f : 150f);
+
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            bestTarget = t;
+                        }
                     }
+                }
+
+                if (bestTarget != null)
+                {
+                    repairTarget = bestTarget;
+                    isWaitingInBuilding = false;
+                    if (isInside) ExitBuilding();
                 }
             }
         }
@@ -236,7 +274,7 @@ namespace GameDevTV.RTS.Units
             if (repairTarget == null) return;
 
             float dist = Vector3.Distance(transform.position, repairTarget.transform.position);
-            float maxRepairDist = repairTarget is BaseBuilding ? 6.5f : 3.0f;
+            float maxRepairDist = repairTarget is BaseBuilding ? 8.5f : 3.0f;
             if (dist <= maxRepairDist)
             {
                 // Stand next to it and repair
@@ -264,7 +302,7 @@ namespace GameDevTV.RTS.Units
                 }
 
                 // Move towards repair site
-                if (agent != null && agent.enabled && !agent.hasPath)
+                if (agent != null && agent.enabled && !(agent.hasPath || agent.pathPending))
                 {
                     agent.SetDestination(repairTarget.transform.position);
                 }
@@ -432,9 +470,9 @@ namespace GameDevTV.RTS.Units
                 foreach (var neighbor in node.ConnectedNodes)
                 {
                     if (neighbor == null) continue;
-                    string key = node.GetInstanceID() < neighbor.GetInstanceID() 
-                        ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
-                        : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
+                    string key = node.GetHashCode() < neighbor.GetHashCode() 
+                        ? $"{node.GetHashCode()}_{neighbor.GetHashCode()}" 
+                        : $"{neighbor.GetHashCode()}_{node.GetHashCode()}";
                     if (checkedPairs.Contains(key)) continue;
                     checkedPairs.Add(key);
 
@@ -499,7 +537,8 @@ namespace GameDevTV.RTS.Units
                     if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        if (distToBuilding <= 6.0f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+                        float distToDest = Vector3.Distance(agent.destination, b.transform.position);
+                        if (distToDest <= 1.0f && distToBuilding <= 8.5f)
                         {
                             EnterBuilding(b);
                             break;

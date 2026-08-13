@@ -645,6 +645,9 @@ namespace GameDevTV.RTS.Environment
                             }
 
                             node.visualGO = dot;
+                            var explorable = dot.AddComponent<ExplorableNode>();
+                            explorable.NodeData = node;
+                            explorable.SectorIndex = sectorIdx;
 
                             // --- "?" floating label (much bigger) ---
                             var qmGo = new GameObject($"QuestionMark_{node.type}");

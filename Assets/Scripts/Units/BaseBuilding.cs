@@ -312,6 +312,12 @@ namespace GameDevTV.RTS.Units
             {
                 GameDevTV.RTS.Player.BuildingUpkeepManager.Instance.RegisterBuilding(this);
             }
+
+            if (GameDevTV.RTS.Player.GameFlowManager.Instance != null)
+            {
+                GameDevTV.RTS.Player.GameFlowManager.Instance.OnTurnUpkeep += HandleTurnUpkeep;
+                GameDevTV.RTS.Player.GameFlowManager.Instance.OnTurnIncome += HandleTurnIncome;
+            }
         }
 
         protected override void OnDisable()
@@ -323,6 +329,12 @@ namespace GameDevTV.RTS.Units
             if (GameDevTV.RTS.Player.BuildingUpkeepManager.Instance != null)
             {
                 GameDevTV.RTS.Player.BuildingUpkeepManager.Instance.UnregisterBuilding(this);
+            }
+
+            if (GameDevTV.RTS.Player.GameFlowManager.Instance != null)
+            {
+                GameDevTV.RTS.Player.GameFlowManager.Instance.OnTurnUpkeep -= HandleTurnUpkeep;
+                GameDevTV.RTS.Player.GameFlowManager.Instance.OnTurnIncome -= HandleTurnIncome;
             }
             productionCoroutine = null;
 
@@ -586,7 +598,9 @@ namespace GameDevTV.RTS.Units
                 }
 
                 UpdateHousingContribution();
-                StartCoroutine(UpkeepRoutine());
+                
+                // Note: The periodic UpkeepRoutine has been replaced with the new GameFlowManager's OnTurnUpkeep/OnTurnIncome events.
+
 
                 // Trigger grid recalculation on construction completed
                 GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
@@ -751,88 +765,123 @@ namespace GameDevTV.RTS.Units
             }
         }
 
-        private IEnumerator UpkeepRoutine()
+        private void HandleTurnUpkeep()
         {
+            if (!gameObject.activeInHierarchy || Progress.State != BuildingProgress.BuildingState.Completed) return;
             var config = BuildingSO.BuildingConfig;
-            if (config == null) yield break;
+            if (config == null) return;
 
-            Debug.Log($"[BaseBuilding] UpkeepRoutine started on {gameObject.name} — Config='{config?.name}', BuildingSO='{BuildingSO?.name}', PowerGeneration={config.PowerGeneration}");
+            bool isOperating = true;
 
-            while (gameObject.activeInHierarchy && Progress.State == BuildingProgress.BuildingState.Completed)
+            // Drains Energy during upkeep if applicable
+            if (config.PowerUpkeep > 0)
             {
-                yield return new WaitForSeconds(1f);
-
-                bool isOperating = true;
-
-                if (TryGetComponent(out GameDevTV.RTS.Environment.PowerNode powerNode))
+                float curEnergy = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float e) ? e : 0f;
+                if (curEnergy >= config.PowerUpkeep)
                 {
-                    if (config.PowerUpkeep > 0)
-                    {
-                        if (!powerNode.IsGridPowered)
-                        {
-                            if (TryGetComponent(out GameDevTV.RTS.Environment.BatteryNode battery) && battery.HasCharge)
-                            {
-                                battery.Drain(1f);
-                            }
-                        }
+                    Supplies.UpdateEnergy(Owner, curEnergy - config.PowerUpkeep);
+                }
+                else
+                {
+                    // Shortfall -> degrade
+                    isOperating = false;
+                    TakeDamage((int)Mathf.Min(20f, CurrentHealth - 1f)); // Don't instantly destroy, but degrade
+                }
+            }
 
-                        if (!powerNode.IsPowered)
-                        {
-                            isOperating = false;
-                        }
-                    }
+            if (isOperating)
+            {
+                if (config.BiomassUpkeep > 0)
+                {
+                    float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
+                    Supplies.UpdateBiomass(Owner, Mathf.Max(0f, curBiomass - config.BiomassUpkeep));
                 }
 
-                // Generation is managed globally via PowerGridManager.RecalculateGrids()
-
-                if (isOperating)
+                if (config.OxygenUpkeep > 0)
                 {
-                    if (config.BiomassGeneration > 0)
-                    {
-                        float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
-                        Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
-
-                        float foodGen = config.BiomassGeneration * 0.5f;
-                        // Boost food production by 50% if the Colony Commander is inside working
-                        if (MartianColonist.Instance != null && MartianColonist.Instance.IsInside && MartianColonist.Instance.CurrentBuilding == this)
-                        {
-                            foodGen *= 1.5f;
-                        }
-                        float curFood = Supplies.Food != null && Supplies.Food.TryGetValue(Owner, out float f) ? f : 0f;
-                        Supplies.UpdateFood(Owner, curFood + foodGen);
-                    }
-
-                    // Passive climate generation (config-driven — replaces old hardcoded GHG Factory check)
-                    if (config.TemperatureGeneration > 0f)
-                    {
-                        float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
-                        Supplies.UpdateTemperature(Owner, curTemp + config.TemperatureGeneration);
-                    }
-                    if (config.AtmosphereGeneration > 0f)
-                    {
-                        float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
-                        Supplies.UpdateAtmosphere(Owner, curAtmos + config.AtmosphereGeneration);
-                    }
-                    if (config.WaterGeneration > 0f)
-                    {
-                        float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner, out float w) ? w : 0f;
-                        Supplies.UpdateWater(Owner, curWater + config.WaterGeneration);
-                    }
-
-                    // Upkeep is managed globally via PowerGridManager.RecalculateGrids()
-                    
-                    if (config.BiomassUpkeep > 0)
-                    {
-                        float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
-                        Supplies.UpdateBiomass(Owner, Mathf.Max(0f, curBiomass - config.BiomassUpkeep));
-                    }
-
-                    if (config.OxygenUpkeep > 0)
-                    {
-                        float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
-                        Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
-                    }
+                    float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
+                    Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
                 }
+            }
+        }
+
+        private void HandleTurnIncome()
+        {
+            if (!gameObject.activeInHierarchy || Progress.State != BuildingProgress.BuildingState.Completed) return;
+            var config = BuildingSO.BuildingConfig;
+            if (config == null) return;
+
+            // If Energy upkeep was required and not met, the building is degrading and doesn't generate income
+            float curEnergy = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float e) ? e : 0f;
+            if (config.PowerUpkeep > 0 && curEnergy < config.PowerUpkeep) return;
+
+            // Generate Energy
+            if (config.PowerGeneration > 0)
+            {
+                float curE = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float eng) ? eng : 0f;
+                Supplies.UpdateEnergy(Owner, curE + config.PowerGeneration);
+            }
+
+            if (config.BiomassGeneration > 0)
+            {
+                float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
+                Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+
+                bool isGreenhouse = BuildingSO != null && BuildingSO.Name.Contains("Greenhouse", System.StringComparison.OrdinalIgnoreCase);
+                if (isGreenhouse)
+                {
+                    float foodGen = config.BiomassGeneration * 0.5f;
+                    if (MartianColonist.Instance != null && MartianColonist.Instance.IsInside && MartianColonist.Instance.CurrentBuilding == this)
+                    {
+                        foodGen *= 1.5f;
+                    }
+                    float curFood = Supplies.Food != null && Supplies.Food.TryGetValue(Owner, out float f) ? f : 0f;
+                    Supplies.UpdateFood(Owner, curFood + foodGen);
+                }
+            }
+
+            if (config.TemperatureGeneration > 0f)
+            {
+                float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
+                Supplies.UpdateTemperature(Owner, curTemp + config.TemperatureGeneration);
+            }
+            if (config.AtmosphereGeneration > 0f)
+            {
+                float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
+                Supplies.UpdateAtmosphere(Owner, curAtmos + config.AtmosphereGeneration);
+            }
+            if (config.WaterGeneration > 0f)
+            {
+                float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner, out float w) ? w : 0f;
+                Supplies.UpdateWater(Owner, curWater + config.WaterGeneration);
+            }
+        }
+
+        public void TryRepair()
+        {
+            if (Progress.State != BuildingProgress.BuildingState.Completed || CurrentHealth >= MaxHealth) return;
+
+            // Check if player has at least 2 materials
+            int currentMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner, out int m) ? m : 0;
+            if (currentMats >= 2)
+            {
+                // Deduct 2 materials
+                Supplies.UpdateMaterials(Owner, currentMats - 2);
+
+                // Heal structure fully
+                Heal(MaxHealth - CurrentHealth);
+
+                Debug.Log($"[BaseBuilding] {gameObject.name} repaired for 2 materials.");
+
+                // Notify GameFlowManager
+                if (GameDevTV.RTS.Player.GameFlowManager.Instance != null)
+                {
+                    GameDevTV.RTS.Player.GameFlowManager.Instance.PlayerActed();
+                }
+            }
+            else
+            {
+                Debug.Log($"[BaseBuilding] Not enough materials to repair {gameObject.name}. Costs 2.");
             }
         }
 

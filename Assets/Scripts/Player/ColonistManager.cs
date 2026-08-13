@@ -239,16 +239,24 @@ namespace GameDevTV.RTS.Player
                         }
 
                         GameObject instance = Instantiate(unitSO.Prefab, staggeredPos, Quaternion.identity);
-                        instance.name = "Colonist";
-
                         var abstractUnit = instance.GetComponent<AbstractUnit>();
                         if (abstractUnit != null)
                         {
                             abstractUnit.Owner = Owner.Player1;
                         }
 
-                        // Attach MartianColonist AI loop
-                        instance.AddComponent<MartianColonist>();
+                        // 25% chance to spawn as a technical Engineer, 75% as standard Colonist
+                        bool isEngineerWave = Random.value < 0.25f;
+                        if (isEngineerWave)
+                        {
+                            instance.name = "Colony Engineer";
+                            instance.AddComponent<ColonyEngineer>();
+                        }
+                        else
+                        {
+                            instance.name = "Colonist";
+                            instance.AddComponent<MartianColonist>();
+                        }
 
                         // Disable background behavior graph AI
                         var bgAgent = instance.GetComponent<Unity.Behavior.BehaviorGraphAgent>();

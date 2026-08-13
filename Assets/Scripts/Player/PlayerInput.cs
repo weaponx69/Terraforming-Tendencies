@@ -639,6 +639,12 @@ namespace GameDevTV.RTS.Player
                             building.Die();
                             return;
                         }
+                        
+                        if (building.CurrentHealth < building.MaxHealth)
+                        {
+                            building.TryRepair();
+                            return;
+                        }
                     }
                     else if (vetoHit.collider.transform.parent != null && vetoHit.collider.transform.parent.TryGetComponent<BaseBuilding>(out var parentBuilding))
                     {
@@ -647,6 +653,17 @@ namespace GameDevTV.RTS.Player
                             parentBuilding.Die();
                             return;
                         }
+                        
+                        if (parentBuilding.CurrentHealth < parentBuilding.MaxHealth)
+                        {
+                            parentBuilding.TryRepair();
+                            return;
+                        }
+                    }
+                    else if (vetoHit.collider.TryGetComponent<GameDevTV.RTS.Environment.ExplorableNode>(out var explorableNode))
+                    {
+                        explorableNode.TryExplore();
+                        return;
                     }
                 }
             }

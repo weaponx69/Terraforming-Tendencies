@@ -702,3 +702,40 @@ User right-clicks on map (with units selected)
 * **Building Entry Bounds**: Increased the completed building entry detection radius from `2.2` meters to `6.0` meters. This allows pathing colonists and engineers to successfully trigger the `EnterBuilding()` state when reaching the outer edge of large obstacle colliders (such as the Solar Panels), instead of walking into their perimeter forever.
 * **Tube Proximity Distance-Guards**: Added a distance threshold of `4.5` meters from both building centers to the tube proximity check. This prevents units standing outside next to structures from registering as "inside a tube" and displaying false-positive tube transit badges.
 * **Physical Wave Colonists**: Modified [`ColonistManager.cs`](Assets/Scripts/Player/ColonistManager.cs) to instantiate physical human game units in the scene when a new wave of colonists arrives. They land at the completed Spaceport (or fallback bases) and automatically run the `MartianColonist` logic, showing `👩‍🚀 COL` badges to indicate standard colonists.
+
+#### 35. Core Game Flow (The One Rule: Actions Drive Time)
+* **The One Rule**: There is no "End Turn" button. The turn advances automatically after the player stops acting.
+* **Player Actions**: (Any of these resets a short idle timer)
+  * **Deploy**: Play a card from hand onto a valid map tile.
+  * **Explore**: Reveal an adjacent undiscovered tile (costs 1 energy).
+  * **Repair**: Fix a degraded structure (costs 2 materials).
+* **Flow**:
+  * PLAYER ACTS → idle timer resets (≈2 seconds)
+  * PLAYER ACTS AGAIN → timer resets again
+  * PLAYER STOPS → timer expires → TURN RESOLVES
+* **Turn Resolution (sequential)**:
+  1. **Upkeep**: Each deployed structure drains energy. Shortfall → random structures degrade.
+  2. **Recovery**: Disabled structures tick down toward reactivation.
+  3. **Income**: Gain base resources (energy, materials, research) + bonuses from upgrades/deposits.
+  4. **Threats**: Random chance (scales with turn number × planet danger). Damages resources or structures.
+  5. **Draw**: Discard hand, draw fresh hand. If deck empty, shuffle discard.
+  6. **Events**: Every 3rd turn: Discovery Draft (pick 1 of 3 rewards). Otherwise: 25% chance of a choice event.
+  7. **Milestones**: If terraform progress crosses a threshold, pause and open Upgrade Shop.
+  8. **Win/Lose Check**: All targets met = victory. Max turns exceeded = defeat.
+* **Card Rules**:
+  * **Play-and-draw**: Playing a card immediately draws a replacement (hand stays full during your action window)
+  * **Climate gates**: Some cards locked until terraform stats reach thresholds
+  * **Upkeep**: Deployed cards cost energy each turn to maintain
+* **Exploration**:
+  * Map starts with fog of war, only a few tiles revealed.
+  * Adjacent-to-revealed tiles are “discoverable” (marked visually).
+  * Revealing a tile also makes its neighbors discoverable (frontier expands outward).
+  * Some tiles have resource deposits that boost income when structures are placed on them.
+* **Milestones & Upgrades**:
+  * 3-4 milestones per planet (at ~30%, 50%, 70%, 85% of terraform target).
+  * Hitting one awards meta-currency and opens a shop.
+  * Upgrades are permanent for the mission: cheaper cards, more income, bigger hand, threat resistance, etc.
+* **Key Design Intent**:
+  * **RTS pacing without real-time combat**: The idle timer creates urgency. Players batch actions quickly, then watch resolution.
+  * **“Never stuck, always starving”**: Players always have something to do (emergency cards, exploration), but never have enough resources to do everything.
+  * **Escalating pressure**: Threats scale up, upkeep accumulates, structures degrade. The planet fights back harder as you terraform more.

@@ -55,11 +55,19 @@ namespace GameDevTV.RTS.Player
         private void OnEnable()
         {
             SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.OnTurnDraw += DiscardHandAndDrawFresh;
+            }
         }
 
         private void OnDisable()
         {
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.OnTurnDraw -= DiscardHandAndDrawFresh;
+            }
         }
 
         // Don't fill the hand in Start() — BlueprintDraftUI may not have
@@ -154,6 +162,17 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// Discards the entire hand and draws a fresh one. 
+        /// Triggered during the Draw phase of turn resolution.
+        /// </summary>
+        public void DiscardHandAndDrawFresh()
+        {
+            discardPile.AddRange(hand);
+            hand.Clear();
+            FillHand();
+        }
+
+        /// <summary>
         /// Play the card at the given hand index: apply its effect,
         /// remove from hand, discard it, and draw a replacement.
         /// </summary>
@@ -179,6 +198,12 @@ namespace GameDevTV.RTS.Player
 
             // Apply the card's effect
             played.Apply();
+
+            // Notify GameFlowManager that an action was taken
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.PlayerActed();
+            }
 
             // Move played card to discard
             hand.RemoveAt(handIndex);

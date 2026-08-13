@@ -220,9 +220,9 @@ namespace GameDevTV.RTS.Units
                 foreach (var neighbor in node.ConnectedNodes)
                 {
                     if (neighbor == null) continue;
-                    string key = node.GetInstanceID() < neighbor.GetInstanceID() 
-                        ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
-                        : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
+                    string key = node.GetHashCode() < neighbor.GetHashCode() 
+                        ? $"{node.GetHashCode()}_{neighbor.GetHashCode()}" 
+                        : $"{neighbor.GetHashCode()}_{node.GetHashCode()}";
                     if (checkedPairs.Contains(key)) continue;
                     checkedPairs.Add(key);
 
@@ -293,7 +293,8 @@ namespace GameDevTV.RTS.Units
                     if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        if (distToBuilding <= 6.0f && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+                        float distToDest = Vector3.Distance(agent.destination, b.transform.position);
+                        if (distToDest <= 1.0f && distToBuilding <= 8.5f)
                         {
                             EnterBuilding(b);
                             break;
@@ -456,9 +457,9 @@ namespace GameDevTV.RTS.Units
                     foreach (var neighbor in node.ConnectedNodes)
                     {
                         if (neighbor == null) continue;
-                        string key = node.GetInstanceID() < neighbor.GetInstanceID() 
-                            ? $"{node.GetInstanceID()}_{neighbor.GetInstanceID()}" 
-                            : $"{neighbor.GetInstanceID()}_{node.GetInstanceID()}";
+                        string key = node.GetHashCode() < neighbor.GetHashCode() 
+                            ? $"{node.GetHashCode()}_{neighbor.GetHashCode()}" 
+                            : $"{neighbor.GetHashCode()}_{node.GetHashCode()}";
                         if (checkedPairs.Contains(key)) continue;
                         checkedPairs.Add(key);
 
@@ -658,7 +659,7 @@ namespace GameDevTV.RTS.Units
 
         private void SeekNearestShelter()
         {
-            if (agent != null && agent.enabled && agent.hasPath)
+            if (agent != null && agent.enabled && (agent.hasPath || agent.pathPending))
             {
                 return;
             }
