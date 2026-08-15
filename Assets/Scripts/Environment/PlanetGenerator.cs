@@ -1236,4 +1236,3 @@ namespace GameDevTV.RTS.Environment
             }
         }
     }
-}

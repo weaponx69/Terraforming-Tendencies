@@ -55,19 +55,11 @@ namespace GameDevTV.RTS.Player
         private void OnEnable()
         {
             SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
-            if (GameFlowManager.Instance != null)
-            {
-                GameFlowManager.Instance.OnTurnDraw += DiscardHandAndDrawFresh;
-            }
         }
 
         private void OnDisable()
         {
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
-            if (GameFlowManager.Instance != null)
-            {
-                GameFlowManager.Instance.OnTurnDraw -= DiscardHandAndDrawFresh;
-            }
         }
 
         // Don't fill the hand in Start() — BlueprintDraftUI may not have

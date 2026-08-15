@@ -59,7 +59,6 @@ namespace GameDevTV.RTS.Player
         private void Start()
         {
             GameFlowManager.Instance.OnTurnUpkeep += HandleTurnUpkeep;
-            upkeepRoutine = StartCoroutine(UpkeepLoop());
         }
 
         private void HandleTurnUpkeep()
@@ -69,10 +68,7 @@ namespace GameDevTV.RTS.Player
 
         private void OnDestroy()
         {
-            if (upkeepRoutine != null)
-            {
-                StopCoroutine(upkeepRoutine);
-            }
+            // Empty, removed routine
         }
 
         /// <summary>Register a completed building for upkeep tracking.</summary>
@@ -108,15 +104,6 @@ namespace GameDevTV.RTS.Player
                 }
             }
             return activeCount * baseUpkeepPerBuilding * tickRate;
-        }
-
-        private IEnumerator UpkeepLoop()
-        {
-            while (true)
-            {
-                yield return new WaitForSeconds(tickRate);
-                ProcessUpkeepTick();
-            }
         }
 
         private void ProcessUpkeepTick()
