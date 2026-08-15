@@ -644,29 +644,25 @@ namespace GameDevTV.RTS.Environment
                                 }
                             }
 
-                            node.visualGO = dot;
-                            var explorable = dot.AddComponent<ExplorableNode>();
-                            explorable.NodeData = node;
                                                          node.visualGO = dot;
                                                          var explorable = dot.AddComponent<ExplorableNode>();
                                                          explorable.NodeData = node;
-                                                         explorable.SectorIndex = sectorIdx;
-
-                            // --- "?" floating label (much bigger) ---
-                            var qmGo = new GameObject($"QuestionMark_{node.type}");
-                            qmGo.transform.position = spawnPos + Vector3.up * 2.5f;
-                            qmGo.transform.parent = questionMarkRoot.transform;
-                            var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
-                            qmText.text = "?";
-                            qmText.fontSize = 8f;
-                            qmText.alignment = TMPro.TextAlignmentOptions.Center;
-                            qmText.color = Color.yellow;
-                            qmText.fontStyle = TMPro.FontStyles.Bold;
-                            qmText.transform.localScale = Vector3.one * 0.8f;
-                            node.questionMarkGO = qmGo;
-                        }
-                    }
-                }
+                                                         
+                                                         // --- "?" floating label (much bigger) ---
+                                                         var qmGo = new GameObject($"QuestionMark_{node.type}");
+                                                         qmGo.transform.position = spawnPos + Vector3.up * 2.5f;
+                                                         qmGo.transform.parent = questionMarkRoot.transform;
+                                                         var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
+                                                         qmText.text = "?";
+                                                         qmText.fontSize = 8f;
+                                                         qmText.alignment = TMPro.TextAlignmentOptions.Center;
+                                                         qmText.color = Color.yellow;
+                                                         qmText.fontStyle = TMPro.FontStyles.Bold;
+                                                         qmText.transform.localScale = Vector3.one * 0.8f;
+                                                         node.questionMarkGO = qmGo;
+                                                     }
+                                                 }
+                                             }
 
                 /// <summary>
                 /// Destroy all old scattered GatherableSupply objects left from previous generation.
@@ -1137,108 +1133,107 @@ namespace GameDevTV.RTS.Environment
 
                 for (int i = 0; i < maxAttempts && spawnedCount < density; i++)
                 {
-                float randomX = Random.Range(0f, width * CellSize);
-                float randomZ = Random.Range(0f, height * CellSize);
-                Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
-                
-                if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
+                    float randomX = Random.Range(0f, width * CellSize);
+                    float randomZ = Random.Range(0f, height * CellSize);
+                    Vector3 spawnPos = new Vector3(randomX, 0, randomZ);
+                    
+                    if (Vector3.Distance(spawnPos, center) < exclusionRadius) continue;
 
-                bool tooClose = false;
-                foreach (Vector3 pos in spawnedPositions)
-                {
-                    if (Vector3.Distance(pos, spawnPos) < minSpacing)
+                    bool tooClose = false;
+                    foreach (Vector3 pos in spawnedPositions)
                     {
-                        tooClose = true;
-                        break;
-                    }
-                }
-                if (tooClose) continue;
-                spawnedPositions.Add(spawnPos);
-
-                GameObject prefab = Config.SurfaceFeaturePrefabs[Random.Range(0, Config.SurfaceFeaturePrefabs.Length)];
-                
-                Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-                GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
-                
-                float scaleVar = Random.Range(0.8f, 1.3f);
-                instance.transform.localScale *= scaleVar;
-
-                // Ensure GatherableSupply is correctly configured if it's a mineral/crystal
-                bool isMineral = instance.name.ToLower().Contains("crystal") || instance.name.ToLower().Contains("mineral");
-                if (isMineral)
-                {
-                    EnsureGatherableSupply(instance, MineralsSupplySO);
-                }
-                
-                Color groundColor = new Color(0.65f, 0.35f, 0.20f);
-
-                if (!isMineral)
-                {
-                    Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
-                    foreach (var r in renderers)
-                    {
-                        Material[] sharedMaterials = r.sharedMaterials;
-                        foreach (var m in sharedMaterials)
+                        if (Vector3.Distance(pos, spawnPos) < minSpacing)
                         {
-                            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
-                            else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                            tooClose = true;
+                            break;
                         }
                     }
-                }
+                    if (tooClose) continue;
+                    spawnedPositions.Add(spawnPos);
 
-                if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
-                {
-                    instance.AddComponent<HiddenResource>();
-                }
+                    GameObject prefab = Config.SurfaceFeaturePrefabs[Random.Range(0, Config.SurfaceFeaturePrefabs.Length)];
+                    
+                    Quaternion randomRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+                    GameObject instance = Instantiate(prefab, spawnPos, randomRot, transform);
+                    
+                    float scaleVar = Random.Range(0.8f, 1.3f);
+                    instance.transform.localScale *= scaleVar;
 
-                float mapWidthWorld = width * CellSize;
-                float mapHeightWorld = height * CellSize;
-                float margin = 20f;
-
-                for (int gx = -1; gx <= 1; gx++)
-                {
-                    for (int gz = -1; gz <= 1; gz++)
+                    // Ensure GatherableSupply is correctly configured if it's a mineral/crystal
+                    bool isMineral = instance.name.ToLower().Contains("crystal") || instance.name.ToLower().Contains("mineral");
+                    if (isMineral)
                     {
-                        if (gx == 0 && gz == 0) continue; 
+                        EnsureGatherableSupply(instance, MineralsSupplySO);
+                    }
+                    
+                    Color groundColor = new Color(0.65f, 0.35f, 0.20f);
 
-                        // Only spawn ghost if original is close enough to the opposite edge to be seen when wrapping
-                        bool xNeeded = (gx == 0) || (gx == -1 && spawnPos.x > mapWidthWorld - margin) || (gx == 1 && spawnPos.x < margin);
-                        bool zNeeded = (gz == 0) || (gz == -1 && spawnPos.z > mapHeightWorld - margin) || (gz == 1 && spawnPos.z < margin);
-                        
-                        if (!xNeeded || !zNeeded) continue;
-                        
-                        Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
-                        GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
-                        ghost.name = "Ghost";
-                        ghost.transform.localScale = Vector3.one;
-                        SetLayerRecursive(ghost, transparentLayer);
-                        
-                        Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
-                        foreach (var r in ghostRenderers)
+                    if (!isMineral)
+                    {
+                        Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+                        foreach (var r in renderers)
                         {
                             Material[] sharedMaterials = r.sharedMaterials;
                             foreach (var m in sharedMaterials)
                             {
-                                if (!isMineral)
-                                {
-                                    if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
-                                    else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
-                                }
+                                if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                                else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
                             }
                         }
+                    }
 
-                        foreach (var c in ghost.GetComponentsInChildren<Collider>())
+                    if (instance.GetComponent<GatherableSupply>() != null && instance.GetComponent<HiddenResource>() == null)
+                    {
+                        instance.AddComponent<HiddenResource>();
+                    }
+
+                    float mapWidthWorld = width * CellSize;
+                    float mapHeightWorld = height * CellSize;
+                    float margin = 20f;
+
+                    for (int gx = -1; gx <= 1; gx++)
+                    {
+                        for (int gz = -1; gz <= 1; gz++)
                         {
-                            if (Application.isPlaying) c.enabled = false;
-                            else DestroyImmediate(c);
+                            if (gx == 0 && gz == 0) continue;
+
+                            // Only spawn ghost if original is close enough to the opposite edge to be seen when wrapping
+                            bool xNeeded = (gx == 0) || (gx == -1 && spawnPos.x > mapWidthWorld - margin) || (gx == 1 && spawnPos.x < margin);
+                            bool zNeeded = (gz == 0) || (gz == -1 && spawnPos.z > mapHeightWorld - margin) || (gz == 1 && spawnPos.z < margin);
+                            
+                            if (!xNeeded || !zNeeded) continue;
+                            
+                            Vector3 ghostPos = spawnPos + new Vector3(gx * mapWidthWorld, 0, gz * mapHeightWorld);
+                            GameObject ghost = Instantiate(prefab, ghostPos, randomRot, instance.transform);
+                            ghost.name = "Ghost";
+                            ghost.transform.localScale = Vector3.one;
+                            SetLayerRecursive(ghost, transparentLayer);
+                            
+                            Renderer[] ghostRenderers = ghost.GetComponentsInChildren<Renderer>();
+                            foreach (var r in ghostRenderers)
+                            {
+                                Material[] sharedMaterials = r.sharedMaterials;
+                                foreach (var m in sharedMaterials)
+                                {
+                                    if (!isMineral)
+                                    {
+                                        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", groundColor);
+                                        else if (m.HasProperty("_Color")) m.SetColor("_Color", groundColor);
+                                    }
+                                }
+                            }
+
+                            foreach (var c in ghost.GetComponentsInChildren<Collider>())
+                            {
+                                if (Application.isPlaying) c.enabled = false;
+                                else DestroyImmediate(c);
+                            }
                         }
                     }
-                }
 
-                spawnedCount++;
+                    spawnedCount++;
                 }
-                }
-
-
-                }
-                }
+            }
+        }
+    }
+}
