@@ -59,12 +59,12 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void OnEnable()
         {
-            GenerationManager.OnGenerationStarted += OnGenerationStarted;
+            // Removed automatic drafting at start of generations
         }
 
         private void OnDisable()
         {
-            GenerationManager.OnGenerationStarted -= OnGenerationStarted;
+            // Removed automatic drafting at start of generations
         }
 
         private void OnGenerationStarted(int currentGen, int maxGen)
