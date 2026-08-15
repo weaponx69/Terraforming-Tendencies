@@ -1,4 +1,5 @@
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Player;
 using UnityEngine;
 using GameDevTV.RTS.VisualScriptingStubs;
 
@@ -28,6 +29,12 @@ namespace GameDevTV.RTS.Commands
                 if (context.Commandable is IRepairer repairer)
                 {
                     repairer.Repair(target);
+        
+                    // Notify GameFlowManager that an action was taken
+                    if (GameFlowManager.Instance != null)
+                    {
+                        GameFlowManager.Instance.PlayerActed();
+                    }
                 }
             }
         }

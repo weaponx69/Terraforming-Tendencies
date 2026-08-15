@@ -152,6 +152,12 @@ namespace GameDevTV.RTS.Environment
             // 6. Update all node visibility
             UpdateNodeVisibility();
 
+            // Notify GameFlowManager that an action was taken
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.PlayerActed();
+            }
+
             Debug.Log($"[ExplorationManager] Explored node '{node.labelOverride ?? node.type.ToString()}' in Sector {sectorIndex}");
         }
 

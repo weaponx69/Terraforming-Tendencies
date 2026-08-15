@@ -102,6 +102,12 @@ namespace GameDevTV.RTS.Player
         {
             PlanetGenerator.OnPlanetGenerated += InitializeGenerations;
             BlueprintDraftManager.OnDraftCompleted += HandleDraftCompleted;
+            
+            // Subscribe to GameFlowManager's milestone event
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.OnTurnMilestones += CheckMilestones;
+            }
         }
 
         private void OnDisable()
@@ -214,78 +220,11 @@ namespace GameDevTV.RTS.Player
         private void Update()
         {
             if (IsBetweenRounds) return;
-            if (IsExpansionPhase) return; 
+            if (IsExpansionPhase) return;
             if (Time.time < roundStartTime + 2f) return;
 
             if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
             if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
-
-            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
-            var milestone = milestones[milestoneIndex];
-
-            float currentValue = 0f;
-            switch (milestone.Type)
-            {
-                case MilestoneType.Biomass:
-                    if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float bio))
-                        currentValue = bio;
-                    break;
-                case MilestoneType.Oxygen:
-                    if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))
-                        currentValue = ox;
-                    break;
-                case MilestoneType.Power:
-                    if (Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow))
-                        currentValue = pow - baselinePower;
-                    break;
-                case MilestoneType.Population:
-                    if (Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int pop))
-                        currentValue = pop - baselinePopulation;
-                    break;
-                case MilestoneType.CommandPosts:
-                    int cpCount = 0;
-                    foreach (var building in BaseBuilding.ActiveBuildings)
-                    {
-                        if (building != null && building.BuildingSO != null && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) &&
-                            building.Progress.State == BuildingProgress.BuildingState.Completed &&
-                            SectorManager.Instance != null && SectorManager.Instance.GetNearestSector(building.transform.position) == SectorManager.Instance.ActiveSector)
-                        {
-                            cpCount++;
-                        }
-                    }
-                    currentValue = cpCount;
-                    break;
-            }
-
-            CurrentMilestoneTarget = milestone.TargetValue;
-            CurrentMilestoneType = milestone.Type;
-            CurrentMilestoneValue = currentValue;
-
-            float primaryProgress = milestone.TargetValue > 0 ? Mathf.Clamp01(currentValue / milestone.TargetValue) : 1f;
-
-            // Temperature progress
-            float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
-            float targetTemp = GetTargetTemperature(CurrentGeneration);
-            float tempProgress = Mathf.Clamp01((currentTemp - (-60f)) / (targetTemp - (-60f)));
-
-            // Atmosphere progress
-            float currentAtmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
-            float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
-            float atmosProgress = Mathf.Clamp01((currentAtmos - 0.01f) / (targetAtmos - 0.01f));
-
-            // Water progress
-            float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
-            float targetWater = GetTargetWater(CurrentGeneration);
-            float waterProgress = targetWater > 0f ? Mathf.Clamp01(currentWater / targetWater) : 1f;
-
-            // Combined progress is the bottleneck (minimum) of all four parameters
-            float progress = Mathf.Min(primaryProgress, Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress)));
-            OnGenerationProgressChanged?.Invoke(progress);
-
-            if (progress >= 1f)
-            {
-                TriggerGenerationEnd();
-            }
         }
 
         public void TriggerGenerationEnd()
@@ -324,6 +263,81 @@ namespace GameDevTV.RTS.Player
             }
 
             OnGenerationEnded?.Invoke(earnedTC, TotalTerraCoins);
+        }
+
+        private void CheckMilestones()
+        {
+            if (IsBetweenRounds || IsExpansionPhase) return;
+
+            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
+            if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
+
+            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
+            var milestone = milestones[milestoneIndex];
+
+            float currentValue = 0f;
+            switch (milestone.Type)
+            {
+                case MilestoneType.Biomass:
+                    if (Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float bio))
+                        currentValue = bio;
+                    break;
+                case MilestoneType.Oxygen:
+                    if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox))
+                        currentValue = ox;
+                    break;
+                case MilestoneType.Power:
+                    if (Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow))
+                        currentValue = pow - baselinePower;
+                    break;
+                case MilestoneType.Population:
+                    if (Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int pop))
+                        currentValue = pop - baselinePopulation;
+                    break;
+                case MilestoneType.CommandPosts:
+                    int cpCount = 0;
+                    foreach (var building in BaseBuilding.ActiveBuildings)
+                    {
+                        if (building != null && building.BuildingSO != null && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase) &&
+                            building.Progress.State == BuildingProgress.BuildingState.Completed)
+                        {
+                            cpCount++;
+                        }
+                    }
+                    currentValue = cpCount;
+                    break;
+            }
+
+            CurrentMilestoneTarget = milestone.TargetValue;
+            CurrentMilestoneType = milestone.Type;
+            CurrentMilestoneValue = currentValue;
+
+            float primaryProgress = milestone.TargetValue > 0 ? Mathf.Clamp01(currentValue / milestone.TargetValue) : 1f;
+
+            // Temperature progress
+            float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
+            float targetTemp = GetTargetTemperature(CurrentGeneration);
+            float tempProgress = Mathf.Clamp01((currentTemp - (-60f)) / (targetTemp - (-60f)));
+
+            // Atmosphere progress
+            float currentAtmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
+            float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
+            float atmosProgress = Mathf.Clamp01((currentAtmos - 0.01f) / (targetAtmos - 0.01f));
+
+            // Water progress
+            float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
+            float targetWater = GetTargetWater(CurrentGeneration);
+            float waterProgress = targetWater > 0f ? Mathf.Clamp01(currentWater / targetWater) : 1f;
+
+            // Combined progress is the bottleneck (minimum) of all four parameters
+            float progress = Mathf.Min(primaryProgress, Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress)));
+
+            OnGenerationProgressChanged?.Invoke(progress);
+
+            if (progress >= 1f)
+            {
+                TriggerGenerationEnd();
+            }
         }
 
         public void CheatCompleteGeneration()

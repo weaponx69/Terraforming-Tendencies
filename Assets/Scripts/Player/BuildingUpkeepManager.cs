@@ -58,7 +58,13 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
+            GameFlowManager.Instance.OnTurnUpkeep += HandleTurnUpkeep;
             upkeepRoutine = StartCoroutine(UpkeepLoop());
+        }
+
+        private void HandleTurnUpkeep()
+        {
+            ProcessUpkeepTick();
         }
 
         private void OnDestroy()

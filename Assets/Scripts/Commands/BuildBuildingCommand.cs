@@ -174,18 +174,6 @@ namespace GameDevTV.RTS.Commands
                     newBuilding.CompleteConstruction();
                 }
 
-                // Consume blueprint immediately on placement
-                BlueprintDraftManager.LockBuilding(Building.Name);
-                if (CardDeckController.Instance != null)
-                {
-                    CardDeckController.Instance.DrawCard();
-                }
-
-                if (Building.Cost != null)
-                {
-                    Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Minerals, Building.Cost.MineralsSO));
-                    Bus<SupplyEvent>.Raise(context.Owner, new SupplyEvent(context.Owner, -Building.Cost.Gas, Building.Cost.GasSO));
-                }
                 return;
             }
 
@@ -205,6 +193,12 @@ namespace GameDevTV.RTS.Commands
                     if (CardDeckController.Instance != null)
                     {
                         CardDeckController.Instance.DrawCard();
+                    }
+
+                    // Trigger PlayerActed event
+                    if (GameFlowManager.Instance != null)
+                    {
+                        GameFlowManager.Instance.PlayerActed();
                     }
                 }
                 else
