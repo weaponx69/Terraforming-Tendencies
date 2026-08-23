@@ -243,6 +243,7 @@ protected UnitSO unitSO;
         // directly here, which is reliable and verified on the NavMesh.
         private bool hasDirectMoveTarget;
         private Vector3 directMoveTarget;
+        public bool agentShouldBeDisabled = false;
 
         protected virtual void Update()
         {
@@ -280,9 +281,14 @@ protected UnitSO unitSO;
                     }
                 }
             }
-            else if (Agent != null && !Agent.enabled)
+            else if (Agent != null && !Agent.enabled && !agentShouldBeDisabled)
             {
-                Agent.enabled = true;
+                // Safely check if we are near the NavMesh before blindly enabling to prevent crashes
+                // if we were spawned inside a building or NavMeshObstacle.
+                if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas }))
+                {
+                    Agent.enabled = true;
+                }
             }
 
             // Maintain direct-drive movement for explicit Move commands.

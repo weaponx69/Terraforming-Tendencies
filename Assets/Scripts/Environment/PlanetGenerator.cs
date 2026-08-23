@@ -176,8 +176,7 @@ namespace GameDevTV.RTS.Environment
                     // buildings/units snap upward into the air. The air surface uses
                     // collectObjects=Children so it still bakes the FlyZone correctly.
                     if (!isAirAgent && transparentLayer != -1) mask &= ~(1 << transparentLayer);
-                    // Add explicit check for FlyZone layer
-                    if (isAirAgent && targetObj.name.Contains("FlyZone")) mask &= ~(1 << transparentLayer);
+
                     // Exclude Text meshes from NavMesh baking to prevent invalid vertex data errors
                     int textMeshProLayer = LayerMask.NameToLayer("TextMeshPro");
                     if (textMeshProLayer != -1) mask &= ~(1 << textMeshProLayer);

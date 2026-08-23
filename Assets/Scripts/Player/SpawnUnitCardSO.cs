@@ -55,8 +55,12 @@ namespace GameDevTV.RTS.Player
                 }
     
                 // Validate spawn position is on NavMesh to prevent agent creation failures
-                NavMeshQueryFilter navFilter = new NavMeshQueryFilter { agentTypeID = 0, areaMask = NavMesh.AllAreas };
-                if (NavMesh.SamplePosition(spawnPos, out NavMeshHit navHit, 10f, navFilter))
+                int agentType = 0;
+                var prefabAgent = unitPrefab.GetComponent<NavMeshAgent>();
+                if (prefabAgent != null) agentType = prefabAgent.agentTypeID;
+                
+                NavMeshQueryFilter navFilter = new NavMeshQueryFilter { agentTypeID = agentType, areaMask = NavMesh.AllAreas };
+                if (NavMesh.SamplePosition(spawnPos, out NavMeshHit navHit, 20f, navFilter))
                 {
                     spawnPos = navHit.position;
                 }
