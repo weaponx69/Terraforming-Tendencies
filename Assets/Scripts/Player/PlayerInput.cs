@@ -331,7 +331,7 @@ namespace GameDevTV.RTS.Player
             if (!Application.isFocused) 
             {
                 // Optional: hasMouseMoved = false; // Could reset this if desired
-                return;
+                // return; // COMMENTED OUT FOR TESTING: Never block input!
             }
 
             Vector2 currentMousePos = Mouse.current.position.ReadValue();

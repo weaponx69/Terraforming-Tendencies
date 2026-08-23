@@ -655,11 +655,11 @@ namespace GameDevTV.RTS.Units
                         {
                             spawnPos = hit.position;
                         }
-                        GameObject instance = Instantiate(miningDroneSO.Prefab, spawnPos, Quaternion.identity);
-                        if (instance.TryGetComponent(out AbstractCommandable commandable))
-                        {
-                            commandable.Owner = Owner.Player1;
-                        }
+                        // GameObject instance = Instantiate(miningDroneSO.Prefab, spawnPos, Quaternion.identity); // Temp disabled to fix NavMesh camera freeze
+                        // if (instance.TryGetComponent(out AbstractCommandable commandable))
+                        // {
+                        //     commandable.Owner = Owner.Player1;
+                        // }
                         Debug.Log("[BaseBuilding] Spawned 1 free starting Mining Drone for Player 1.");
                     }
                 }

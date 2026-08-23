@@ -45,3 +45,4 @@ TagManager:
   m_RenderingLayers:
   - Default
   - Floor
+  m_MigratedRenderPipelines: []

@@ -1,4 +1,6 @@
 using UnityEngine;
+using Unity.AI.Navigation;
+using UnityEngine.AI;
 using System.Collections.Generic;
 
 namespace GameDevTV.RTS.Environment
@@ -16,7 +18,7 @@ namespace GameDevTV.RTS.Environment
         
         [Header("Shroud Settings")]
         [SerializeField] private GameObject shroudTilePrefab;
-        [SerializeField] private LayerMask shroudLayer = LayerMask.NameToLayer("Shroud");
+        [SerializeField] private LayerMask shroudLayer;
         [SerializeField] private bool generateShroudOnStart = true;
         
         // Hex grid data
@@ -51,14 +53,10 @@ namespace GameDevTV.RTS.Environment
                 {
                     IsRevealed = true;
                     // Disable the shroud material or destroy the tile
-                    Renderer renderer = GameObject.GetComponent<Renderer>();
-                    if (renderer != null)
+                    // Simply disable the GameObject to reveal the terrain underneath!
+                    if (GameObject != null)
                     {
-                        Material[] materials = renderer.materials;
-                        for (int i = 0; i < materials.Length; i++)
-                        {
-                            materials[i].color = Color.clear; // Make transparent
-                        }
+                        GameObject.SetActive(false);
                     }
                 }
             }
@@ -67,7 +65,7 @@ namespace GameDevTV.RTS.Environment
             {
                 if (GameObject != null)
                 {
-                    Destroy(GameObject);
+                    UnityEngine.Object.Destroy(GameObject);
                 }
             }
         }
@@ -96,7 +94,7 @@ namespace GameDevTV.RTS.Environment
         {
             float x = hexCoords.x * (HEX_WIDTH * 0.75f);
             float z = hexCoords.y * (HEX_HEIGHT * 0.5f);
-            return new Vector3(x, 0, z);
+            return new Vector3(x, 0f, z);
         }
         
         /// <summary>
@@ -132,6 +130,13 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public void GenerateHexGrid()
         {
+            if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
+            {
+                gridDimensions = new Vector2Int(
+                    Mathf.CeilToInt(PlanetGenerator.Instance.Config.MapWidth / cellSize * 1.2f), 
+                    Mathf.CeilToInt(PlanetGenerator.Instance.Config.MapHeight / cellSize * 1.2f)
+                );
+            }
             if (gridRoot == null)
             {
                 GameObject rootGO = new GameObject("HexGridRoot");
@@ -175,14 +180,16 @@ namespace GameDevTV.RTS.Environment
             {
                 // Use the provided shroud tile prefab
                 hexGO = Instantiate(shroudTilePrefab, position, Quaternion.identity, gridRoot);
+                hexGO.layer = LayerMask.NameToLayer("TransparentFX");
+                hexGO.transform.localScale = new Vector3(cellSize * 0.95f, 0.1f, cellSize * 0.95f); // 5% gap to show honeycomb pattern
             }
             else
             {
                 // Create a simple hex cylinder as fallback
                 hexGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 hexGO.transform.position = position;
-                hexGO.transform.localScale = new Vector3(cellSize, 0.1f, cellSize);
-                hexGO.layer = LayerMask.NameToLayer("Shroud");
+                hexGO.transform.localScale = new Vector3(cellSize * 0.95f, 0.1f, cellSize * 0.95f); // 5% gap to show honeycomb pattern
+                hexGO.layer = LayerMask.NameToLayer("TransparentFX"); // TransparentFX is ignored by PlanetGenerator NavMesh bake!
                 
                 // Make it semi-transparent
                 Renderer renderer = hexGO.GetComponent<Renderer>();
@@ -192,12 +199,81 @@ namespace GameDevTV.RTS.Environment
                 }
             }
             
+            Collider[] colliders = hexGO.GetComponentsInChildren<Collider>();
+            foreach (Collider c in colliders) {
+                UnityEngine.Object.Destroy(c);
+            }
+            
+            var modifier = hexGO.AddComponent<NavMeshModifier>();
+            if (modifier != null) {
+                modifier.ignoreFromBuild = true;
+            }
+
             hexGO.name = $"Hex_{hexCoords.x}_{hexCoords.y}";
             return hexGO;
         }
         
+        
+        /// <summary>
+        /// Reveals all hexes within a certain world-space radius around a position.
+        /// </summary>
+        public void RevealHexesAroundPosition(Vector3 position, float radius)
+        {
+            Vector2Int centerHex = WorldToHexCoordinates(position);
+            int hexRadius = Mathf.CeilToInt(radius / cellSize);
+            
+            for (int q = centerHex.x - hexRadius; q <= centerHex.x + hexRadius; q++)
+            {
+                for (int r = centerHex.y - hexRadius; r <= centerHex.y + hexRadius; r++)
+                {
+                    Vector2Int hexCoords = new Vector2Int(q, r);
+                    if (hexGrid.TryGetValue(hexCoords, out HexTile hexTile))
+                    {
+                        if (!hexTile.IsRevealed && Vector3.Distance(hexTile.WorldPosition, position) <= radius)
+                        {
+                            hexTile.Reveal();
+                        }
+                    }
+                }
+            }
+        }
+        
+        private float explorationTimer = 0f;
+        
+        private void Update()
+        {
+            // Only run exploration logic every 0.25 seconds to save performance
+            explorationTimer += Time.deltaTime;
+            if (explorationTimer >= 0.25f)
+            {
+                explorationTimer = 0f;
+                
+                // Find all units and buildings. In a fully optimized version, we'd use a central registry.
+                // For now, FindObjectsOfType is fast enough when throttled to 4 times a second.
+                GameDevTV.RTS.Units.AbstractCommandable[] commandables = FindObjectsOfType<GameDevTV.RTS.Units.AbstractCommandable>();
+                
+                foreach (var cmd in commandables)
+                {
+                    // Only reveal for Player 1 (the local player)
+                    if (cmd.Owner == GameDevTV.RTS.Units.Owner.Player1)
+                    {
+                        float sightRadius = 10f; // Default sight radius
+                        
+                        if (cmd.UnitSO != null && cmd.UnitSO.SightConfig != null)
+                        {
+                            sightRadius = cmd.UnitSO.SightConfig.SightRadius;
+                        }
+                        
+                        RevealHexesAroundPosition(cmd.transform.position, sightRadius);
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// Clears all hex tiles from the grid.
+
+
         /// </summary>
         private void ClearHexGrid()
         {
@@ -260,9 +336,6 @@ namespace GameDevTV.RTS.Environment
             }
         }
         
-        private void Update()
-        {
-            // Optional: Update logic for hex grid if needed
-        }
+
     }
 }
