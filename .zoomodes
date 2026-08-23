@@ -1,5 +1,4 @@
 # NOTE: This project uses .zoomodes as the sole custom mode configuration.
-# Do NOT read or reference .roomodes — it is deprecated and will be removed.
 customModes:
   - slug: convert-project-mode
     name: Convert-Project-Mode
@@ -7,12 +6,8 @@ customModes:
     whenToUse: Use this mode when transforming an existing C# codebase into Unity Visual Scripting assets, mapping classes to node behaviors, or adding metadata attributes to code files.
     description: Convert, wrap, and refactor Unity C# scripts into Visual Scripting nodes.
     customInstructions: |
-      # Unity Visual Scripting Mode Instructions
-      - You must always protect the project's performance by enforcing a HYBRID structure.
-      - CRITICAL: Never transform complex algorithms, math formulas, data collections, or procedural loops into Flow Graph nodes. 
-      - Instead, optimize the existing C# script by decorating public methods and fields with the `[IncludeInSettings]` and `[Inspectable]` attributes.
-      - Use your file system tools to only write State Graph (.graph) assets for managers/state flows, and Flow Graphs (.graph) for high-level event wrappers.
-      - Do not make broad multi-file changes simultaneously. Modify one file, wait for unit testing confirmation, and ensure the Unity reflection compilation completes before advancing.
+      Always read PROJECT_KNOWLEDGE.md before starting a task.
+      If working with Visual Scripting or C# refactoring/conversions, read and strictly adhere to the guidelines in .zoo/rules/UnityVisualScripting-conversion.md.
     groups:
       - read
       - edit

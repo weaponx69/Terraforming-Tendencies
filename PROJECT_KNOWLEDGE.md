@@ -1,6 +1,14 @@
 
 ### Terraforming Tendencies - Project Knowledge & Architecture Notes
 
+
+**📚 Central Hub Documentation**
+* **Game Design Document (Lore, Mechanics, Stats):** Read [GDD.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/GDD.md)
+* **Visual Scripting & C# Refactoring:** Read [.zoo/rules/UnityVisualScripting-conversion.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/.zoo/rules/UnityVisualScripting-conversion.md)
+* **Agent Rules:** See `.agents/AGENTS.md`, `.clinerules`, or `.zoomodes` for tool-specific configurations (they all point here).
+
+---
+
 > **Design Note — Spoke & Hub Text Adventure Philosophy:**
 > The Universal Command Center (UCC) is the central hub. Sectors are the spokes radiating outward. The game loop: start at UCC → explore outward along sector spokes → discover nodes → return resources to UCC → upgrade → push further out. This maps naturally to a text adventure / roguelike structure. The sector nodes, discovery UI flavor text, and chain exploration already support this. Future design should lean into this: make the game equally playable as a text-driven experience where the player reads node descriptions, makes strategic choices from the UCC hub, and watches the colony grow. The 3D RTS layer is the visual reward — the strategic depth comes from the spoke-and-hub expansion decisions.
 This document serves as a persistent memory bank for AI context, detailing the core systems, recent architectural decisions, and current state of the game's economy.
@@ -739,3 +747,17 @@ User right-clicks on map (with units selected)
   * **RTS pacing without real-time combat**: The idle timer creates urgency. Players batch actions quickly, then watch resolution.
   * **“Never stuck, always starving”**: Players always have something to do (emergency cards, exploration), but never have enough resources to do everything.
   * **Escalating pressure**: Threats scale up, upkeep accumulates, structures degrade. The planet fights back harder as you terraform more.
+
+#### 20. GameFlowManager & Turn Resolution Loop
+* **Turn-Based System in Real-Time:** The game operates on a semi-turn-based loop managed by `GameFlowManager.cs`. The turn resolves automatically if the player is idle for a set duration (`idleTimerDuration = 2.0f`).
+* **Player Action Interrupts:** Any action the player takes (Deploy, Explore, Repair, etc.) calls `PlayerActed()`, which resets the idle timer, giving the player more time to think.
+* **8-Phase Resolution:** When the timer expires, the turn resolves sequentially in 8 phases using C# events:
+  1. **Upkeep:** Structures drain energy.
+  2. **Recovery:** Disabled structures tick down toward reactivation.
+  3. **Income:** Gain base resources and bonuses.
+  4. **Threats:** Random chance of damage/events.
+  5. **Draw:** Discard hand, draw fresh hand.
+  6. **Events:** Discovery Draft or choice events.
+  7. **Milestones:** Pause and open Upgrade Shop if terraform progress crosses a threshold.
+  8. **Win/Lose Check:** Victory or defeat conditions evaluated.
+* **System Integration:** This manager replaced the periodic `UpkeepRoutine` coroutines in buildings. Now, buildings and systems subscribe directly to `GameFlowManager` events (like `OnTurnUpkeep` and `OnTurnIncome`) for synchronized, deterministic economy ticks.
