@@ -53,10 +53,14 @@ namespace GameDevTV.RTS.Environment
                 {
                     IsRevealed = true;
                     // Disable the shroud material or destroy the tile
-                    // Simply disable the GameObject to reveal the terrain underneath!
+                    // Disable the solid mesh, but leave the GameObject (and its LineRenderer) active!
                     if (GameObject != null)
                     {
-                        GameObject.SetActive(false);
+                        Renderer renderer = GameObject.GetComponent<Renderer>();
+                        if (renderer != null)
+                        {
+                            renderer.enabled = false;
+                        }
                     }
                 }
             }
@@ -209,6 +213,27 @@ namespace GameDevTV.RTS.Environment
                 modifier.ignoreFromBuild = true;
             }
 
+            // ADD PERMANENT OUTLINE
+            LineRenderer lr = hexGO.AddComponent<LineRenderer>();
+            lr.useWorldSpace = false;
+            lr.loop = true;
+            lr.positionCount = 6;
+            lr.startWidth = 0.05f;
+            lr.endWidth = 0.05f;
+            lr.material = new Material(Shader.Find("Sprites/Default"));
+            lr.startColor = new Color(0, 1f, 0.8f, 0.3f); // Faint cyan outline
+            lr.endColor = new Color(0, 1f, 0.8f, 0.3f);
+            
+            // Calculate 6 points of a pointy-topped hexagon (radius 0.5 in local space)
+            Vector3[] points = new Vector3[6];
+            for (int i = 0; i < 6; i++)
+            {
+                float angle_deg = 60f * i - 30f;
+                float angle_rad = Mathf.PI / 180f * angle_deg;
+                points[i] = new Vector3(0.5f * Mathf.Cos(angle_rad), 0.5f, 0.5f * Mathf.Sin(angle_rad));
+            }
+            lr.SetPositions(points);
+
             hexGO.name = $"Hex_{hexCoords.x}_{hexCoords.y}";
             return hexGO;
         }
@@ -219,20 +244,18 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public void RevealHexesAroundPosition(Vector3 position, float radius)
         {
-            Vector2Int centerHex = WorldToHexCoordinates(position);
-            int hexRadius = Mathf.CeilToInt(radius / cellSize);
-            
-            for (int q = centerHex.x - hexRadius; q <= centerHex.x + hexRadius; q++)
+            // Zoo Code's coordinate conversion is mathematically broken for finding neighbors,
+            // so we will use a hyper-fast distance check over all hexes.
+            float sqrRadius = radius * radius;
+            foreach (HexTile hexTile in hexGrid.Values)
             {
-                for (int r = centerHex.y - hexRadius; r <= centerHex.y + hexRadius; r++)
+                if (!hexTile.IsRevealed)
                 {
-                    Vector2Int hexCoords = new Vector2Int(q, r);
-                    if (hexGrid.TryGetValue(hexCoords, out HexTile hexTile))
+                    // Check if hex is within the sphere radius
+                    float sqrDistance = (hexTile.WorldPosition - position).sqrMagnitude;
+                    if (sqrDistance <= sqrRadius)
                     {
-                        if (!hexTile.IsRevealed && Vector3.Distance(hexTile.WorldPosition, position) <= radius)
-                        {
-                            hexTile.Reveal();
-                        }
+                        hexTile.Reveal();
                     }
                 }
             }
@@ -333,6 +356,16 @@ namespace GameDevTV.RTS.Environment
             if (generateShroudOnStart)
             {
                 GenerateHexGrid();
+                
+                // Reveal the center of the map so the player has a starting area cleared
+                if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
+                {
+                    // PlanetGenerator uses its own CellSize (usually 1), so MapWidth * PlanetGenerator.CellSize is the real size
+                    float realMapWidth = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
+                    float realMapHeight = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
+                    Vector3 center = new Vector3(realMapWidth / 2f, 0, realMapHeight / 2f);
+                    RevealHexesAroundPosition(center, 30f); // 30 units starting radius
+                }
             }
         }
         

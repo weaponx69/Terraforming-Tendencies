@@ -1,3 +1,4 @@
+using UnityEngine.AI;
 using UnityEngine;
 using GameDevTV.RTS.Units;
 
@@ -53,6 +54,13 @@ namespace GameDevTV.RTS.Player
                     }
                 }
     
+                // Validate spawn position is on NavMesh to prevent agent creation failures
+                NavMeshQueryFilter navFilter = new NavMeshQueryFilter { agentTypeID = 0, areaMask = NavMesh.AllAreas };
+                if (NavMesh.SamplePosition(spawnPos, out NavMeshHit navHit, 10f, navFilter))
+                {
+                    spawnPos = navHit.position;
+                }
+                
                 GameObject spawnedUnit = UnityEngine.Object.Instantiate(unitPrefab, spawnPos, Quaternion.identity);
                 
                 // Set Owner to Player1
