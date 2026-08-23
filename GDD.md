@@ -2,7 +2,7 @@
 
 That sounds like a fantastic "Cold Start" mechanic! It adds a layer of mystery and urgency that fits perfectly with a casual but tense RTS. You aren't just building; you are scouting for your life.
 
-By starting the player in a "Fog of War" with decaying buildings, you create an immediate resource race. If they don't find a Biomass vent or a Mineral vein within the first two minutes, their starting base will simply rot away.
+By starting the player in a dark, unexplored map covered by a physical Hex-Grid Shroud with decaying buildings, you create an immediate resource race. If they don't find a Biomass vent or a Mineral vein within the first two minutes, their starting base will simply rot away.
 
 The Gameplay Loop: Search & Secure
 
@@ -14,7 +14,7 @@ Instead of micro-managing every scout, the player hits a "Scan Sector" button.
 
 Cost: 25 Biomass per Probe.
 
-Behavior: The Probe spawns and picks a random "Unexplored" coordinate on the map. It flies there, reveals a radius of the fog, and "Pings" any resources it finds.
+Behavior: The Probe spawns and picks a random "Unexplored" Hex on the map. As it moves, it permanently reveals the Hexes it travels through (removing the physical shroud tiles), exposing the 3D terrain and pinging any resources underneath.
 
 Risk: The Probes themselves are fragile. If they fly into a "Toxic Storm" (a natural disaster), they are destroyed.
 
@@ -24,7 +24,7 @@ When the game starts, a ResourceGenerator script places resource nodes randomly,
 
 The player sees nothing but a barren wasteland.
 
-When a Probe's "Scanner" radius overlaps a hidden node, the node becomes Visible and Selectable.
+When a Probe "Reveals" a Hex, the Hex Manager checks for any hidden resources within that Hex coordinate and makes them permanently Visible and Selectable.
 
 3. Transition to "Permanence"
 
@@ -33,6 +33,13 @@ Once a resource is found, the player has to move from "Scouting" to "Settling."
 The Mining Station: A building that can only be placed on a discovered resource node.
 
 The Life Support Link: Once the station is built, the player can build a Conduit or Spreader Node to connect it back to the main base, stopping the decay of that specific outpost.
+
+
+### The Hex-Based Presentation System
+While the game remains a 3D RTS on a continuous plane, the exploration and visibility are strictly Hex-based.
+1. **The Shroud:** The map is covered in physical Hex-Tile GameObjects that obscure the terrain and resources.
+2. **The Reveal:** When a player's unit enters a Hex coordinate, the Shroud tile is destroyed/animated away, revealing the 3D world underneath.
+3. **Hex Coordinates:** The underlying 3D world space is mapped to a mathematical Hex Grid, ensuring units can accurately translate their XYZ positions into Hex Q/R/S coordinates to trigger reveals.
 
 Implementation Hints: How to build this "Decay & Discovery" System
 

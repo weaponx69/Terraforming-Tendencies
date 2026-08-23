@@ -119,7 +119,22 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Parallax Sinking Fix:** Prevented the Crawler from snapping its Y-pivot to the flat NavMesh, stopping it from visually "sinking" underground.
 * **UI & UX Changes:** ProbeLogic no longer automatically calls TriggerExpansion; players place Command Centers directly again via their drone's Build UI. Added a persistent Volume Control Slider to the PauseMenuUI.
 
-#### 13. Architecture Pivot: Sector Lockdown & Milestone Progression
+To prevent unregulated expansion across the map, the game's core progression loop now restricts exploration and building to explicitly unlocked **Sectors**.
+
+##### 1. Sector Lockdown
+* **Restricted Action:** The map is divided into Sectors. At the start of a game, only Sector 0 (the starting location) is unlocked. All other sectors are strictly locked.
+* **Building Blocked:** The player cannot place building ghosts inside a locked sector. The auto-placement logic for Command Posts also ignores locked sectors.
+* **Exploration Blocked:** Drones and units cannot be commanded to move into locked sectors. The input system physically drops movement commands into uncharted territory.
+
+##### 2. Milestone Unlocks
+* **Progression:** The player plays out the game as a standard RTS within their active, unlocked sectors.
+* **Sector Expansion:** To expand, the player must meet specific "Terraforming Conditions" or milestones (determined by external drafting/roguelite mechanics).
+* **Unlocking:** Once a milestone is met, a call to `SectorManager.Instance.UnlockNextSector()` dynamically peels back the lockdown on the next adjacent sector, allowing the player's colony to organically expand into the newly unlocked territory.
+
+##### 3. AI Constraints
+* **Fair Play:** The enemy AI (`GreedyAIController`) is fully bound to this new system. It will not attempt to analyze, scout, or build inside locked sectors, ensuring it does not cheat the progression rules.
+
+#### 14. Current Tech Tree & Upgrade Paths
 To prevent unregulated expansion across the map, the game's core progression loop now restricts exploration and building to explicitly unlocked **Sectors**.
 
 ##### 1. Sector Lockdown
