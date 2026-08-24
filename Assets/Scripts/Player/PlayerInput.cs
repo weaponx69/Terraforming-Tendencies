@@ -97,7 +97,47 @@ namespace GameDevTV.RTS.Player
             GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated += CenterCameraOnMap;
         }
 
-        private void Start()
+        {
+            // FORCE re-find the Camera Target to overwrite any corrupted serialization
+            // caused by changing the variable type from Rigidbody to Transform!
+            var camTargetObj = GameObject.Find("Camera Target");
+            if (camTargetObj != null)
+            {
+                cameraTarget = camTargetObj.transform;
+            }
+            else
+            {
+                Debug.LogError("[PlayerInput] 'Camera Target' GameObject could not be found! Panning will not work!");
+                // Create a fallback Camera Target if it doesn't exist
+                GameObject fallbackTarget = new GameObject("Camera Target");
+                fallbackTarget.transform.position = new Vector3(0, 10, 0);
+                cameraTarget = fallbackTarget.transform;
+            }
+
+            CenterCameraOnMap();
+            
+            // Critical Failsafe 1: Ensure Main Camera has a CinemachineBrain!
+            if (playerCamera != null)
+            {
+                if (!playerCamera.TryGetComponent<Unity.Cinemachine.CinemachineBrain>(out _))
+                {
+                    playerCamera.gameObject.AddComponent<Unity.Cinemachine.CinemachineBrain>();
+                    Debug.LogWarning("[PlayerInput] Repaired missing CinemachineBrain on Main Camera!");
+                }
+            }
+
+            // Critical Failsafe 2: Ensure the Cinemachine Camera is actually following the Camera Target!
+            if (cinemachineCamera != null && cameraTarget != null)
+            {
+                if (cinemachineCamera.Follow == null || cinemachineCamera.Follow != cameraTarget)
+                {
+                    cinemachineCamera.Follow = cameraTarget;
+                    Debug.LogWarning("[PlayerInput] Repaired broken Cinemachine Camera! It was not following the Camera Target.");
+                }
+            }
+
+            globalCommander = FindAnyObjectByType<GlobalCommander>();
+        }
         {
             // FORCE re-find the Camera Target to overwrite any corrupted serialization
             // caused by changing the variable type from Rigidbody to Transform!
@@ -145,6 +185,13 @@ namespace GameDevTV.RTS.Player
             if (globalCommander == null)
             {
                 globalCommander = FindAnyObjectByType<GlobalCommander>();
+                
+                // Ensure CameraConfig is initialized
+                if (cameraConfig == null)
+                {
+                    cameraConfig = new CameraConfig();
+                    Debug.LogWarning("[PlayerInput] CameraConfig was null, created default instance");
+                }
             }
             return globalCommander;
         }
