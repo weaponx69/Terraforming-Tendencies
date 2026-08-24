@@ -5,6 +5,7 @@
 **📚 Central Hub Documentation**
 * **Game Design Document (Lore, Mechanics, Stats):** Read [GDD.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/GDD.md)
 * **Visual Scripting & C# Refactoring:** Read [.zoo/rules/UnityVisualScripting-conversion.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/.zoo/rules/UnityVisualScripting-conversion.md)
+* **AI Unity CLI Automation:** Read [.zoo/rules/UnityCLI-Automation.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/.zoo/rules/UnityCLI-Automation.md)
 * **Agent Rules:** See `.agents/AGENTS.md`, `.clinerules`, or `.zoomodes` for tool-specific configurations (they all point here).
 
 ---

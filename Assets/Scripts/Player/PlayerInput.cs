@@ -105,6 +105,7 @@ namespace GameDevTV.RTS.Player
             if (camTargetObj != null)
             {
                 cameraTarget = camTargetObj.transform;
+                Debug.Log($"[PlayerInput] Found Camera Target: {cameraTarget.name} at position {cameraTarget.position}");
             }
             else
             {
@@ -113,6 +114,7 @@ namespace GameDevTV.RTS.Player
                 GameObject fallbackTarget = new GameObject("Camera Target");
                 fallbackTarget.transform.position = new Vector3(0, 10, 0);
                 cameraTarget = fallbackTarget.transform;
+                Debug.Log($"[PlayerInput] Created fallback Camera Target at position {cameraTarget.position}");
             }
 
             CenterCameraOnMap();
@@ -130,11 +132,23 @@ namespace GameDevTV.RTS.Player
             // Critical Failsafe 2: Ensure the Cinemachine Camera is actually following the Camera Target!
             if (cinemachineCamera != null && cameraTarget != null)
             {
+                Debug.Log($"[PlayerInput] CinemachineCamera: {cinemachineCamera}, cameraTarget: {cameraTarget}");
+                Debug.Log($"[PlayerInput] CinemachineCamera.Follow: {cinemachineCamera.Follow}, cameraTarget.name: {cameraTarget.name}");
+                
                 if (cinemachineCamera.Follow == null || cinemachineCamera.Follow != cameraTarget)
                 {
+                    Debug.LogWarning($"[PlayerInput] CinemachineCamera.Follow is null or doesn't match cameraTarget. Setting Follow to cameraTarget.");
                     cinemachineCamera.Follow = cameraTarget;
                     Debug.LogWarning("[PlayerInput] Repaired broken Cinemachine Camera! It was not following the Camera Target.");
                 }
+                else
+                {
+                    Debug.Log($"[PlayerInput] Cinemachine Camera is correctly following Camera Target: {cinemachineCamera.Follow.name}");
+                }
+            }
+            else
+            {
+                Debug.LogError($"[PlayerInput] Cannot setup Cinemachine follow. cinemachineCamera: {cinemachineCamera}, cameraTarget: {cameraTarget}");
             }
 
             // Ensure CameraConfig is initialized
@@ -143,8 +157,13 @@ namespace GameDevTV.RTS.Player
                 cameraConfig = new CameraConfig();
                 Debug.LogWarning("[PlayerInput] CameraConfig was null, created default instance");
             }
+            else
+            {
+                Debug.Log($"[PlayerInput] CameraConfig initialized with MousePanSpeed={cameraConfig.MousePanSpeed}, KeyboardPanSpeed={cameraConfig.KeyboardPanSpeed}, ZoomSpeed={cameraConfig.ZoomSpeed}");
+            }
 
             globalCommander = FindAnyObjectByType<GlobalCommander>();
+            Debug.Log($"[PlayerInput] Start() completed. cameraTarget={cameraTarget}, cameraConfig={cameraConfig}, cinemachineCamera={cinemachineCamera}");
         }
 
         private GlobalCommander GetGlobalCommander()
@@ -974,11 +993,15 @@ namespace GameDevTV.RTS.Player
             moveAmount += GetMouseMoveAmount();
 
             Vector3 velocity = new Vector3(moveAmount.x, 0, moveAmount.y);
-            
+             
             if (cameraTarget != null)
             {
                 // Use Space.Self so panning respects the new camera rotation angle!
                 cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.Self);
+            }
+            else
+            {
+                Debug.LogError("[PlayerInput] cameraTarget is null in HandlePanning!");
             }
 
             if (heroActive)
@@ -1072,40 +1095,34 @@ namespace GameDevTV.RTS.Player
         private Vector2 GetMouseMoveAmount()
         {
             Vector2 moveAmount = Vector2.zero;
-
-            // Stop scrolling immediately if the application is not focused or the mouse hasn't moved yet
-            if (!cameraConfig.EnableEdgePan || !hasMouseMoved) { return moveAmount; } // Removed isFocused check!
-
+            
+            // Add debug logging for mouse edge detection
             Vector2 mousePosition = Mouse.current.position.ReadValue();
             int screenWidth = Screen.width;
             int screenHeight = Screen.height;
-
-            // Stop scrolling immediately if the mouse is outside the window bounds.
-            // We use a small epsilon to catch the mouse as it hits or crosses the border.
-            if (mousePosition.x < 1f || mousePosition.x >= screenWidth - 1f || 
-                mousePosition.y < 1f || mousePosition.y >= screenHeight - 1f)
-            {
-                return moveAmount;
-            }
-
+            
             if (mousePosition.x <= cameraConfig.EdgePanSize)
             {
+                Debug.Log("[PlayerInput] Mouse near left edge");
                 moveAmount.x -= cameraConfig.MousePanSpeed;
             }
             else if (mousePosition.x >= screenWidth - cameraConfig.EdgePanSize)
             {
+                Debug.Log("[PlayerInput] Mouse near right edge");
                 moveAmount.x += cameraConfig.MousePanSpeed;
             }
-
+            
             if (mousePosition.y >= screenHeight - cameraConfig.EdgePanSize)
             {
+                Debug.Log("[PlayerInput] Mouse near top edge");
                 moveAmount.y += cameraConfig.MousePanSpeed;
             }
             else if (mousePosition.y <= cameraConfig.EdgePanSize)
             {
+                Debug.Log("[PlayerInput] Mouse near bottom edge");
                 moveAmount.y -= cameraConfig.MousePanSpeed;
             }
-
+            
             return moveAmount;
         }
 
@@ -1113,8 +1130,6 @@ namespace GameDevTV.RTS.Player
         {
             Vector2 moveAmount = Vector2.zero;
             
-            // Removed isFocused check to ensure it always works in Editor!
-
             if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed)
             {
                 moveAmount.y += cameraConfig.KeyboardPanSpeed;
@@ -1131,7 +1146,7 @@ namespace GameDevTV.RTS.Player
             {
                 moveAmount.x += cameraConfig.KeyboardPanSpeed;
             }
-
+            
             return moveAmount;
         }
     }
