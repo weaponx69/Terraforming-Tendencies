@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Player
 {
     public class PlayerInput : MonoBehaviour
     {
-        [SerializeField] private Rigidbody cameraTarget;
+        [SerializeField] private Transform cameraTarget;
         [SerializeField] private CinemachineCamera cinemachineCamera;
         [SerializeField] private Camera playerCamera;
         [SerializeField] private CameraConfig cameraConfig;
@@ -70,7 +70,7 @@ namespace GameDevTV.RTS.Player
 
             if (cameraTarget != null)
             {
-                cameraTarget.isKinematic = true;
+                // cameraTarget.isKinematic = true;
             }
 
             lastMousePosition = Mouse.current.position.ReadValue();
@@ -104,11 +104,28 @@ namespace GameDevTV.RTS.Player
                 var camTargetObj = GameObject.Find("Camera Target");
                 if (camTargetObj != null)
                 {
-                    cameraTarget = camTargetObj.GetComponent<Rigidbody>();
+                    cameraTarget = camTargetObj.transform;
+                    if (cameraTarget == null) {
+                        Debug.LogError("[PlayerInput] 'Camera Target' GameObject was found, but it is missing a Rigidbody! Panning will not work!");
+                    }
+                }
+                else {
+                    Debug.LogError("[PlayerInput] 'Camera Target' GameObject could not be found! Panning will not work!");
                 }
             }
 
             CenterCameraOnMap();
+            
+            // Critical Failsafe: Ensure the Cinemachine Camera is actually following the Camera Target!
+            if (cinemachineCamera != null && cameraTarget != null)
+            {
+                if (cinemachineCamera.Follow == null || cinemachineCamera.Follow != cameraTarget)
+                {
+                    cinemachineCamera.Follow = cameraTarget;
+                    Debug.LogWarning("[PlayerInput] Repaired broken Cinemachine Camera! It was not following the Camera Target.");
+                }
+            }
+
             globalCommander = FindAnyObjectByType<GlobalCommander>();
         }
 
