@@ -99,24 +99,35 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
-            if (cameraTarget == null)
+            // FORCE re-find the Camera Target to overwrite any corrupted serialization
+            // caused by changing the variable type from Rigidbody to Transform!
+            var camTargetObj = GameObject.Find("Camera Target");
+            if (camTargetObj != null)
             {
-                var camTargetObj = GameObject.Find("Camera Target");
-                if (camTargetObj != null)
-                {
-                    cameraTarget = camTargetObj.transform;
-                    if (cameraTarget == null) {
-                        Debug.LogError("[PlayerInput] 'Camera Target' GameObject was found, but it is missing a Rigidbody! Panning will not work!");
-                    }
-                }
-                else {
-                    Debug.LogError("[PlayerInput] 'Camera Target' GameObject could not be found! Panning will not work!");
-                }
+                cameraTarget = camTargetObj.transform;
+            }
+            else
+            {
+                Debug.LogError("[PlayerInput] 'Camera Target' GameObject could not be found! Panning will not work!");
+                // Create a fallback Camera Target if it doesn't exist
+                GameObject fallbackTarget = new GameObject("Camera Target");
+                fallbackTarget.transform.position = new Vector3(0, 10, 0);
+                cameraTarget = fallbackTarget.transform;
             }
 
             CenterCameraOnMap();
             
-            // Critical Failsafe: Ensure the Cinemachine Camera is actually following the Camera Target!
+            // Critical Failsafe 1: Ensure Main Camera has a CinemachineBrain!
+            if (playerCamera != null)
+            {
+                if (!playerCamera.TryGetComponent<Unity.Cinemachine.CinemachineBrain>(out _))
+                {
+                    playerCamera.gameObject.AddComponent<Unity.Cinemachine.CinemachineBrain>();
+                    Debug.LogWarning("[PlayerInput] Repaired missing CinemachineBrain on Main Camera!");
+                }
+            }
+
+            // Critical Failsafe 2: Ensure the Cinemachine Camera is actually following the Camera Target!
             if (cinemachineCamera != null && cameraTarget != null)
             {
                 if (cinemachineCamera.Follow == null || cinemachineCamera.Follow != cameraTarget)
@@ -367,8 +378,6 @@ namespace GameDevTV.RTS.Player
             HandleBasePaging();
             HandleCheats();
         }
-
-
 
 
 
@@ -804,7 +813,7 @@ namespace GameDevTV.RTS.Player
                     cameraTarget.position = targetCameraPos;
                     hasCameraBeenFocused = true;
                 }
-}
+            }
 
             List<AbstractCommandable> abstractCommandables = selectedUnits
 .Where((unit) => unit is AbstractCommandable)
@@ -1051,7 +1060,7 @@ namespace GameDevTV.RTS.Player
             Vector2 moveAmount = Vector2.zero;
 
             // Stop scrolling immediately if the application is not focused or the mouse hasn't moved yet
-            if (!cameraConfig.EnableEdgePan || !Application.isFocused || !hasMouseMoved) { return moveAmount; }
+            if (!cameraConfig.EnableEdgePan || !hasMouseMoved) { return moveAmount; } // Removed isFocused check!
 
             Vector2 mousePosition = Mouse.current.position.ReadValue();
             int screenWidth = Screen.width;
@@ -1090,9 +1099,7 @@ namespace GameDevTV.RTS.Player
         {
             Vector2 moveAmount = Vector2.zero;
             
-            // Explicitly check focus for keyboard input to prevent "stuck" keys from scrolling
-            // the camera when the user alt-tabs or moves the mouse out of the window.
-            if (!Application.isFocused) return moveAmount;
+            // Removed isFocused check to ensure it always works in Editor!
 
             if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed)
             {
