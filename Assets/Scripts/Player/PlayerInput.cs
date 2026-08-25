@@ -70,7 +70,11 @@ namespace GameDevTV.RTS.Player
 
             if (cameraTarget != null)
             {
-                // cameraTarget.isKinematic = true;
+                var rb = cameraTarget.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = true;
+                }
             }
 
             lastMousePosition = Mouse.current.position.ReadValue();
@@ -106,6 +110,18 @@ namespace GameDevTV.RTS.Player
             {
                 cameraTarget = camTargetObj.transform;
                 Debug.Log($"[PlayerInput] Found Camera Target: {cameraTarget.name} at position {cameraTarget.position}");
+                
+                // Ensure the Camera Target's Rigidbody is kinematic so panning works
+                var rb = cameraTarget.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = true;
+                    Debug.Log($"[PlayerInput] Set Rigidbody isKinematic=true, was: false");
+                }
+                else
+                {
+                    Debug.Log("[PlayerInput] No Rigidbody found on Camera Target");
+                }
             }
             else
             {
@@ -115,6 +131,18 @@ namespace GameDevTV.RTS.Player
                 fallbackTarget.transform.position = new Vector3(0, 10, 0);
                 cameraTarget = fallbackTarget.transform;
                 Debug.Log($"[PlayerInput] Created fallback Camera Target at position {cameraTarget.position}");
+                
+                // Ensure the fallback Camera Target's Rigidbody is kinematic
+                var rb = cameraTarget.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = true;
+                    Debug.Log($"[PlayerInput] Set fallback Rigidbody isKinematic=true");
+                }
+                else
+                {
+                    Debug.Log("[PlayerInput] No Rigidbody found on fallback Camera Target");
+                }
             }
 
             CenterCameraOnMap();
