@@ -1124,7 +1124,9 @@ namespace GameDevTV.RTS.Player
         {
             Vector2 move = Vector2.zero;
 
-            if (!Application.isFocused) return move;
+            // COMMENTED OUT FOR FIXING CAMERA PAN ISSUES:
+            // The Application.isFocused check was blocking keyboard input when the Unity Editor window wasn't focused
+            // if (!Application.isFocused) return move;
 
             if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed) move.y += 1f;
             if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed) move.y -= 1f;
