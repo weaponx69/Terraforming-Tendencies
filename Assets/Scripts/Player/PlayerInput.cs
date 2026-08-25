@@ -952,6 +952,7 @@ namespace GameDevTV.RTS.Player
         {
             if (cinemachineFollow == null) return;
 
+            // Mouse scroll zoom
             float scroll = Mouse.current.scroll.y.ReadValue();
             if (Mathf.Abs(scroll) > 0.01f)
             {
@@ -963,6 +964,19 @@ namespace GameDevTV.RTS.Player
                 // Clamp distance to keep from zooming through the floor or too far out
                 targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 4f);
             }
+            
+            // Keyboard zoom (Page Up/Page Down) for CLI testing
+            if (Keyboard.current.pageUpKey.isPressed)
+            {
+                targetZoomDistance -= cameraConfig.ZoomSpeed * Time.deltaTime * 10f;
+            }
+            else if (Keyboard.current.pageDownKey.isPressed)
+            {
+                targetZoomDistance += cameraConfig.ZoomSpeed * Time.deltaTime * 10f;
+            }
+            
+            // Clamp distance to keep from zooming through the floor or too far out
+            targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 4f);
 
             Vector3 targetFollowOffset = new Vector3(
                 cinemachineFollow.FollowOffset.x,

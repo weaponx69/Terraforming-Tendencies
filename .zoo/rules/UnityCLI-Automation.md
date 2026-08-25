@@ -18,16 +18,15 @@ The project may expose custom tools via the `[CliCommand]` attribute.
 * To see what operations are available to you, run: `unity command`
 * To execute a command: `unity command <command-name> --arg Value`
 
-### 3. Running Automated Tests
-The CLI provides structured output that is easy to parse.
-* To run tests and get a clean JSON summary, run:
-  `unity test run --projectPath . --testPlatform PlayMode --format json`
-* Always read the JSON output (or stderr) to find stack traces and analyze failures.
+### 3. Running Automated Tests & Iteration Loop
+**CRITICAL RULE: YOU MUST NEVER USE `unity test run` OR `-batchmode`!** 
+This project is extremely heavy (14,000+ hex tiles). If you launch a background headless Unity Editor to run tests while the user already has the main Editor open, it will consume all system RAM and the Linux OOM Killer will instantly assassinate both Editors!
 
-### Iteration Loop Instructions
+You are strictly forbidden from launching background instances. You must ONLY use `unity command eval` to communicate with the single, live Editor.
+
 When instructed to fix a bug via a `/goal` or autonomous loop:
-1. Use `unity command eval` to inspect the live state of the game if needed.
-2. Edit the C# files to apply a fix.
-3. Use the Unity CLI to run the automated tests (`unity test run ...`).
-4. Read the JSON output to determine if tests passed. 
-5. If tests fail, analyze the stack trace, edit the code, and repeat. Do not stop iterating until all tests pass or you are fundamentally blocked.
+1. Use `unity command eval "UnityEditor.EditorApplication.isPlaying = true;"` to start Play Mode in the user's live Editor.
+2. Use `unity command eval` to inspect the live state of the game, read coordinates, or verify fixes.
+3. Edit the C# files to apply a fix.
+4. Restart Play Mode via `eval` to reload the code, then use `eval` again to verify if your fix worked.
+5. Do not stop iterating until you have verified the fix works using `eval`.
