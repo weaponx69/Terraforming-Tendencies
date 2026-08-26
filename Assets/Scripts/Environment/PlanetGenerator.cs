@@ -782,6 +782,19 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
+                private Vector3 GetStartingAreaCenter()
+                {
+                    if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                    {
+                        return SectorManager.Instance.Sectors[0].Center;
+                    }
+
+                    return new Vector3(
+                        (Config.MapWidth * CellSize) / 2f,
+                        0,
+                        (Config.MapHeight * CellSize) / 2f);
+                }
+
                 private void ScatterFlora()
                 {
                     if (Config == null || Config.EnvironmentPrefabs == null || Config.EnvironmentPrefabs.Length == 0) return;
@@ -792,7 +805,7 @@ namespace GameDevTV.RTS.Environment
                     float mapHeightWorld = height * CellSize;
                 
                     float exclusionRadius = 15f; 
-                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+                    Vector3 center = GetStartingAreaCenter();
 
                     int count = Config.EnvironmentDensity;
                     int maxAttempts = count * 20;
@@ -885,7 +898,7 @@ namespace GameDevTV.RTS.Environment
                     float mapHeightWorld = height * CellSize;
                 
                     float exclusionRadius = 15f; 
-                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+                    Vector3 center = GetStartingAreaCenter();
 
                     int count = Config.ResourceCount;
                     int maxAttempts = count * 20;
@@ -971,7 +984,7 @@ namespace GameDevTV.RTS.Environment
                     float mapHeightWorld = height * CellSize;
                 
                     float exclusionRadius = 15f; 
-                    Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+                    Vector3 center = GetStartingAreaCenter();
 
                     SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
                     SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
@@ -1128,7 +1141,7 @@ namespace GameDevTV.RTS.Environment
                 int height = Config.MapHeight;
             
                 float exclusionRadius = 15f; 
-                Vector3 center = new Vector3((width * CellSize) / 2f, 0, (height * CellSize) / 2f);
+                Vector3 center = GetStartingAreaCenter();
 
                 int density = Config.SurfaceFeatureDensity;
                 int maxAttempts = density * 10;

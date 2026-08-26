@@ -378,7 +378,10 @@ namespace GameDevTV.RTS.Environment
                 {
                     // PlanetGenerator uses its own CellSize (usually 1), so MapWidth * PlanetGenerator.CellSize is the real size
                     // Clear the starting area (Sector 0) center, where the camera starts!
-                    Vector3 center = new Vector3(50f, 0f, 50f);
+                    Vector3 center = new Vector3(
+                        PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize / 2f,
+                        0f,
+                        PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize / 2f);
                     if (GameDevTV.RTS.Environment.SectorManager.Instance != null && GameDevTV.RTS.Environment.SectorManager.Instance.Sectors.Count > 0)
                     {
                         var startingSector = GameDevTV.RTS.Environment.SectorManager.Instance.Sectors[0];
