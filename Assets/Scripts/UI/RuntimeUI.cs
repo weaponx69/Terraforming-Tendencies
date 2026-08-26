@@ -40,12 +40,7 @@ namespace GameDevTV.RTS.UI
 
         [SerializeField] private AbstractCommandable globalCommander;
 
-        [Header("Hero & Probe HUD")]
-        [SerializeField] private TextMeshProUGUI heroCargoLabelText;
-        [SerializeField] private TextMeshProUGUI heroCargoValueText;
-
-        private HeroDrone heroDroneReference;
-private HashSet<AbstractCommandable> selectedUnits = new(12);
+        private HashSet<AbstractCommandable> selectedUnits = new(12);
         private Owner displayedOwner = Owner.Player1;
 
         private void OnEnable()
@@ -259,7 +254,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
-            FindAndLinkUI("Hero Cargo Container", ref heroCargoLabelText, ref heroCargoValueText, "Hero Cargo Header");
             
             // Setup layouts and alignments dynamically (Power, Temp, Atmos)
             GameObject integrityContainerGo = GameObject.Find("Integrity Container");
@@ -466,21 +460,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             
             // Special case for the duplicate population text if it exists
             if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
-
-            // Permanently delete Hero Cargo and Probe Progress containers as they are not needed
-            GameObject cargoContainer = GameObject.Find("Hero Cargo Container");
-            if (cargoContainer == null)
-            {
-                Transform t = FindChildRecursive(transform, "Hero Cargo Container");
-                if (t != null) cargoContainer = t.gameObject;
-            }
-            if (cargoContainer != null)
-            {
-                if (Application.isPlaying)
-                    Destroy(cargoContainer);
-                else
-                    DestroyImmediate(cargoContainer);
-            }
 
             GameObject probeContainer = GameObject.Find("Probe Progress Container");
             if (probeContainer == null)
@@ -718,8 +697,6 @@ private HashSet<AbstractCommandable> selectedUnits = new(12);
             if (atmosphereValueText != null) atmosphereValueText.SetText("0.01 atm");
             // Water
             if (waterValueText != null) waterValueText.SetText("0.0%");
-            // Hero Cargo
-            if (heroCargoValueText != null) heroCargoValueText.SetText("0");
         }
 
         private void OnDestroy()

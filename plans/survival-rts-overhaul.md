@@ -32,7 +32,6 @@ The round still ends automatically when the milestone target is met. The differe
   - *"Pipeline Boost"* — crawler moves 2x faster this round
   - *"Survey Drone"* — deploy a fast Probe to scout ahead without moving the crawler
 - **Tradeoff:** Fuel the crawler for slow/reliable expansion with deposits revealed along the path, or use cards for fast expansion that skips those intermediate deposits.
-- **Note:** The Hero Drone system is fully deprecated (see [`PROJECT_KNOWLEDGE.md:5`](PROJECT_KNOWLEDGE.md:5)).
 - **Files:** [`SectorManager.cs`](Assets/Scripts/Environment/SectorManager.cs), [`GenerationManager.cs`](Assets/Scripts/Player/GenerationManager.cs:27), [`BlueprintDraftManager.cs`](Assets/Scripts/Player/BlueprintDraftManager.cs)
 
 ### 1.2 Draft = Discovery Phase (Not Permits, Not Free Resources)

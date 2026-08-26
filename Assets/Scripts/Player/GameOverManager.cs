@@ -194,12 +194,6 @@ namespace GameDevTV.RTS.Player
                 {
                     if (b.Progress.State == BuildingProgress.BuildingState.Completed && b.IsOperating) return true;
                 }
-
-                // Hero Drone acts as a mobile life support node
-                if (node.TryGetComponent<HeroDrone>(out var hero) && hero.Owner == owner)
-                {
-                    return true;
-                }
             }
             return false;
         }
@@ -236,15 +230,11 @@ namespace GameDevTV.RTS.Player
             int materials = Supplies.Materials.TryGetValue(monitoredOwner, out int b) ? b : 0;
             bool supplyNodesExist = AnySupplyNodesRemain();
             bool miningUnitsExist = AnyMiningUnitsAlive();
-
-            // Hero Drone count can also recover
-            bool heroDroneAlive = Object.FindAnyObjectByType<HeroDrone>() != null;
-
-            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || heroDroneAlive || materials >= 400);
+            bool recoveryPossible = supplyNodesExist && (miningUnitsExist || materials >= 400);
 
             if (!recoveryPossible)
             {
-                Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Hero Alive: {heroDroneAlive}, Biomass: {materials}");
+                Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Biomass: {materials}");
                 
                 // Instead of game over, end the generation!
                 if (GenerationManager.Instance != null)

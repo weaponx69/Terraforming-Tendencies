@@ -14,12 +14,6 @@
 > The Universal Command Center (UCC) is the central hub. Sectors are the spokes radiating outward. The game loop: start at UCC → explore outward along sector spokes → discover nodes → return resources to UCC → upgrade → push further out. This maps naturally to a text adventure / roguelike structure. The sector nodes, discovery UI flavor text, and chain exploration already support this. Future design should lean into this: make the game equally playable as a text-driven experience where the player reads node descriptions, makes strategic choices from the UCC hub, and watches the colony grow. The 3D RTS layer is the visual reward — the strategic depth comes from the spoke-and-hub expansion decisions.
 This document serves as a persistent memory bank for AI context, detailing the core systems, recent architectural decisions, and current state of the game's economy.
 
-#### [DEPRECATED] Hero Drone & Hybrid Control System
-*Note: The Hero Drone system has been completely removed to support the new "Terraforming Mars" roguelite pivot, which requires macro-level map awareness.*
-* **Architecture Changes:** `HeroDroneSpawner.cs` and `HeroDroneController.cs` have been deleted. The `useHeroControlMode` flag and camera-tethering logic in `PlayerInput.cs` have been removed.
-* **Restored RTS Camera:** The game now uses a traditional Starcraft-style isometric perspective. WASD inputs once again control free-roaming camera panning across the map instead of piloting a specific unit.
-* **System Cleanup:** All Hero Drone dependencies have been stripped. The `GreedyAIController` no longer needs exemptions for the drone, the `GameOverManager` no longer checks `heroDroneAlive` for recovery, and all custom UI/mechanics for manual drone vacuuming and cargo have been removed.
-* **Design Goal:** This standard point-and-click RTS setup frees the player's camera to focus entirely on the new Terra-Coins engine-building economy and strategically planning the adjacency placement of Cities and Greenery.
 
 #### 1. Automated Economy & AI (GreedyAIController)
 * **Logarithmic Spending:** The AI limits its spending mathematically so it doesn't instantly bankrupt the player's treasury.

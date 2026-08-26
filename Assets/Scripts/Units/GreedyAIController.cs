@@ -696,7 +696,6 @@ if (SectorManager.Instance != null)
             var idleDrones = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .Where(w => w != null
                             && w.Owner == aiOwner
-                            && w.GetComponent<HeroDroneController>() == null      // not the Hero Drone
                             && (w.UnitSO == null || w.UnitSO.Name != "Construction Drone") // not a Builder
                             && w.IsIdle)
                 .ToList();
@@ -905,7 +904,7 @@ else
         {
             return Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .OrderBy(w => Vector3.Distance(w.transform.position, transform.position))
-                .FirstOrDefault(w => w.Owner == aiOwner && w.IsIdle && !w.HasSupplies && w.GetComponent<HeroDroneController>() == null);
+                .FirstOrDefault(w => w.Owner == aiOwner && w.IsIdle && !w.HasSupplies);
         }
 
         // Like FindAvailableWorker but, if no worker is idle, falls back to pulling a
@@ -915,7 +914,6 @@ else
         {
             var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude)
                 .Where(w => w != null && w.Owner == aiOwner
-                            && w.GetComponent<HeroDroneController>() == null // never the Hero Drone
                             && !w.HasSupplies)
                 .ToList();
 
@@ -946,7 +944,6 @@ else
             {
                 if (w == null) continue;
                 if (w.Owner != aiOwner) continue;
-                if (w.GetComponent<HeroDroneController>() != null) continue; // never the Hero Drone
                 if (w.HasSupplies) continue;                           // busy hauling
                 if (w.IsBuilding) continue;                            // already building
                 return true;                                           // idle OR mining (reassignable)
