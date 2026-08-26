@@ -23,13 +23,9 @@ This document serves as a persistent memory bank for AI context, detailing the c
 
 #### 2. Colony Expansion & Mobile Forge (FoundryCrawler & EnergyPipelineManager)
 * **Pipeline Logistics:** The EnergyPipelineManager drives the expansion of the colony. It spawns the FoundryCrawler which slowly crawls along the pipeline path (movementSpeed = 0.05f).
-* **Crawler Fuel Hoppers:** The crawler requires Regolith and Iron to move. It has internal hoppers (default reset: 500 Regolith, 200 Iron, with a max of 1000). The maxRegolith and maxIron capacities are forcefully overridden in FoundryCrawler.Awake() to guarantee the Unity Inspector doesn't accidentally load old, smaller prefab capacities.
-* **Resource Spawning:** As the crawler moves, the Pipeline Manager exposes Regolith and Iron deposits along the path. These deposits are explicitly parented to the PlanetGenerator so the GreedyAI recognizes them.
 
 #### 3. Drone Routing & Economy (WorkerBrainController & Supplies)
 * **Identification:** Drones perfectly identify what they are holding by checking both the SupplySO.name and the physical GameObject.name (fallback).
-* **Iron & Regolith:** Routed directly into the active Foundry Crawler's hoppers to fuel the pipeline expansion. Drones will actively avoid the crawler if its hoppers reach maximum capacity (1000).
-* **Gas & Minerals:** Routed to the active Foundry Crawler as a centralized drop-off point, but bypass the physical hoppers. Instead, they instantly liquidate into the global **Materials** economy by triggering the GatherEventChannelSO.
 
 #### 4. Game Over Logic (GameOverManager)
 * **Depletion Checks:** The game continuously checks if there are valid ways to recover. If Materials is low and all GatherableSupply nodes on the map are destroyed, it triggers Game Over. *(Note: This logic is being repurposed for the new Micro-Round Depletion Trigger).*
@@ -37,7 +33,6 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Quit & Scene Unload Safety:** Employs static isQuitting tracking via Application.quitting to automatically suppress any loss-checking or GameOver events during scene teardown, editor playmode transition, or application exit. This prevents false Game Over prompts during destruction of scene objects on shutdown.
 
 #### 5. UI & Selection Indicators
-* **Standardized Outlines:** The FoundryCrawler uses C# Reflection to look inside the constructionDronePrefab and perfectly clone its standard selection indicator ring. This ensures the Crawler matches the stylistic visual outlines of all other units in the game, scaled perfectly to 1.5x to fit the Crawler's chassis without distorting into a dome.
 
 #### 6. Recent Fixes Changelog
 * **Probe Build Order (race condition):** Added BaseBuilding.IsFirstInQueueProbe(). GreedyAIController and AIController now skip buildings whose first queued item is the Probe. Added regression test ColonyExpansionTests.ColonyExpansion_BuildsProbeDroneFirst.
@@ -95,23 +90,14 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Persistent BGM:** Created AudioManager.cs as a persistent DontDestroyOnLoad Singleton that automatically spawns and plays the BGM using a RuntimeInitializeOnLoadMethod tag.
 * **Smooth Volume Fading:** Features a built-in volume fader that smoothly transitions the audio from 0 to 0.5 volume over 3.0 seconds.
 
-#### 10. World-Space Foundry Crawler Metrics
-* **FoundryWorldUI:** Added a custom billboarding world-space canvas to the side of the Foundry crawler prefab displaying live stats for Regolith (Yellow), Iron (Gray), and Pipes Buffer (Cyan).
-* **Lowered Close Positioning:** Adjusted the local Y position down to 0.55 so the status text sits exactly 0.64 world meters above the top of the forge roof.
-
 #### 11. Recent Visual and Economy Polish
 * **Map Wrapping Visual Fix:** The CurvedWorldUpdater.cs has been moved to LateUpdate() to ensure it only queries the camera's final position, fixing a massive 1-frame backwards bend during teleports.
 * **Dynamic Proximity Labels:** Added an OnGUI overlay to GatherableSupply.cs that dynamically draws the resource's name above the node when the camera is within 15 units.
 * **Visual Shrinking:** GatherableSupply.cs now visually shrinks the node's transform proportional to the remaining amount (clamped to 30%) when resources are depleted.
 * **Geography Camouflage for Fuel:** PlanetGenerator.ScatterFuelResources() now randomly selects non-crystal rock models, applies the dynamically generated ground color, and hides fuel resources as natural planetary geography.
 * **Selection Indicator Sizing:** Modified BaseBuilding.Start() to intercept the selectionIndicator of the Command Post and shrink it by a factor of 0.6f.
-* **Gas/Minerals Efficiency Routing:** Updated WorkerBrainController.cs so that Gas and Minerals route directly back to the Command Center instead of the expanding Crawler, boosting Materials income.
 * **Runtime Shader Injection:** Hooked ApplyCurvedWorldShader into AbstractCommandable.Start() to ensure all dynamically spawned units perfectly hug the bent terrain.
 
-#### 12. Hybrid Construction & Auto-Supply Crawler
-* **Hybrid Building Construction:** Drones will withdraw from the global bank if the Command Center is physically closer, otherwise they will manually mine Map Resources.
-* **Auto-Supply Crawler Mechanics:** Drones can enter an autonomous SupplyMissionLoop to fetch missing Iron/Regolith for the Crawler. Changed the assignment command to the standard Build command to prevent Unity behavior cancellation.
-* **Parallax Sinking Fix:** Prevented the Crawler from snapping its Y-pivot to the flat NavMesh, stopping it from visually "sinking" underground.
 * **UI & UX Changes:** ProbeLogic no longer automatically calls TriggerExpansion; players place Command Centers directly again via their drone's Build UI. Added a persistent Volume Control Slider to the PauseMenuUI.
 
 To prevent unregulated expansion across the map, the game's core progression loop now restricts exploration and building to explicitly unlocked **Sectors**.
@@ -232,31 +218,6 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 18. **Elite Processor** (-AnalysisTime)
 19. **Elite Thrusters** (+Speed)
 20. **Omega Optics** (+ScanRadius)
-</details>
-
-<details>
-<summary><b>Foundry Crawler (Levels 1-20)</b></summary>
-
-1. **Treads Mk I** (+MovementSpeed)
-2. **Iron Hopper Mk I** (+MaxIron)
-3. **Regolith Hopper Mk I** (+MaxRegolith)
-4. **Treads Mk II** (+MovementSpeed)
-5. **Iron Hopper Mk II** (+MaxIron)
-6. **Regolith Hopper Mk II** (+MaxRegolith)
-7. **Treads Mk III** (+MovementSpeed)
-8. **Iron Hopper Mk III** (+MaxIron)
-9. **Regolith Hopper Mk III** (+MaxRegolith)
-10. **Treads Mk IV** (+MovementSpeed)
-11. **Iron Hopper Mk IV** (+MaxIron)
-12. **Regolith Hopper Mk IV** (+MaxRegolith)
-13. **Treads Mk V** (+MovementSpeed)
-14. **Iron Hopper Mk V** (+MaxIron)
-15. **Regolith Hopper Mk V** (+MaxRegolith)
-16. **Advanced Treads** (+MovementSpeed)
-17. **Advanced Iron Hopper** (+MaxIron)
-18. **Elite Regolith Hopper** (+MaxRegolith)
-19. **Elite Treads** (+MovementSpeed)
-20. **Omega Iron Hopper** (+MaxIron)
 </details>
 
 <details>
@@ -445,10 +406,7 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
 6. **Mining Drone**
    * *Type:* Spawn Unit
    * *Description:* Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.
-7. **Automated Repair Crawler**
-   * *Type:* Spawn Unit
-   * *Description:* Deploy a specialized Repair Drone to automatically rebuild pipelines and repair bases.
-8. **High-Power Induction Drills**
+7. 8. **High-Power Induction Drills**
    * *Type:* Passive Buff
    * *Description:* Upgrade mining tools. All mining droids gather minerals and deposits +30% faster permanently.
    * *Stats:* 1.3x Gather Speed multiplier.

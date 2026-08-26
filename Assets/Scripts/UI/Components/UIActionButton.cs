@@ -169,11 +169,6 @@ public void Disable()
                 }
             }
 
-            // Add Foundry Crawler Pipe Costs to tooltips
-            if (command.Name.ToLower().Contains("warrior")) tooltipText += "Cost: <color=#00A2FF>5 Pipes</color>\n";
-            else if (command.Name.ToLower().Contains("mining")) tooltipText += "Cost: <color=#00A2FF>3 Pipes</color>\n";
-            else if (command.Name.ToLower().Contains("construction")) tooltipText += "Cost: <color=#00A2FF>4 Pipes</color>\n";
-
             if (command.IsLocked(new CommandContext(Owner.Player1, null, new RaycastHit()))
                 && command is IUnlockableCommand unlockableCommand)
             {

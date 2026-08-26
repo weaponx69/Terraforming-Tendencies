@@ -19,6 +19,7 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private CinemachineCamera cinemachineCamera;
         [SerializeField] private Camera playerCamera;
         [SerializeField] private CameraConfig cameraConfig;
+        [SerializeField] private bool showCameraTargetDebug = true;
         [SerializeField] private LayerMask selectableUnitsLayers;
         [SerializeField] private LayerMask interactableLayers;
         [SerializeField] private LayerMask floorLayers;
@@ -140,6 +141,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            CreateCameraTargetDebugVisual();
             CenterCameraOnMap();
             
             // Critical Failsafe 1: Ensure Main Camera has a CinemachineBrain!
@@ -203,6 +205,41 @@ namespace GameDevTV.RTS.Player
                 }
             }
             return globalCommander;
+        }
+
+        private void CreateCameraTargetDebugVisual()
+        {
+            if (!showCameraTargetDebug || cameraTarget == null || cameraTarget.Find("Camera Target Debug") != null)
+            {
+                return;
+            }
+
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            marker.name = "Camera Target Debug";
+            marker.transform.SetParent(cameraTarget, false);
+            marker.transform.localPosition = Vector3.zero;
+            marker.transform.localScale = Vector3.one * 1.5f;
+
+            Collider markerCollider = marker.GetComponent<Collider>();
+            if (markerCollider != null)
+            {
+                Destroy(markerCollider);
+            }
+
+            Renderer markerRenderer = marker.GetComponent<Renderer>();
+            if (markerRenderer != null)
+            {
+                Shader markerShader = Shader.Find("Universal Render Pipeline/Unlit")
+                    ?? Shader.Find("Unlit/Color")
+                    ?? Shader.Find("Standard");
+                if (markerShader != null)
+                {
+                    markerRenderer.material = new Material(markerShader)
+                    {
+                        color = Color.magenta
+                    };
+                }
+            }
         }
 
         private bool hasCameraBeenFocused = false;
@@ -1030,8 +1067,13 @@ namespace GameDevTV.RTS.Player
               
             if (cameraTarget != null)
             {
-                // Use Space.Self so panning respects the new camera rotation angle!
-                cameraTarget.transform.Translate(velocity * Time.deltaTime, Space.Self);
+                cameraTarget.position += cameraTarget.TransformDirection(velocity * Time.unscaledDeltaTime);
+
+                // DEBUG: Log keyboard panning
+                if (moveAmount.magnitude > 0.01f)
+                {
+                    Debug.Log($"[PlayerInput] Panning by {velocity}. cameraTarget pos: {cameraTarget.position}");
+                }
             }
             else
             {

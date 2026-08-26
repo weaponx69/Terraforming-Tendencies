@@ -25,14 +25,7 @@ The round still ends automatically when the milestone target is met. The differe
 
 ### 1.1 Sector Unlocking Through Exploration (Not Automatic)
 - **Current:** Sectors unlock automatically when all milestones in a generation are completed.
-- **Change:** Sectors are locked behind **exploration**. The Foundry Crawler's pipeline advance physically reveals new terrain, or scouting cards/drones explore ahead.
-- **Foundry Crawler as exploration engine:** The crawler burns Iron + Regolith from its hoppers to move along the pipeline path. Drones mine and deliver fuel (if those resource types have been discovered). As it moves, it exposes new deposits in the adjacent sector.
-- **Scouting alternatives via cards:**
-  - *"Orbital Scan"* — skip the fuel grind, instantly reveal adjacent sector
-  - *"Pipeline Boost"* — crawler moves 2x faster this round
-  - *"Survey Drone"* — deploy a fast Probe to scout ahead without moving the crawler
-- **Tradeoff:** Fuel the crawler for slow/reliable expansion with deposits revealed along the path, or use cards for fast expansion that skips those intermediate deposits.
-- **Files:** [`SectorManager.cs`](Assets/Scripts/Environment/SectorManager.cs), [`GenerationManager.cs`](Assets/Scripts/Player/GenerationManager.cs:27), [`BlueprintDraftManager.cs`](Assets/Scripts/Player/BlueprintDraftManager.cs)
+
 
 ### 1.2 Draft = Discovery Phase (Not Permits, Not Free Resources)
 The draft between rounds represents your colony's **prospecting and scouting phase**. Cards show what was found.
@@ -63,7 +56,6 @@ The player must always be able to finish a round. Tension comes from *how barely
 
 ### 1.4 Persistent Depletion (No Replenishment Between Rounds)
 - **Current:** `PlanetGenerator.ReplenishResources()` refills all nodes between generations.
-- **Change:** Resources do NOT replenish between generations — only when the Foundry Crawler explores a new sector. Depleted deposits stay gone, forcing the player to explore or adapt their draft strategy.
 - **Files:** [`PlanetGenerator.cs`](Assets/Scripts/Environment/PlanetGenerator.cs)
 
 ### 1.5 Building Upkeep Tax (Materials Only)
@@ -154,7 +146,6 @@ The player must always be able to finish a round. Tension comes from *how barely
 ---
 
 ## Key Design Principles
-1. **Explore to expand** — sectors unlock through scouting and crawler advance
 2. **Draft = discovery, not permission** — cards represent what scouts found during prospecting
 3. **Resources are finite per sector** — no replenishment without new exploration
 4. **Materials are the only spendable currency** — upkeep, building, repairs all cost Materials
@@ -179,7 +170,6 @@ The player must always be able to finish a round. Tension comes from *how barely
 
 ### Round End
 8. Milestone met (barely) OR timer expires (partial reward). Materials → Terra-Coins.
-9. Depleted deposits stay gone. Crawler maybe advanced (if fueled). New sector maybe revealed.
 10. Next draft. Adapt to what remains. Repeat — harder.
 
 ```

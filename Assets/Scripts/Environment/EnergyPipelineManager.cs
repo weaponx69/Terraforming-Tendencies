@@ -100,12 +100,6 @@ namespace GameDevTV.RTS.Environment
             neededSegments = Mathf.CeilToInt(totalDist / segmentLength);
             builtSegments = 0;
 
-            // Pre-build 4 segments for free to establish the starting line so the crawler
-            // has room to move and doesn't sit on top of the base.
-            for (int i = 0; i < 4 && builtSegments < neededSegments; i++)
-            {
-                SpawnSegmentPhysically(true); // true = free
-            }
         }
 
         private void SpawnSegmentPhysically(bool isFree)
