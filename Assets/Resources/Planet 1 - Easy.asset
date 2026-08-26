@@ -21,8 +21,8 @@ MonoBehaviour:
   ToxicityLevel: 0
   BiomassDrainRate: 0.2
   IntegrityDrainRate: 0.5
-  SectorsX: 2
-  SectorsY: 2
+  SectorsX: 3
+  SectorsY: 3
   SectorOccupationRadius: 40
   EnvironmentDensity: 100
   EnvironmentPrefabs: []

@@ -85,10 +85,23 @@ namespace GameDevTV.RTS.Environment
             secW = worldWidth / config.SectorsX;
             secH = worldHeight / config.SectorsY;
 
+            int startingX = config.SectorsX / 2;
+            int startingY = config.SectorsY / 2;
+            var sectorCoordinates = new List<Vector2Int> { new Vector2Int(startingX, startingY) };
+
             for (int y = 0; y < config.SectorsY; y++)
             {
                 for (int x = 0; x < config.SectorsX; x++)
                 {
+                    if (x == startingX && y == startingY) continue;
+                    sectorCoordinates.Add(new Vector2Int(x, y));
+                }
+            }
+
+            for (int i = 0; i < sectorCoordinates.Count; i++)
+            {
+                    int x = sectorCoordinates[i].x;
+                    int y = sectorCoordinates[i].y;
                     Vector3 center = new Vector3(
                         (x + 0.5f) * secW,
                         0,
@@ -101,7 +114,7 @@ namespace GameDevTV.RTS.Environment
                         center.y = hit.point.y;
                     }
 
-                    bool isFirst = (x == 0 && y == 0);
+                    bool isFirst = i == 0;
                     SectorFeature feature = SectorFeature.None;
                     if (!isFirst)
                     {
@@ -109,7 +122,6 @@ namespace GameDevTV.RTS.Environment
                         feature = (SectorFeature)featureIndex;
                     }
                     Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst, IsExplored = isFirst, Feature = feature });
-                }
             }
             
             if (Sectors.Count > 0)

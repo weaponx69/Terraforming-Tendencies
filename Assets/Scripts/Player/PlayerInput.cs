@@ -263,6 +263,14 @@ namespace GameDevTV.RTS.Player
                     var startingSector = sectorManager.Sectors[0];
                     if (startingSector != null)
                     {
+                        globalCommander = FindAnyObjectByType<GlobalCommander>();
+                        if (globalCommander != null)
+                        {
+                            Vector3 commanderPosition = startingSector.Center;
+                            commanderPosition.y = globalCommander.transform.position.y;
+                            globalCommander.transform.position = commanderPosition;
+                        }
+
                         Vector3 targetPos = startingSector.Center;
                         targetPos.y = cameraTarget.position.y;
                         cameraTarget.position = targetPos;
@@ -1047,7 +1055,7 @@ namespace GameDevTV.RTS.Player
             cinemachineFollow.FollowOffset = Vector3.Lerp(
                 cinemachineFollow.FollowOffset,
                 targetFollowOffset,
-                Time.deltaTime * 10f
+                Time.unscaledDeltaTime * 10f
             );
         }
 
@@ -1101,11 +1109,22 @@ namespace GameDevTV.RTS.Player
         private Vector2 GetMouseMoveAmount()
         {
             Vector2 moveAmount = Vector2.zero;
+
+            if (!Application.isFocused)
+            {
+                return moveAmount;
+            }
             
             // Add debug logging for mouse edge detection
             Vector2 mousePosition = Mouse.current.position.ReadValue();
             int screenWidth = Screen.width;
             int screenHeight = Screen.height;
+
+            if (mousePosition.x < 0f || mousePosition.x > screenWidth
+                || mousePosition.y < 0f || mousePosition.y > screenHeight)
+            {
+                return moveAmount;
+            }
             
             if (mousePosition.x <= cameraConfig.EdgePanSize)
             {
