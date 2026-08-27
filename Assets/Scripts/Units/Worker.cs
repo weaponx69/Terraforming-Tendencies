@@ -87,6 +87,31 @@ namespace GameDevTV.RTS.Units
             LoadEventChannels();
         }
 
+        public void BeginAutoGather(BaseBuilding homeBase)
+        {
+            StartCoroutine(BeginAutoGatherNextFrame(homeBase));
+        }
+
+        private System.Collections.IEnumerator BeginAutoGatherNextFrame(BaseBuilding homeBase)
+        {
+            yield return null;
+
+            GatherableSupply nearestSupply = GatherableSupply.ActiveSupplies
+                .Where(supply => supply != null && supply.Amount > 0 && !supply.IsBusy &&
+                    (!supply.TryGetComponent<HiddenResource>(out HiddenResource hidden) || hidden.IsDiscovered))
+                .OrderBy(supply => (supply.transform.position - transform.position).sqrMagnitude)
+                .FirstOrDefault();
+
+            if (nearestSupply == null)
+            {
+                Debug.Log($"[Worker] {name} found no revealed supply to gather.");
+                yield break;
+            }
+
+            Brain.SetHomeBase(homeBase != null ? homeBase.transform : null);
+            Gather(nearestSupply);
+        }
+
         protected override void OnDestroy()
         {
             base.OnDestroy();

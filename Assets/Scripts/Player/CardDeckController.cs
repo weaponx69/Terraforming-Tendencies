@@ -102,6 +102,10 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            cmdPostCard ??= EnsureStarterCard<UnlockBuildingCardSO>("Cards/CommandPostCard");
+            solarCard ??= EnsureStarterCard<UnlockBuildingCardSO>("Cards/SolarPanelCard");
+            droneCard ??= EnsureStarterCard<SpawnUnitCardSO>("Cards/MiningDroneCard");
+
             // 3. Direct-add the guaranteed cards in the desired slot order.
             //    Command Post → index 0, Solar Panel → index 1, Mining Drone → index 2.
             if (cmdPostCard != null) { hand.Add(cmdPostCard); drawPile.Remove(cmdPostCard); }
@@ -174,6 +178,12 @@ namespace GameDevTV.RTS.Player
             if (hand[handIndex] == null) return;
 
             BlueprintCardSO played = hand[handIndex];
+            if (!played.IsGateMet())
+            {
+                Debug.LogWarning($"[CardDeckController] Card '{played.cardName}' cannot be played yet because its requirements are not met.");
+                return;
+            }
+
             Debug.Log($"[CardDeckController] Playing card: '{played.cardName}' (index {handIndex})");
 
             // Register card's hazards if it has any
@@ -308,6 +318,22 @@ namespace GameDevTV.RTS.Player
             drawPile.AddRange(discardPile);
             discardPile.Clear();
             drawPile = drawPile.OrderBy(_ => UnityEngine.Random.value).ToList();
+        }
+
+        private T EnsureStarterCard<T>(string resourcePath) where T : BlueprintCardSO
+        {
+            T card = Resources.Load<T>(resourcePath);
+            if (card == null)
+            {
+                throw new InvalidOperationException(
+                    $"[CardDeckController] Required opening card is missing at Resources/{resourcePath}. " +
+                    "The opening hand must contain Command Post, Mining Drone, and Solar Panel so the player can establish a base, deploy a builder, and generate power. " +
+                    "Restore the missing asset or correct its Resources path before starting the game.");
+            }
+
+            if (!masterDeck.Contains(card)) masterDeck.Add(card);
+            if (!drawPile.Contains(card)) drawPile.Add(card);
+            return card;
         }
     }
 }

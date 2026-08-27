@@ -7,6 +7,11 @@ namespace GameDevTV.RTS.Player
     public class SpawnUnitCardSO : BlueprintCardSO
         {
             public GameObject unitPrefab;
+
+            public override bool IsGateMet()
+            {
+                return FindPlayerCommandPost() != null;
+            }
     
             public override string GetCardGoal()
             {
@@ -23,36 +28,14 @@ namespace GameDevTV.RTS.Player
             {
                 if (unitPrefab == null) return;
     
-                // Find command post to spawn at
-                var bldgs = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
-                BaseBuilding spawnBase = null;
-                foreach (var b in bldgs)
+                BaseBuilding spawnBase = FindPlayerCommandPost();
+                if (spawnBase == null)
                 {
-                    if (b != null && b.Owner == Owner.Player1 && b.BuildingSO != null && b.BuildingSO.Name.Contains("Command"))
-                    {
-                        spawnBase = b;
-                        break;
-                    }
+                    Debug.LogWarning($"[Blueprint] Cannot spawn '{cardName}' without a player Command Post.");
+                    return;
                 }
-    
-                Vector3 spawnPos = Vector3.zero;
-                if (spawnBase != null)
-                {
-                    spawnPos = spawnBase.transform.position + Vector3.forward * 4f;
-                }
-                else
-                {
-                    // Fallback to active camera projection center or origin
-                    var mainCam = Camera.main;
-                    if (mainCam != null)
-                    {
-                        Ray ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-                        if (Physics.Raycast(ray, out RaycastHit hit, 100f))
-                        {
-                            spawnPos = hit.point;
-                        }
-                    }
-                }
+
+                Vector3 spawnPos = spawnBase.transform.position + Vector3.forward * 4f;
     
                 // Validate spawn position is on NavMesh to prevent agent creation failures
                 int agentType = 0;
@@ -73,8 +56,28 @@ namespace GameDevTV.RTS.Player
                 {
                     abstractUnit.Owner = Owner.Player1;
                 }
+
+                if (spawnedUnit.TryGetComponent(out Worker worker))
+                {
+                    worker.BeginAutoGather(spawnBase);
+                }
                 
                 Debug.Log($"[Blueprint] Spawned free unit: {unitPrefab.name} at {spawnPos}");
+            }
+
+            private static BaseBuilding FindPlayerCommandPost()
+            {
+                BaseBuilding[] buildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
+                foreach (BaseBuilding building in buildings)
+                {
+                    if (building != null && building.Owner == Owner.Player1 && building.BuildingSO != null &&
+                        building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        return building;
+                    }
+                }
+
+                return null;
             }
         }
 }
