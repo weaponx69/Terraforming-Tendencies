@@ -2,6 +2,14 @@
 
 This file gives concise, actionable context for automated coding agents to be productive in this Unity project.
 
+## Required Game Design Context
+
+- `PROJECT_KNOWLEDGE.md` is the persistent game-design and architecture reference for Terraforming Tendencies. Before proposing or implementing a change that affects gameplay, progression, economy, units, sectors, cards, UI behavior, audio feedback, or player-facing presentation, read the relevant sections of this document.
+- Read `GDD.md` as well when a change concerns intended game rules, lore, balance, win/loss conditions, or player experience. Use the GDD as the source of truth for design intent; use `PROJECT_KNOWLEDGE.md` for the current implemented architecture, decisions, and known constraints.
+- Preserve the established hub-and-spoke colony loop: the Universal Command Center is the hub; sector exploration, resource recovery, upgrades, and outward expansion are the strategic progression path. The RTS layer should reinforce those decisions rather than replace them with opaque automation.
+- When design documentation and current implementation conflict, explain the conflict briefly and favor the documented design intent unless the user explicitly requests a technical preservation of current behavior.
+- If the design documents do not establish an important gameplay decision, ask for a short design direction before introducing a new rule, economy value, progression gate, or player-facing workflow.
+
 - Project type: Unity 2020+ style C# RTS project using ScriptableObjects for data (SO suffix), a small EventBus (`Assets/Scripts/EventBus/Bus.cs`), and Behavior Graph / blackboard driven unit AI (`Assets/Scripts/Behavior/*`, `BehaviorGraphAgent`).
 - Primary code areas:
   - Units and gameplay: `Assets/Scripts/Units/` (key: `AbstractUnit.cs`, `UnitSO.cs`, `AttackConfigSO.cs`)

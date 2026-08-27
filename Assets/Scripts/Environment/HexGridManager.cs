@@ -100,6 +100,7 @@ namespace GameDevTV.RTS.Environment
                         }
                         if (count == 0) Debug.LogWarning($"[HexTile.Reveal] Found zero renderers to disable on {GameObject.name}! Is the shroud prefab missing a MeshRenderer?");
                     }
+                    UpdateOutline();
                 }
             }
             
@@ -138,6 +139,9 @@ namespace GameDevTV.RTS.Environment
                     if (HighlightTrace) Debug.LogWarning($"[HexHighlight] Cannot update {HexCoordinates}: LineRenderer is missing.");
                     return;
                 }
+
+                outline.enabled = IsRevealed;
+                if (!IsRevealed) return;
 
                 Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : isHovered ? Color.white : Color.cyan;
                 float width = isHighlighted || isHovered ? 0.2f : 0.1f;
@@ -379,6 +383,7 @@ namespace GameDevTV.RTS.Environment
             lr.numCornerVertices = 2;
             lr.numCapVertices = 2;
             lr.sortingOrder = 100;
+            lr.enabled = false;
             lr.startColor = Color.cyan; // Solid cyan!
             lr.endColor = Color.cyan;
             
