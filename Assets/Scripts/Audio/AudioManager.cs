@@ -26,6 +26,8 @@ namespace GameDevTV.RTS.Audio
         }
 
         private AudioSource musicSource;
+        private AudioSource soundEffectSource;
+        private AudioClip hexHoverClip;
         private Coroutine fadeCoroutine;
         private float targetVolume = 0.5f; // Set a default pleasant background volume
 
@@ -57,6 +59,12 @@ namespace GameDevTV.RTS.Audio
             musicSource.playOnAwake = false;
             musicSource.spatialBlend = 0f; // 2D Stereo sound
             musicSource.volume = 0f; // Start at 0 for smooth fade-in
+
+            soundEffectSource = gameObject.AddComponent<AudioSource>();
+            soundEffectSource.playOnAwake = false;
+            soundEffectSource.spatialBlend = 0f;
+            soundEffectSource.volume = 0.35f;
+            hexHoverClip = CreateHexHoverClip();
 
             AudioClip bgm = Resources.Load<AudioClip>("Audio/Music/AtmosphericSoundtrack");
             if (bgm != null)
@@ -120,6 +128,34 @@ namespace GameDevTV.RTS.Audio
             {
                 musicSource.UnPause();
             }
+        }
+
+        public void PlayHexHoverSound()
+        {
+            if (soundEffectSource != null && hexHoverClip != null)
+            {
+                soundEffectSource.PlayOneShot(hexHoverClip);
+            }
+        }
+
+        private static AudioClip CreateHexHoverClip()
+        {
+            const int sampleRate = 44100;
+            const float duration = 0.08f;
+            int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+            {
+                float time = sampleIndex / (float)sampleRate;
+                float envelope = Mathf.Exp(-time * 28f);
+                samples[sampleIndex] = (Mathf.Sin(2f * Mathf.PI * 880f * time) +
+                    0.35f * Mathf.Sin(2f * Mathf.PI * 1320f * time)) * envelope * 0.18f;
+            }
+
+            AudioClip clip = AudioClip.Create("HexHover", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
     }
 }

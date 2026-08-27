@@ -4,6 +4,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Audio;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -62,6 +63,7 @@ namespace GameDevTV.RTS.Player
         private void Awake()
         {
             HexGridManager.SetHighlightTrace(highlightTrace);
+            Debug.Log($"[HexHighlight] PlayerInput initialized; trace={highlightTrace}");
 
             if (playerCamera == null)
             {
@@ -99,6 +101,7 @@ namespace GameDevTV.RTS.Player
             Bus<UnitDeathEvent>.OnEvent[Owner.Player1] += HandleUnitDeath;
 
             GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated += CenterCameraOnMap;
+            HexGridManager.OnStartingAreaRevealed += HandleStartingAreaRevealed;
         }
 
         private void Start()
@@ -282,6 +285,14 @@ namespace GameDevTV.RTS.Player
             Bus<UnitDeathEvent>.OnEvent[Owner.Player1] -= HandleUnitDeath;
             
             GameDevTV.RTS.Environment.PlanetGenerator.OnPlanetGenerated -= CenterCameraOnMap;
+            HexGridManager.OnStartingAreaRevealed -= HandleStartingAreaRevealed;
+        }
+
+        private void HandleStartingAreaRevealed()
+        {
+            currentHex = null;
+            hoveredHex = null;
+            InitializeCurrentHex();
         }
 
         private void HandleUnitSelected(UnitSelectedEvent evt)
@@ -1099,6 +1110,10 @@ namespace GameDevTV.RTS.Player
             hoveredHex?.SetHovered(false);
             hoveredHex = nextHoveredHex;
             hoveredHex?.SetHovered(true);
+            if (hoveredHex != null)
+            {
+                AudioManager.Instance.PlayHexHoverSound();
+            }
         }
 
         private void InitializeCurrentHex()

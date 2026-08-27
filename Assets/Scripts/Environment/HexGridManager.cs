@@ -12,6 +12,7 @@ namespace GameDevTV.RTS.Environment
     public class HexGridManager : MonoBehaviour
     {
         public static HexGridManager Instance { get; private set; }
+        public static event System.Action OnStartingAreaRevealed;
 
         [Header("Grid Settings")]
         [SerializeField] private float cellSize = 2.0f;
@@ -44,7 +45,7 @@ namespace GameDevTV.RTS.Environment
         private void OnEnable()
         {
             Instance = this;
-            HighlightTrace = highlightTrace;
+            HighlightTrace |= highlightTrace;
             PlanetGenerator.OnPlanetGenerated += RevealStartingArea;
         }
 
@@ -138,7 +139,7 @@ namespace GameDevTV.RTS.Environment
                     return;
                 }
 
-                Color color = isHighlighted ? Color.yellow : isHovered ? Color.white : Color.cyan;
+                Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : isHovered ? Color.white : Color.cyan;
                 float width = isHighlighted || isHovered ? 0.2f : 0.1f;
                 if (HighlightTrace)
                 {
@@ -370,9 +371,14 @@ namespace GameDevTV.RTS.Environment
             lr.useWorldSpace = true; // Use world space so the prefab's scale doesn't warp the lines!
             lr.loop = true;
             lr.positionCount = 6;
-            lr.startWidth = 0.1f; // Thicker so it's visible
-            lr.endWidth = 0.1f;
-            lr.material = new Material(Shader.Find("Sprites/Default"));
+            lr.startWidth = 0.15f;
+            lr.endWidth = 0.15f;
+            lr.material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            lr.numCornerVertices = 2;
+            lr.numCapVertices = 2;
+            lr.sortingOrder = 100;
             lr.startColor = Color.cyan; // Solid cyan!
             lr.endColor = Color.cyan;
             
@@ -384,7 +390,7 @@ namespace GameDevTV.RTS.Environment
                 float angle_rad = Mathf.PI / 180f * angle_deg;
                 // Radius is cellSize = HEX_WIDTH / 2.0f
                 float radius = HEX_WIDTH * 0.5f;
-                points[i] = position + new Vector3(radius * Mathf.Cos(angle_rad), 0.2f, radius * Mathf.Sin(angle_rad));
+                points[i] = position + new Vector3(radius * Mathf.Cos(angle_rad), 0.75f, radius * Mathf.Sin(angle_rad));
             }
             lr.SetPositions(points);
 
@@ -536,6 +542,7 @@ namespace GameDevTV.RTS.Environment
             }
 
             RevealHexesAroundPosition(center, startingAreaRevealRadius);
+            OnStartingAreaRevealed?.Invoke();
         }
         
 
