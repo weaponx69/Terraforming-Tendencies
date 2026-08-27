@@ -19,7 +19,6 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private CinemachineCamera cinemachineCamera;
         [SerializeField] private Camera playerCamera;
         [SerializeField] private CameraConfig cameraConfig;
-        [SerializeField] private bool showCameraTargetDebug = true;
         [SerializeField] private LayerMask selectableUnitsLayers;
         [SerializeField] private LayerMask interactableLayers;
         [SerializeField] private LayerMask floorLayers;
@@ -53,6 +52,7 @@ namespace GameDevTV.RTS.Player
         private Vector2 lastMousePosition;
         private int currentBaseIndex = -1;
         private GlobalCommander globalCommander;
+        private GameDevTV.RTS.Environment.HexGridManager.HexTile currentHex;
 
         private static readonly int TINT = Shader.PropertyToID("_Tint");
         private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
@@ -141,7 +141,6 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            CreateCameraTargetDebugVisual();
             CenterCameraOnMap();
             
             // Critical Failsafe 1: Ensure Main Camera has a CinemachineBrain!
@@ -207,41 +206,6 @@ namespace GameDevTV.RTS.Player
             return globalCommander;
         }
 
-        private void CreateCameraTargetDebugVisual()
-        {
-            if (!showCameraTargetDebug || cameraTarget == null || cameraTarget.Find("Camera Target Debug") != null)
-            {
-                return;
-            }
-
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = "Camera Target Debug";
-            marker.transform.SetParent(cameraTarget, false);
-            marker.transform.localPosition = Vector3.zero;
-            marker.transform.localScale = Vector3.one * 1.5f;
-
-            Collider markerCollider = marker.GetComponent<Collider>();
-            if (markerCollider != null)
-            {
-                Destroy(markerCollider);
-            }
-
-            Renderer markerRenderer = marker.GetComponent<Renderer>();
-            if (markerRenderer != null)
-            {
-                Shader markerShader = Shader.Find("Universal Render Pipeline/Unlit")
-                    ?? Shader.Find("Unlit/Color")
-                    ?? Shader.Find("Standard");
-                if (markerShader != null)
-                {
-                    markerRenderer.material = new Material(markerShader)
-                    {
-                        color = Color.magenta
-                    };
-                }
-            }
-        }
-
         private bool hasCameraBeenFocused = false;
         private bool hasCameraSnappedToCommandPost = false;
 
@@ -272,8 +236,7 @@ namespace GameDevTV.RTS.Player
                         }
 
                         Vector3 targetPos = startingSector.Center;
-                        targetPos.y = cameraTarget.position.y;
-                        cameraTarget.position = targetPos;
+                        MoveToStartingHex(targetPos);
                         hasCameraBeenFocused = true;
                         return;
                     }
@@ -470,6 +433,7 @@ namespace GameDevTV.RTS.Player
             }
             lastMousePosition = currentMousePos;
 
+            InitializeCurrentHex();
             HandlePanning();
             HandleZooming();
             HandleRotation();
@@ -1067,26 +1031,37 @@ namespace GameDevTV.RTS.Player
 
         private void HandlePanning()
         {
-            // WASD and arrow keys pan the camera. Mouse edge-pan is always honored.
-            Vector2 moveAmount = GetKeyboardMoveAmount();
-            moveAmount += GetMouseMoveAmount();
+            if (cameraTarget == null || HexGridManager.Instance == null) return;
 
-            Vector3 velocity = new Vector3(moveAmount.x, 0, moveAmount.y);
-              
-            if (cameraTarget != null)
-            {
-                cameraTarget.position += cameraTarget.TransformDirection(velocity * Time.unscaledDeltaTime);
+            InitializeCurrentHex();
+            if (currentHex == null) return;
 
-                // DEBUG: Log keyboard panning
-                if (moveAmount.magnitude > 0.01f)
-                {
-                    Debug.Log($"[PlayerInput] Panning by {velocity}. cameraTarget pos: {cameraTarget.position}");
-                }
-            }
-            else
-            {
-                Debug.LogError("[PlayerInput] cameraTarget is null in HandlePanning!");
-            }
+            Vector2Int direction = Vector2Int.zero;
+            if (Keyboard.current.wKey.wasPressedThisFrame || Keyboard.current.upArrowKey.wasPressedThisFrame) direction = Vector2Int.up;
+            else if (Keyboard.current.sKey.wasPressedThisFrame || Keyboard.current.downArrowKey.wasPressedThisFrame) direction = Vector2Int.down;
+            else if (Keyboard.current.aKey.wasPressedThisFrame || Keyboard.current.leftArrowKey.wasPressedThisFrame) direction = Vector2Int.left;
+            else if (Keyboard.current.dKey.wasPressedThisFrame || Keyboard.current.rightArrowKey.wasPressedThisFrame) direction = Vector2Int.right;
+
+            if (direction == Vector2Int.zero) return;
+
+            var destination = HexGridManager.Instance.GetHex(currentHex.HexCoordinates + direction);
+            if (destination == null || !destination.IsRevealed) return;
+
+            currentHex.SetHighlighted(false);
+            currentHex = destination;
+            currentHex.SetHighlighted(true);
+
+            Vector3 destinationPosition = currentHex.WorldPosition;
+            destinationPosition.y = cameraTarget.position.y;
+            cameraTarget.position = destinationPosition;
+        }
+
+        private void InitializeCurrentHex()
+        {
+            if (currentHex != null || cameraTarget == null || HexGridManager.Instance == null) return;
+
+            currentHex = HexGridManager.Instance.GetNearestRevealedHex(cameraTarget.position);
+            currentHex?.SetHighlighted(true);
         }
 
 

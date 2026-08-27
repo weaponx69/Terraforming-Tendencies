@@ -51,6 +51,11 @@ namespace GameDevTV.RTS.Environment
             {
                 // // Debug.LogWarning("[PlanetGenerator] Could not load SupplySOs from Resources! Ensure they exist in Assets/Resources/Gatherable Supplies/");
             }
+
+            if (SectorManager.Instance != null)
+            {
+                SectorManager.Instance.ReinitializeSectors();
+            }
             
             FixPreplacedGatherables();
 
@@ -305,6 +310,16 @@ namespace GameDevTV.RTS.Environment
 
                 GetComponent<MeshFilter>().mesh = mesh;
                 GetComponent<MeshCollider>().sharedMesh = mesh;
+
+                float generatedMapWidth = width * CellSize;
+                float generatedMapHeight = height * CellSize;
+                Vector3 mapMin = transform.TransformPoint(Vector3.zero);
+                Vector3 mapMax = transform.TransformPoint(new Vector3(generatedMapWidth, 0f, generatedMapHeight));
+                Vector3 mapCenter = transform.TransformPoint(new Vector3(generatedMapWidth / 2f, 0f, generatedMapHeight / 2f));
+                Vector3 sectorCenter = SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0
+                    ? SectorManager.Instance.Sectors[0].Center
+                    : Vector3.zero;
+                Debug.Log($"[PlanetGenerator] World bounds min={mapMin}, max={mapMax}, center={mapCenter}; Sector 0 center={sectorCenter}; offset={sectorCenter - mapCenter}");
 
                 MeshRenderer renderer = GetComponent<MeshRenderer>();
                 Shader shader = Shader.Find("Custom/URP_CurvedWorld");

@@ -11,6 +11,8 @@ namespace GameDevTV.RTS.Environment
     /// </summary>
     public class HexGridManager : MonoBehaviour
     {
+        public static HexGridManager Instance { get; private set; }
+
         [Header("Grid Settings")]
         [SerializeField] private float cellSize = 2.0f;
         [SerializeField] private Vector2Int gridDimensions = new Vector2Int(50, 50);
@@ -20,14 +22,28 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private GameObject shroudTilePrefab;
         [SerializeField] private LayerMask shroudLayer;
         [SerializeField] private bool generateShroudOnStart = true;
+        [SerializeField] private float startingAreaRevealRadius = 15f;
         
         // Hex grid data
         private Dictionary<Vector2Int, HexTile> hexGrid = new Dictionary<Vector2Int, HexTile>();
         private Dictionary<Vector3, Vector2Int> worldToHexMap = new Dictionary<Vector3, Vector2Int>();
+        private Vector3 gridOrigin;
         
         // Configuration for pointy-topped hexagons
         private const float HEX_HEIGHT = 1.732f; // sqrt(3) * cellSize
         private const float HEX_WIDTH = 2.0f;   // 2 * cellSize
+
+        private void OnEnable()
+        {
+            Instance = this;
+            PlanetGenerator.OnPlanetGenerated += RevealStartingArea;
+        }
+
+        private void OnDisable()
+        {
+            PlanetGenerator.OnPlanetGenerated -= RevealStartingArea;
+            if (Instance == this) Instance = null;
+        }
         
         /// <summary>
         /// Represents a single hex tile in the grid.
@@ -38,6 +54,7 @@ namespace GameDevTV.RTS.Environment
             public Vector3 WorldPosition { get; private set; }
             public GameObject GameObject { get; private set; }
             public bool IsRevealed { get; private set; }
+            private LineRenderer outline;
             
             public HexTile(Vector2Int hexCoords, Vector3 worldPos, GameObject hexGO)
             {
@@ -45,6 +62,7 @@ namespace GameDevTV.RTS.Environment
                 WorldPosition = worldPos;
                 GameObject = hexGO;
                 IsRevealed = false;
+                outline = hexGO != null ? hexGO.GetComponent<LineRenderer>() : null;
             }
             
             public void Reveal()
@@ -79,6 +97,16 @@ namespace GameDevTV.RTS.Environment
                     UnityEngine.Object.Destroy(GameObject);
                 }
             }
+
+            public void SetHighlighted(bool highlighted)
+            {
+                if (outline == null) return;
+
+                outline.startColor = highlighted ? Color.yellow : Color.cyan;
+                outline.endColor = highlighted ? Color.yellow : Color.cyan;
+                outline.startWidth = highlighted ? 0.2f : 0.1f;
+                outline.endWidth = highlighted ? 0.2f : 0.1f;
+            }
         }
         
         /// <summary>
@@ -86,6 +114,7 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public Vector2Int WorldToHexCoordinates(Vector3 worldPosition)
         {
+            worldPosition -= gridOrigin;
             // Convert world position to hex coordinates using pointy-topped formula
             float q = (worldPosition.x / (HEX_WIDTH * 0.75f)) - (worldPosition.z / (HEX_HEIGHT * 0.5f));
             float r = (worldPosition.z / (HEX_HEIGHT * 0.5f));
@@ -112,7 +141,7 @@ namespace GameDevTV.RTS.Environment
             {
                 z += HEX_HEIGHT * 0.5f;
             }
-            return new Vector3(x, 0f, z);
+            return gridOrigin + new Vector3(x, 0f, z);
         }
         
         /// <summary>
@@ -142,6 +171,31 @@ namespace GameDevTV.RTS.Environment
             
             return null;
         }
+
+        public HexTile GetHex(Vector2Int coordinates)
+        {
+            return hexGrid.TryGetValue(coordinates, out HexTile tile) ? tile : null;
+        }
+
+        public HexTile GetNearestRevealedHex(Vector3 worldPosition)
+        {
+            HexTile nearest = null;
+            float nearestDistance = float.MaxValue;
+
+            foreach (HexTile tile in hexGrid.Values)
+            {
+                if (!tile.IsRevealed) continue;
+
+                float distance = (tile.WorldPosition - worldPosition).sqrMagnitude;
+                if (distance < nearestDistance)
+                {
+                    nearest = tile;
+                    nearestDistance = distance;
+                }
+            }
+
+            return nearest;
+        }
         
         /// <summary>
         /// Generates the hex grid and Shroud overlay.
@@ -154,6 +208,13 @@ namespace GameDevTV.RTS.Environment
                     Mathf.CeilToInt(PlanetGenerator.Instance.Config.MapWidth / cellSize * 1.2f), 
                     Mathf.CeilToInt(PlanetGenerator.Instance.Config.MapHeight / cellSize * 1.2f)
                 );
+
+                float gridWidth = (gridDimensions.x - 1) * (HEX_WIDTH * 0.75f);
+                float gridHeight = (gridDimensions.y - 1) * HEX_HEIGHT;
+                gridOrigin = new Vector3(
+                    PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize / 2f - gridWidth / 2f,
+                    0f,
+                    PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize / 2f - gridHeight / 2f);
             }
             if (gridRoot == null)
             {
@@ -184,6 +245,10 @@ namespace GameDevTV.RTS.Environment
                 }
             }
             
+            Vector3 gridMin = HexToWorldPosition(Vector2Int.zero);
+            Vector3 gridMax = HexToWorldPosition(new Vector2Int(gridDimensions.x - 1, gridDimensions.y - 1));
+            Vector3 gridCenter = (gridMin + gridMax) * 0.5f;
+            Debug.Log($"[HexGridManager] World bounds min={gridMin}, max={gridMax}, center={gridCenter}, origin={gridOrigin}");
             Debug.Log($"[HexGridManager] Generated hex grid with {hexGrid.Count} tiles");
         }
         
@@ -371,25 +436,33 @@ namespace GameDevTV.RTS.Environment
         {
             if (generateShroudOnStart)
             {
-                GenerateHexGrid();
-                
-                // Reveal the center of the map so the player has a starting area cleared
                 if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
                 {
-                    // PlanetGenerator uses its own CellSize (usually 1), so MapWidth * PlanetGenerator.CellSize is the real size
-                    // Clear the starting area (Sector 0) center, where the camera starts!
-                    Vector3 center = new Vector3(
-                        PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize / 2f,
-                        0f,
-                        PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize / 2f);
-                    if (GameDevTV.RTS.Environment.SectorManager.Instance != null && GameDevTV.RTS.Environment.SectorManager.Instance.Sectors.Count > 0)
-                    {
-                        var startingSector = GameDevTV.RTS.Environment.SectorManager.Instance.Sectors[0];
-                        if (startingSector != null) center = startingSector.Center;
-                    }
-                    RevealHexesAroundPosition(center, 5f); // 5 units starting radius as requested
+                    GenerateHexGrid();
+                    RevealStartingArea();
                 }
             }
+        }
+
+        private void RevealStartingArea()
+        {
+            if (!generateShroudOnStart || PlanetGenerator.Instance == null || PlanetGenerator.Instance.Config == null)
+            {
+                return;
+            }
+
+            GenerateHexGrid();
+
+            Vector3 center = new Vector3(
+                PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize / 2f,
+                0f,
+                PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize / 2f);
+            if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+            {
+                center = SectorManager.Instance.Sectors[0].Center;
+            }
+
+            RevealHexesAroundPosition(center, startingAreaRevealRadius);
         }
         
 

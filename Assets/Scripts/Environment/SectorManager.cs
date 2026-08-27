@@ -140,6 +140,14 @@ namespace GameDevTV.RTS.Environment
             Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector 0 is unlocked.");
         }
 
+        public void ReinitializeSectors()
+        {
+            _hasInitialized = false;
+            Sectors.Clear();
+            borderInstances.Clear();
+            InitializeSectors();
+        }
+
         public void DiscoverResourcesInUnlockedSectors()
         {
             var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include);
