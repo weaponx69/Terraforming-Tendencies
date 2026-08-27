@@ -141,7 +141,10 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            CenterCameraOnMap();
+            if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.HasGenerated)
+            {
+                CenterCameraOnMap();
+            }
             
             // Critical Failsafe 1: Ensure Main Camera has a CinemachineBrain!
             if (playerCamera != null)
@@ -214,33 +217,21 @@ namespace GameDevTV.RTS.Player
             if (cameraTarget == null) return;
             if (hasCameraBeenFocused) return;
             
-            // Prioritize centering on the starting sector (Sector 0) center
-            var sectorManager = GameDevTV.RTS.Environment.SectorManager.Instance;
-            if (sectorManager != null)
+            // PlanetGenerator owns the generated starting-sector position.
+            var planetGenerator = PlanetGenerator.Instance;
+            if (planetGenerator != null && planetGenerator.HasGenerated)
             {
-                if (sectorManager.Sectors.Count == 0)
+                Vector3 startingPosition = planetGenerator.StartingAreaCenter;
+                globalCommander = FindAnyObjectByType<GlobalCommander>();
+                if (globalCommander != null)
                 {
-                    sectorManager.InitializeSectors();
+                    startingPosition.y = globalCommander.transform.position.y;
+                    globalCommander.transform.position = startingPosition;
                 }
-                if (sectorManager.Sectors.Count > 0)
-                {
-                    var startingSector = sectorManager.Sectors[0];
-                    if (startingSector != null)
-                    {
-                        globalCommander = FindAnyObjectByType<GlobalCommander>();
-                        if (globalCommander != null)
-                        {
-                            Vector3 commanderPosition = startingSector.Center;
-                            commanderPosition.y = globalCommander.transform.position.y;
-                            globalCommander.transform.position = commanderPosition;
-                        }
 
-                        Vector3 targetPos = startingSector.Center;
-                        MoveToStartingHex(targetPos);
-                        hasCameraBeenFocused = true;
-                        return;
-                    }
-                }
+                MoveToStartingHex(startingPosition);
+                hasCameraBeenFocused = true;
+                return;
             }
 
             // Prioritize centering on the base if one exists

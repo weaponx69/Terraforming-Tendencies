@@ -14,6 +14,22 @@ namespace GameDevTV.RTS.Environment
         public PlanetConfig Config;
         public float CellSize = 1f;
         public bool SpawnFloraOnStart = false; // Default to barren planet
+        public bool HasGenerated { get; private set; }
+
+        public Vector3 StartingAreaCenter
+        {
+            get
+            {
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
+                {
+                    return SectorManager.Instance.Sectors[0].Center;
+                }
+
+                return Config == null
+                    ? Vector3.zero
+                    : new Vector3(Config.MapWidth * CellSize / 2f, 0f, Config.MapHeight * CellSize / 2f);
+            }
+        }
 
         [Header("Air Unit Settings")]
         public float AirUnitFlightHeight = 4f;
@@ -381,10 +397,8 @@ namespace GameDevTV.RTS.Environment
                 // updater.transform.parent = transform;
                 // updater.AddComponent<CurvedWorldUpdater>();
 
-                if (OnPlanetGenerated != null)
-                {
-                    OnPlanetGenerated?.Invoke();
-                }
+                HasGenerated = true;
+                OnPlanetGenerated?.Invoke();
                 }
 
                 /// <summary>
