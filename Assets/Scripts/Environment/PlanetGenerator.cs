@@ -510,6 +510,10 @@ namespace GameDevTV.RTS.Environment
                     // Spawn visual markers (small dots + "?" labels)
                     SpawnNodeVisuals();
 
+                    // Resource types for Sector 0 are discovered before node visuals exist.
+                    // Run the discovery pass again now that their HiddenResource components are present.
+                    SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
+
                     // Set Sector 0's first node as explored (entry point from UCC)
                     if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
                     {
