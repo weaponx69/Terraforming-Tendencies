@@ -267,6 +267,17 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        private void MoveToStartingHex(Vector3 targetPosition)
+        {
+            if (cameraTarget == null) return;
+
+            targetPosition.y = cameraTarget.position.y;
+            cameraTarget.position = targetPosition;
+            currentHex?.SetHighlighted(false);
+            currentHex = HexGridManager.Instance?.GetNearestRevealedHex(cameraTarget.position);
+            currentHex?.SetHighlighted(true);
+        }
+
         private void OnDestroy()
         {
             Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] -= HandleUnitSelected;

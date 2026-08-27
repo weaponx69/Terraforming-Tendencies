@@ -353,8 +353,8 @@ namespace GameDevTV.RTS.Environment
                 explorationTimer = 0f;
                 
                 // Find all units and buildings. In a fully optimized version, we'd use a central registry.
-                // For now, FindObjectsOfType is fast enough when throttled to 4 times a second.
-                GameDevTV.RTS.Units.AbstractCommandable[] commandables = FindObjectsOfType<GameDevTV.RTS.Units.AbstractCommandable>();
+                // For now, the lookup is throttled to four times a second.
+                GameDevTV.RTS.Units.AbstractCommandable[] commandables = FindObjectsByType<GameDevTV.RTS.Units.AbstractCommandable>(FindObjectsSortMode.None);
                 
                 foreach (var cmd in commandables)
                 {
