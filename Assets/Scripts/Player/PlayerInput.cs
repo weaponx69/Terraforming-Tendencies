@@ -22,6 +22,7 @@ namespace GameDevTV.RTS.Player
         [SerializeField] private LayerMask selectableUnitsLayers;
         [SerializeField] private LayerMask interactableLayers;
         [SerializeField] private LayerMask floorLayers;
+        [SerializeField] private bool highlightTrace;
         [SerializeField] private RectTransform selectionBox;
         [SerializeField] [ColorUsage(showAlpha: true, hdr: true)]
         private Color errorTintColor = Color.red;
@@ -53,12 +54,15 @@ namespace GameDevTV.RTS.Player
         private int currentBaseIndex = -1;
         private GlobalCommander globalCommander;
         private GameDevTV.RTS.Environment.HexGridManager.HexTile currentHex;
+        private GameDevTV.RTS.Environment.HexGridManager.HexTile hoveredHex;
 
         private static readonly int TINT = Shader.PropertyToID("_Tint");
         private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
 
         private void Awake()
         {
+            HexGridManager.SetHighlightTrace(highlightTrace);
+
             if (playerCamera == null)
             {
                 playerCamera = GetComponent<Camera>();
@@ -436,6 +440,7 @@ namespace GameDevTV.RTS.Player
             lastMousePosition = currentMousePos;
 
             InitializeCurrentHex();
+            HandleHexHover();
             HandlePanning();
             HandleZooming();
             HandleRotation();
@@ -1033,7 +1038,11 @@ namespace GameDevTV.RTS.Player
 
         private void HandlePanning()
         {
-            if (cameraTarget == null || HexGridManager.Instance == null) return;
+            if (cameraTarget == null || HexGridManager.Instance == null)
+            {
+                if (highlightTrace) Debug.LogWarning($"[HexHighlight] Keyboard update skipped: cameraTarget={cameraTarget}, grid={HexGridManager.Instance}");
+                return;
+            }
 
             InitializeCurrentHex();
             if (currentHex == null) return;
@@ -1046,8 +1055,12 @@ namespace GameDevTV.RTS.Player
 
             if (direction == Vector2Int.zero) return;
 
-            var destination = HexGridManager.Instance.GetHex(currentHex.HexCoordinates + direction);
-            if (destination == null || !destination.IsRevealed) return;
+            var destination = HexGridManager.Instance.GetRevealedNeighborInDirection(currentHex, direction);
+            if (destination == null)
+            {
+                if (highlightTrace) Debug.Log($"[HexHighlight] No revealed keyboard neighbor from {currentHex.HexCoordinates} in {direction}");
+                return;
+            }
 
             currentHex.SetHighlighted(false);
             currentHex = destination;
@@ -1056,6 +1069,36 @@ namespace GameDevTV.RTS.Player
             Vector3 destinationPosition = currentHex.WorldPosition;
             destinationPosition.y = cameraTarget.position.y;
             cameraTarget.position = destinationPosition;
+            if (highlightTrace) Debug.Log($"[HexHighlight] Keyboard moved {direction}: {currentHex.HexCoordinates} at {destinationPosition}");
+        }
+
+        private void HandleHexHover()
+        {
+            if (playerCamera == null || HexGridManager.Instance == null || Mouse.current == null) return;
+
+            HexGridManager.HexTile nextHoveredHex = null;
+            Ray ray = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(ray, out RaycastHit hit, float.MaxValue, floorLayers, QueryTriggerInteraction.Ignore))
+            {
+                nextHoveredHex = HexGridManager.Instance.GetNearestRevealedHex(hit.point);
+                if (highlightTrace) Debug.Log($"[HexHighlight] Hover floor hit: point={hit.point}, collider={hit.collider.name}, mask={floorLayers.value}");
+            }
+            else if (Physics.Raycast(ray, out hit, float.MaxValue, ~0, QueryTriggerInteraction.Ignore))
+            {
+                nextHoveredHex = HexGridManager.Instance.GetNearestRevealedHex(hit.point);
+                if (highlightTrace) Debug.Log($"[HexHighlight] Hover fallback hit: point={hit.point}, collider={hit.collider.name}");
+            }
+            else if (highlightTrace)
+            {
+                Debug.Log("[HexHighlight] Hover ray missed floor and fallback geometry.");
+            }
+
+            if (nextHoveredHex == hoveredHex) return;
+
+            if (highlightTrace) Debug.Log($"[HexHighlight] Hover changed: {hoveredHex?.HexCoordinates.ToString() ?? "NULL"} -> {nextHoveredHex?.HexCoordinates.ToString() ?? "NULL"}");
+            hoveredHex?.SetHovered(false);
+            hoveredHex = nextHoveredHex;
+            hoveredHex?.SetHovered(true);
         }
 
         private void InitializeCurrentHex()
@@ -1063,6 +1106,7 @@ namespace GameDevTV.RTS.Player
             if (currentHex != null || cameraTarget == null || HexGridManager.Instance == null) return;
 
             currentHex = HexGridManager.Instance.GetNearestRevealedHex(cameraTarget.position);
+            if (highlightTrace) Debug.Log($"[HexHighlight] Current tile initialized at camera {cameraTarget.position}: {currentHex?.HexCoordinates.ToString() ?? "NULL"}");
             currentHex?.SetHighlighted(true);
         }
 

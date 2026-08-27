@@ -23,6 +23,14 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private LayerMask shroudLayer;
         [SerializeField] private bool generateShroudOnStart = true;
         [SerializeField] private float startingAreaRevealRadius = 15f;
+        [SerializeField] private bool highlightTrace;
+
+        public static bool HighlightTrace { get; private set; }
+
+        public static void SetHighlightTrace(bool enabled)
+        {
+            HighlightTrace = enabled;
+        }
         
         // Hex grid data
         private Dictionary<Vector2Int, HexTile> hexGrid = new Dictionary<Vector2Int, HexTile>();
@@ -36,12 +44,14 @@ namespace GameDevTV.RTS.Environment
         private void OnEnable()
         {
             Instance = this;
+            HighlightTrace = highlightTrace;
             PlanetGenerator.OnPlanetGenerated += RevealStartingArea;
         }
 
         private void OnDisable()
         {
             PlanetGenerator.OnPlanetGenerated -= RevealStartingArea;
+            if (Instance == this) HighlightTrace = false;
             if (Instance == this) Instance = null;
         }
         
@@ -55,6 +65,8 @@ namespace GameDevTV.RTS.Environment
             public GameObject GameObject { get; private set; }
             public bool IsRevealed { get; private set; }
             private LineRenderer outline;
+            private bool isHighlighted;
+            private bool isHovered;
             
             public HexTile(Vector2Int hexCoords, Vector3 worldPos, GameObject hexGO)
             {
@@ -100,12 +112,42 @@ namespace GameDevTV.RTS.Environment
 
             public void SetHighlighted(bool highlighted)
             {
-                if (outline == null) return;
+                isHighlighted = highlighted;
+                if (HighlightTrace)
+                {
+                    Debug.Log($"[HexHighlight] Selected {HexCoordinates} -> {highlighted}; revealed={IsRevealed}, object={GameObject?.name ?? "NULL"}, outline={outline != null}");
+                }
+                UpdateOutline();
+            }
 
-                outline.startColor = highlighted ? Color.yellow : Color.cyan;
-                outline.endColor = highlighted ? Color.yellow : Color.cyan;
-                outline.startWidth = highlighted ? 0.2f : 0.1f;
-                outline.endWidth = highlighted ? 0.2f : 0.1f;
+            public void SetHovered(bool hovered)
+            {
+                isHovered = hovered;
+                if (HighlightTrace)
+                {
+                    Debug.Log($"[HexHighlight] Hovered {HexCoordinates} -> {hovered}; revealed={IsRevealed}, object={GameObject?.name ?? "NULL"}, outline={outline != null}");
+                }
+                UpdateOutline();
+            }
+
+            private void UpdateOutline()
+            {
+                if (outline == null)
+                {
+                    if (HighlightTrace) Debug.LogWarning($"[HexHighlight] Cannot update {HexCoordinates}: LineRenderer is missing.");
+                    return;
+                }
+
+                Color color = isHighlighted ? Color.yellow : isHovered ? Color.white : Color.cyan;
+                float width = isHighlighted || isHovered ? 0.2f : 0.1f;
+                if (HighlightTrace)
+                {
+                    Debug.Log($"[HexHighlight] Outline {HexCoordinates}: enabled={outline.enabled}, positions={outline.positionCount}, width={width}, color={color}");
+                }
+                outline.startColor = color;
+                outline.endColor = color;
+                outline.startWidth = width;
+                outline.endWidth = width;
             }
         }
         
@@ -175,6 +217,37 @@ namespace GameDevTV.RTS.Environment
         public HexTile GetHex(Vector2Int coordinates)
         {
             return hexGrid.TryGetValue(coordinates, out HexTile tile) ? tile : null;
+        }
+
+        public HexTile GetRevealedNeighborInDirection(HexTile origin, Vector2Int direction)
+        {
+            if (origin == null || direction == Vector2Int.zero) return null;
+
+            Vector3 desiredDirection = new Vector3(direction.x, 0f, direction.y).normalized;
+            HexTile nearest = null;
+            float nearestDistance = float.MaxValue;
+            float maximumDistance = Mathf.Max(HEX_HEIGHT, HEX_WIDTH) * 1.25f;
+
+            foreach (HexTile candidate in hexGrid.Values)
+            {
+                if (candidate == origin || !candidate.IsRevealed) continue;
+
+                Vector3 offset = candidate.WorldPosition - origin.WorldPosition;
+                offset.y = 0f;
+                float distance = offset.magnitude;
+                if (distance > maximumDistance || distance < 0.01f) continue;
+
+                float directionAlignment = Vector3.Dot(offset / distance, desiredDirection);
+                if (directionAlignment < 0.45f) continue;
+
+                if (distance < nearestDistance)
+                {
+                    nearest = candidate;
+                    nearestDistance = distance;
+                }
+            }
+
+            return nearest;
         }
 
         public HexTile GetNearestRevealedHex(Vector3 worldPosition)
@@ -354,7 +427,7 @@ namespace GameDevTV.RTS.Environment
                 
                 // Find all units and buildings. In a fully optimized version, we'd use a central registry.
                 // For now, the lookup is throttled to four times a second.
-                GameDevTV.RTS.Units.AbstractCommandable[] commandables = FindObjectsByType<GameDevTV.RTS.Units.AbstractCommandable>(FindObjectsSortMode.None);
+                GameDevTV.RTS.Units.AbstractCommandable[] commandables = FindObjectsByType<GameDevTV.RTS.Units.AbstractCommandable>();
                 
                 foreach (var cmd in commandables)
                 {
