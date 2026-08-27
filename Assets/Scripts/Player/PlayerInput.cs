@@ -1080,6 +1080,7 @@ namespace GameDevTV.RTS.Player
             Vector3 destinationPosition = currentHex.WorldPosition;
             destinationPosition.y = cameraTarget.position.y;
             cameraTarget.position = destinationPosition;
+            AudioManager.Instance.PlayHexHoverSound();
             if (highlightTrace) Debug.Log($"[HexHighlight] Keyboard moved {direction}: {currentHex.HexCoordinates} at {destinationPosition}");
         }
 
@@ -1110,10 +1111,6 @@ namespace GameDevTV.RTS.Player
             hoveredHex?.SetHovered(false);
             hoveredHex = nextHoveredHex;
             hoveredHex?.SetHovered(true);
-            if (hoveredHex != null)
-            {
-                AudioManager.Instance.PlayHexHoverSound();
-            }
         }
 
         private void InitializeCurrentHex()

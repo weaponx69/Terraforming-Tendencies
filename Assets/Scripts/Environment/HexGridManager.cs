@@ -66,6 +66,7 @@ namespace GameDevTV.RTS.Environment
             public GameObject GameObject { get; private set; }
             public bool IsRevealed { get; private set; }
             private LineRenderer outline;
+            private Material outlineMaterial;
             private bool isHighlighted;
             private bool isHovered;
             
@@ -76,6 +77,7 @@ namespace GameDevTV.RTS.Environment
                 GameObject = hexGO;
                 IsRevealed = false;
                 outline = hexGO != null ? hexGO.GetComponent<LineRenderer>() : null;
+                outlineMaterial = outline != null ? outline.material : null;
             }
             
             public void Reveal()
@@ -144,7 +146,7 @@ namespace GameDevTV.RTS.Environment
                 if (!IsRevealed) return;
 
                 Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : isHovered ? Color.white : Color.cyan;
-                float width = isHighlighted || isHovered ? 0.2f : 0.1f;
+                float width = isHighlighted ? 0.32f : isHovered ? 0.22f : 0.1f;
                 if (HighlightTrace)
                 {
                     Debug.Log($"[HexHighlight] Outline {HexCoordinates}: enabled={outline.enabled}, positions={outline.positionCount}, width={width}, color={color}");
@@ -153,6 +155,11 @@ namespace GameDevTV.RTS.Environment
                 outline.endColor = color;
                 outline.startWidth = width;
                 outline.endWidth = width;
+                if (outlineMaterial != null)
+                {
+                    if (outlineMaterial.HasProperty("_BaseColor")) outlineMaterial.SetColor("_BaseColor", color);
+                    if (outlineMaterial.HasProperty("_Color")) outlineMaterial.SetColor("_Color", color);
+                }
             }
         }
         
