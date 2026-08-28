@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Units;
 using UnityEngine.Internal;
 
 namespace GameDevTV.RTS.Environment
@@ -34,6 +36,14 @@ namespace GameDevTV.RTS.Environment
 
         [Tooltip("Current exploration speed multiplier (modified by Pipeline Boost cards).")]
         [SerializeField] private float explorationSpeedMultiplier = 1f;
+
+        [Tooltip("Energy spent to commit exploration of a frontier node.")]
+        [SerializeField] private float exploreEnergyCost = 1f;
+
+        public float ExploreEnergyCost => exploreEnergyCost;
+
+        /// <summary>Fired when exploration is blocked (insufficient energy, no target, etc.).</summary>
+        public static event Action<string> OnExplorationFailed;
 
         /// <summary>Whether exploration is currently in progress.</summary>
         public bool IsExploring { get; private set; }
@@ -81,47 +91,104 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-        /// <summary>
-        /// Instantly explore the nearest discovered-but-unexplored node (Orbital Scan card).
-        /// Node-by-node exploration: reveals one node, shows "?" on its connections.
-        /// </summary>
-        public void InstantExplore()
+        public bool CanAffordExploration(Owner owner = Owner.Player1)
         {
-            if (SectorManager.Instance == null) return;
+            float current = Supplies.Energy != null && Supplies.Energy.TryGetValue(owner, out float energy)
+                ? energy
+                : 0f;
+            return current >= exploreEnergyCost;
+        }
 
-            // Find the nearest discovered-but-unexplored node
-            SectorNode targetNode = null;
-            int targetSectorIndex = -1;
+        public bool HasFrontierNode(out SectorNode node, out int sectorIndex)
+        {
+            node = null;
+            sectorIndex = -1;
+            if (SectorManager.Instance == null) return false;
 
             for (int i = 0; i < SectorManager.Instance.Sectors.Count; i++)
             {
                 var sector = SectorManager.Instance.Sectors[i];
-                foreach (var node in sector.Nodes)
+                foreach (var candidate in sector.Nodes)
                 {
-                    if (node.isDiscovered && !node.isExplored)
+                    if (candidate.isDiscovered && !candidate.isExplored)
                     {
-                        targetNode = node;
-                        targetSectorIndex = i;
-                        break;
+                        node = candidate;
+                        sectorIndex = i;
+                        return true;
                     }
                 }
-                if (targetNode != null) break;
             }
 
-            if (targetNode == null)
+            return false;
+        }
+
+        public bool IsValidExploreTarget(SectorNode node)
+        {
+            return node != null && node.isDiscovered && !node.isExplored;
+        }
+
+        private bool TrySpendExplorationEnergy(Owner owner = Owner.Player1)
+        {
+            if (!CanAffordExploration(owner))
             {
-                Debug.Log("[ExplorationManager] No discovered nodes to explore. Play a scouting card near an explored node first.");
-                return;
+                ReportExplorationFailed($"Need {exploreEnergyCost:0.#} Energy to explore.");
+                return false;
             }
 
-            // Explore this node (reveals it + shows "?" on connections)
-            ExploreNode(targetNode, targetSectorIndex);
+            float current = Supplies.Energy[owner];
+            Supplies.UpdateEnergy(owner, current - exploreEnergyCost);
+            return true;
+        }
+
+        /// <summary>
+        /// Instantly explore the nearest discovered-but-unexplored node (Orbital Scan card).
+        /// Node-by-node exploration: reveals one node, shows "?" on its connections.
+        /// </summary>
+        public bool TryExploreFrontier(Owner owner = Owner.Player1)
+        {
+            if (!HasFrontierNode(out SectorNode targetNode, out int targetSectorIndex))
+            {
+                ReportExplorationFailed("No frontier nodes to explore. Scout from an explored node first.");
+                return false;
+            }
+
+            return TryExploreNode(targetNode, targetSectorIndex, owner);
+        }
+
+        /// <summary>Backward-compatible alias for scouting cards.</summary>
+        public void InstantExplore()
+        {
+            TryExploreFrontier();
+        }
+
+        /// <summary>
+        /// Spend energy and explore a specific frontier node.
+        /// </summary>
+        public bool TryExploreNode(SectorNode node, int sectorIndex, Owner owner = Owner.Player1)
+        {
+            if (!IsValidExploreTarget(node))
+            {
+                ReportExplorationFailed("That node cannot be explored right now.");
+                return false;
+            }
+
+            if (!TrySpendExplorationEnergy(owner)) return false;
+
+            ExploreNodeInternal(node, sectorIndex);
+            return true;
         }
 
         /// <summary>
         /// Explore a specific node: reveal it, show "?" on connections, unlock sector if first node.
+        /// Does not spend energy — prefer <see cref="TryExploreNode"/>.
         /// </summary>
         public void ExploreNode(SectorNode node, int sectorIndex)
+        {
+            if (!IsValidExploreTarget(node)) return;
+            ExploreNodeInternal(node, sectorIndex);
+        }
+
+        private void ExploreNodeInternal(SectorNode node, int sectorIndex)
         {
             if (node == null || node.isExplored) return;
 
@@ -231,9 +298,19 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public void DeploySurveyDrone()
         {
-            InstantExplore();
-            Debug.Log("[ExplorationManager] Survey Drone deployed!");
+            if (TryExploreFrontier())
+            {
+                Debug.Log("[ExplorationManager] Survey Drone deployed!");
+            }
         }
+
+        private static void ReportExplorationFailed(string message)
+        {
+            Debug.Log($"[ExplorationManager] {message}");
+            OnExplorationFailed?.Invoke(message);
+        }
+
+        public static void NotifyExplorationFailed(string message) => ReportExplorationFailed(message);
 
         private void CompleteExploration()
         {

@@ -18,6 +18,10 @@ namespace GameDevTV.RTS.Player
             public List<GameObject> HazardEventPrefabs => hazardEventPrefabs;
     
             public abstract void Apply();
+
+            /// <summary>Returns false when the card cannot be played right now (e.g. insufficient energy).</summary>
+            public virtual bool CanApply() => true;
+
             public virtual bool IsGateMet() => true;
             public virtual string GetCardGoal() => "BLUEPRINT";
         }

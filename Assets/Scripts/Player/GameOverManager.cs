@@ -113,6 +113,12 @@ namespace GameDevTV.RTS.Player
 
         private void Update()
         {
+            EvaluateTurnConditions();
+        }
+
+        /// <summary>Runs win/lose checks once per turn resolution (and every frame via Update).</summary>
+        public void EvaluateTurnConditions()
+        {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
             

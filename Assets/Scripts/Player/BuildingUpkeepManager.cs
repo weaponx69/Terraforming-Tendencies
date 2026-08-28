@@ -58,7 +58,10 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
-            GameFlowManager.Instance.OnTurnUpkeep += HandleTurnUpkeep;
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.OnTurnUpkeep += HandleTurnUpkeep;
+            }
         }
 
         private void HandleTurnUpkeep()
@@ -68,7 +71,10 @@ namespace GameDevTV.RTS.Player
 
         private void OnDestroy()
         {
-            // Empty, removed routine
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.OnTurnUpkeep -= HandleTurnUpkeep;
+            }
         }
 
         /// <summary>Register a completed building for upkeep tracking.</summary>
@@ -214,6 +220,28 @@ namespace GameDevTV.RTS.Player
                     b.SetDegraded(false);
                     OnBuildingRecovered?.Invoke(b);
                 }
+            }
+        }
+
+        /// <summary>Recover one degraded building during the turn Recovery phase.</summary>
+        public void TryTurnRecovery()
+        {
+            if (IsPanicMode || degradedBuildings.Count == 0) return;
+
+            int materials = Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int current)
+                ? current
+                : 0;
+            if (materials < panicThreshold) return;
+
+            foreach (var building in new List<BaseBuilding>(degradedBuildings))
+            {
+                if (building == null) continue;
+
+                degradedBuildings.Remove(building);
+                building.SetDegraded(false);
+                OnBuildingRecovered?.Invoke(building);
+                Debug.Log($"[BuildingUpkeepManager] Turn recovery: {building.name} restored.");
+                return;
             }
         }
     }

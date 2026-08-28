@@ -28,6 +28,21 @@ namespace GameDevTV.RTS.Player
                 };
             }
     
+            public override bool CanApply()
+            {
+                if (!IsGateMet()) return false;
+
+                if (scoutingType == ScoutingType.EmergencyCaches || scoutingType == ScoutingType.PipelineBoost)
+                {
+                    return true;
+                }
+
+                var explorationMgr = Environment.ExplorationManager.Instance;
+                if (explorationMgr == null) return false;
+                if (!explorationMgr.HasFrontierNode(out _, out _)) return false;
+                return explorationMgr.CanAffordExploration();
+            }
+
             public override void Apply()
             {
                 var explorationMgr = Environment.ExplorationManager.Instance;
@@ -37,7 +52,7 @@ namespace GameDevTV.RTS.Player
                     case ScoutingType.OrbitalScan:
                         if (explorationMgr != null)
                         {
-                            explorationMgr.InstantExplore();
+                            explorationMgr.TryExploreFrontier();
                         }
                         else
                         {
@@ -58,7 +73,10 @@ namespace GameDevTV.RTS.Player
                         {
                             explorationMgr.DeploySurveyDrone();
                         }
-                        Debug.Log("[Blueprint] Survey Drone deployed to scout ahead!");
+                        else
+                        {
+                            Debug.LogWarning("[Blueprint] Survey Drone: No ExplorationManager found in scene!");
+                        }
                         break;
     
                     case ScoutingType.EmergencyCaches:

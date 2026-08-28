@@ -141,6 +141,18 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        /// <summary>Chance-based single threat during turn resolution.</summary>
+        public void TryTurnThreat(int turnNumber)
+        {
+            if (waveRoutine == null) return;
+
+            float chance = Mathf.Clamp(0.05f + turnNumber * 0.02f, 0.05f, 0.35f);
+            if (Random.value > chance) return;
+
+            Debug.Log($"[NaturalEventManager] Turn {turnNumber} threat triggered ({chance:P0} chance).");
+            SpawnEvent();
+        }
+
         private IEnumerator WaveLoop()
         {
             Debug.Log($"[NaturalEventManager] WaveLoop started. First wave in {firstWaveDelay}s. Time={Time.time:F1}s");

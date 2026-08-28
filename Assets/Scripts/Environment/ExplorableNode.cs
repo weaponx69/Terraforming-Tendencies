@@ -1,6 +1,5 @@
 using UnityEngine;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.EventBus;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -13,23 +12,13 @@ namespace GameDevTV.RTS.Environment
         {
             if (NodeData == null || NodeData.isExplored) return;
 
-            // Check if player has at least 1 energy
-            float currentEnergy = Supplies.Energy != null && Supplies.Energy.TryGetValue(Units.Owner.Player1, out float e) ? e : 0f;
-            if (currentEnergy >= 1f)
+            if (CardDeckController.Instance == null)
             {
-                // Deduct 1 energy
-                Supplies.UpdateEnergy(Units.Owner.Player1, currentEnergy - 1f);
-
-                // Explore it
-                ExplorationManager.Instance?.ExploreNode(NodeData, SectorIndex);
-
-                // Notify GameFlowManager
-                GameFlowManager.Instance?.PlayerActed();
+                Debug.Log("[ExplorableNode] Card deck is not ready.");
+                return;
             }
-            else
-            {
-                Debug.Log("[ExplorableNode] Not enough Energy to explore!");
-            }
+
+            CardDeckController.Instance.TryExploreAtNode(NodeData, SectorIndex);
         }
     }
 }

@@ -184,6 +184,19 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
+            if (!played.CanApply())
+            {
+                if (played is ScoutingCardSO)
+                {
+                    ExplorationManager.NotifyExplorationFailed($"Cannot play '{played.cardName}' right now.");
+                }
+                else
+                {
+                    Debug.LogWarning($"[CardDeckController] Card '{played.cardName}' cannot be played right now.");
+                }
+                return;
+            }
+
             Debug.Log($"[CardDeckController] Playing card: '{played.cardName}' (index {handIndex})");
 
             // Register card's hazards if it has any
@@ -222,6 +235,65 @@ namespace GameDevTV.RTS.Player
         public void DrawCard()
         {
             FillHand();
+        }
+
+        /// <summary>
+        /// Explore a specific frontier node by consuming a scouting card from hand plus energy.
+        /// </summary>
+        public bool TryExploreAtNode(SectorNode node, int sectorIndex)
+        {
+            if (node == null || ExplorationManager.Instance == null) return false;
+
+            if (!ExplorationManager.Instance.IsValidExploreTarget(node))
+            {
+                ExplorationManager.NotifyExplorationFailed("That node is not a valid exploration target.");
+                return false;
+            }
+
+            int handIndex = FindExplorationScoutingCardIndex();
+            if (handIndex < 0)
+            {
+                ExplorationManager.NotifyExplorationFailed("Need an Orbital Scan or Survey Drone card to explore.");
+                return false;
+            }
+
+            BlueprintCardSO scoutingCard = hand[handIndex];
+            if (!scoutingCard.CanApply())
+            {
+                ExplorationManager.NotifyExplorationFailed($"Cannot play '{scoutingCard.cardName}' right now.");
+                return false;
+            }
+
+            hand.RemoveAt(handIndex);
+            discardPile.Add(scoutingCard);
+
+            if (!ExplorationManager.Instance.TryExploreNode(node, sectorIndex))
+            {
+                hand.Add(scoutingCard);
+                discardPile.Remove(scoutingCard);
+                return false;
+            }
+
+            FillHand();
+            GameFlowManager.Instance?.PlayerActed();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            OnHandChanged?.Invoke();
+            return true;
+        }
+
+        private int FindExplorationScoutingCardIndex()
+        {
+            for (int i = 0; i < hand.Count; i++)
+            {
+                if (hand[i] is ScoutingCardSO scouting &&
+                    (scouting.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan ||
+                     scouting.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         // ── Draft UI ─────────────────────────────────────────────────────────

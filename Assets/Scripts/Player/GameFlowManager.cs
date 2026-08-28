@@ -9,6 +9,15 @@ namespace GameDevTV.RTS.Player
     {
         public static GameFlowManager Instance { get; private set; }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void AutoSpawn()
+        {
+            if (FindAnyObjectByType<GameFlowManager>() != null) return;
+            var go = new GameObject("GameFlowManager (auto)");
+            go.AddComponent<GameFlowManager>();
+            DontDestroyOnLoad(go);
+        }
+
         public float idleTimerDuration = 2.0f;
         private float currentIdleTimer;
         private bool isTimerRunning;
