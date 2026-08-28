@@ -230,7 +230,8 @@ namespace GameDevTV.RTS.UI.Containers
         {
             Debug.Log($"[BlueprintDraftUI] Player drafted card: {card.cardName}");
             BlueprintDraftManager.CompleteDraft(card);
-            
+            Time.timeScale = 1f;
+
             if (draftPanel != null)
             {
                 draftPanel.SetActive(false);

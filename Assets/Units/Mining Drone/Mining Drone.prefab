@@ -169,7 +169,7 @@ MonoBehaviour:
   <IsSelected>k__BackingField: 0
   <CurrentHealth>k__BackingField: 100
   <MaxHealth>k__BackingField: 100
-  <Owner>k__BackingField: 0
+  <Owner>k__BackingField: 1
   <IsVisible>k__BackingField: 1
   <AvailableCommands>k__BackingField:
   - {fileID: 11400000, guid: 84c8d4cd8863b1244994c4ca7b8d09a6, type: 2}

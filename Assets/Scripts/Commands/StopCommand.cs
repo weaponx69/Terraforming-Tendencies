@@ -1,5 +1,6 @@
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using UnityEngine.InputSystem.LowLevel;
 using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Commands
@@ -12,6 +13,8 @@ namespace GameDevTV.RTS.Commands
 
         public override bool CanHandle(CommandContext context)
         {
+            // Right-click on the ground should move/gather, not stop.
+            if (context.Button == MouseButton.Right) return false;
             return context.Commandable is AbstractUnit;
         }
 

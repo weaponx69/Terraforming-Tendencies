@@ -84,8 +84,26 @@ namespace GameDevTV.RTS.Units
         {
             base.Start();
 
-            // Ensure event channels are loaded (even if graphAgent is null for purely script-driven drones)
             LoadEventChannels();
+
+            // Worker navigation is handled by WorkerBrainController + direct NavMesh drive.
+            // The embedded behavior graph runs StopAgent on restart and fights manual move orders.
+            if (graphAgent != null)
+            {
+                graphAgent.enabled = false;
+            }
+
+            if (Agent != null)
+            {
+                NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
+            }
+
+            SetStatusColor(Color.cyan, "IDLE");
+        }
+
+        protected override void Update()
+        {
+            base.Update();
         }
 
         public void BeginAutoGather(BaseBuilding homeBase)
@@ -219,6 +237,23 @@ namespace GameDevTV.RTS.Units
 
             if (Agent != null && Agent.isOnNavMesh)
                 Agent.SetDestination(commandPost.transform.position);
+        }
+
+        public override void SetCurrentCommand(UnitCommands cmd)
+        {
+            currentCommand = cmd;
+        }
+
+        public override void MoveTo(Vector3 position)
+        {
+            Brain.Halt();
+            base.MoveTo(position);
+        }
+
+        public override void MoveTo(Transform transform)
+        {
+            Brain.Halt();
+            base.MoveTo(transform);
         }
 
         public override void Stop()

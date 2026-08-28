@@ -226,7 +226,12 @@ protected UnitSO unitSO;
             {
                 Agent.speed = unitSO.MovementConfig.Speed;
             }
-}
+
+            if (Agent != null)
+            {
+                NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
+            }
+        }
 
         private float lastNavMeshSampleTime = 0f;
         private const float NAVMESH_SAMPLE_INTERVAL = 0.5f;
@@ -331,10 +336,6 @@ protected UnitSO unitSO;
             {
                 reason = "OFF NAVMESH";
             }
-            else if (graphAgent == null)
-            {
-                reason = "NO BEHAVIOR";
-            }
             else if (!TryGetCurrentCommand(out UnitCommands cmd))
             {
                 reason = "NO COMMAND";
@@ -416,30 +417,36 @@ protected UnitSO unitSO;
 
         public bool TryGetCurrentCommand(out UnitCommands cmd)
         {
-            cmd = UnitCommands.Stop;
-            if (graphAgent == null) return false;
+            cmd = currentCommand;
 
-            // Primary: typed generic GetVariable — fires correctly after m_IsInitialised = true
+            if (graphAgent == null || !graphAgent.isActiveAndEnabled)
+            {
+                return true;
+            }
+
             try
             {
                 if (graphAgent.GetVariable(BlackboardConstants.COMMAND, out BlackboardVariable<UnitCommands> cmdVar))
                 {
                     cmd = cmdVar.Value;
+                    currentCommand = cmd;
                     return true;
                 }
-            } catch {}
+            }
+            catch { }
 
-            // Fallback: non-generic, converts via ObjectValue
             try
             {
                 if (graphAgent.GetVariable(BlackboardConstants.COMMAND, out BlackboardVariable bbVar) && bbVar?.ObjectValue != null)
                 {
                     cmd = (UnitCommands)System.Convert.ToInt32(bbVar.ObjectValue);
+                    currentCommand = cmd;
                     return true;
                 }
-            } catch {}
+            }
+            catch { }
 
-            return false;
+            return true;
         }
 
         public UnitCommands GetCurrentCommand()
@@ -451,7 +458,7 @@ protected UnitSO unitSO;
             return UnitCommands.Stop;
         }
 
-        public void SetCurrentCommand(UnitCommands cmd)
+        public virtual void SetCurrentCommand(UnitCommands cmd)
         {
             currentCommand = cmd;
             if (graphAgent == null) return;
@@ -473,7 +480,7 @@ protected UnitSO unitSO;
                 catch {}
             }
 
-            if (setSuccess)
+            if (setSuccess && cmd != UnitCommands.Move)
             {
                 try
                 {
@@ -484,6 +491,10 @@ protected UnitSO unitSO;
                 {
                     Debug.LogError($"[Command Queue] Failed to restart behavior graph: {ex.Message}");
                 }
+            }
+            else if (setSuccess)
+            {
+                ReapplyCoreBlackboardVariables();
             }
         }
 
@@ -538,7 +549,7 @@ protected UnitSO unitSO;
             }
         }
 
-        public void MoveTo(Vector3 position)
+        public virtual void MoveTo(Vector3 position)
         {
             if (graphAgent != null && graphAgent.isActiveAndEnabled)
             {
@@ -553,7 +564,7 @@ protected UnitSO unitSO;
             DriveAgentTo(position);
         }
 
-        public void MoveTo(Transform transform)
+        public virtual void MoveTo(Transform transform)
         {
             if (graphAgent != null)
             {
@@ -587,13 +598,10 @@ protected UnitSO unitSO;
         {
             if (Agent == null) return;
 
+            NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
+
             Vector3 dest = worldPosition;
-            NavMeshQueryFilter filter = new NavMeshQueryFilter
-            {
-                agentTypeID = Agent.agentTypeID,
-                areaMask = NavMesh.AllAreas
-            };
-            if (NavMesh.SamplePosition(worldPosition, out NavMeshHit hit, 25f, filter))
+            if (NavMeshSpawnUtility.TrySamplePosition(worldPosition, Agent.agentTypeID, 25f, out NavMeshHit hit))
             {
                 dest = hit.position;
             }
@@ -605,6 +613,10 @@ protected UnitSO unitSO;
             {
                 Agent.isStopped = false;
                 Agent.SetDestination(dest);
+            }
+            else
+            {
+                Debug.LogWarning($"[AbstractUnit] {name} could not move: agent enabled={Agent.enabled}, onNavMesh={Agent.isOnNavMesh}, agentType={Agent.agentTypeID}");
             }
         }
 
