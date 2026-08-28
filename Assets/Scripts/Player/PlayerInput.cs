@@ -849,17 +849,14 @@ namespace GameDevTV.RTS.Player
 
             if (activeCommand == null)
             {
-                if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, selectableUnitsLayers)
-                    && hit.collider.TryGetComponent(out ISelectable selectable))
+                RaycastHit[] hits = Physics.RaycastAll(cameraRay, float.MaxValue, ~0, QueryTriggerInteraction.Ignore);
+                foreach (RaycastHit hit in hits.OrderBy(hit => hit.distance))
                 {
-                    selectable.Select();
-                }
-                else if (Physics.Raycast(cameraRay, out RaycastHit hitFallback, float.MaxValue, ~floorLayers))
-                {
-                    ISelectable fallbackSelectable = hitFallback.collider.GetComponentInParent<ISelectable>();
-                    if (fallbackSelectable != null)
+                    ISelectable selectable = hit.collider.GetComponentInParent<ISelectable>();
+                    if (selectable != null)
                     {
-                        fallbackSelectable.Select();
+                        selectable.Select();
+                        break;
                     }
                 }
             }

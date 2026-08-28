@@ -673,6 +673,12 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            if (Owner == Owner.Player1 && BuildingSO != null && BuildingSO.BuildingConfig != null &&
+                BuildingSO.BuildingConfig.PowerGeneration > 0)
+            {
+                StartCoroutine(ConnectPowerGeneratorToCommandPost());
+            }
+
             GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
 
             // Register with BuildingUpkeepManager for Materials upkeep tax
@@ -682,6 +688,39 @@ namespace GameDevTV.RTS.Units
             }
 
             RaiseSpawnEvent();
+        }
+
+        private IEnumerator ConnectPowerGeneratorToCommandPost()
+        {
+            yield return null;
+
+            if (!TryGetComponent(out PowerNode generatorNode)) yield break;
+
+            BaseBuilding nearestCommandPost = null;
+            float nearestDistance = float.MaxValue;
+            foreach (BaseBuilding building in ActiveBuildings)
+            {
+                if (building == null || building == this || building.Owner != Owner.Player1 ||
+                    building.Progress.State != BuildingProgress.BuildingState.Completed || building.BuildingSO == null ||
+                    !building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                float distance = (building.transform.position - transform.position).sqrMagnitude;
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestCommandPost = building;
+                }
+            }
+
+            if (nearestCommandPost != null && nearestCommandPost.TryGetComponent(out PowerNode commandPostNode) &&
+                !generatorNode.ConnectedNodes.Contains(commandPostNode))
+            {
+                generatorNode.ConnectTo(commandPostNode);
+                Debug.Log($"[Power] Automatically connected {name} to {nearestCommandPost.name}.");
+            }
         }
 
         private void AddActiveAbilityCommand(string name, string desc, float tempBonus, float atmosBonus, float oxyBonus, int matsBonus, int bioBonus, float waterBonus = 0f)
