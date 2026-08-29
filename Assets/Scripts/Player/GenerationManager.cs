@@ -146,6 +146,7 @@ namespace GameDevTV.RTS.Player
 
             UnlockPrerequisitesForMilestone();
             RecordBaselines();
+            roundStartTime = Time.time;
             OnGenerationProgressChanged?.Invoke(0f);
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
         }

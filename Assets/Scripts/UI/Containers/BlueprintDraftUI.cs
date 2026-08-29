@@ -73,168 +73,18 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void OnGenerationStarted(int currentGen, int maxGen)
         {
-            // First generation usually starts with standard setup.
-            // In Terraformers, drafting occurs at the start of EVERY generation (starting from Gen 1 or 2).
-            // Let's trigger it for all rounds to give the player an early strategy boost!
-            Debug.Log($"[BlueprintDraftUI] Generation {currentGen} started! Triggering blueprint draft selection.");
-            ShowDraftSelection();
+            // Draft rounds disabled — do not pause for card pick on generation start.
         }
 
         public void ShowDraftSelection()
         {
-            if (draftPanel == null) return;
-
-            // Select cards before pausing — an empty draft must not freeze the game forever.
-            List<BlueprintCardSO> selectedCards = GetRandomCards(3);
-            if (selectedCards == null || selectedCards.Count == 0)
+            // Card draft rounds are disabled — keep the game unpaused.
+            if (draftPanel != null)
             {
-                Debug.LogWarning("[BlueprintDraftUI] No draftable cards available — skipping draft and keeping timeScale=1.");
                 draftPanel.SetActive(false);
-                Time.timeScale = 1f;
-                return;
             }
-
-            // Pause the game
-            Time.timeScale = 0f;
-            draftPanel.SetActive(true);
-
-            if (roundGoalText != null && GenerationManager.Instance != null)
-            {
-                roundGoalText.text = $"ACTIVE ROUND GOAL: {GenerationManager.Instance.CurrentMilestoneDescription.ToUpper()}";
-            }
-
-            // Populate slots
-            for (int i = 0; i < cardSlots.Count; i++)
-            {
-                if (i < selectedCards.Count)
-                {
-                    cardSlots[i].cardObj.SetActive(true);
-                    var card = selectedCards[i];
-                    
-                    cardSlots[i].titleText.text = card.cardName.ToUpper();
-                    cardSlots[i].goalText.text = card.GetCardGoal().ToUpper();
-                    
-                    string desc = card.cardDescription;
-                    if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
-                    {
-                        var building = unlockCard.buildingToUnlock;
-                        var sb = new System.Text.StringBuilder();
-                        sb.AppendLine(desc);
-                        sb.AppendLine();
-                        
-                        if (building.Cost != null)
-                        {
-                            var costs = new List<string>();
-                            if (building.Cost.Minerals > 0) costs.Add($"{building.Cost.Minerals} Minerals");
-                            if (building.Cost.Gas > 0) costs.Add($"{building.Cost.Gas} Gas");
-                            if (costs.Count > 0)
-                            {
-                                sb.AppendLine($"<color=#FFD700>Cost:</color> {string.Join(", ", costs)}");
-                            }
-                        }
-
-                        if (building.BuildingConfig != null)
-                        {
-                            var stats = new List<string>();
-                            if (building.BuildingConfig.PowerUpkeep > 0) stats.Add($"-{building.BuildingConfig.PowerUpkeep} Power Upkeep");
-                            if (building.BuildingConfig.PowerGeneration > 0) stats.Add($"+{building.BuildingConfig.PowerGeneration} Power Gen");
-                            if (building.BuildingConfig.HousingCapacity > 0) stats.Add($"+{building.BuildingConfig.HousingCapacity} Housing");
-                            if (building.BuildingConfig.BiomassGeneration > 0) stats.Add($"+{building.BuildingConfig.BiomassGeneration} Biomass Gen");
-                            if (stats.Count > 0)
-                            {
-                                sb.AppendLine($"<color=#ADD8E6>Stats:</color> {string.Join(", ", stats)}");
-                            }
-                        }
-
-                        if (card is TerraformingCardSO tfCard)
-                        {
-                            var reqs = new List<string>();
-                            if (tfCard.minTemperature > -9999f && tfCard.maxTemperature < 9999f)
-                            {
-                                reqs.Add($"Temp: {tfCard.minTemperature:F0}°C to {tfCard.maxTemperature:F0}°C");
-                            }
-                            else if (tfCard.minTemperature > -9999f)
-                            {
-                                reqs.Add($"Temp: >= {tfCard.minTemperature:F0}°C");
-                            }
-                            else if (tfCard.maxTemperature < 9999f)
-                            {
-                                reqs.Add($"Temp: <= {tfCard.maxTemperature:F0}°C");
-                            }
-
-                            if (tfCard.minOxygen > -9999f && tfCard.maxOxygen < 9999f)
-                            {
-                                reqs.Add($"O2: {tfCard.minOxygen:F1}% to {tfCard.maxOxygen:F1}%");
-                            }
-                            else if (tfCard.minOxygen > -9999f)
-                            {
-                                reqs.Add($"O2: >= {tfCard.minOxygen:F1}%");
-                            }
-                            else if (tfCard.maxOxygen < 9999f)
-                            {
-                                reqs.Add($"O2: <= {tfCard.maxOxygen:F1}%");
-                            }
-
-                            if (tfCard.minAtmosphere > -9999f && tfCard.maxAtmosphere < 9999f)
-                            {
-                                reqs.Add($"Atmos: {tfCard.minAtmosphere:F2} to {tfCard.maxAtmosphere:F2} atm");
-                            }
-                            else if (tfCard.minAtmosphere > -9999f)
-                            {
-                                reqs.Add($"Atmos: >= {tfCard.minAtmosphere:F2} atm");
-                            }
-                            else if (tfCard.maxAtmosphere < 9999f)
-                            {
-                                reqs.Add($"Atmos: <= {tfCard.maxAtmosphere:F2} atm");
-                            }
-
-                            if (tfCard.minWater > -9999f && tfCard.maxWater < 9999f)
-                            {
-                                reqs.Add($"Water: {tfCard.minWater:F1}% to {tfCard.maxWater:F1}%");
-                            }
-                            else if (tfCard.minWater > -9999f)
-                            {
-                                reqs.Add($"Water: >= {tfCard.minWater:F1}%");
-                            }
-                            else if (tfCard.maxWater < 9999f)
-                            {
-                                reqs.Add($"Water: <= {tfCard.maxWater:F1}%");
-                            }
-
-                            if (tfCard.requiredSectorFeature != SectorManager.SectorFeature.None)
-                            {
-                                reqs.Add($"Feature: {tfCard.requiredSectorFeature}");
-                            }
-
-                            if (reqs.Count > 0)
-                            {
-                                sb.AppendLine($"<color=#FFA07A>Reqs:</color> {string.Join(", ", reqs)}");
-                            }
-                        }
-
-                        desc = sb.ToString();
-                    }
-
-                    cardSlots[i].descText.text = desc;
-                    if (cardSlots[i].iconImage != null && card.icon != null)
-                    {
-                        cardSlots[i].iconImage.sprite = card.icon;
-                        cardSlots[i].iconImage.gameObject.SetActive(true);
-                    }
-                    else if (cardSlots[i].iconImage != null)
-                    {
-                        cardSlots[i].iconImage.gameObject.SetActive(false);
-                    }
-
-                    // Setup button
-                    cardSlots[i].selectButton.onClick.RemoveAllListeners();
-                    cardSlots[i].selectButton.onClick.AddListener(() => OnCardSelected(card));
-                }
-                else
-                {
-                    cardSlots[i].cardObj.SetActive(false);
-                }
-            }
+            Time.timeScale = 1f;
+            Debug.Log("[BlueprintDraftUI] ShowDraftSelection skipped — card draft rounds are disabled.");
         }
 
         private void OnCardSelected(BlueprintCardSO card)

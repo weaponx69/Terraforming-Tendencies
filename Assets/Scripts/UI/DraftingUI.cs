@@ -61,10 +61,9 @@ namespace GameDevTV.RTS.UI
 
         private void HandleDraftStarted(List<BlueprintCardSO> hand)
         {
-            currentHand = hand;
-            draftRound++;
-
-            ShowPanel(hand);
+            // Card draft rounds are disabled.
+            Debug.Log("[DraftingUI] Draft ignored — card draft rounds are disabled.");
+            Time.timeScale = 1f;
         }
 
         // ── UI Logic ───────────────────────────────────────────────────────────────

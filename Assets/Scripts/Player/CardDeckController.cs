@@ -55,12 +55,11 @@ namespace GameDevTV.RTS.Player
 
         private void OnEnable()
         {
-            SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
+            // Draft rounds removed — sector unlock no longer pauses for card pick.
         }
 
         private void OnDisable()
         {
-            SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
         }
 
         // Don't fill the hand in Start() — BlueprintDraftUI may not have
@@ -297,33 +296,15 @@ namespace GameDevTV.RTS.Player
             return -1;
         }
 
-        // ── Draft UI ─────────────────────────────────────────────────────────
+        // ── Draft UI (disabled) ──────────────────────────────────────────────
 
-        /// <summary>Trigger a draft immediately (use from Inspector button or milestone code).</summary>
+        /// <summary>
+        /// Draft rounds are disabled. The player uses the normal hand/deck instead.
+        /// Kept as a no-op so old callers (sector unlock, cheats) do not pause the game.
+        /// </summary>
         public void TriggerDraft()
         {
-            var curatedHand = GetCuratedHand();
-            if (curatedHand == null || curatedHand.Count == 0) return;
-
-            // Prefer the self-assembled BlueprintDraftUI overlay when present.
-            if (BlueprintDraftUI.Instance != null)
-            {
-                BlueprintDraftUI.Instance.ShowDraftSelection();
-                return;
-            }
-
-            // CardDeck DraftingUI path — never pause if nothing is listening,
-            // or the game freezes forever with no overlay (units "move" but deltaTime=0).
-            if (OnDraftStarted == null)
-            {
-                Debug.LogWarning(
-                    "[CardDeckController] TriggerDraft skipped — no DraftingUI subscribed and no BlueprintDraftUI. " +
-                    "Leaving Time.timeScale unchanged.");
-                return;
-            }
-
-            Time.timeScale = 0f;
-            OnDraftStarted.Invoke(curatedHand);
+            Debug.Log("[CardDeckController] TriggerDraft skipped — card draft rounds are disabled.");
         }
 
         /// <summary>Called by the UI when the player selects a card.</summary>
@@ -394,7 +375,7 @@ namespace GameDevTV.RTS.Player
 
         private void HandleSectorUnlocked()
         {
-            TriggerDraft();
+            // Draft rounds removed — no pause/pick on sector unlock.
         }
 
         private void ShuffleDeck()
