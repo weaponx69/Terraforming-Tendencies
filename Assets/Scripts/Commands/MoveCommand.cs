@@ -34,7 +34,9 @@ namespace GameDevTV.RTS.Commands
             if (context.Hit.collider != null && context.Hit.collider.TryGetComponent(out AbstractCommandable commandable)
                 && commandable.IsVisible)
             {
-                unit.MoveTo(SampleMoveDestination(unit, commandable.transform.position));
+                Vector3 followDest = SampleMoveDestination(unit, commandable.transform.position);
+                Debug.Log($"[MoveCommand] {unit.name} follow={commandable.name} dest={followDest}");
+                unit.MoveTo(followDest);
                 return;
             }
 
@@ -52,7 +54,9 @@ namespace GameDevTV.RTS.Commands
                 context.Hit.point.z + circleRadius * Mathf.Sin(radialOffset * unitsOnLayer)
             );
 
-            unit.MoveTo(SampleMoveDestination(unit, targetPosition));
+            Vector3 destination = SampleMoveDestination(unit, targetPosition);
+            Debug.Log($"[MoveCommand] {unit.name} hit={context.Hit.collider?.name} point={context.Hit.point} dest={destination}");
+            unit.MoveTo(destination);
             unitsOnLayer++;
 
             if (unitsOnLayer >= maxUnitsOnLayer)

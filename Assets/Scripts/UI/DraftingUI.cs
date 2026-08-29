@@ -20,6 +20,9 @@ namespace GameDevTV.RTS.UI
     /// </summary>
     public class DraftingUI : MonoBehaviour
     {
+        /// <summary>True while the drafting overlay panel is visible.</summary>
+        public bool IsOverlayVisible => overlayPanel != null && overlayPanel.activeInHierarchy;
+
         [Header("Overlay")]
         [SerializeField] private GameObject overlayPanel;
         [SerializeField] private CanvasGroup canvasGroup;

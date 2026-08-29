@@ -21,6 +21,8 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private GameObject listItemPrefab;
         [SerializeField] private Button dismissButton;
 
+        public bool IsVisible => panel != null && panel.activeInHierarchy;
+
         private static ExplorationDiscoveryUI _instance;
         public static ExplorationDiscoveryUI Instance
         {

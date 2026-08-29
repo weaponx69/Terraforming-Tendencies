@@ -244,6 +244,11 @@ protected UnitSO unitSO;
         // directly here, which is reliable and verified on the NavMesh.
         private bool hasDirectMoveTarget;
         private Vector3 directMoveTarget;
+        /// <summary>
+        /// When true, bypass NavMesh path following and MoveTowards+Warp toward the target.
+        /// Used when SamplePosition finds a point on a disconnected FlyZone island (Incomplete path).
+        /// </summary>
+        private bool useDirectAirDrive;
         public bool IsDirectMoving => hasDirectMoveTarget;
         public bool agentShouldBeDisabled = false;
 
@@ -286,20 +291,38 @@ protected UnitSO unitSO;
             }
 
             // Maintain direct-drive movement for explicit Move commands.
-            if (hasDirectMoveTarget && Agent != null && Agent.isActiveAndEnabled && Agent.isOnNavMesh)
+            // Incomplete FlyZone paths report hasPath=true but never produce velocity —
+            // fall back to MoveTowards+Warp so air units still move.
+            if (hasDirectMoveTarget && Agent != null && Agent.isActiveAndEnabled)
             {
-                if (!Agent.pathPending)
+                float arrivalThreshold = Mathf.Max(Agent.stoppingDistance, 0.5f);
+                float distToTarget = Vector3.Distance(transform.position, directMoveTarget);
+
+                if (distToTarget <= arrivalThreshold)
                 {
-                    if (Agent.hasPath && Agent.remainingDistance <= Mathf.Max(Agent.stoppingDistance, 0.5f))
+                    ClearDirectMove();
+                    SetCurrentCommand(UnitCommands.Stop);
+                    if (Agent.isOnNavMesh)
                     {
-                        hasDirectMoveTarget = false;
-                        SetCurrentCommand(UnitCommands.Stop);
+                        Agent.isStopped = true;
                     }
-                    else if (!Agent.hasPath)
+                }
+                else if (useDirectAirDrive || ShouldFallbackToDirectAirDrive())
+                {
+                    useDirectAirDrive = true;
+                    DriveDirectAirTowardTarget(distToTarget);
+                }
+                else if (Agent.isOnNavMesh && !Agent.pathPending)
+                {
+                    if (!Agent.hasPath)
                     {
                         // Path was lost or not yet assigned — (re)assert the destination.
                         Agent.isStopped = false;
                         Agent.SetDestination(directMoveTarget);
+                        if (ShouldFallbackToDirectAirDrive())
+                        {
+                            useDirectAirDrive = true;
+                        }
                     }
                 }
             }
@@ -599,33 +622,118 @@ protected UnitSO unitSO;
         /// </summary>
         protected void DriveAgentTo(Vector3 worldPosition)
         {
-            if (Agent == null) return;
+            if (Agent == null)
+            {
+                Debug.LogWarning($"[AbstractUnit] DriveAgentTo aborted: {name} has no NavMeshAgent.");
+                return;
+            }
+
+            if (Time.timeScale <= 0.01f)
+            {
+                Debug.LogWarning(
+                    $"[AbstractUnit] DriveAgentTo while paused (timeScale={Time.timeScale}). " +
+                    $"{name} will not move until the draft/summary overlay is dismissed.");
+            }
 
             NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
 
             Vector3 dest = worldPosition;
-            if (NavMeshSpawnUtility.TrySamplePosition(worldPosition, Agent.agentTypeID, 25f, out NavMeshHit hit))
+            bool sampled = NavMeshSpawnUtility.TrySamplePosition(worldPosition, Agent.agentTypeID, 25f, out NavMeshHit hit);
+            if (sampled)
             {
                 dest = hit.position;
             }
 
             directMoveTarget = dest;
             hasDirectMoveTarget = true;
+            useDirectAirDrive = false;
 
             if (Agent.isActiveAndEnabled && Agent.isOnNavMesh)
             {
                 Agent.isStopped = false;
                 Agent.SetDestination(dest);
+
+                NavMeshPath probe = new NavMeshPath();
+                bool calculated = Agent.CalculatePath(dest, probe);
+                bool incomplete = !calculated || probe.status != NavMeshPathStatus.PathComplete;
+                useDirectAirDrive = incomplete;
+
+                Debug.Log(
+                    $"[AbstractUnit] DriveAgentTo {name}: from={transform.position} requested={worldPosition} dest={dest} " +
+                    $"sampled={sampled} agentType={Agent.agentTypeID} speed={Agent.speed} " +
+                    $"pathStatus={(calculated ? probe.status.ToString() : "CalculateFailed")} " +
+                    $"airDrive={useDirectAirDrive} velocity={Agent.velocity.magnitude:F2}");
             }
             else
             {
-                Debug.LogWarning($"[AbstractUnit] {name} could not move: agent enabled={Agent.enabled}, onNavMesh={Agent.isOnNavMesh}, agentType={Agent.agentTypeID}");
+                // Agent not on mesh yet — still allow direct air drive so the unit moves.
+                useDirectAirDrive = true;
+                Debug.LogWarning(
+                    $"[AbstractUnit] {name} off-mesh; using air drive. enabled={Agent.enabled}, " +
+                    $"onNavMesh={Agent.isOnNavMesh}, agentType={Agent.agentTypeID}");
+            }
+        }
+
+        private bool ShouldFallbackToDirectAirDrive()
+        {
+            if (Agent == null || !Agent.isActiveAndEnabled)
+            {
+                return true;
+            }
+
+            if (!Agent.isOnNavMesh)
+            {
+                return true;
+            }
+
+            // Incomplete / Invalid paths report hasPath=true but never produce velocity.
+            if (!Agent.pathPending && Agent.hasPath &&
+                Agent.pathStatus != NavMeshPathStatus.PathComplete &&
+                Agent.velocity.sqrMagnitude < 0.01f)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private void DriveDirectAirTowardTarget(float distToTarget)
+        {
+            float speed = Agent != null && Agent.speed > 0.01f ? Agent.speed : 5f;
+            Vector3 next = Vector3.MoveTowards(transform.position, directMoveTarget, speed * Time.deltaTime);
+            if (Agent != null && Agent.enabled)
+            {
+                // Warp keeps the agent in sync for later SamplePosition / path queries.
+                Agent.Warp(next);
+                Agent.isStopped = true;
+                if (Agent.hasPath)
+                {
+                    Agent.ResetPath();
+                }
+            }
+            else
+            {
+                transform.position = next;
+            }
+
+            if (distToTarget > 0.05f)
+            {
+                Vector3 look = directMoveTarget - transform.position;
+                look.y = 0f;
+                if (look.sqrMagnitude > 0.001f)
+                {
+                    transform.rotation = Quaternion.Slerp(
+                        transform.rotation,
+                        Quaternion.LookRotation(look),
+                        Time.deltaTime * 8f);
+                }
             }
         }
 
         protected void ClearDirectMove()
         {
             hasDirectMoveTarget = false;
+            useDirectAirDrive = false;
         }
 
         public void Attack(IDamageable damageable)

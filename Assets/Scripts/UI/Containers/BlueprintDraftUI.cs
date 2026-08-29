@@ -12,6 +12,10 @@ namespace GameDevTV.RTS.UI.Containers
     {
         public static BlueprintDraftUI Instance { get; private set; }
 
+        /// <summary>True while the full-screen draft overlay is visible (game should stay paused).</summary>
+        public static bool IsDraftVisible =>
+            Instance != null && Instance.draftPanel != null && Instance.draftPanel.activeInHierarchy;
+
         [Header("Draft Setup")]
         [SerializeField] private List<BlueprintCardSO> poolOfCards = new();
         [SerializeField] private GameObject draftPanel;
@@ -80,6 +84,16 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (draftPanel == null) return;
 
+            // Select cards before pausing — an empty draft must not freeze the game forever.
+            List<BlueprintCardSO> selectedCards = GetRandomCards(3);
+            if (selectedCards == null || selectedCards.Count == 0)
+            {
+                Debug.LogWarning("[BlueprintDraftUI] No draftable cards available — skipping draft and keeping timeScale=1.");
+                draftPanel.SetActive(false);
+                Time.timeScale = 1f;
+                return;
+            }
+
             // Pause the game
             Time.timeScale = 0f;
             draftPanel.SetActive(true);
@@ -88,9 +102,6 @@ namespace GameDevTV.RTS.UI.Containers
             {
                 roundGoalText.text = $"ACTIVE ROUND GOAL: {GenerationManager.Instance.CurrentMilestoneDescription.ToUpper()}";
             }
-
-            // Select 3 random unique cards from the pool
-            List<BlueprintCardSO> selectedCards = GetRandomCards(3);
 
             // Populate slots
             for (int i = 0; i < cardSlots.Count; i++)

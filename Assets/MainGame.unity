@@ -326,7 +326,7 @@ MonoBehaviour:
   floorLayers:
     serializedVersion: 2
     m_Bits: 0
-  highlightTrace: 1
+  highlightTrace: 0
   selectionBox: {fileID: 0}
   errorTintColor: {r: 1, g: 0, b: 0, a: 1}
   errorFresnelColor: {r: 4, g: 1.7, b: 0, a: 2}

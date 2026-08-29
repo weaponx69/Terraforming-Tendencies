@@ -14,6 +14,8 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private Button viewTechTreeButton;
         [SerializeField] private TechTreeUI techTreeUI;
 
+        public bool IsVisible => panel != null && panel.activeInHierarchy;
+
         private void OnEnable()
         {
             Debug.Log("[GenerationSummaryUI] OnEnable called. Subscribing to OnGenerationEnded.");

@@ -63,6 +63,8 @@ namespace GameDevTV.RTS.Player
 
         private void Awake()
         {
+            // Scene-serialized true floods the console; keep hover/selection visuals, drop log spam.
+            highlightTrace = false;
             HexGridManager.SetHighlightTrace(highlightTrace);
             Debug.Log($"[HexHighlight] PlayerInput initialized; trace={highlightTrace}");
 
@@ -723,6 +725,20 @@ namespace GameDevTV.RTS.Player
         {
             if (Mouse.current.rightButton.wasReleasedThisFrame)
             {
+                // Draft / pause overlays use full-screen raycast blockers. Without this check,
+                // right-clicks pass through UI, issue Move while Time.timeScale==0, and units
+                // appear "stuck" (green status, zero deltaTime movement).
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                {
+                    return;
+                }
+
+                if (Time.timeScale <= 0.01f)
+                {
+                    Debug.LogWarning("[PlayerInput] Right-click ignored — game is paused (Time.timeScale=0). Dismiss any draft/summary overlay first.");
+                    return;
+                }
+
                 Ray vetoRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
                 if (Physics.Raycast(vetoRay, out RaycastHit vetoHit, float.MaxValue, ~0, QueryTriggerInteraction.Collide))
                 {
@@ -780,43 +796,65 @@ namespace GameDevTV.RTS.Player
             }
 
             if (selectedUnits.Count == 0) { return; }
+            if (!Mouse.current.rightButton.wasReleasedThisFrame) { return; }
 
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-            if (Mouse.current.rightButton.wasReleasedThisFrame
-                && Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
+            // Prefer configured masks, but fall back to any collider (PlanetManager is often not on floorLayers).
+            if (!Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers)
+                && !Physics.Raycast(cameraRay, out hit, float.MaxValue))
             {
-                var sector = SectorManager.Instance?.GetNearestSector(hit.point);
-                if (sector != null && sector.IsLocked)
-                {
-                    Debug.Log("[PlayerInput] Cannot interact with locked sectors.");
-                    return;
-                }
-                List<AbstractUnit> abstractUnits = new (selectedUnits.Count);
-                foreach(ISelectable selectable in selectedUnits)
-                {
-                    if (selectable is AbstractUnit unit)
-                    {
-                        abstractUnits.Add(unit);
-                    }
-                }
+                Debug.LogWarning("[PlayerInput] Right-click move raycast missed everything.");
+                return;
+            }
 
-                for(int i = 0; i < abstractUnits.Count; i++)
-                {
-                    CommandContext context = new(abstractUnits[i], hit, i, MouseButton.Right);
+            Debug.Log($"[PlayerInput] Right-click hit {hit.collider?.name} at {hit.point} with {selectedUnits.Count} selected.");
 
-                    foreach(ICommand command in GetAvailableCommands(abstractUnits[i]))
+            var sector = SectorManager.Instance?.GetNearestSector(hit.point);
+            if (sector != null && sector.IsLocked)
+            {
+                Debug.Log("[PlayerInput] Cannot interact with locked sectors.");
+                return;
+            }
+
+            List<AbstractUnit> abstractUnits = new(selectedUnits.Count);
+            foreach (ISelectable selectable in selectedUnits)
+            {
+                if (selectable is AbstractUnit unit)
+                {
+                    abstractUnits.Add(unit);
+                }
+            }
+
+            if (abstractUnits.Count == 0)
+            {
+                Debug.LogWarning("[PlayerInput] Right-click had selection but no AbstractUnit targets.");
+                return;
+            }
+
+            for (int i = 0; i < abstractUnits.Count; i++)
+            {
+                CommandContext context = new(abstractUnits[i], hit, i, MouseButton.Right);
+                bool handled = false;
+
+                foreach (ICommand command in GetAvailableCommands(abstractUnits[i]))
+                {
+                    if (command.CanHandle(context))
                     {
-                        if (command.CanHandle(context))
+                        Debug.Log($"[PlayerInput] Issuing {command.GetType().Name} for {abstractUnits[i].name} -> {hit.point}");
+                        command.Handle(context);
+                        handled = true;
+                        if (command.IsSingleUnitCommand)
                         {
-                            command.Handle(context);
-                            if (command.IsSingleUnitCommand)
-                            {
-                                return;
-                            }
-                            break;
+                            return;
                         }
+                        break;
                     }
+                }
+
+                if (!handled)
+                {
+                    Debug.LogWarning($"[PlayerInput] No right-click command handled for {abstractUnits[i].name}.");
                 }
             }
         }
@@ -879,6 +917,12 @@ namespace GameDevTV.RTS.Player
 
         private void ActivateAction(RaycastHit hit)
         {
+            if (Time.timeScale <= 0.01f)
+            {
+                Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Dismiss any draft/summary overlay first.");
+                return;
+            }
+
             if (ghostInstance != null)
             {
                 Destroy(ghostInstance);

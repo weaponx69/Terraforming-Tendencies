@@ -122,6 +122,12 @@ namespace GameDevTV.RTS.Units
         {
             yield return null;
 
+            // Manual MoveCommand may have started on the spawn frame — don't steal the agent.
+            if (IsDirectMoving)
+            {
+                yield break;
+            }
+
             GatherableSupply nearestSupply = GatherableSupply.ActiveSupplies
                 .Where(supply => supply != null && supply.Amount > 0 && !supply.IsBusy &&
                     (!supply.TryGetComponent<HiddenResource>(out HiddenResource hidden) || hidden.IsDiscovered))
@@ -131,6 +137,11 @@ namespace GameDevTV.RTS.Units
             if (nearestSupply == null)
             {
                 Debug.Log($"[Worker] {name} found no revealed supply to gather.");
+                yield break;
+            }
+
+            if (IsDirectMoving)
+            {
                 yield break;
             }
 
@@ -219,6 +230,9 @@ namespace GameDevTV.RTS.Units
         {
             if (supply == null) return;
 
+            // Don't override an active player MoveCommand with gather pathing.
+            if (IsDirectMoving) return;
+
             if (Agent != null)
             {
                 float verticalGap = Mathf.Abs(transform.position.y - supply.transform.position.y);
@@ -256,9 +270,13 @@ namespace GameDevTV.RTS.Units
             Brain.Halt();
             if (Agent != null)
             {
+                // Gather/Return inflate stoppingDistance for vertical air approach —
+                // reset so a MoveCommand doesn't arrive-stop immediately at spawn.
+                Agent.stoppingDistance = 0.5f;
                 Agent.isStopped = false;
                 NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
             }
+            Debug.Log($"[Worker] MoveTo {name} -> {position} agentType={(Agent != null ? Agent.agentTypeID.ToString() : "null")} onNavMesh={(Agent != null && Agent.isOnNavMesh)}");
             base.MoveTo(position);
             SetStatusColor(Color.green, "MOVING");
         }
@@ -268,6 +286,7 @@ namespace GameDevTV.RTS.Units
             Brain.Halt();
             if (Agent != null)
             {
+                Agent.stoppingDistance = 0.5f;
                 Agent.isStopped = false;
                 NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
             }

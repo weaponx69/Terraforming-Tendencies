@@ -395,11 +395,14 @@ namespace GameDevTV.RTS.Units
 
                         // Stuck detection: position unchanged between Ticks but agent has a path to travel.
                         // Skip if the BrainController is intentionally stationary (Gathering) or returning home.
+                        // Never interrupt an active player MoveCommand (IsDirectMoving) — that clears
+                        // the destination and makes manual move look broken.
                         bool brainIsStationary = drone.TryGetComponent(out WorkerBrainController wbc) &&
                             (wbc.CurrentState == WorkerBrainController.State.Gathering ||
                              wbc.CurrentState == WorkerBrainController.State.MovingToBase);
+                        bool playerMoving = drone.IsDirectMoving || droneCmd == UnitCommands.Move;
 
-                        if (!brainIsStationary && droneCmd != UnitCommands.Stop && !na.pathPending)
+                        if (!brainIsStationary && !playerMoving && droneCmd != UnitCommands.Stop && !na.pathPending)
                         {
                             if (lastDronePositions.TryGetValue(drone, out Vector3 lastPos))
                             {
@@ -446,8 +449,15 @@ namespace GameDevTV.RTS.Units
                     else
                     {
                         UnitCommands cmd = drone.GetCurrentCommand();
-                        // Only re-send if drone is Stop/Move AND we haven't sent it in the last 2 seconds
-                        bool needsCommand = cmd == UnitCommands.Stop || cmd == UnitCommands.Move;
+                        // Never steal an active player Move — Gather early-outs on IsDirectMoving,
+                        // but re-issuing still fights once the move completes or Halt clears it.
+                        if (drone.IsDirectMoving || cmd == UnitCommands.Move)
+                        {
+                            continue;
+                        }
+
+                        // Only re-send if drone is idle AND we haven't sent it in the last 2 seconds
+                        bool needsCommand = cmd == UnitCommands.Stop;
                         bool cooldownOver = !lastCommandTime.ContainsKey(drone) || (Time.time - lastCommandTime[drone] > 2f);
 
                         if (needsCommand && cooldownOver)

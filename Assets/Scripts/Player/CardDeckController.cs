@@ -6,6 +6,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using GameDevTV.RTS.UI.Containers;
 
 namespace GameDevTV.RTS.Player
 {
@@ -304,8 +305,25 @@ namespace GameDevTV.RTS.Player
             var curatedHand = GetCuratedHand();
             if (curatedHand == null || curatedHand.Count == 0) return;
 
+            // Prefer the self-assembled BlueprintDraftUI overlay when present.
+            if (BlueprintDraftUI.Instance != null)
+            {
+                BlueprintDraftUI.Instance.ShowDraftSelection();
+                return;
+            }
+
+            // CardDeck DraftingUI path — never pause if nothing is listening,
+            // or the game freezes forever with no overlay (units "move" but deltaTime=0).
+            if (OnDraftStarted == null)
+            {
+                Debug.LogWarning(
+                    "[CardDeckController] TriggerDraft skipped — no DraftingUI subscribed and no BlueprintDraftUI. " +
+                    "Leaving Time.timeScale unchanged.");
+                return;
+            }
+
             Time.timeScale = 0f;
-            OnDraftStarted?.Invoke(curatedHand);
+            OnDraftStarted.Invoke(curatedHand);
         }
 
         /// <summary>Called by the UI when the player selects a card.</summary>

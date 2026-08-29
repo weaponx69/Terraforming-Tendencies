@@ -14,6 +14,10 @@ namespace GameDevTV.RTS.UI
         public Button loadButton;
         public Button quitButton;
 
+        public bool IsPauseMenuVisible =>
+            (menuPanel != null && menuPanel.activeInHierarchy) ||
+            (slotPanel != null && slotPanel.activeInHierarchy);
+
         // Slot buttons
         public Button slot1Button;
         public Button slot2Button;

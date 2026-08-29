@@ -117,7 +117,12 @@ namespace GameDevTV.RTS.Environment
                 flyZone.localRotation = Quaternion.identity;
                 flyZone.localScale = Vector3.one;
 
-                // Ensure FlyZone has the terrain mesh child for baking
+                float mapWidthWorld = Config.MapWidth * CellSize;
+                float mapHeightWorld = Config.MapHeight * CellSize;
+                Mesh airBakeMesh = CreateFlatPlaneMesh(mapWidthWorld, mapHeightWorld);
+                Material terrainMat = GetComponent<MeshRenderer>().sharedMaterial;
+
+                // Ensure FlyZone has a continuous flat plane for Air Units (matches DroneMovementTests)
                 GameObject bakeMeshObj = new GameObject("BakeMesh");
                 bakeMeshObj.transform.parent = flyZone;
                 bakeMeshObj.transform.localPosition = Vector3.zero;
@@ -127,11 +132,8 @@ namespace GameDevTV.RTS.Environment
 
                 var tempRenderers = new System.Collections.Generic.List<MeshRenderer>();
 
-                Mesh terrainMesh = GetComponent<MeshFilter>().sharedMesh;
-                Material terrainMat = GetComponent<MeshRenderer>().sharedMaterial;
-
                 if (!bakeMeshObj.TryGetComponent<MeshFilter>(out var ff)) ff = bakeMeshObj.AddComponent<MeshFilter>();
-                ff.sharedMesh = terrainMesh;
+                ff.sharedMesh = airBakeMesh;
 
                 if (!bakeMeshObj.TryGetComponent<MeshRenderer>(out var mr)) mr = bakeMeshObj.AddComponent<MeshRenderer>();
                 mr.sharedMaterial = terrainMat;
@@ -139,8 +141,6 @@ namespace GameDevTV.RTS.Environment
                 tempRenderers.Add(mr);
 
                 // Ghosting for Air NavMesh wrapping
-                float mapWidthWorld = Config.MapWidth * CellSize;
-                float mapHeightWorld = Config.MapHeight * CellSize;
                 for (int x = -2; x <= 2; x++)
                 {
                     for (int z = -2; z <= 2; z++)
@@ -154,7 +154,7 @@ namespace GameDevTV.RTS.Environment
                         ghost.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
                     
                         var gff = ghost.AddComponent<MeshFilter>();
-                        gff.sharedMesh = terrainMesh;
+                        gff.sharedMesh = airBakeMesh;
 
                         var gmr = ghost.AddComponent<MeshRenderer>();
                         gmr.sharedMaterial = terrainMat;
@@ -214,6 +214,36 @@ namespace GameDevTV.RTS.Environment
                 {
                     renderer.enabled = false;
                 }
+            }
+
+            /// <summary>
+            /// Continuous flat plane covering the map extents for Air Units NavMesh bake.
+            /// Matches the elevated Plane used by DroneMovementTests.
+            /// </summary>
+            private static Mesh CreateFlatPlaneMesh(float width, float height)
+            {
+                Mesh mesh = new Mesh { name = "AirBakePlane" };
+                mesh.vertices = new[]
+                {
+                    new Vector3(0f, 0f, 0f),
+                    new Vector3(width, 0f, 0f),
+                    new Vector3(0f, 0f, height),
+                    new Vector3(width, 0f, height)
+                };
+                mesh.triangles = new[] { 0, 2, 1, 2, 3, 1 };
+                mesh.normals = new[]
+                {
+                    Vector3.up, Vector3.up, Vector3.up, Vector3.up
+                };
+                mesh.uv = new[]
+                {
+                    new Vector2(0f, 0f),
+                    new Vector2(1f, 0f),
+                    new Vector2(0f, 1f),
+                    new Vector2(1f, 1f)
+                };
+                mesh.RecalculateBounds();
+                return mesh;
             }
 
                 public void ClearPlanet()
