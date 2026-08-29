@@ -31,27 +31,29 @@
 - Uses `UnityEngine.UI.Image` component for rendering
 - Visual script nodes must be assigned in the Unity Editor
 
-## Integrity Bar ↔ DecayStarter Wiring
+## Integrity Bar ↔ Colony Health
 
-### Full Event Chain
-1. **`DecayStarter.Update()`** fires every 0.1s → calls `TakeDamage(5)` on itself (500 max HP) → calls `Supplies.UpdateIntegrity(Owner, ratio * 100f)` where ratio = `CurrentHealth / MaxHealth`
-2. **`Supplies.UpdateIntegrity()`** clamps to 0 and fires `Supplies.OnIntegrityChanged`
-3. **`ColonyIntegrityBar.HandleIntegrityChanged()`** sets `_targetFill = newValue / 100f`
-4. **`ColonyIntegrityBar.Update()`** lerps `_currentFill` → `_targetFill` and sets `fillImage.fillAmount` + applies color transitions
+### Authoritative calculation
+1. **`GlobalDecayManager.DecayLoop()`** damages buildings/units outside life support every tick
+2. **`Supplies.CalculateIntegrity()`** aggregates `CurrentHealth / MaxHealth` for player-owned commandables
+3. **`Supplies.UpdateIntegrity()`** fires `OnIntegrityChanged`
+4. **`ColonyIntegrityBar`** subscribes and updates the HUD fill
 
-### Bug Fixed (2026-06-30)
-`SurvivalManager.SurvivalLoop()` was calling `Supplies.CalculateIntegrity()` (aggregates ALL commandable HP — mostly full → ~100%) and writing that back every second, **overwriting** `DecayStarter`'s per-tick writes and keeping the bar near 100%.
+### Excluded from integrity (do not count toward the bar)
+- **`GlobalCommander`** / **Universal Command Center** — invulnerable hub (99999 HP)
+- **`DecayStarter`** — hidden legacy stand-in for the UCC; must never inflate integrity
+- Any commandable with `MaxHealth >= 90000`
 
-**Fix**: `SurvivalManager` now drains integrity by `integrityDrainRate * tickRate` from the current value each tick, rather than recalculating from commandable health. This means:
-- `DecayStarter` writes drive the bar directly without being overwritten
-- `SurvivalManager` provides an additional constant drain on top
-- Both drain in the same direction; neither resets
+### Bug fixed (2026-06-30)
+`SurvivalManager` was recalculating integrity from all commandables every second and overwriting per-tick writes. It now only drains biomass; integrity is owned by `GlobalDecayManager` + `CalculateIntegrity()`.
 
-### Key Files
-- `Assets/Scripts/Environment/DecayStarter.cs` — ticks integrity down via its own HP ratio
-- `Assets/Scripts/UI/Components/ColonyIntegrityBar.cs` — `Filled` Image bar subscribed to `Supplies.OnIntegrityChanged`
-- `Assets/Scripts/Player/SurvivalManager.cs` — drain-based loop (NOT recalculate-based)
-- `Assets/Scripts/Player/Supplies.cs` — `UpdateIntegrity()` + `OnIntegrityChanged` event
+### Key files
+- `Assets/Scripts/Environment/GlobalDecayManager.cs` — decay ticks + integrity refresh
+- `Assets/Scripts/Player/Supplies.cs` — `CalculateIntegrity()` + `CountsTowardIntegrity()`
+- `Assets/Scripts/UI/Components/ColonyIntegrityBar.cs` — HUD bar
+- `Assets/Scripts/Environment/DecayStarter.cs` — legacy stand-in (excluded from calculation)
+
+See also `PROJECT_KNOWLEDGE.md` § Colony Integrity Decay Override Removal.
 
 ---
 

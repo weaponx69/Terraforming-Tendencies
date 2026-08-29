@@ -244,6 +244,7 @@ protected UnitSO unitSO;
         // directly here, which is reliable and verified on the NavMesh.
         private bool hasDirectMoveTarget;
         private Vector3 directMoveTarget;
+        public bool IsDirectMoving => hasDirectMoveTarget;
         public bool agentShouldBeDisabled = false;
 
         protected virtual void Update()
@@ -270,11 +271,7 @@ protected UnitSO unitSO;
                     if (Time.time - lastNavMeshSampleTime >= NAVMESH_SAMPLE_INTERVAL)
                     {
                         lastNavMeshSampleTime = Time.time;
-                        // Use a broad sample range to find the ground navmesh
-                        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 25f, new NavMeshQueryFilter { agentTypeID = Agent.agentTypeID, areaMask = NavMesh.AllAreas }))
-                        {
-                            Agent.Warp(hit.position);
-                        }
+                        NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
                     }
                 }
             }
@@ -295,7 +292,8 @@ protected UnitSO unitSO;
                 {
                     if (Agent.hasPath && Agent.remainingDistance <= Mathf.Max(Agent.stoppingDistance, 0.5f))
                     {
-                        hasDirectMoveTarget = false; // arrived
+                        hasDirectMoveTarget = false;
+                        SetCurrentCommand(UnitCommands.Stop);
                     }
                     else if (!Agent.hasPath)
                     {
@@ -351,6 +349,11 @@ protected UnitSO unitSO;
                 {
                     statusColor = Color.green; // Building
                     reason = "BUILDING";
+                }
+                else if (cmd == UnitCommands.Move || IsDirectMoving)
+                {
+                    statusColor = Color.green;
+                    reason = "MOVING";
                 }
                 else if (this is Worker w && w.IsActivelyWorking)
                 {

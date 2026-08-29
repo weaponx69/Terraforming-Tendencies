@@ -504,10 +504,7 @@ namespace GameDevTV.RTS.Player
 
             foreach (var c in commandables)
             {
-                if (c == null) continue;
-                // Skip the GlobalCommander (UCC) — it's invulnerable with 99999 HP
-                // and would mask the colony's true health status.
-                if (c is GlobalCommander || c.gameObject.name.Contains("Universal Command Center") || c.MaxHealth >= 90000) continue;
+                if (!CountsTowardIntegrity(c)) continue;
                 if (c.Owner == owner)
                 {
                     totalMaxHP += c.MaxHealth;
@@ -524,6 +521,19 @@ namespace GameDevTV.RTS.Player
             if (totalMaxHP == 0) return 100f;
 
             return ((float)totalCurrentHP / totalMaxHP) * 100f;
+        }
+
+        /// <summary>
+        /// Colony integrity reflects player-built infrastructure only.
+        /// Excludes the invulnerable UCC hub and the hidden DecayStarter stand-in.
+        /// </summary>
+        private static bool CountsTowardIntegrity(AbstractCommandable c)
+        {
+            if (c == null) return false;
+            if (c is GlobalCommander || c is DecayStarter) return false;
+            if (c.gameObject.name.Contains("Universal Command Center")) return false;
+            if (c.MaxHealth >= 90000) return false;
+            return true;
         }
 
         private void HandleSupplyEvent(SupplyEvent evt)

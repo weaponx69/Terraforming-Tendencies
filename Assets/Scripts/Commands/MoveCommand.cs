@@ -1,4 +1,5 @@
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using GameDevTV.RTS.VisualScriptingStubs;
 
@@ -33,7 +34,7 @@ namespace GameDevTV.RTS.Commands
             if (context.Hit.collider != null && context.Hit.collider.TryGetComponent(out AbstractCommandable commandable)
                 && commandable.IsVisible)
             {
-                unit.MoveTo(commandable.transform);
+                unit.MoveTo(SampleMoveDestination(unit, commandable.transform.position));
                 return;
             }
 
@@ -51,7 +52,7 @@ namespace GameDevTV.RTS.Commands
                 context.Hit.point.z + circleRadius * Mathf.Sin(radialOffset * unitsOnLayer)
             );
 
-            unit.MoveTo(targetPosition);
+            unit.MoveTo(SampleMoveDestination(unit, targetPosition));
             unitsOnLayer++;
 
             if (unitsOnLayer >= maxUnitsOnLayer)
@@ -61,6 +62,21 @@ namespace GameDevTV.RTS.Commands
                 maxUnitsOnLayer = Mathf.FloorToInt(2 * Mathf.PI * circleRadius / (unit.AgentRadius * 2));
                 radialOffset = 2 * Mathf.PI / maxUnitsOnLayer;
             }
+        }
+
+        private static Vector3 SampleMoveDestination(AbstractUnit unit, Vector3 approximatePosition)
+        {
+            if (unit.Agent != null &&
+                NavMeshSpawnUtility.TrySamplePosition(
+                    approximatePosition,
+                    unit.Agent.agentTypeID,
+                    NavMeshSpawnUtility.DefaultSampleRadius,
+                    out UnityEngine.AI.NavMeshHit navHit))
+            {
+                return navHit.position;
+            }
+
+            return approximatePosition;
         }
 
         public override bool IsLocked(CommandContext context) => false;

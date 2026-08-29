@@ -46,18 +46,7 @@ namespace GameDevTV.RTS.Environment
                 baseDecayRate *= decayRateMultiplier;
                 integrityDamageRate *= decayRateMultiplier;
 
-            // Spawn invisible decaying starter so integrity starts at 100%.
-            SpawnDecayStarter();
-
             StartCoroutine(DecayLoop());
-        }
-
-        private void SpawnDecayStarter()
-        {
-            if (GameObject.Find("DecayStarter") != null) return;
-            GameObject starter = new GameObject("DecayStarter", typeof(DecayStarter));
-            starter.transform.position = new Vector3(-1000f, -1000f, -1000f);
-            starter.transform.localScale = Vector3.zero;
         }
 
         private IEnumerator DecayLoop()

@@ -92,8 +92,17 @@ namespace GameDevTV.RTS.Units
                 targetSupply = null;
             }
             CurrentPipeline = null;
-            if (agent.isOnNavMesh) agent.ResetPath();
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.ResetPath();
+                agent.isStopped = false;
+            }
             CurrentState = State.Idle;
+        }
+
+        private bool ShouldYieldToManualMove()
+        {
+            return worker != null && worker.IsDirectMoving;
         }
 
         // --- Internal ---
@@ -169,6 +178,8 @@ namespace GameDevTV.RTS.Units
         {
             while (targetSupply != null && targetSupply.Amount > 0)
             {
+                if (ShouldYieldToManualMove()) yield break;
+
                 // ── State: MovingToSupply ──────────────────────────────
                 CurrentState = State.MovingToSupply;
 
@@ -176,6 +187,8 @@ namespace GameDevTV.RTS.Units
                     agent.SetDestination(targetSupply.transform.position);
 
                 yield return WaitUntilNear(targetSupply.transform, agent.stoppingDistance + 0.5f, timeout: 30f);
+
+                if (ShouldYieldToManualMove()) yield break;
 
                 if (targetSupply == null || targetSupply.Amount <= 0) break;
 

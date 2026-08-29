@@ -4,6 +4,10 @@ using GameDevTV.RTS.Commands;
 
 namespace GameDevTV.RTS.Environment
 {
+    /// <summary>
+    /// Legacy stand-in for the invulnerable Universal Command Center hub.
+    /// Not counted in colony integrity — see Supplies.CountsTowardIntegrity().
+    /// </summary>
     public class DecayStarter : AbstractCommandable
     {
         private float _nextTick;

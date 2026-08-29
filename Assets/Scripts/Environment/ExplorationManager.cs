@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
@@ -43,7 +42,7 @@ namespace GameDevTV.RTS.Environment
         public float ExploreEnergyCost => exploreEnergyCost;
 
         /// <summary>Fired when exploration is blocked (insufficient energy, no target, etc.).</summary>
-        public static event Action<string> OnExplorationFailed;
+        public static event System.Action<string> OnExplorationFailed;
 
         /// <summary>Whether exploration is currently in progress.</summary>
         public bool IsExploring { get; private set; }

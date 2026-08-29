@@ -80,21 +80,28 @@ namespace GameDevTV.RTS.Units
             }
         }
 
+        protected override void Awake()
+        {
+            base.Awake();
+
+            // Worker navigation is handled by WorkerBrainController + direct NavMesh drive.
+            if (graphAgent != null)
+            {
+                graphAgent.enabled = false;
+            }
+        }
+
         protected override void Start()
         {
             base.Start();
 
             LoadEventChannels();
 
-            // Worker navigation is handled by WorkerBrainController + direct NavMesh drive.
-            // The embedded behavior graph runs StopAgent on restart and fights manual move orders.
-            if (graphAgent != null)
-            {
-                graphAgent.enabled = false;
-            }
-
             if (Agent != null)
             {
+                Agent.updatePosition = true;
+                Agent.updateRotation = true;
+                Agent.isStopped = false;
                 NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
             }
 
@@ -247,13 +254,25 @@ namespace GameDevTV.RTS.Units
         public override void MoveTo(Vector3 position)
         {
             Brain.Halt();
+            if (Agent != null)
+            {
+                Agent.isStopped = false;
+                NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
+            }
             base.MoveTo(position);
+            SetStatusColor(Color.green, "MOVING");
         }
 
         public override void MoveTo(Transform transform)
         {
             Brain.Halt();
+            if (Agent != null)
+            {
+                Agent.isStopped = false;
+                NavMeshSpawnUtility.EnsureAgentOnNavMesh(Agent);
+            }
             base.MoveTo(transform);
+            SetStatusColor(Color.green, "MOVING");
         }
 
         public override void Stop()

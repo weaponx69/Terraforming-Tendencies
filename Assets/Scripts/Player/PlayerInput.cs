@@ -37,6 +37,7 @@ namespace GameDevTV.RTS.Player
         private Vector2 startingMousePosition;
 
         private BaseCommand activeCommand;
+        private List<ISelectable> commandTargetUnits = new(12);
         private GameObject ghostInstance;
         private Renderer ghostRenderer;
         private bool wasMouseDownOnUI;
@@ -338,6 +339,7 @@ namespace GameDevTV.RTS.Player
         private void HandleActionSelected(CommandSelectedEvent evt)
         {
             activeCommand = evt.Command;
+            commandTargetUnits = new List<ISelectable>(selectedUnits);
 
             // Auto-place logic for Command Posts: automatically build in the nearest unoccupied sector
             if (activeCommand is BuildBuildingCommand commandPostBbc && commandPostBbc.Building != null && commandPostBbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
@@ -895,10 +897,18 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            List<AbstractCommandable> abstractCommandables = selectedUnits
-.Where((unit) => unit is AbstractCommandable)
-                                .Cast<AbstractCommandable>()
-                                .ToList();
+            List<AbstractCommandable> abstractCommandables = GetCommandTargets()
+                .Where(unit => unit is AbstractCommandable)
+                .Cast<AbstractCommandable>()
+                .ToList();
+
+            if (abstractCommandables.Count == 0 && activeCommand is MoveCommand)
+            {
+                Debug.LogWarning("[PlayerInput] Select a unit before issuing a move order.");
+                activeCommand = null;
+                commandTargetUnits.Clear();
+                return;
+            }
 
             // Fallback for Global Commands: If no units are selected, the command is coming from the GlobalCommander
             if (abstractCommandables.Count == 0)
@@ -932,6 +942,18 @@ namespace GameDevTV.RTS.Player
             {
                 activeCommand = null;
             }
+
+            commandTargetUnits.Clear();
+        }
+
+        private IEnumerable<ISelectable> GetCommandTargets()
+        {
+            if (selectedUnits.Count > 0)
+            {
+                return selectedUnits;
+            }
+
+            return commandTargetUnits.Count > 0 ? commandTargetUnits : selectedUnits;
         }
 
         private void HandleRotation()
