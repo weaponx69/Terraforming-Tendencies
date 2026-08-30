@@ -24,7 +24,6 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private LayerMask shroudLayer;
         [SerializeField] private bool generateShroudOnStart = true;
         [SerializeField] private float startingAreaRevealRadius = 15f;
-        [SerializeField] private bool highlightTrace;
 
         public static bool HighlightTrace { get; private set; }
 
@@ -45,7 +44,6 @@ namespace GameDevTV.RTS.Environment
         private void OnEnable()
         {
             Instance = this;
-            HighlightTrace |= highlightTrace;
             PlanetGenerator.OnPlanetGenerated += RevealStartingArea;
         }
 
@@ -147,10 +145,6 @@ namespace GameDevTV.RTS.Environment
 
                 Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : isHovered ? Color.white : Color.cyan;
                 float width = isHighlighted ? 0.32f : isHovered ? 0.22f : 0.1f;
-                if (HighlightTrace)
-                {
-                    Debug.Log($"[HexHighlight] Outline {HexCoordinates}: enabled={outline.enabled}, positions={outline.positionCount}, width={width}, color={color}");
-                }
                 outline.startColor = color;
                 outline.endColor = color;
                 outline.startWidth = width;

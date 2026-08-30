@@ -217,7 +217,7 @@ namespace GameDevTV.RTS.Commands
             return AllRestrictionsPass(point, Owner.Player1);
         }
 
-        public bool AllRestrictionsPass(Vector3 point, Owner owner)
+        public bool AllRestrictionsPass(Vector3 point, Owner owner, bool requireWorker = true)
         {
             // If this is a Command Post, prevent placing multiple Command Posts in the same sector.
             // Ignore GlobalCommander (editor-placed starting base) — only count player-built "(Clone)" buildings.
@@ -297,9 +297,9 @@ namespace GameDevTV.RTS.Commands
                 }
             }
 
-            // Enforce worker requirement for standard buildings
+            // Enforce worker requirement for standard buildings (skipped for reserved-site card builds).
             bool isCP = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-            if (!isCP)
+            if (requireWorker && !isCP)
             {
                 Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
                 bool hasWorker = false;

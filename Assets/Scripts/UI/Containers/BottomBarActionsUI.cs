@@ -6,20 +6,14 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 
 namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
-    /// Persistent bottom-center action bar that shows the player's 5-card hand
-    /// from the CardDeckController. Each card is a consumable action:
-    ///   - Building card → unlock + enter placement mode
-    ///   - Unit card → spawn the unit
-    ///   - Resource card → grant resources, draw replacement
-    ///   - Buff card → apply buff, draw replacement
-    ///
-    /// When a card is played, it's removed from the hand and a new card is
-    /// drawn from the deck. Refreshes on various game events.
+    /// Persistent bottom-center action bar that shows the player's card hand.
+    /// Building cards build instantly at pre-placed reserved sites (no ghost placement).
     /// </summary>
     public class BottomBarActionsUI : MonoBehaviour
     {
@@ -122,21 +116,27 @@ namespace GameDevTV.RTS.UI.Containers
                     // Create a BuildBuildingCommand for building cards so placement works
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
                     {
-                        // Create a BuildBuildingCommand for this building
                         var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
                         buildCmd.Name = "Build " + unlockCard.buildingToUnlock.Name;
                         buildCmd.Building = unlockCard.buildingToUnlock;
                         buildCmd.Icon = unlockCard.buildingToUnlock.Icon;
-                        buildCmd.GhostPrefab = FindGhostPrefabForBuilding(unlockCard.buildingToUnlock)
-                            ?? unlockCard.buildingToUnlock.Prefab;
                         buildCmd.Slot = i;
 
                         actionButtons[i].EnableFor(buildCmd, null, () =>
                         {
-                            // Play the card (unlock the building) then start placement
+                            var building = unlockCard.buildingToUnlock;
+                            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(
+                                    building, owner, out string reason, requireUnlocked: false))
+                            {
+                                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
+                                return;
+                            }
+
                             CardDeckController.Instance.PlayCard(cardIndex);
-                            // CommandSelectedEvent lets PlayerInput enter placement mode
-                            Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(buildCmd));
+                            if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(building, owner, out reason))
+                            {
+                                Debug.LogWarning($"[BottomBarActionsUI] Build failed after playing card: {reason}");
+                            }
                         });
                     }
                     else
@@ -212,7 +212,10 @@ namespace GameDevTV.RTS.UI.Containers
 
                         actionButtons[slot].EnableFor(fbBbc, null, () =>
                         {
-                            Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(fbBbc));
+                            if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(bbc.Building, owner, out string reason))
+                            {
+                                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
+                            }
                         });
 
                         filledSlots.Add(slot);

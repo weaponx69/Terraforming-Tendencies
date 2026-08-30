@@ -66,7 +66,6 @@ namespace GameDevTV.RTS.Player
             // Scene-serialized true floods the console; keep hover/selection visuals, drop log spam.
             highlightTrace = false;
             HexGridManager.SetHighlightTrace(highlightTrace);
-            Debug.Log($"[HexHighlight] PlayerInput initialized; trace={highlightTrace}");
 
             if (playerCamera == null)
             {

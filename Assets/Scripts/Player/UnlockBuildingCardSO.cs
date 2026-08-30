@@ -1,3 +1,6 @@
+using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using GameDevTV.RTS.Units;
 
@@ -6,6 +9,13 @@ namespace GameDevTV.RTS.Player
     public class UnlockBuildingCardSO : BlueprintCardSO
         {
             public BuildingSO buildingToUnlock;
+    
+            public override bool CanApply()
+            {
+                if (buildingToUnlock == null) return false;
+                return ReservedSiteBuildUtility.CanBuildAtReservedSite(
+                    buildingToUnlock, Owner.Player1, out _, requireUnlocked: false);
+            }
     
             public override string GetCardGoal()
             {

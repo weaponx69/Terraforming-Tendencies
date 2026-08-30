@@ -559,7 +559,124 @@ namespace GameDevTV.RTS.Environment
                     // Update visibility based on node states
                     UpdateAllNodeVisibility();
 
+                    PlaceSectorBuildingSites();
+
                     Debug.Log($"[PlanetGenerator] Placed sector resource nodes across {SectorManager.Instance.Sectors.Count} sectors.");
+                }
+
+                /// <summary>
+                /// Pre-place reserved building pads per sector. Mine pads sit on resource geography;
+                /// infrastructure pads are scattered; each sector gets one command post pad.
+                /// </summary>
+                private void PlaceSectorBuildingSites()
+                {
+                    var markerRoot = new GameObject("BuildingSiteMarkers");
+                    markerRoot.transform.parent = transform;
+
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        sector.BuildingSites.Clear();
+
+                        float secW = (Config.MapWidth * CellSize) / Config.SectorsX;
+                        float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
+                        Vector3 sectorMin = sector.Center - new Vector3(secW * 0.4f, 0, secH * 0.4f);
+                        Vector3 sectorMax = sector.Center + new Vector3(secW * 0.4f, 0, secH * 0.4f);
+
+                        Vector3 commandPos = SnapSitePosition(sector.Center + new Vector3(-secW * 0.15f, 0, -secH * 0.15f));
+                        var commandSite = new BuildingSiteSlot(BuildingSiteKind.CommandPost, commandPos, sector);
+                        sector.BuildingSites.Add(commandSite);
+                        commandSite.MarkerGO = CreateSiteMarker(markerRoot.transform, commandPos, BuildingSiteKind.CommandPost);
+
+                        for (int i = 0; i < 3; i++)
+                        {
+                            Vector3 infraPos = SnapSitePosition(new Vector3(
+                                Random.Range(sectorMin.x, sectorMax.x),
+                                0f,
+                                Random.Range(sectorMin.z, sectorMax.z)));
+                            if (Vector3.Distance(infraPos, sector.Center) < 6f) continue;
+
+                            var infraSite = new BuildingSiteSlot(BuildingSiteKind.Infrastructure, infraPos, sector);
+                            sector.BuildingSites.Add(infraSite);
+                            infraSite.MarkerGO = CreateSiteMarker(markerRoot.transform, infraPos, BuildingSiteKind.Infrastructure);
+                        }
+
+                        foreach (var node in sector.Nodes)
+                        {
+                            if (node.type != SectorNode.NodeType.Minerals &&
+                                node.type != SectorNode.NodeType.Gas &&
+                                node.type != SectorNode.NodeType.Iron &&
+                                node.type != SectorNode.NodeType.Regolith)
+                            {
+                                continue;
+                            }
+
+                            Vector3 minePos = node.visualGO != null
+                                ? node.visualGO.transform.position
+                                : SnapSitePosition(node.position);
+                            var mineSite = new BuildingSiteSlot(BuildingSiteKind.Mine, minePos, sector, node);
+                            sector.BuildingSites.Add(mineSite);
+                            mineSite.MarkerGO = CreateSiteMarker(markerRoot.transform, minePos, BuildingSiteKind.Mine);
+                        }
+                    }
+
+                    int totalSites = 0;
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        totalSites += sector.BuildingSites.Count;
+                    }
+
+                    Debug.Log($"[PlanetGenerator] Placed {totalSites} reserved building sites.");
+                }
+
+                private Vector3 SnapSitePosition(Vector3 approximate)
+                {
+                    Vector3 pos = approximate;
+                    if (Physics.Raycast(pos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f,
+                            LayerMask.GetMask("Default", "Terrain")))
+                    {
+                        pos = hit.point;
+                    }
+
+                    UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
+                    {
+                        agentTypeID = 0,
+                        areaMask = UnityEngine.AI.NavMesh.AllAreas
+                    };
+                    if (UnityEngine.AI.NavMesh.SamplePosition(pos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+                    {
+                        pos = navHit.position;
+                    }
+
+                    return pos;
+                }
+
+                private GameObject CreateSiteMarker(Transform parent, Vector3 position, BuildingSiteKind kind)
+                {
+                    var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    marker.name = $"Site_{kind}";
+                    marker.transform.SetParent(parent, false);
+                    marker.transform.position = position + Vector3.up * 0.05f;
+
+                    Color color = kind switch
+                    {
+                        BuildingSiteKind.CommandPost => new Color(0.2f, 0.55f, 1f, 0.55f),
+                        BuildingSiteKind.Mine => new Color(1f, 0.65f, 0.1f, 0.55f),
+                        _ => new Color(0.75f, 0.75f, 0.75f, 0.45f)
+                    };
+
+                    float size = kind == BuildingSiteKind.CommandPost ? 2.4f : kind == BuildingSiteKind.Mine ? 1.6f : 2f;
+                    marker.transform.localScale = new Vector3(size, 0.08f, size);
+
+                    var renderer = marker.GetComponent<MeshRenderer>();
+                    var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                    mat.color = color;
+                    renderer.material = mat;
+
+                    var collider = marker.GetComponent<Collider>();
+                    if (collider != null) collider.enabled = false;
+
+                    marker.layer = LayerMask.NameToLayer("TransparentFX");
+                    return marker;
                 }
 
                 /// <summary>
