@@ -28,12 +28,13 @@ namespace GameDevTV.RTS.Units
 
         private void EnsureSelectionCollider()
         {
-            if (GetComponentInChildren<Collider>() != null) return;
-
-            var box = gameObject.AddComponent<BoxCollider>();
-            box.center = Vector3.up * 2f;
-            box.size = new Vector3(8f, 4f, 8f);
-            box.isTrigger = false;
+            // The UCC is an invisible stand-in selected via empty-ground clicks in PlayerInput.
+            // A solid collider here sits under air drones near the starting Command Post and
+            // steals selection raycasts, making trained mining drones appear "unselectable".
+            foreach (var col in GetComponentsInChildren<Collider>(true))
+            {
+                col.enabled = false;
+            }
         }
 
         public override BaseCommand[] AvailableCommands

@@ -20,7 +20,7 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private GameObject visualPrefab;
 
         [Header("Appearance")]
-        [SerializeField] private Color ghostColor = new Color(0.45f, 0.47f, 0.50f, 0.75f);  // dull grey, slightly transparent
+        [SerializeField] private Color ghostColor = new Color(0.45f, 0.55f, 0.7f, 0.22f);  // translucent site/construction ghost
         [SerializeField] private Color finalColor = new Color(0.38f, 0.40f, 0.42f);           // dark industrial monolith
 
         [Header("Smoke")]
@@ -114,8 +114,16 @@ namespace GameDevTV.RTS.Units
             var mat = new Material(shader);
             if (transparent)
             {
-                // Fade rendering mode for semi-transparent ghost
-                mat.SetFloat("_Mode", 2); // Fade
+                // URP Lit transparent surface (old Standard _Mode flags alone are ignored by URP).
+                if (mat.HasProperty("_Surface"))
+                {
+                    mat.SetFloat("_Surface", 1f);
+                    mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                    mat.DisableKeyword("_SURFACE_TYPE_OPAQUE");
+                }
+
+                mat.SetFloat("_Mode", 2); // Fade (Standard fallback)
+                mat.SetOverrideTag("RenderType", "Transparent");
                 mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
                 mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
                 mat.SetInt("_ZWrite", 0);
@@ -124,8 +132,12 @@ namespace GameDevTV.RTS.Units
                 mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
                 mat.renderQueue = 3000;
             }
+
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
             mat.color = color;
             mat.SetFloat("_Metallic", metallic);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
             mat.SetFloat("_Glossiness", smoothness);
             return mat;
         }

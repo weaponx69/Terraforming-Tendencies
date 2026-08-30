@@ -28,6 +28,6 @@ MonoBehaviour:
   builderConfig: {fileID: 0}
   probeConfig: {fileID: 0}
   buildingConfig: {fileID: 11400000, guid: ab41f145349bdd9fc98fe123141fed7b, type: 2}
-  <PlacementMaterial>k__BackingField: {fileID: 0}
+  <PlacementMaterial>k__BackingField: {fileID: 2100000, guid: b1ef2fa16faec654da7102aa095d466e, type: 2}
   <IsLifeSupport>k__BackingField: 0
   <LifeSupportRadius>k__BackingField: 25

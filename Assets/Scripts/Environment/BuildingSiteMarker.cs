@@ -165,7 +165,6 @@ namespace GameDevTV.RTS.Environment
 
             Material ghostMaterial = building.PlacementMaterial;
             NeutralizeGhostSimulation(ghostInstance, ghostMaterial);
-            ApplyGhostMaterialFallback(ghostInstance, ghostMaterial);
             HideSelectionIndicators(ghostInstance);
             StripSimulationComponents(ghostInstance);
 
@@ -173,10 +172,11 @@ namespace GameDevTV.RTS.Environment
             DestroyImmediate(holder);
             ghostInstance.SetActive(true);
 
-            // Re-assert after activation: parenting into an active hierarchy can still schedule
-            // lifecycle callbacks if any behaviour was left enabled.
+            // Re-assert after activation: SmokestackVisuals/etc. Awake builds meshes on activate,
+            // so ghost materials must be applied after that geometry exists.
             NeutralizeGhostSimulation(ghostInstance, ghostMaterial);
             StripSimulationComponents(ghostInstance);
+            ApplyGhostMaterialFallback(ghostInstance, ghostMaterial);
 
             CacheTintMaterials();
             FitClickCollider();
@@ -243,27 +243,76 @@ namespace GameDevTV.RTS.Environment
         {
             if (root == null) return;
 
+            Material source = ghostMaterial;
+
             foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
             {
                 if (renderer == null) continue;
                 string nameLower = renderer.gameObject.name.ToLowerInvariant();
-                if (nameLower.Contains("vision") || nameLower.Contains("selection") || nameLower.Contains("indicator"))
+                if (nameLower.Contains("vision") || nameLower.Contains("selection") || nameLower.Contains("indicator") || nameLower.Contains("smoke"))
                 {
                     continue;
                 }
 
-                // Instance materials so site opacity tweaks never mutate the shared asset.
-                if (ghostMaterial != null)
+                if (source != null)
                 {
-                    renderer.material = new Material(ghostMaterial);
+                    // Always use the translucent placement shader for site pads — procedural
+                    // building meshes (e.g. Oxygen Processor) otherwise stay fully opaque.
+                    var mats = new Material[Mathf.Max(1, renderer.sharedMaterials.Length)];
+                    for (int i = 0; i < mats.Length; i++)
+                    {
+                        mats[i] = new Material(source);
+                        ApplyOpacityToMaterial(mats[i], IdleTint, IdleFresnel, IdleBaseAlpha);
+                    }
+                    renderer.materials = mats;
                 }
                 else if (renderer.sharedMaterial != null)
                 {
-                    renderer.material = new Material(renderer.sharedMaterial);
+                    renderer.material = CreateTransparentFallback(renderer.sharedMaterial, IdleTint);
                 }
-
-                ApplyOpacityToMaterial(renderer.material, IdleTint, IdleFresnel, IdleBaseAlpha);
             }
+        }
+
+        private static Material CreateTransparentFallback(Material source, Color tint)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+
+            Material mat;
+            if (shader != null)
+            {
+                mat = new Material(shader);
+            }
+            else
+            {
+                mat = new Material(source);
+            }
+
+            ConfigureTransparentSurface(mat);
+            if (mat.HasProperty(BaseColorId)) mat.SetColor(BaseColorId, tint);
+            if (mat.HasProperty(ColorId)) mat.SetColor(ColorId, tint);
+            if (mat.HasProperty(TintId)) mat.SetColor(TintId, tint);
+            return mat;
+        }
+
+        private static void ConfigureTransparentSurface(Material mat)
+        {
+            if (mat == null) return;
+
+            if (mat.HasProperty("_Surface"))
+            {
+                mat.SetFloat("_Surface", 1f); // Transparent
+                mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                mat.DisableKeyword("_SURFACE_TYPE_OPAQUE");
+            }
+
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.renderQueue = 3000;
         }
 
         private void CacheTintMaterials()

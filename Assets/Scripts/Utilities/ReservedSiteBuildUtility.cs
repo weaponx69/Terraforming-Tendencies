@@ -210,6 +210,14 @@ namespace GameDevTV.RTS.Utilities
             built.enabled = true;
             built.Owner = owner;
             built.CompleteConstruction();
+            EnsurePowerNodeReady(built);
+
+            // Ensure power nodes are grid-registered before cluster wiring (Start may not
+            // have run yet in the same frame as Instantiate).
+            if (site.Cluster?.SolarBuilding != null)
+            {
+                EnsurePowerNodeReady(site.Cluster.SolarBuilding);
+            }
 
             site.SetOccupied(built);
             site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
@@ -232,16 +240,52 @@ namespace GameDevTV.RTS.Utilities
 
         private static void ConnectToClusterSolar(BaseBuilding built, BuildingSiteSlot site)
         {
-            if (built == null || site?.Cluster?.SolarBuilding == null) return;
+            if (built == null || site?.Cluster == null) return;
             if (site.Kind != BuildingSiteKind.PairedBuilding && site.Kind != BuildingSiteKind.Infrastructure) return;
 
-            if (built.TryGetComponent(out PowerNode consumerNode) &&
-                site.Cluster.SolarBuilding.TryGetComponent(out PowerNode solarNode) &&
-                !consumerNode.ConnectedNodes.Contains(solarNode))
+            BaseBuilding solar = site.Cluster.SolarBuilding;
+            if (solar == null)
+            {
+                Debug.LogWarning($"[ReservedSiteBuild] No solar on cluster for {built.name}; power will need a manual Connect Power.");
+                return;
+            }
+
+            if (!built.TryGetComponent(out PowerNode consumerNode))
+            {
+                consumerNode = built.gameObject.AddComponent<PowerNode>();
+            }
+            if (!solar.TryGetComponent(out PowerNode solarNode))
+            {
+                solarNode = solar.gameObject.AddComponent<PowerNode>();
+            }
+
+            EnsurePowerNodeReady(built);
+            EnsurePowerNodeReady(solar);
+
+            if (!consumerNode.ConnectedNodes.Contains(solarNode))
             {
                 consumerNode.ConnectTo(solarNode);
-                Debug.Log($"[ReservedSiteBuild] Connected {built.name} to cluster solar {site.Cluster.SolarBuilding.name}.");
+                Debug.Log($"[ReservedSiteBuild] Connected {built.name} to cluster solar {solar.name}.");
             }
+        }
+
+        private static void EnsurePowerNodeReady(BaseBuilding building)
+        {
+            if (building == null) return;
+            if (!building.TryGetComponent(out PowerNode node))
+            {
+                node = building.gameObject.AddComponent<PowerNode>();
+            }
+
+            // Ensure a clickable collider exists for Connect Power targeting.
+            if (building.GetComponentInChildren<Collider>() == null)
+            {
+                var box = building.gameObject.AddComponent<BoxCollider>();
+                box.center = Vector3.up * 1.5f;
+                box.size = new Vector3(6f, 4f, 6f);
+            }
+
+            PowerGridManager.RegisterNode(node);
         }
 
         private static BuildBuildingCommand CreateCommand(BuildingSO building)

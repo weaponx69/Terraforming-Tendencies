@@ -586,6 +586,8 @@ namespace GameDevTV.RTS.Player
             if (collider.gameObject.layer == 12) return true; // World Bounds
             if (collider.GetComponentInParent<BuildingSiteMarker>() != null) return true;
             if (collider.gameObject.name.Contains("GhostPreview", System.StringComparison.OrdinalIgnoreCase)) return true;
+            // Invisible UCC stand-in must never block unit/building clicks.
+            if (collider.GetComponentInParent<GlobalCommander>() != null) return true;
             // Disabled building components on site ghosts must never steal unit selection.
             var building = collider.GetComponentInParent<BaseBuilding>();
             if (building != null && (!building.enabled || !BuildingSiteSlot.IsValidOccupant(building))) return true;
@@ -964,21 +966,38 @@ namespace GameDevTV.RTS.Player
             if (activeCommand == null)
             {
                 RaycastHit[] hits = Physics.RaycastAll(cameraRay, float.MaxValue, ~0, QueryTriggerInteraction.Ignore);
-                foreach (RaycastHit hit in hits.OrderBy(hit => hit.distance))
+                ISelectable best = null;
+                float bestScore = float.MaxValue;
+
+                foreach (RaycastHit hit in hits.OrderBy(h => h.distance))
                 {
                     if (ShouldIgnoreSelectionHit(hit.collider)) continue;
 
                     ISelectable selectable = hit.collider.GetComponentInParent<ISelectable>();
-                    if (selectable != null)
-                    {
-                        if (!Keyboard.current.shiftKey.isPressed)
-                        {
-                            DeselectAllUnits();
-                        }
+                    if (selectable == null) continue;
 
-                        selectable.Select();
-                        break;
+                    // Prefer real field units over the invisible Universal Command Center /
+                    // large building volumes when the ray grazes multiple selectables.
+                    float score = hit.distance;
+                    if (selectable is GlobalCommander) score += 1000f;
+                    else if (selectable is BaseBuilding) score += 50f;
+                    else if (selectable is AbstractUnit) score -= 10f;
+
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        best = selectable;
                     }
+                }
+
+                if (best != null)
+                {
+                    if (!Keyboard.current.shiftKey.isPressed)
+                    {
+                        DeselectAllUnits();
+                    }
+
+                    best.Select();
                 }
             }
             else if (activeCommand != null

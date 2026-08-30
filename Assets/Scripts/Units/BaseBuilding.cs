@@ -1018,9 +1018,11 @@ namespace GameDevTV.RTS.Units
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 0;
             Heal(300);
-            Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
-                ? sv.GhostMaterial
-                : ghostMaterial;
+            // Prefer the caller's placement material (Ghost Placement shader). SmokestackVisuals'
+            // runtime GhostMaterial is URP Lit and was rendering fully opaque for site pads.
+            Material effectiveMat = ghostMaterial != null
+                ? ghostMaterial
+                : (TryGetComponent<SmokestackVisuals>(out var sv) ? sv.GhostMaterial : null);
 
             ApplyGhostMaterialToRenderers(effectiveMat);
 
