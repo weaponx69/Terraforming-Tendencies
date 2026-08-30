@@ -242,7 +242,10 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (building == null) return;
 
-            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(building, owner, out string reason))
+            // Cards defer PlayCard until a site is chosen, so the building is not unlocked yet.
+            bool requireUnlocked = cardIndex < 0;
+
+            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(building, owner, out string reason, requireUnlocked))
             {
                 Debug.LogWarning($"[BottomBarActionsUI] {reason}");
                 return;

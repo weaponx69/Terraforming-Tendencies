@@ -1018,15 +1018,11 @@ namespace GameDevTV.RTS.Units
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 0;
             Heal(300);
-            // Let SmokestackVisuals (or any future visual override) supply its own ghost material.
-Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
+            Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                 ? sv.GhostMaterial
                 : ghostMaterial;
 
-            if (MainRenderer != null && effectiveMat != null)
-            {
-                MainRenderer.material = effectiveMat;
-            }
+            ApplyGhostMaterialToRenderers(effectiveMat);
 
             if (navMeshObstacle != null)
             {
@@ -1039,10 +1035,26 @@ Material effectiveMat = TryGetComponent<SmokestackVisuals>(out var sv)
                 c.enabled = false;
             }
 
-            // Turn off vision range while under construction/ghost
             if (VisionTransform != null)
             {
                 VisionTransform.gameObject.SetActive(false);
+            }
+        }
+
+        private void ApplyGhostMaterialToRenderers(Material ghostMaterial)
+        {
+            if (ghostMaterial == null) return;
+
+            foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null) continue;
+                string nameLower = renderer.gameObject.name.ToLowerInvariant();
+                if (nameLower.Contains("vision") || nameLower.Contains("selection") || nameLower.Contains("indicator"))
+                {
+                    continue;
+                }
+
+                renderer.material = ghostMaterial;
             }
         }
 

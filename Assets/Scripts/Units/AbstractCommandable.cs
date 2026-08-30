@@ -77,7 +77,10 @@ namespace GameDevTV.RTS.Units
 
         protected virtual void Start()
         {
-            if (GameDevTV.RTS.Environment.PlanetGenerator.Instance != null)
+            bool isGhostPreview = this is BaseBuilding building &&
+                                  building.Progress.State == BuildingProgress.BuildingState.Paused;
+
+            if (!isGhostPreview && GameDevTV.RTS.Environment.PlanetGenerator.Instance != null)
             {
                 GameDevTV.RTS.Environment.PlanetGenerator.Instance.ApplyCurvedWorldShader(gameObject);
             }

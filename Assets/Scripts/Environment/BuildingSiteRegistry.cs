@@ -100,6 +100,21 @@ namespace GameDevTV.RTS.Environment
             return true;
         }
 
+        public static bool IsSiteVisibleToPlayer(BuildingSiteSlot site)
+        {
+            if (site?.Sector == null)
+            {
+                return true;
+            }
+
+            if (site.Sector.IsLocked || !site.Sector.IsExplored)
+            {
+                return false;
+            }
+
+            return HexGridManager.IsWorldPositionRevealed(site.Position);
+        }
+
         private static bool IsSiteValidForBuilding(BuildingSO building, BuildingSiteSlot site)
         {
             if (!IsMineBuilding(building) || !site.HasLinkedResource) return true;

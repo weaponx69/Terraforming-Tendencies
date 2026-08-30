@@ -460,6 +460,7 @@ namespace GameDevTV.RTS.Player
             lastMousePosition = currentMousePos;
 
             BuildingSiteSelectionController.ActivatePendingMarkersIfNeeded();
+            HandleSiteSelectionCancel();
 
             InitializeCurrentHex();
             HandleHexHover();
@@ -565,6 +566,25 @@ namespace GameDevTV.RTS.Player
                 DeselectAllUnits();
                 target.Select();
             }
+        }
+
+        private void HandleSiteSelectionCancel()
+        {
+            if (!BuildingSiteSelectionController.IsSelecting || Keyboard.current == null) return;
+
+            if (Keyboard.current.escapeKey.wasReleasedThisFrame)
+            {
+                BuildingSiteSelectionController.Cancel();
+            }
+        }
+
+        private static bool ShouldIgnoreSelectionHit(Collider collider)
+        {
+            if (collider == null) return true;
+            if (collider.gameObject.name == "Selection Indicator") return true;
+            if (collider.gameObject.name == "Camera Target") return true;
+            if (collider.gameObject.layer == 12) return true; // World Bounds
+            return false;
         }
 
         private void HandleGhost()
@@ -941,14 +961,16 @@ namespace GameDevTV.RTS.Player
                 RaycastHit[] hits = Physics.RaycastAll(cameraRay, float.MaxValue, ~0, QueryTriggerInteraction.Ignore);
                 foreach (RaycastHit hit in hits.OrderBy(hit => hit.distance))
                 {
-                    if (hit.collider == null) continue;
-                    // Camera follow target / world-bounds volumes must not eat unit selection clicks.
-                    if (hit.collider.gameObject.name == "Camera Target") continue;
-                    if (hit.collider.gameObject.layer == 12) continue; // World Bounds
+                    if (ShouldIgnoreSelectionHit(hit.collider)) continue;
 
                     ISelectable selectable = hit.collider.GetComponentInParent<ISelectable>();
                     if (selectable != null)
                     {
+                        if (!Keyboard.current.shiftKey.isPressed)
+                        {
+                            DeselectAllUnits();
+                        }
+
                         selectable.Select();
                         break;
                     }

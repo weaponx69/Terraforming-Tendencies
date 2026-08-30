@@ -220,6 +220,20 @@ namespace GameDevTV.RTS.Environment
             return null;
         }
 
+        /// <summary>
+        /// Returns true when the hex under this world position has been revealed to the player.
+        /// </summary>
+        public bool IsPositionRevealed(Vector3 worldPosition)
+        {
+            HexTile tile = GetHexAtWorldPosition(worldPosition);
+            return tile != null && tile.IsRevealed;
+        }
+
+        public static bool IsWorldPositionRevealed(Vector3 worldPosition)
+        {
+            return Instance == null || Instance.IsPositionRevealed(worldPosition);
+        }
+
         public HexTile GetHex(Vector2Int coordinates)
         {
             return hexGrid.TryGetValue(coordinates, out HexTile tile) ? tile : null;

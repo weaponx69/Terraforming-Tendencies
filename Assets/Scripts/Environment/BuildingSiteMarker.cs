@@ -28,7 +28,17 @@ namespace GameDevTV.RTS.Environment
         {
             Site = site;
             isSelectable = false;
-            RebuildGhost();
+            previewBuilding = null;
+
+            if (Site?.Kind == BuildingSiteKind.CommandPost)
+            {
+                RebuildGhost();
+            }
+            else
+            {
+                DestroyGhost();
+            }
+
             RefreshVisibility();
         }
 
@@ -60,6 +70,7 @@ namespace GameDevTV.RTS.Environment
             EnsureClickCollider();
             ApplyColliderEnabledState();
             SetHighlight(selectable);
+            RefreshVisibility();
         }
 
         public void SetHighlight(bool highlighted)
@@ -82,33 +93,38 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            if (ghostInstance == null && Site.Kind != BuildingSiteKind.PairedBuilding)
+            if (!ShouldShowGhostPreview())
             {
-                RebuildGhost();
+                DestroyGhost();
+                gameObject.SetActive(false);
+                return;
             }
 
-            if (Site.Kind == BuildingSiteKind.PairedBuilding)
+            if (ghostInstance == null)
             {
-                bool showPreview = previewBuilding != null &&
-                                   Site.Cluster != null &&
-                                   Site.Cluster.SolarBuilding != null;
-                gameObject.SetActive(showPreview && ghostInstance != null);
-                ApplyColliderEnabledState();
-                return;
+                RebuildGhost();
             }
 
             gameObject.SetActive(ghostInstance != null);
             ApplyColliderEnabledState();
         }
 
+        private bool ShouldShowGhostPreview()
+        {
+            if (Site == null) return false;
+
+            return Site.Kind switch
+            {
+                BuildingSiteKind.CommandPost => true,
+                BuildingSiteKind.PairedBuilding => previewBuilding != null,
+                BuildingSiteKind.Solar => isSelectable,
+                _ => isSelectable
+            };
+        }
+
         private static bool IsSiteVisibleInWorld(BuildingSiteSlot site)
         {
-            if (site?.Sector == null)
-            {
-                return true;
-            }
-
-            return site.Sector.IsExplored && !site.Sector.IsLocked;
+            return BuildingSiteRegistry.IsSiteVisibleToPlayer(site);
         }
 
         private bool IsSiteVisibleInWorld()
@@ -120,7 +136,7 @@ namespace GameDevTV.RTS.Environment
         {
             DestroyGhost();
 
-            if (!IsSiteVisibleInWorld())
+            if (!IsSiteVisibleInWorld() || !ShouldShowGhostPreview())
             {
                 return;
             }
@@ -131,8 +147,6 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            // Prefer the real building prefab so InitializeAsGhost works. Visual-only ghost
-            // variants (e.g. SolarPanel Ghost Variant) have no BaseBuilding and look solid.
             GameObject prefab = building.Prefab != null
                 ? building.Prefab
                 : BuildingSiteGhostUtility.GetGhostPrefab(building);
@@ -146,22 +160,26 @@ namespace GameDevTV.RTS.Environment
             ghostInstance.transform.localPosition = Vector3.zero;
             ghostInstance.transform.localRotation = Quaternion.identity;
 
-            BaseBuilding baseBuilding = ghostInstance.GetComponentInChildren<BaseBuilding>(true);
-            if (baseBuilding != null)
-            {
-                baseBuilding.enabled = true;
-                baseBuilding.InitializeAsGhost(building.PlacementMaterial, Owner.Player1);
-            }
-            else
-            {
-                ApplyGhostMaterialFallback(ghostInstance, building.PlacementMaterial);
-            }
+            Material ghostMaterial = building.PlacementMaterial;
+            StripBuildingSimulation(ghostInstance);
+            ApplyGhostMaterialFallback(ghostInstance, ghostMaterial);
 
+            HideSelectionIndicators(ghostInstance);
             StripSimulationComponents(ghostInstance);
             CacheTintMaterials();
             FitClickCollider();
             ApplyColliderEnabledState();
             ApplyTint();
+        }
+
+        private static void StripBuildingSimulation(GameObject root)
+        {
+            if (root == null) return;
+
+            foreach (var behaviour in root.GetComponentsInChildren<BaseBuilding>(true))
+            {
+                Destroy(behaviour);
+            }
         }
 
         private void DestroyGhost()
@@ -174,6 +192,17 @@ namespace GameDevTV.RTS.Environment
             }
 
             ApplyColliderEnabledState();
+        }
+
+        private static void HideSelectionIndicators(GameObject root)
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == "Selection Indicator")
+                {
+                    child.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void StripSimulationComponents(GameObject root)
@@ -234,8 +263,6 @@ namespace GameDevTV.RTS.Environment
                 clickCollider = gameObject.AddComponent<BoxCollider>();
             }
 
-            // Trigger colliders still raycast with QueryTriggerInteraction.Collide,
-            // but they won't block unit/building selection physics the same way.
             clickCollider.isTrigger = true;
 
             if (ghostInstance == null)

@@ -39,7 +39,13 @@ namespace GameDevTV.RTS.Environment
             markersPending = true;
 
             eligibleSites.Clear();
-            eligibleSites.AddRange(BuildingSiteRegistry.GetEligibleSites(building, owner));
+            foreach (var site in BuildingSiteRegistry.GetEligibleSites(building, owner))
+            {
+                if (BuildingSiteRegistry.IsSiteVisibleToPlayer(site))
+                {
+                    eligibleSites.Add(site);
+                }
+            }
 
             if (eligibleSites.Count == 0)
             {
@@ -108,6 +114,7 @@ namespace GameDevTV.RTS.Environment
             acceptClicksAfterFrame = -1;
             pendingCardIndex = -1;
             ClearPending();
+            BuildingSiteRegistry.RefreshAllMarkers();
         }
 
         private static BuildingSiteSlot ResolveSiteFromHit(RaycastHit hit)
