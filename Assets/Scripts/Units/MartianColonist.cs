@@ -144,6 +144,13 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
+            // Site-marker ghosts can look like completed buildings; if our shelter was one
+            // (or was destroyed), recover so the colonist is selectable again.
+            if (isInside && !BuildingSiteSlot.IsValidOccupant(currentBuilding))
+            {
+                ForceExitInvalidShelter();
+            }
+
             if (isInside)
             {
                 // Refill oxygen
@@ -171,13 +178,11 @@ namespace GameDevTV.RTS.Units
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (!BuildingSiteSlot.IsValidOccupant(b)) continue;
+                    if (Vector3.Distance(dest, b.transform.position) <= 4.0f)
                     {
-                        if (Vector3.Distance(dest, b.transform.position) <= 4.0f)
-                        {
-                            targetBuilding = b;
-                            break;
-                        }
+                        targetBuilding = b;
+                        break;
                     }
                 }
 
@@ -186,13 +191,11 @@ namespace GameDevTV.RTS.Units
                     BaseBuilding startBuilding = null;
                     foreach (var b in buildings)
                     {
-                        if (b != null && b != targetBuilding && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                        if (b == targetBuilding || !BuildingSiteSlot.IsValidOccupant(b)) continue;
+                        if (Vector3.Distance(transform.position, b.transform.position) <= 4.0f)
                         {
-                            if (Vector3.Distance(transform.position, b.transform.position) <= 4.0f)
-                            {
-                                startBuilding = b;
-                                break;
-                            }
+                            startBuilding = b;
+                            break;
                         }
                     }
 
@@ -290,15 +293,13 @@ namespace GameDevTV.RTS.Units
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (!BuildingSiteSlot.IsValidOccupant(b)) continue;
+                    float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
+                    float distToDest = Vector3.Distance(agent.destination, b.transform.position);
+                    if (distToDest <= 1.0f && distToBuilding <= 8.5f)
                     {
-                        float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        float distToDest = Vector3.Distance(agent.destination, b.transform.position);
-                        if (distToDest <= 1.0f && distToBuilding <= 8.5f)
-                        {
-                            EnterBuilding(b);
-                            break;
-                        }
+                        EnterBuilding(b);
+                        break;
                     }
                 }
             }
@@ -512,7 +513,7 @@ namespace GameDevTV.RTS.Units
 
         public void EnterBuilding(BaseBuilding building)
         {
-            if (building == null) return;
+            if (!BuildingSiteSlot.IsValidOccupant(building)) return;
             currentBuilding = building;
             isInside = true;
 
@@ -542,13 +543,29 @@ namespace GameDevTV.RTS.Units
 
         public void ExitBuilding()
         {
-            if (!isInside || currentBuilding == null) return;
+            if (!isInside) return;
 
+            Vector3 spawnPos = transform.position + Vector3.forward * 3f;
+            if (BuildingSiteSlot.IsValidOccupant(currentBuilding))
+            {
+                spawnPos = currentBuilding.transform.position + Vector3.forward * 3f;
+            }
+
+            ForceExitAt(spawnPos);
+            Debug.Log("[MartianColonist] Exited building onto Martian surface.");
+        }
+
+        private void ForceExitInvalidShelter()
+        {
+            ForceExitAt(transform.position + Vector3.forward * 3f);
+            Debug.Log("[MartianColonist] Left invalid/ghost shelter; collider restored.");
+        }
+
+        private void ForceExitAt(Vector3 spawnPos)
+        {
             isInside = false;
             isWaitingInBuilding = false;
 
-            // Position outside the building
-            Vector3 spawnPos = currentBuilding.transform.position + Vector3.forward * 3f;
             if (NavMesh.SamplePosition(spawnPos, out NavMeshHit hit, 8f, NavMesh.AllAreas))
             {
                 spawnPos = hit.position;
@@ -564,17 +581,14 @@ namespace GameDevTV.RTS.Units
             }
             if (col != null) col.enabled = true;
 
-            // Show visuals
             SetVisualsActive(true);
 
-            // Restore lower height offset when walking outside (Y 15.0f is 3.0f world units)
             if (trackerGo != null)
             {
                 trackerGo.transform.localPosition = new Vector3(0f, 15f, 0f);
             }
 
             currentBuilding = null;
-            Debug.Log("[MartianColonist] Exited building onto Martian surface.");
         }
 
         private void SetVisualsActive(bool active)
@@ -640,7 +654,7 @@ namespace GameDevTV.RTS.Units
                 List<BaseBuilding> completedBuildings = new List<BaseBuilding>();
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (BuildingSiteSlot.IsValidOccupant(b))
                     {
                         completedBuildings.Add(b);
                     }
@@ -669,14 +683,12 @@ namespace GameDevTV.RTS.Units
             float minDist = float.MaxValue;
             foreach (var b in buildings)
             {
-                if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                if (!BuildingSiteSlot.IsValidOccupant(b)) continue;
+                float dist = Vector3.Distance(transform.position, b.transform.position);
+                if (dist < minDist)
                 {
-                    float dist = Vector3.Distance(transform.position, b.transform.position);
-                    if (dist < minDist)
-                    {
-                        minDist = dist;
-                        nearest = b;
-                    }
+                    minDist = dist;
+                    nearest = b;
                 }
             }
 

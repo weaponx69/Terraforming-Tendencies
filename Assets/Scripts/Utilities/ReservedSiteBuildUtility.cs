@@ -24,6 +24,8 @@ namespace GameDevTV.RTS.Utilities
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += HandleBuildingSpawn;
             Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] += HandleBuildingDeath;
             SectorManager.OnSectorUnlocked += BuildingSiteRegistry.RefreshAllMarkers;
+            PlanetGenerator.OnPlanetGenerated += BuildingSiteRegistry.RefreshAllMarkers;
+            HexGridManager.OnStartingAreaRevealed += BuildingSiteRegistry.RefreshAllMarkers;
         }
 
         private static void HandleBuildingSpawn(BuildingSpawnEvent evt)

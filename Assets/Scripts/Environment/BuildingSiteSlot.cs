@@ -31,7 +31,17 @@ namespace GameDevTV.RTS.Environment
         [System.NonSerialized] public BaseBuilding OccupyingBuilding;
         [System.NonSerialized] public GameObject MarkerGO;
 
-        public bool IsOccupied => OccupyingBuilding != null;
+        public bool IsOccupied => IsValidOccupant(OccupyingBuilding);
+
+        public static bool IsValidOccupant(BaseBuilding building)
+        {
+            if (building == null) return false;
+            if (!building.gameObject.activeInHierarchy) return false;
+            if (building.Progress.State == BuildingProgress.BuildingState.Paused) return false;
+            if (building.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase)) return false;
+            if (building.GetComponentInParent<BuildingSiteMarker>() != null) return false;
+            return true;
+        }
 
         public BuildingSiteSlot(
             BuildingSiteKind kind,

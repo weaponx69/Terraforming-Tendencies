@@ -584,6 +584,11 @@ namespace GameDevTV.RTS.Player
             if (collider.gameObject.name == "Selection Indicator") return true;
             if (collider.gameObject.name == "Camera Target") return true;
             if (collider.gameObject.layer == 12) return true; // World Bounds
+            if (collider.GetComponentInParent<BuildingSiteMarker>() != null) return true;
+            if (collider.gameObject.name.Contains("GhostPreview", System.StringComparison.OrdinalIgnoreCase)) return true;
+            // Disabled building components on site ghosts must never steal unit selection.
+            var building = collider.GetComponentInParent<BaseBuilding>();
+            if (building != null && (!building.enabled || !BuildingSiteSlot.IsValidOccupant(building))) return true;
             return false;
         }
 

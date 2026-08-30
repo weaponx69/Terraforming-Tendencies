@@ -14,8 +14,16 @@ namespace GameDevTV.RTS.Environment
 
         private static readonly int TintId = Shader.PropertyToID("_Tint");
         private static readonly int FresnelId = Shader.PropertyToID("_FresnelColor");
-        private static readonly Color SelectTint = new Color(0.2f, 0.65f, 1f, 2f);
-        private static readonly Color SelectFresnel = new Color(4f, 1.7f, 0f, 2f);
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int ColorId = Shader.PropertyToID("_Color");
+
+        // Site-pad previews stay very translucent so finished buildings read clearly.
+        private static readonly Color IdleTint = new Color(0.45f, 0.7f, 0.95f, 0.16f);
+        private static readonly Color IdleFresnel = new Color(0.35f, 0.55f, 0.8f, 0.2f);
+        private static readonly Color SelectTint = new Color(0.25f, 0.75f, 1f, 0.4f);
+        private static readonly Color SelectFresnel = new Color(1.2f, 0.7f, 0.15f, 0.55f);
+        private const float IdleBaseAlpha = 0.18f;
+        private const float SelectBaseAlpha = 0.38f;
 
         private GameObject ghostInstance;
         private BuildingSO previewBuilding;
@@ -29,16 +37,7 @@ namespace GameDevTV.RTS.Environment
             Site = site;
             isSelectable = false;
             previewBuilding = null;
-
-            if (Site?.Kind == BuildingSiteKind.CommandPost)
-            {
-                RebuildGhost();
-            }
-            else
-            {
-                DestroyGhost();
-            }
-
+            RebuildGhost();
             RefreshVisibility();
         }
 
@@ -52,15 +51,7 @@ namespace GameDevTV.RTS.Environment
         public void ClearPreview()
         {
             previewBuilding = null;
-            if (Site?.Kind == BuildingSiteKind.PairedBuilding)
-            {
-                DestroyGhost();
-            }
-            else
-            {
-                RebuildGhost();
-            }
-
+            RebuildGhost();
             RefreshVisibility();
         }
 
@@ -113,11 +104,14 @@ namespace GameDevTV.RTS.Environment
         {
             if (Site == null) return false;
 
+            // Always show fog-revealed reserved pads so the bootstrap sites
+            // (Command Post, Solar, Oxygen Processor) stay visible in the starting area.
             return Site.Kind switch
             {
                 BuildingSiteKind.CommandPost => true,
-                BuildingSiteKind.PairedBuilding => previewBuilding != null,
-                BuildingSiteKind.Solar => isSelectable,
+                BuildingSiteKind.Solar => true,
+                BuildingSiteKind.PairedBuilding => true,
+                BuildingSiteKind.Mine => isSelectable,
                 _ => isSelectable
             };
         }
@@ -147,38 +141,65 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            GameObject prefab = building.Prefab != null
-                ? building.Prefab
-                : BuildingSiteGhostUtility.GetGhostPrefab(building);
+            // Prefer dedicated ghost variants when available; fall back to the solid prefab.
+            GameObject prefab = BuildingSiteGhostUtility.GetGhostPrefab(building);
+            if (prefab == null)
+            {
+                prefab = building.Prefab;
+            }
             if (prefab == null)
             {
                 return;
             }
 
-            ghostInstance = Instantiate(prefab, transform);
+            // Instantiate under an inactive holder so Awake/OnEnable/Start never run on the
+            // building simulation components (they would complete construction and occupy the pad).
+            var holder = new GameObject("GhostSpawnHolder");
+            holder.SetActive(false);
+            holder.transform.SetParent(transform, false);
+
+            ghostInstance = Instantiate(prefab, holder.transform);
             ghostInstance.name = $"GhostPreview_{building.Name}";
             ghostInstance.transform.localPosition = Vector3.zero;
             ghostInstance.transform.localRotation = Quaternion.identity;
 
             Material ghostMaterial = building.PlacementMaterial;
-            StripBuildingSimulation(ghostInstance);
+            NeutralizeGhostSimulation(ghostInstance, ghostMaterial);
             ApplyGhostMaterialFallback(ghostInstance, ghostMaterial);
-
             HideSelectionIndicators(ghostInstance);
             StripSimulationComponents(ghostInstance);
+
+            ghostInstance.transform.SetParent(transform, false);
+            DestroyImmediate(holder);
+            ghostInstance.SetActive(true);
+
+            // Re-assert after activation: parenting into an active hierarchy can still schedule
+            // lifecycle callbacks if any behaviour was left enabled.
+            NeutralizeGhostSimulation(ghostInstance, ghostMaterial);
+            StripSimulationComponents(ghostInstance);
+
             CacheTintMaterials();
             FitClickCollider();
             ApplyColliderEnabledState();
             ApplyTint();
         }
 
-        private static void StripBuildingSimulation(GameObject root)
+        private static void NeutralizeGhostSimulation(GameObject root, Material ghostMaterial)
         {
             if (root == null) return;
 
-            foreach (var behaviour in root.GetComponentsInChildren<BaseBuilding>(true))
+            foreach (var buildingComp in root.GetComponentsInChildren<BaseBuilding>(true))
             {
-                Destroy(behaviour);
+                if (buildingComp == null) continue;
+                // Force paused ghost state so Start will not CompleteConstruction / RaiseSpawnEvent
+                // even if the component is briefly enabled.
+                buildingComp.InitializeAsGhost(ghostMaterial, buildingComp.Owner);
+                buildingComp.enabled = false;
+            }
+
+            foreach (var behaviour in root.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (behaviour != null) behaviour.enabled = false;
             }
         }
 
@@ -187,7 +208,7 @@ namespace GameDevTV.RTS.Environment
             tintedMaterials.Clear();
             if (ghostInstance != null)
             {
-                Destroy(ghostInstance);
+                DestroyImmediate(ghostInstance);
                 ghostInstance = null;
             }
 
@@ -209,18 +230,18 @@ namespace GameDevTV.RTS.Environment
         {
             foreach (var col in root.GetComponentsInChildren<Collider>(true))
             {
-                Destroy(col);
+                Object.DestroyImmediate(col);
             }
 
             foreach (var nav in root.GetComponentsInChildren<UnityEngine.AI.NavMeshObstacle>(true))
             {
-                Destroy(nav);
+                Object.DestroyImmediate(nav);
             }
         }
 
         private static void ApplyGhostMaterialFallback(GameObject root, Material ghostMaterial)
         {
-            if (root == null || ghostMaterial == null) return;
+            if (root == null) return;
 
             foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
             {
@@ -231,7 +252,17 @@ namespace GameDevTV.RTS.Environment
                     continue;
                 }
 
-                renderer.sharedMaterial = ghostMaterial;
+                // Instance materials so site opacity tweaks never mutate the shared asset.
+                if (ghostMaterial != null)
+                {
+                    renderer.material = new Material(ghostMaterial);
+                }
+                else if (renderer.sharedMaterial != null)
+                {
+                    renderer.material = new Material(renderer.sharedMaterial);
+                }
+
+                ApplyOpacityToMaterial(renderer.material, IdleTint, IdleFresnel, IdleBaseAlpha);
             }
         }
 
@@ -242,8 +273,43 @@ namespace GameDevTV.RTS.Environment
 
             foreach (var renderer in ghostInstance.GetComponentsInChildren<Renderer>())
             {
-                if (renderer == null) continue;
+                if (renderer == null || renderer.material == null) continue;
+                string nameLower = renderer.gameObject.name.ToLowerInvariant();
+                if (nameLower.Contains("vision") || nameLower.Contains("selection") || nameLower.Contains("indicator"))
+                {
+                    continue;
+                }
+
                 tintedMaterials.Add(renderer.material);
+            }
+        }
+
+        private static void ApplyOpacityToMaterial(Material material, Color tint, Color fresnel, float baseAlpha)
+        {
+            if (material == null) return;
+
+            if (material.HasProperty(TintId))
+            {
+                material.SetColor(TintId, tint);
+            }
+
+            if (material.HasProperty(FresnelId))
+            {
+                material.SetColor(FresnelId, fresnel);
+            }
+
+            if (material.HasProperty(BaseColorId))
+            {
+                Color baseColor = material.GetColor(BaseColorId);
+                baseColor.a = baseAlpha;
+                material.SetColor(BaseColorId, baseColor);
+            }
+
+            if (material.HasProperty(ColorId))
+            {
+                Color color = material.GetColor(ColorId);
+                color.a = baseAlpha;
+                material.SetColor(ColorId, color);
             }
         }
 
@@ -315,26 +381,13 @@ namespace GameDevTV.RTS.Environment
 
         private void ApplyTint()
         {
+            Color tint = highlighted ? SelectTint : IdleTint;
+            Color fresnel = highlighted ? SelectFresnel : IdleFresnel;
+            float baseAlpha = highlighted ? SelectBaseAlpha : IdleBaseAlpha;
+
             foreach (Material material in tintedMaterials)
             {
-                if (material == null || !material.HasProperty(TintId)) continue;
-
-                if (highlighted)
-                {
-                    material.SetColor(TintId, SelectTint);
-                    if (material.HasProperty(FresnelId))
-                    {
-                        material.SetColor(FresnelId, SelectFresnel);
-                    }
-                }
-                else if (material.HasProperty(TintId))
-                {
-                    material.SetColor(TintId, Color.white);
-                    if (material.HasProperty(FresnelId))
-                    {
-                        material.SetColor(FresnelId, Color.white);
-                    }
-                }
+                ApplyOpacityToMaterial(material, tint, fresnel, baseAlpha);
             }
         }
 

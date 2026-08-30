@@ -25,6 +25,8 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private bool generateShroudOnStart = true;
         [SerializeField] private float startingAreaRevealRadius = 15f;
 
+        public float StartingAreaRevealRadius => startingAreaRevealRadius;
+
         public static bool HighlightTrace { get; private set; }
 
         public static void SetHighlightTrace(bool enabled)
@@ -226,7 +228,9 @@ namespace GameDevTV.RTS.Environment
         public bool IsPositionRevealed(Vector3 worldPosition)
         {
             HexTile tile = GetHexAtWorldPosition(worldPosition);
-            return tile != null && tile.IsRevealed;
+            // No shroud tile means no fog cover at this spot — don't permanently hide sites.
+            if (tile == null) return true;
+            return tile.IsRevealed;
         }
 
         public static bool IsWorldPositionRevealed(Vector3 worldPosition)

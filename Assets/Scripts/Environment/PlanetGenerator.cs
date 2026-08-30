@@ -452,6 +452,11 @@ namespace GameDevTV.RTS.Environment
                         Vector3 sectorMin = sector.Center - new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         float exclusionRadius = 5f;
+                        bool isStartingSector = sectorIndex == 0;
+                        float revealRadius = HexGridManager.Instance != null
+                            ? HexGridManager.Instance.StartingAreaRevealRadius
+                            : 15f;
+                        float bootstrapRadius = Mathf.Max(6f, revealRadius * 0.7f);
 
                         System.Func<Vector3> randomPos = () =>
                         {
@@ -460,11 +465,19 @@ namespace GameDevTV.RTS.Environment
                             return new Vector3(rx, 0, rz);
                         };
 
-                        // 2 Minerals
+                        // 2 Minerals — Sector 0 guarantees the first deposit inside the starting reveal.
                         for (int i = 0; i < 2; i++)
                         {
-                            Vector3 pos = randomPos();
-                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
+                            Vector3 pos;
+                            if (isStartingSector && i == 0)
+                            {
+                                pos = sector.Center + new Vector3(-bootstrapRadius * 0.55f, 0f, bootstrapRadius * 0.4f);
+                            }
+                            else
+                            {
+                                pos = randomPos();
+                                if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
+                            }
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                         }
 
@@ -567,11 +580,18 @@ namespace GameDevTV.RTS.Environment
                 /// <summary>
                 /// Pre-place reserved building pads per sector. Each sector gets one command post pad,
                 /// three solar/building clusters, and mine pads on resource geography.
+                /// Sector 0 guarantees Command Post + one Solar/Oxygen cluster inside the starting
+                /// reveal radius so the bootstrap loop is always playable in the visible fog area.
                 /// </summary>
                 private void PlaceSectorBuildingSites()
                 {
                     var markerRoot = new GameObject("BuildingSiteMarkers");
                     markerRoot.transform.parent = transform;
+                    float revealRadius = HexGridManager.Instance != null
+                        ? HexGridManager.Instance.StartingAreaRevealRadius
+                        : 15f;
+                    // Keep pads comfortably inside the reveal circle (hex edges / snap variance).
+                    float bootstrapRadius = Mathf.Max(6f, revealRadius * 0.7f);
 
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
@@ -582,13 +602,32 @@ namespace GameDevTV.RTS.Environment
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
                         Vector3 sectorMin = sector.Center - new Vector3(secW * 0.4f, 0, secH * 0.4f);
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.4f, 0, secH * 0.4f);
+                        bool isStartingSector = SectorManager.Instance.Sectors.IndexOf(sector) == 0;
 
-                        Vector3 commandPos = SnapSitePosition(sector.Center + new Vector3(-secW * 0.15f, 0, -secH * 0.15f));
+                        Vector3 commandPos = isStartingSector
+                            ? SnapSitePosition(sector.Center + new Vector3(-bootstrapRadius * 0.35f, 0f, -bootstrapRadius * 0.2f))
+                            : SnapSitePosition(sector.Center + new Vector3(-secW * 0.15f, 0, -secH * 0.15f));
                         var commandSite = new BuildingSiteSlot(BuildingSiteKind.CommandPost, commandPos, sector);
                         sector.BuildingSites.Add(commandSite);
                         commandSite.MarkerGO = CreateSiteMarker(markerRoot.transform, commandPos, BuildingSiteKind.CommandPost, commandSite);
 
                         int clustersPlaced = 0;
+
+                        if (isStartingSector)
+                        {
+                            // Guaranteed bootstrap cluster: Solar Pad + Paired Building (Oxygen Processor)
+                            // inside the starting reveal so both sites are visible from turn 1.
+                            Vector3 solarPos = SnapSitePosition(sector.Center + new Vector3(bootstrapRadius * 0.45f, 0f, bootstrapRadius * 0.15f));
+                            Vector3 buildingPos = SnapSitePosition(solarPos + new Vector3(5.5f, 0f, 2f));
+                            if (Vector3.Distance(buildingPos, sector.Center) > bootstrapRadius)
+                            {
+                                buildingPos = SnapSitePosition(solarPos + new Vector3(-5.5f, 0f, 2f));
+                            }
+
+                            PlaceCluster(sector, markerRoot.transform, solarPos, buildingPos);
+                            clustersPlaced++;
+                        }
+
                         for (int attempt = 0; attempt < 12 && clustersPlaced < 3; attempt++)
                         {
                             Vector3 clusterCenter = SnapSitePosition(new Vector3(
@@ -596,6 +635,10 @@ namespace GameDevTV.RTS.Environment
                                 0f,
                                 Random.Range(sectorMin.z, sectorMax.z)));
                             if (Vector3.Distance(clusterCenter, sector.Center) < 8f) continue;
+                            if (isStartingSector && Vector3.Distance(clusterCenter, sector.Center) < bootstrapRadius + 4f)
+                            {
+                                continue; // don't crowd the guaranteed starter cluster
+                            }
 
                             float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
                             Vector3 buildingOffset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 6f;
@@ -603,29 +646,14 @@ namespace GameDevTV.RTS.Environment
                             Vector3 buildingPos = SnapSitePosition(clusterCenter + buildingOffset);
                             if (Vector3.Distance(solarPos, buildingPos) < 4f) continue;
 
-                            var cluster = new BuildingSiteCluster
-                            {
-                                Id = sector.BuildingClusters.Count,
-                                Sector = sector
-                            };
-
-                            var solarSite = new BuildingSiteSlot(BuildingSiteKind.Solar, solarPos, sector);
-                            solarSite.Cluster = cluster;
-                            cluster.SolarSlot = solarSite;
-
-                            var buildingSite = new BuildingSiteSlot(BuildingSiteKind.PairedBuilding, buildingPos, sector);
-                            buildingSite.Cluster = cluster;
-                            cluster.BuildingSlot = buildingSite;
-
-                            sector.BuildingClusters.Add(cluster);
-                            sector.BuildingSites.Add(solarSite);
-                            sector.BuildingSites.Add(buildingSite);
-
-                            solarSite.MarkerGO = CreateSiteMarker(markerRoot.transform, solarPos, BuildingSiteKind.Solar, solarSite);
-                            buildingSite.MarkerGO = CreateSiteMarker(markerRoot.transform, buildingPos, BuildingSiteKind.PairedBuilding, buildingSite);
+                            PlaceCluster(sector, markerRoot.transform, solarPos, buildingPos);
                             clustersPlaced++;
                         }
+                    }
 
+                    // Mine pads after clusters so resource nodes already exist.
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
                         foreach (var node in sector.Nodes)
                         {
                             if (node.type != SectorNode.NodeType.Minerals &&
@@ -652,6 +680,30 @@ namespace GameDevTV.RTS.Environment
                     }
 
                     Debug.Log($"[PlanetGenerator] Placed {totalSites} reserved building sites.");
+                }
+
+                private void PlaceCluster(SectorManager.Sector sector, Transform markerRoot, Vector3 solarPos, Vector3 buildingPos)
+                {
+                    var cluster = new BuildingSiteCluster
+                    {
+                        Id = sector.BuildingClusters.Count,
+                        Sector = sector
+                    };
+
+                    var solarSite = new BuildingSiteSlot(BuildingSiteKind.Solar, solarPos, sector);
+                    solarSite.Cluster = cluster;
+                    cluster.SolarSlot = solarSite;
+
+                    var buildingSite = new BuildingSiteSlot(BuildingSiteKind.PairedBuilding, buildingPos, sector);
+                    buildingSite.Cluster = cluster;
+                    cluster.BuildingSlot = buildingSite;
+
+                    sector.BuildingClusters.Add(cluster);
+                    sector.BuildingSites.Add(solarSite);
+                    sector.BuildingSites.Add(buildingSite);
+
+                    solarSite.MarkerGO = CreateSiteMarker(markerRoot, solarPos, BuildingSiteKind.Solar, solarSite);
+                    buildingSite.MarkerGO = CreateSiteMarker(markerRoot, buildingPos, BuildingSiteKind.PairedBuilding, buildingSite);
                 }
 
                 private Vector3 SnapSitePosition(Vector3 approximate)

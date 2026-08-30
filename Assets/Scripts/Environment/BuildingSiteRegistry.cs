@@ -68,7 +68,12 @@ namespace GameDevTV.RTS.Environment
 
                 foreach (var site in sector.BuildingSites)
                 {
-                    if (site == null || site.IsOccupied) continue;
+                    if (site == null) continue;
+                    if (site.OccupyingBuilding != null && !BuildingSiteSlot.IsValidOccupant(site.OccupyingBuilding))
+                    {
+                        site.ClearOccupancy();
+                    }
+                    if (site.IsOccupied) continue;
                     if (site.Kind != kind && !(kind == BuildingSiteKind.PairedBuilding && site.Kind == BuildingSiteKind.Infrastructure))
                     {
                         continue;
@@ -110,6 +115,28 @@ namespace GameDevTV.RTS.Environment
             if (site.Sector.IsLocked || !site.Sector.IsExplored)
             {
                 return false;
+            }
+
+            // Sector 0 bootstrap guarantee: pads inside the starting reveal radius stay
+            // visible even if hex fog hasn't finished updating yet.
+            if (SectorManager.Instance != null &&
+                SectorManager.Instance.Sectors.Count > 0 &&
+                site.Sector == SectorManager.Instance.Sectors[0])
+            {
+                float reveal = HexGridManager.Instance != null
+                    ? HexGridManager.Instance.StartingAreaRevealRadius
+                    : 15f;
+                Vector3 a = site.Position; a.y = 0f;
+                Vector3 b = site.Sector.Center; b.y = 0f;
+                if (Vector3.Distance(a, b) <= reveal)
+                {
+                    return true;
+                }
+            }
+
+            if (HexGridManager.Instance == null)
+            {
+                return true;
             }
 
             return HexGridManager.IsWorldPositionRevealed(site.Position);
@@ -155,7 +182,7 @@ namespace GameDevTV.RTS.Environment
 
         public static void RegisterOccupancy(BaseBuilding building)
         {
-            if (building == null || SectorManager.Instance == null) return;
+            if (!BuildingSiteSlot.IsValidOccupant(building) || SectorManager.Instance == null) return;
 
             BuildingSiteSlot nearest = null;
             float nearestDist = 4f;
@@ -208,7 +235,12 @@ namespace GameDevTV.RTS.Environment
                 if (sector?.BuildingSites == null) continue;
                 foreach (var site in sector.BuildingSites)
                 {
-                    site?.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
+                    if (site == null) continue;
+                    if (site.OccupyingBuilding != null && !BuildingSiteSlot.IsValidOccupant(site.OccupyingBuilding))
+                    {
+                        site.ClearOccupancy();
+                    }
+                    site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
                 }
             }
         }

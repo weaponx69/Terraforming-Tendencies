@@ -126,6 +126,11 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
+            if (isInside && !BuildingSiteSlot.IsValidOccupant(currentBuilding))
+            {
+                ForceExitInvalidShelter();
+            }
+
             // High Priority: Scan for any damaged structure
             CheckForRepairs();
 
@@ -230,17 +235,15 @@ namespace GameDevTV.RTS.Units
                 // Within each bracket, we naturally select the closest one.
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed && b.CurrentHealth < b.MaxHealth)
-                    {
-                        float dist = Vector3.Distance(transform.position, b.transform.position);
-                        float healthPct = (float)b.CurrentHealth / b.MaxHealth;
-                        float score = dist + (healthPct < 0.3f ? 0f : 150f);
+                    if (!BuildingSiteSlot.IsValidOccupant(b) || b.CurrentHealth >= b.MaxHealth) continue;
+                    float dist = Vector3.Distance(transform.position, b.transform.position);
+                    float healthPct = (float)b.CurrentHealth / b.MaxHealth;
+                    float score = dist + (healthPct < 0.3f ? 0f : 150f);
 
-                        if (score < bestScore)
-                        {
-                            bestScore = score;
-                            bestTarget = b;
-                        }
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        bestTarget = b;
                     }
                 }
 
@@ -338,7 +341,7 @@ namespace GameDevTV.RTS.Units
                 List<BaseBuilding> completedBuildings = new List<BaseBuilding>();
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (BuildingSiteSlot.IsValidOccupant(b))
                     {
                         completedBuildings.Add(b);
                     }
@@ -364,13 +367,11 @@ namespace GameDevTV.RTS.Units
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (!BuildingSiteSlot.IsValidOccupant(b)) continue;
+                    if (Vector3.Distance(dest, b.transform.position) <= 4.0f)
                     {
-                        if (Vector3.Distance(dest, b.transform.position) <= 4.0f)
-                        {
-                            targetBuilding = b;
-                            break;
-                        }
+                        targetBuilding = b;
+                        break;
                     }
                 }
 
@@ -379,13 +380,11 @@ namespace GameDevTV.RTS.Units
                     BaseBuilding startBuilding = null;
                     foreach (var b in buildings)
                     {
-                        if (b != null && b != targetBuilding && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                        if (b == targetBuilding || !BuildingSiteSlot.IsValidOccupant(b)) continue;
+                        if (Vector3.Distance(transform.position, b.transform.position) <= 4.0f)
                         {
-                            if (Vector3.Distance(transform.position, b.transform.position) <= 4.0f)
-                            {
-                                startBuilding = b;
-                                break;
-                            }
+                            startBuilding = b;
+                            break;
                         }
                     }
 
@@ -534,15 +533,13 @@ namespace GameDevTV.RTS.Units
                 var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
                 foreach (var b in buildings)
                 {
-                    if (b != null && b.Progress.State == BuildingProgress.BuildingState.Completed)
+                    if (!BuildingSiteSlot.IsValidOccupant(b)) continue;
+                    float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
+                    float distToDest = Vector3.Distance(agent.destination, b.transform.position);
+                    if (distToDest <= 1.0f && distToBuilding <= 8.5f)
                     {
-                        float distToBuilding = Vector3.Distance(transform.position, b.transform.position);
-                        float distToDest = Vector3.Distance(agent.destination, b.transform.position);
-                        if (distToDest <= 1.0f && distToBuilding <= 8.5f)
-                        {
-                            EnterBuilding(b);
-                            break;
-                        }
+                        EnterBuilding(b);
+                        break;
                     }
                 }
             }
@@ -580,7 +577,7 @@ namespace GameDevTV.RTS.Units
 
         public void EnterBuilding(BaseBuilding building)
         {
-            if (building == null) return;
+            if (!BuildingSiteSlot.IsValidOccupant(building)) return;
             currentBuilding = building;
             isInside = true;
             isWaitingInBuilding = true;
@@ -605,12 +602,27 @@ namespace GameDevTV.RTS.Units
 
         public void ExitBuilding()
         {
-            if (!isInside || currentBuilding == null) return;
+            if (!isInside) return;
 
+            Vector3 spawnPos = transform.position + Vector3.forward * 3f;
+            if (BuildingSiteSlot.IsValidOccupant(currentBuilding))
+            {
+                spawnPos = currentBuilding.transform.position + Vector3.forward * 3f;
+            }
+
+            ForceExitAt(spawnPos);
+        }
+
+        private void ForceExitInvalidShelter()
+        {
+            ForceExitAt(transform.position + Vector3.forward * 3f);
+        }
+
+        private void ForceExitAt(Vector3 spawnPos)
+        {
             isInside = false;
             isWaitingInBuilding = false;
 
-            Vector3 spawnPos = currentBuilding.transform.position + Vector3.forward * 3f;
             if (NavMesh.SamplePosition(spawnPos, out NavMeshHit hit, 8f, NavMesh.AllAreas))
             {
                 spawnPos = hit.position;
