@@ -884,7 +884,24 @@ namespace GameDevTV.RTS.Player
         {
             if (playerCamera == null) { return ; }
 
+            if (EventSystem.current.IsPointerOverGameObject()) { return; }
+
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+
+            if (BuildingSiteSelectionController.IsSelecting)
+            {
+                RaycastHit[] selectionHits = Physics.RaycastAll(
+                    cameraRay, float.MaxValue, ~0, QueryTriggerInteraction.Collide);
+                foreach (RaycastHit hit in selectionHits.OrderBy(h => h.distance))
+                {
+                    if (BuildingSiteSelectionController.TryHandleClick(hit))
+                    {
+                        return;
+                    }
+                }
+
+                return;
+            }
 
             if (activeCommand == null)
             {

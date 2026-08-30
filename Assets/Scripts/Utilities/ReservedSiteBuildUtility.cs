@@ -59,9 +59,13 @@ namespace GameDevTV.RTS.Utilities
                 {
                     reason = "No available Command Post site in an unlocked sector.";
                 }
+                else if (BuildingSiteRegistry.IsSolarBuilding(building))
+                {
+                    reason = "No open solar array sites in unlocked sectors.";
+                }
                 else
                 {
-                    reason = $"No available build site for {building.Name}.";
+                    reason = $"No powered building sites for {building.Name}. Build a Solar Panel first, then pick its cluster.";
                 }
                 return false;
             }
@@ -100,12 +104,63 @@ namespace GameDevTV.RTS.Utilities
 
         public static bool TryBuildAtReservedSite(BuildingSO building, Owner owner, out string reason)
         {
-            if (!CanBuildAtReservedSite(building, owner, out reason))
+            var site = BuildingSiteRegistry.GetAvailableSite(building, owner);
+            if (site == null)
             {
+                reason = $"No available site for {building?.Name}.";
                 return false;
             }
 
-            var site = BuildingSiteRegistry.GetAvailableSite(building, owner);
+            return TryBuildAtSite(building, owner, site, out reason);
+        }
+
+        public static bool TryBuildAtSite(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason)
+        {
+            reason = null;
+            if (building == null || site == null)
+            {
+                reason = "No building or site specified.";
+                return false;
+            }
+
+            if (site.IsOccupied)
+            {
+                reason = "That build site is already occupied.";
+                return false;
+            }
+
+            if (!BuildingSiteRegistry.GetEligibleSites(building, owner).Contains(site))
+            {
+                reason = BuildingSiteRegistry.IsSolarBuilding(building)
+                    ? "That solar site is not available."
+                    : "That building site needs its own solar array first.";
+                return false;
+            }
+
+            if (!HasEnoughMaterials(building, owner))
+            {
+                reason = $"Not enough materials to build {building.Name}.";
+                return false;
+            }
+
+            var cmd = CreateCommand(building);
+            var context = CreateContext(owner, site.Position);
+            if (cmd.IsLocked(context))
+            {
+                reason = $"Cannot build {building.Name} yet (locked or insufficient materials).";
+                Object.Destroy(cmd);
+                return false;
+            }
+
+            if (!cmd.AllRestrictionsPass(SnapToNavMesh(site.Position), owner, requireWorker: false))
+            {
+                reason = $"Cannot build {building.Name} at the reserved site right now.";
+                Object.Destroy(cmd);
+                return false;
+            }
+
+            Object.Destroy(cmd);
+
             Vector3 targetPos = SnapToNavMesh(site.Position);
 
             if (!ConsumeMaterials(building, owner))
@@ -127,18 +182,36 @@ namespace GameDevTV.RTS.Utilities
             built.CompleteConstruction();
 
             site.SetOccupied(built);
-            if (site.MarkerGO != null)
+            site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
+
+            if (site.Cluster?.BuildingSlot?.MarkerGO != null)
             {
-                site.MarkerGO.SetActive(false);
+                site.Cluster.BuildingSlot.MarkerGO.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
             }
 
-            if (!BuildingSiteRegistry.IsCommandBuilding(building))
+            ConnectToClusterSolar(built, site);
+
+            if (!BuildingSiteRegistry.IsCommandBuilding(building) && !BuildingSiteRegistry.IsSolarBuilding(building))
             {
                 BlueprintDraftManager.LockBuilding(building.Name);
             }
 
             Debug.Log($"[ReservedSiteBuild] Built {building.Name} at reserved site {targetPos}");
             return true;
+        }
+
+        private static void ConnectToClusterSolar(BaseBuilding built, BuildingSiteSlot site)
+        {
+            if (built == null || site?.Cluster?.SolarBuilding == null) return;
+            if (site.Kind != BuildingSiteKind.PairedBuilding && site.Kind != BuildingSiteKind.Infrastructure) return;
+
+            if (built.TryGetComponent(out PowerNode consumerNode) &&
+                site.Cluster.SolarBuilding.TryGetComponent(out PowerNode solarNode) &&
+                !consumerNode.ConnectedNodes.Contains(solarNode))
+            {
+                consumerNode.ConnectTo(solarNode);
+                Debug.Log($"[ReservedSiteBuild] Connected {built.name} to cluster solar {site.Cluster.SolarBuilding.name}.");
+            }
         }
 
         private static BuildBuildingCommand CreateCommand(BuildingSO building)

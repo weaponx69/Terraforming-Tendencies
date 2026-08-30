@@ -6,7 +6,10 @@ namespace GameDevTV.RTS.Environment
     public enum BuildingSiteKind
     {
         CommandPost,
+        /// <summary>Deprecated: replaced by Solar + PairedBuilding clusters.</summary>
         Infrastructure,
+        Solar,
+        PairedBuilding,
         Mine
     }
 
@@ -24,6 +27,7 @@ namespace GameDevTV.RTS.Environment
         public bool HasLinkedResource;
 
         [System.NonSerialized] public SectorManager.Sector Sector;
+        [System.NonSerialized] public BuildingSiteCluster Cluster;
         [System.NonSerialized] public BaseBuilding OccupyingBuilding;
         [System.NonSerialized] public GameObject MarkerGO;
 

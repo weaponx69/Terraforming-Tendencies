@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using GameDevTV.RTS.Commands;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
@@ -13,7 +14,7 @@ namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
     /// Persistent bottom-center action bar that shows the player's card hand.
-    /// Building cards build instantly at pre-placed reserved sites (no ghost placement).
+    /// Building cards open site selection so the player picks which solar cluster to use.
     /// </summary>
     public class BottomBarActionsUI : MonoBehaviour
     {
@@ -124,19 +125,7 @@ namespace GameDevTV.RTS.UI.Containers
 
                         actionButtons[i].EnableFor(buildCmd, null, () =>
                         {
-                            var building = unlockCard.buildingToUnlock;
-                            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(
-                                    building, owner, out string reason, requireUnlocked: false))
-                            {
-                                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
-                                return;
-                            }
-
-                            CardDeckController.Instance.PlayCard(cardIndex);
-                            if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(building, owner, out reason))
-                            {
-                                Debug.LogWarning($"[BottomBarActionsUI] Build failed after playing card: {reason}");
-                            }
+                            PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
                         });
                     }
                     else
@@ -212,10 +201,7 @@ namespace GameDevTV.RTS.UI.Containers
 
                         actionButtons[slot].EnableFor(fbBbc, null, () =>
                         {
-                            if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(bbc.Building, owner, out string reason))
-                            {
-                                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
-                            }
+                            BeginBuildingSelection(bbc.Building);
                         });
 
                         filledSlots.Add(slot);
@@ -223,6 +209,50 @@ namespace GameDevTV.RTS.UI.Containers
                     }
                 }
             }
+        }
+
+        private void PlayBuildingCard(int cardIndex, BuildingSO building)
+        {
+            if (building == null) return;
+
+            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(
+                    building, owner, out string reason, requireUnlocked: false))
+            {
+                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
+                return;
+            }
+
+            CardDeckController.Instance.PlayCard(cardIndex);
+
+            if (BuildingSiteRegistry.IsCommandBuilding(building))
+            {
+                if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(building, owner, out reason))
+                {
+                    Debug.LogWarning($"[BottomBarActionsUI] Build failed after playing card: {reason}");
+                }
+                return;
+            }
+
+            BeginBuildingSelection(building);
+        }
+
+        private void BeginBuildingSelection(BuildingSO building)
+        {
+            if (building == null) return;
+
+            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(building, owner, out string reason))
+            {
+                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
+                return;
+            }
+
+            BuildingSiteSelectionController.Begin(building, owner, (ok, selectReason) =>
+            {
+                if (!ok)
+                {
+                    Debug.LogWarning($"[BottomBarActionsUI] {selectReason}");
+                }
+            });
         }
 
         /// <summary>

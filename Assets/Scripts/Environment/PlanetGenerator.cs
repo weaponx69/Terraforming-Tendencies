@@ -565,8 +565,8 @@ namespace GameDevTV.RTS.Environment
                 }
 
                 /// <summary>
-                /// Pre-place reserved building pads per sector. Mine pads sit on resource geography;
-                /// infrastructure pads are scattered; each sector gets one command post pad.
+                /// Pre-place reserved building pads per sector. Each sector gets one command post pad,
+                /// three solar/building clusters, and mine pads on resource geography.
                 /// </summary>
                 private void PlaceSectorBuildingSites()
                 {
@@ -576,6 +576,7 @@ namespace GameDevTV.RTS.Environment
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
                         sector.BuildingSites.Clear();
+                        sector.BuildingClusters.Clear();
 
                         float secW = (Config.MapWidth * CellSize) / Config.SectorsX;
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
@@ -585,19 +586,44 @@ namespace GameDevTV.RTS.Environment
                         Vector3 commandPos = SnapSitePosition(sector.Center + new Vector3(-secW * 0.15f, 0, -secH * 0.15f));
                         var commandSite = new BuildingSiteSlot(BuildingSiteKind.CommandPost, commandPos, sector);
                         sector.BuildingSites.Add(commandSite);
-                        commandSite.MarkerGO = CreateSiteMarker(markerRoot.transform, commandPos, BuildingSiteKind.CommandPost);
+                        commandSite.MarkerGO = CreateSiteMarker(markerRoot.transform, commandPos, BuildingSiteKind.CommandPost, commandSite);
 
-                        for (int i = 0; i < 3; i++)
+                        int clustersPlaced = 0;
+                        for (int attempt = 0; attempt < 12 && clustersPlaced < 3; attempt++)
                         {
-                            Vector3 infraPos = SnapSitePosition(new Vector3(
+                            Vector3 clusterCenter = SnapSitePosition(new Vector3(
                                 Random.Range(sectorMin.x, sectorMax.x),
                                 0f,
                                 Random.Range(sectorMin.z, sectorMax.z)));
-                            if (Vector3.Distance(infraPos, sector.Center) < 6f) continue;
+                            if (Vector3.Distance(clusterCenter, sector.Center) < 8f) continue;
 
-                            var infraSite = new BuildingSiteSlot(BuildingSiteKind.Infrastructure, infraPos, sector);
-                            sector.BuildingSites.Add(infraSite);
-                            infraSite.MarkerGO = CreateSiteMarker(markerRoot.transform, infraPos, BuildingSiteKind.Infrastructure);
+                            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+                            Vector3 buildingOffset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 6f;
+                            Vector3 solarPos = clusterCenter;
+                            Vector3 buildingPos = SnapSitePosition(clusterCenter + buildingOffset);
+                            if (Vector3.Distance(solarPos, buildingPos) < 4f) continue;
+
+                            var cluster = new BuildingSiteCluster
+                            {
+                                Id = sector.BuildingClusters.Count,
+                                Sector = sector
+                            };
+
+                            var solarSite = new BuildingSiteSlot(BuildingSiteKind.Solar, solarPos, sector);
+                            solarSite.Cluster = cluster;
+                            cluster.SolarSlot = solarSite;
+
+                            var buildingSite = new BuildingSiteSlot(BuildingSiteKind.PairedBuilding, buildingPos, sector);
+                            buildingSite.Cluster = cluster;
+                            cluster.BuildingSlot = buildingSite;
+
+                            sector.BuildingClusters.Add(cluster);
+                            sector.BuildingSites.Add(solarSite);
+                            sector.BuildingSites.Add(buildingSite);
+
+                            solarSite.MarkerGO = CreateSiteMarker(markerRoot.transform, solarPos, BuildingSiteKind.Solar, solarSite);
+                            buildingSite.MarkerGO = CreateSiteMarker(markerRoot.transform, buildingPos, BuildingSiteKind.PairedBuilding, buildingSite);
+                            clustersPlaced++;
                         }
 
                         foreach (var node in sector.Nodes)
@@ -615,7 +641,7 @@ namespace GameDevTV.RTS.Environment
                                 : SnapSitePosition(node.position);
                             var mineSite = new BuildingSiteSlot(BuildingSiteKind.Mine, minePos, sector, node);
                             sector.BuildingSites.Add(mineSite);
-                            mineSite.MarkerGO = CreateSiteMarker(markerRoot.transform, minePos, BuildingSiteKind.Mine);
+                            mineSite.MarkerGO = CreateSiteMarker(markerRoot.transform, minePos, BuildingSiteKind.Mine, mineSite);
                         }
                     }
 
@@ -650,30 +676,15 @@ namespace GameDevTV.RTS.Environment
                     return pos;
                 }
 
-                private GameObject CreateSiteMarker(Transform parent, Vector3 position, BuildingSiteKind kind)
+                private GameObject CreateSiteMarker(Transform parent, Vector3 position, BuildingSiteKind kind, BuildingSiteSlot site)
                 {
-                    var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    marker.name = $"Site_{kind}";
+                    var marker = new GameObject($"Site_{kind}");
                     marker.transform.SetParent(parent, false);
-                    marker.transform.position = position + Vector3.up * 0.05f;
+                    marker.transform.position = position;
+                    marker.transform.rotation = Quaternion.identity;
 
-                    Color color = kind switch
-                    {
-                        BuildingSiteKind.CommandPost => new Color(0.2f, 0.55f, 1f, 0.55f),
-                        BuildingSiteKind.Mine => new Color(1f, 0.65f, 0.1f, 0.55f),
-                        _ => new Color(0.75f, 0.75f, 0.75f, 0.45f)
-                    };
-
-                    float size = kind == BuildingSiteKind.CommandPost ? 2.4f : kind == BuildingSiteKind.Mine ? 1.6f : 2f;
-                    marker.transform.localScale = new Vector3(size, 0.08f, size);
-
-                    var renderer = marker.GetComponent<MeshRenderer>();
-                    var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                    mat.color = color;
-                    renderer.material = mat;
-
-                    var collider = marker.GetComponent<Collider>();
-                    if (collider != null) collider.enabled = false;
+                    var markerComponent = marker.AddComponent<BuildingSiteMarker>();
+                    markerComponent.Initialize(site);
 
                     marker.layer = LayerMask.NameToLayer("TransparentFX");
                     return marker;

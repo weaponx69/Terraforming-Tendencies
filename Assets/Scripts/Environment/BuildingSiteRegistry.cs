@@ -10,6 +10,13 @@ namespace GameDevTV.RTS.Environment
     /// </summary>
     public static class BuildingSiteRegistry
     {
+        public static bool IsSolarBuilding(BuildingSO building)
+        {
+            if (building == null || string.IsNullOrEmpty(building.Name)) return false;
+            string name = building.Name.ToLowerInvariant();
+            return name.Contains("solar");
+        }
+
         public static bool IsMineBuilding(BuildingSO building)
         {
             if (building == null || string.IsNullOrEmpty(building.Name)) return false;
@@ -27,20 +34,32 @@ namespace GameDevTV.RTS.Environment
         {
             if (IsCommandBuilding(building)) return BuildingSiteKind.CommandPost;
             if (IsMineBuilding(building)) return BuildingSiteKind.Mine;
-            return BuildingSiteKind.Infrastructure;
+            if (IsSolarBuilding(building)) return BuildingSiteKind.Solar;
+            return BuildingSiteKind.PairedBuilding;
         }
 
         public static bool HasAvailableSite(BuildingSO building, Owner owner)
         {
-            return GetAvailableSite(building, owner) != null;
+            return GetEligibleSites(building, owner).Count > 0;
         }
 
         public static BuildingSiteSlot GetAvailableSite(BuildingSO building, Owner owner)
         {
-            if (building == null || SectorManager.Instance == null) return null;
+            var eligible = GetEligibleSites(building, owner);
+            if (eligible.Count == 0) return null;
+
+            Vector3 reference = GetReferencePosition(owner);
+            eligible.Sort((a, b) =>
+                Vector3.Distance(reference, a.Position).CompareTo(Vector3.Distance(reference, b.Position)));
+            return eligible[0];
+        }
+
+        public static List<BuildingSiteSlot> GetEligibleSites(BuildingSO building, Owner owner)
+        {
+            var candidates = new List<BuildingSiteSlot>();
+            if (building == null || SectorManager.Instance == null) return candidates;
 
             BuildingSiteKind kind = GetRequiredKind(building);
-            var candidates = new List<BuildingSiteSlot>();
 
             foreach (var sector in SectorManager.Instance.Sectors)
             {
@@ -49,25 +68,42 @@ namespace GameDevTV.RTS.Environment
 
                 foreach (var site in sector.BuildingSites)
                 {
-                    if (site == null || site.IsOccupied || site.Kind != kind) continue;
+                    if (site == null || site.IsOccupied) continue;
+                    if (site.Kind != kind && !(kind == BuildingSiteKind.PairedBuilding && site.Kind == BuildingSiteKind.Infrastructure))
+                    {
+                        continue;
+                    }
+
                     if (!IsSiteValidForBuilding(building, site)) continue;
+                    if (!IsClusterValidForBuilding(building, site)) continue;
                     candidates.Add(site);
                 }
             }
 
-            if (candidates.Count == 0) return null;
+            return candidates;
+        }
 
-            Vector3 reference = GetReferencePosition(owner);
-            candidates.Sort((a, b) =>
-                Vector3.Distance(reference, a.Position).CompareTo(Vector3.Distance(reference, b.Position)));
-            return candidates[0];
+        private static bool IsClusterValidForBuilding(BuildingSO building, BuildingSiteSlot site)
+        {
+            if (site.Cluster == null) return true;
+
+            if (IsSolarBuilding(building))
+            {
+                return site.Cluster.CanPlaceSolar;
+            }
+
+            if (GetRequiredKind(building) == BuildingSiteKind.PairedBuilding)
+            {
+                return site.Cluster.CanPlaceBuilding;
+            }
+
+            return true;
         }
 
         private static bool IsSiteValidForBuilding(BuildingSO building, BuildingSiteSlot site)
         {
             if (!IsMineBuilding(building) || !site.HasLinkedResource) return true;
 
-            // Mine buildings must sit on their geographic resource node.
             SectorNode.NodeType nodeType = site.LinkedResourceType;
             string name = building.Name.ToLowerInvariant();
 
@@ -123,7 +159,11 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            nearest?.SetOccupied(building);
+            if (nearest != null)
+            {
+                nearest.SetOccupied(building);
+                nearest.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
+            }
         }
 
         public static void ClearOccupancy(BaseBuilding building)
@@ -138,6 +178,7 @@ namespace GameDevTV.RTS.Environment
                     if (site != null && site.OccupyingBuilding == building)
                     {
                         site.ClearOccupancy();
+                        site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
                     }
                 }
             }
