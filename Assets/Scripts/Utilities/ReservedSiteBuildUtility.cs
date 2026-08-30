@@ -302,7 +302,7 @@ namespace GameDevTV.RTS.Utilities
             AbstractCommandable commandable = Object.FindAnyObjectByType<GlobalCommander>();
             if (commandable == null)
             {
-                Worker[] workers = Object.FindObjectsByType<Worker>(FindObjectsSortMode.None);
+                Worker[] workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
                 foreach (var worker in workers)
                 {
                     if (worker != null && worker.Owner == owner)

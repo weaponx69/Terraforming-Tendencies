@@ -18,17 +18,17 @@ namespace GameDevTV.RTS.Environment
     {
         [Header("Wave Timing")]
         [Tooltip("Delay before the very first wave begins.")]
-        [SerializeField] private float firstWaveDelay = 60f;
+        [SerializeField] private float firstWaveDelay = 180f;
         [Tooltip("Rest time between the end of one wave and the start of the next.")]
-        [SerializeField] private float timeBetweenWaves = 50f;
+        [SerializeField] private float timeBetweenWaves = 120f;
 
         [Header("Wave Content")]
         [Tooltip("Number of events in the first wave.")]
-        [SerializeField] private int baseEventsPerWave = 3;
+        [SerializeField] private int baseEventsPerWave = 1;
         [Tooltip("Extra events added to each subsequent wave.")]
         [SerializeField] private int eventsAddedPerWave = 1;
         [Tooltip("Delay between individual events within a wave.")]
-        [SerializeField] private float eventInterval = 8.0f;
+        [SerializeField] private float eventInterval = 15f;
 
         [Header("Targeting")]
         [Tooltip("Probability that an event homes in on a player structure instead of a random spot.")]
@@ -146,7 +146,8 @@ namespace GameDevTV.RTS.Environment
         {
             if (waveRoutine == null) return;
 
-            float chance = Mathf.Clamp(0.05f + turnNumber * 0.02f, 0.05f, 0.35f);
+            // Softer early-game pressure: ~3% base, caps at 20%.
+            float chance = Mathf.Clamp(0.03f + turnNumber * 0.01f, 0.03f, 0.20f);
             if (Random.value > chance) return;
 
             Debug.Log($"[NaturalEventManager] Turn {turnNumber} threat triggered ({chance:P0} chance).");

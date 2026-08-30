@@ -37,7 +37,9 @@ namespace GameDevTV.RTS.Player
         public static event Action OnHandChanged;
 
         /// <summary>Fired when the draft phase begins. Carries the offered hand.</summary>
+#pragma warning disable CS0067 // Draft rounds removed; DraftingUI still subscribes for compatibility.
         public static event Action<List<BlueprintCardSO>> OnDraftStarted;
+#pragma warning restore CS0067
 
         // ── Auto-initialization ──────────────────────────────────────────────
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

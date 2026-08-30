@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.UI;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Environment
@@ -64,8 +65,8 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            Debug.Log($"[BuildingSiteSelection] Choose a site for {building.Name} ({eligibleSites.Count} option(s)).");
-            NotifyBuildFeedback($"Select a highlighted pad for {building.Name} ({eligibleSites.Count} available). Esc to cancel.");
+            // Instructional only — do not use the red failure banner.
+            Debug.Log($"[BuildingSiteSelection] Choose a site for {building.Name} ({eligibleSites.Count} option(s)). Esc to cancel.");
         }
 
         public static void ActivatePendingMarkersIfNeeded()
@@ -99,11 +100,11 @@ namespace GameDevTV.RTS.Environment
             return true;
         }
 
-        /// <summary>Missed all pads — tell the player what to do.</summary>
+        /// <summary>Missed all pads — quiet tip in the console; avoid spamming the red banner.</summary>
         public static void NotifyMissedClick()
         {
             if (!IsSelecting || pendingBuilding == null) return;
-            NotifyBuildFeedback($"Click a highlighted pad to build {pendingBuilding.Name}. Esc to cancel.");
+            Debug.Log($"[BuildingSiteSelection] Click a highlighted pad to build {pendingBuilding.Name}. Esc to cancel.");
         }
 
         public static void Cancel()
@@ -132,7 +133,13 @@ namespace GameDevTV.RTS.Environment
                 CardDeckController.Instance.PlayCard(pendingCardIndex);
             }
 
-            if (!built)
+            if (built)
+            {
+                // Clear any prior selection tip / failure flash.
+                var runtimeUi = UnityEngine.Object.FindAnyObjectByType<RuntimeUI>(FindObjectsInactive.Include);
+                runtimeUi?.HideWarningBanner();
+            }
+            else
             {
                 NotifyBuildFeedback(string.IsNullOrEmpty(reason)
                     ? $"Could not build {pendingBuilding?.Name}."

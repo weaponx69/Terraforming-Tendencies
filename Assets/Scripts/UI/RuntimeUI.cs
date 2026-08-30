@@ -505,15 +505,26 @@ namespace GameDevTV.RTS.UI
         private System.Collections.IEnumerator FlashWarningRoutine()
         {
             Image bg = warningBanner.GetComponent<Image>();
-            if (bg == null) yield break;
-
-            while (true)
+            if (bg == null)
             {
-                bg.color = new Color(1f, 0f, 0f, 0.8f);
-                yield return new WaitForSeconds(0.5f);
-                bg.color = new Color(1f, 0f, 0f, 0.3f);
-                yield return new WaitForSeconds(0.5f);
+                yield return new WaitForSeconds(3.5f);
+                HideWarningBanner();
+                yield break;
             }
+
+            // Flash a few times, then clear — never loop forever.
+            const int flashCount = 4;
+            for (int i = 0; i < flashCount; i++)
+            {
+                if (warningBanner == null || !warningBanner.activeSelf) yield break;
+                bg.color = new Color(1f, 0f, 0f, 0.85f);
+                yield return new WaitForSeconds(0.4f);
+                if (warningBanner == null || !warningBanner.activeSelf) yield break;
+                bg.color = new Color(1f, 0f, 0f, 0.35f);
+                yield return new WaitForSeconds(0.4f);
+            }
+
+            HideWarningBanner();
         }
 
         private void FindAndLinkUI(string containerName, ref TextMeshProUGUI labelField, ref TextMeshProUGUI valueField, params string[] headerNames)

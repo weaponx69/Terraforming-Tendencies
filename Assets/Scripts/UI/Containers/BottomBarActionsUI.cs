@@ -5,6 +5,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
@@ -260,7 +261,13 @@ namespace GameDevTV.RTS.UI.Containers
 
             BuildingSiteSelectionController.Begin(building, owner, cardIndex, (ok, selectReason) =>
             {
-                if (!ok && !string.IsNullOrEmpty(selectReason))
+                if (ok)
+                {
+                    FindAnyObjectByType<RuntimeUI>(FindObjectsInactive.Include)?.HideWarningBanner();
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(selectReason))
                 {
                     ExplorationManager.NotifyExplorationFailed(selectReason);
                 }

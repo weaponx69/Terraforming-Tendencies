@@ -32,31 +32,31 @@ namespace GameDevTV.RTS.Utilities
 
             if (BlueprintDraftUI.IsDraftVisible) return true;
 
-            var draftingUIs = Object.FindObjectsByType<DraftingUI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var draftingUIs = Object.FindObjectsByType<DraftingUI>(FindObjectsInactive.Exclude);
             foreach (var ui in draftingUIs)
             {
                 if (ui != null && ui.IsOverlayVisible) return true;
             }
 
-            var summaries = Object.FindObjectsByType<GenerationSummaryUI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var summaries = Object.FindObjectsByType<GenerationSummaryUI>(FindObjectsInactive.Exclude);
             foreach (var summary in summaries)
             {
                 if (summary != null && summary.IsVisible) return true;
             }
 
-            var discoveries = Object.FindObjectsByType<ExplorationDiscoveryUI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var discoveries = Object.FindObjectsByType<ExplorationDiscoveryUI>(FindObjectsInactive.Exclude);
             foreach (var discovery in discoveries)
             {
                 if (discovery != null && discovery.IsVisible) return true;
             }
 
-            var pauseMenus = Object.FindObjectsByType<PauseMenuUI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var pauseMenus = Object.FindObjectsByType<PauseMenuUI>(FindObjectsInactive.Exclude);
             foreach (var pause in pauseMenus)
             {
                 if (pause != null && pause.IsPauseMenuVisible) return true;
             }
 
-            var gameOvers = Object.FindObjectsByType<GameOverUI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var gameOvers = Object.FindObjectsByType<GameOverUI>(FindObjectsInactive.Exclude);
             foreach (var go in gameOvers)
             {
                 if (go != null && go.IsVisible) return true;
