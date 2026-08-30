@@ -127,6 +127,12 @@ namespace GameDevTV.RTS.Player
                 {
                     Debug.Log("[PlayerInput] No Rigidbody found on Camera Target");
                 }
+
+                // Keep the follow target out of gameplay raycasts.
+                foreach (var col in camTargetObj.GetComponentsInChildren<Collider>(true))
+                {
+                    col.enabled = false;
+                }
             }
             else
             {
@@ -649,7 +655,17 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            if (!wasMouseDownOnUI && activeCommand == null && !Keyboard.current.shiftKey.isPressed)
+            // Don't steal the selection when the press started on UI (e.g. playing a building card).
+            if (wasMouseDownOnUI)
+            {
+                if (selectionBox != null)
+                {
+                    selectionBox.gameObject.SetActive(false);
+                }
+                return;
+            }
+
+            if (activeCommand == null && !Keyboard.current.shiftKey.isPressed)
             {
                 DeselectAllUnits();
             }
@@ -666,7 +682,7 @@ namespace GameDevTV.RTS.Player
 
             // If the click landed on empty space (nothing got selected and it wasn't a UI
             // interaction or an active command placement), fall back to selecting the Global Commander.
-            if (!wasMouseDownOnUI && activeCommand == null && selectedUnits.Count == 0)
+            if (activeCommand == null && selectedUnits.Count == 0)
             {
                 GlobalCommander commander = GetGlobalCommander();
                 if (commander != null)
@@ -925,6 +941,11 @@ namespace GameDevTV.RTS.Player
                 RaycastHit[] hits = Physics.RaycastAll(cameraRay, float.MaxValue, ~0, QueryTriggerInteraction.Ignore);
                 foreach (RaycastHit hit in hits.OrderBy(hit => hit.distance))
                 {
+                    if (hit.collider == null) continue;
+                    // Camera follow target / world-bounds volumes must not eat unit selection clicks.
+                    if (hit.collider.gameObject.name == "Camera Target") continue;
+                    if (hit.collider.gameObject.layer == 12) continue; // World Bounds
+
                     ISelectable selectable = hit.collider.GetComponentInParent<ISelectable>();
                     if (selectable != null)
                     {

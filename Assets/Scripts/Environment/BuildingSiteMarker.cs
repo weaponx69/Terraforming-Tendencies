@@ -6,6 +6,7 @@ namespace GameDevTV.RTS.Environment
 {
     /// <summary>
     /// Shows a building ghost preview at a reserved pad so the player knows what goes there.
+    /// Click colliders are only enabled while site selection is active.
     /// </summary>
     public class BuildingSiteMarker : MonoBehaviour
     {
@@ -21,10 +22,12 @@ namespace GameDevTV.RTS.Environment
         private Collider clickCollider;
         private readonly List<Material> tintedMaterials = new();
         private bool highlighted;
+        private bool isSelectable;
 
         public void Initialize(BuildingSiteSlot site)
         {
             Site = site;
+            isSelectable = false;
             RebuildGhost();
             RefreshVisibility();
         }
@@ -53,13 +56,9 @@ namespace GameDevTV.RTS.Environment
 
         public void SetSelectable(bool selectable)
         {
+            isSelectable = selectable;
             EnsureClickCollider();
-
-            if (clickCollider != null)
-            {
-                clickCollider.enabled = selectable;
-            }
-
+            ApplyColliderEnabledState();
             SetHighlight(selectable);
         }
 
@@ -94,10 +93,12 @@ namespace GameDevTV.RTS.Environment
                                    Site.Cluster != null &&
                                    Site.Cluster.SolarBuilding != null;
                 gameObject.SetActive(showPreview && ghostInstance != null);
+                ApplyColliderEnabledState();
                 return;
             }
 
             gameObject.SetActive(ghostInstance != null);
+            ApplyColliderEnabledState();
         }
 
         private static bool IsSiteVisibleInWorld(BuildingSiteSlot site)
@@ -130,7 +131,11 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            GameObject prefab = BuildingSiteGhostUtility.GetGhostPrefab(building);
+            // Prefer the real building prefab so InitializeAsGhost works. Visual-only ghost
+            // variants (e.g. SolarPanel Ghost Variant) have no BaseBuilding and look solid.
+            GameObject prefab = building.Prefab != null
+                ? building.Prefab
+                : BuildingSiteGhostUtility.GetGhostPrefab(building);
             if (prefab == null)
             {
                 return;
@@ -141,14 +146,21 @@ namespace GameDevTV.RTS.Environment
             ghostInstance.transform.localPosition = Vector3.zero;
             ghostInstance.transform.localRotation = Quaternion.identity;
 
-            if (ghostInstance.TryGetComponent(out BaseBuilding baseBuilding))
+            BaseBuilding baseBuilding = ghostInstance.GetComponentInChildren<BaseBuilding>(true);
+            if (baseBuilding != null)
             {
+                baseBuilding.enabled = true;
                 baseBuilding.InitializeAsGhost(building.PlacementMaterial, Owner.Player1);
+            }
+            else
+            {
+                ApplyGhostMaterialFallback(ghostInstance, building.PlacementMaterial);
             }
 
             StripSimulationComponents(ghostInstance);
             CacheTintMaterials();
             FitClickCollider();
+            ApplyColliderEnabledState();
             ApplyTint();
         }
 
@@ -161,10 +173,7 @@ namespace GameDevTV.RTS.Environment
                 ghostInstance = null;
             }
 
-            if (clickCollider != null)
-            {
-                clickCollider.enabled = false;
-            }
+            ApplyColliderEnabledState();
         }
 
         private void StripSimulationComponents(GameObject root)
@@ -177,6 +186,23 @@ namespace GameDevTV.RTS.Environment
             foreach (var nav in root.GetComponentsInChildren<UnityEngine.AI.NavMeshObstacle>(true))
             {
                 Destroy(nav);
+            }
+        }
+
+        private static void ApplyGhostMaterialFallback(GameObject root, Material ghostMaterial)
+        {
+            if (root == null || ghostMaterial == null) return;
+
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null) continue;
+                string nameLower = renderer.gameObject.name.ToLowerInvariant();
+                if (nameLower.Contains("vision") || nameLower.Contains("selection") || nameLower.Contains("indicator"))
+                {
+                    continue;
+                }
+
+                renderer.sharedMaterial = ghostMaterial;
             }
         }
 
@@ -208,28 +234,30 @@ namespace GameDevTV.RTS.Environment
                 clickCollider = gameObject.AddComponent<BoxCollider>();
             }
 
-            clickCollider.isTrigger = false;
+            // Trigger colliders still raycast with QueryTriggerInteraction.Collide,
+            // but they won't block unit/building selection physics the same way.
+            clickCollider.isTrigger = true;
 
             if (ghostInstance == null)
             {
-                clickCollider.enabled = false;
                 if (clickCollider is BoxCollider fallbackBox)
                 {
-                    fallbackBox.center = Vector3.up * 2f;
-                    fallbackBox.size = new Vector3(10f, 8f, 10f);
+                    fallbackBox.center = Vector3.up * 1.5f;
+                    fallbackBox.size = new Vector3(6f, 4f, 6f);
                 }
+                ApplyColliderEnabledState();
                 return;
             }
 
             Renderer[] renderers = ghostInstance.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0)
             {
-                clickCollider.enabled = false;
                 if (clickCollider is BoxCollider emptyBox)
                 {
-                    emptyBox.center = Vector3.up * 2f;
-                    emptyBox.size = new Vector3(10f, 8f, 10f);
+                    emptyBox.center = Vector3.up * 1.5f;
+                    emptyBox.size = new Vector3(6f, 4f, 6f);
                 }
+                ApplyColliderEnabledState();
                 return;
             }
 
@@ -243,11 +271,19 @@ namespace GameDevTV.RTS.Environment
             {
                 box.center = transform.InverseTransformPoint(bounds.center);
                 Vector3 size = bounds.size;
-                size.x = Mathf.Max(size.x, 8f);
-                size.z = Mathf.Max(size.z, 8f);
-                size.y = Mathf.Max(size.y, 6f);
+                size.x = Mathf.Max(size.x + 1f, 4f);
+                size.z = Mathf.Max(size.z + 1f, 4f);
+                size.y = Mathf.Max(size.y, 3f);
                 box.size = size;
             }
+
+            ApplyColliderEnabledState();
+        }
+
+        private void ApplyColliderEnabledState()
+        {
+            if (clickCollider == null) return;
+            clickCollider.enabled = isSelectable && ghostInstance != null && gameObject.activeInHierarchy;
         }
 
         private void ApplyTint()

@@ -20,8 +20,20 @@ namespace GameDevTV.RTS.Units
             // Set stats to make it invulnerable and fully operational under any condition
             MaxHealth = 99999;
             CurrentHealth = 99999;
+
+            EnsureSelectionCollider();
             
             BuildAugmentedCommands();
+        }
+
+        private void EnsureSelectionCollider()
+        {
+            if (GetComponentInChildren<Collider>() != null) return;
+
+            var box = gameObject.AddComponent<BoxCollider>();
+            box.center = Vector3.up * 2f;
+            box.size = new Vector3(8f, 4f, 8f);
+            box.isTrigger = false;
         }
 
         public override BaseCommand[] AvailableCommands
