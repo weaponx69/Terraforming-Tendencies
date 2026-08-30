@@ -39,6 +39,17 @@ namespace GameDevTV.RTS.Environment
         public bool HasBatteryBackup =>
             TryGetComponent(out BatteryNode battery) && battery.HasCharge;
 
+        /// <summary>True while StartTemporaryPower() backup cells are still active.</summary>
+        [Inspectable]
+        public bool HasTemporaryPower =>
+            hasTemporaryPower && Time.time < temporaryPowerEndTime;
+
+        /// <summary>
+        /// True when this node does not need to draw from shared generation
+        /// (starting CP backup cells or battery). Used by grid allocation.
+        /// </summary>
+        public bool IsSelfPowered => HasTemporaryPower || HasBatteryBackup;
+
         [SerializeField] private bool isGridPowered = false;
 
         /// <summary>

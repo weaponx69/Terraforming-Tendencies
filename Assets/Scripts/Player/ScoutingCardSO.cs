@@ -39,6 +39,13 @@ namespace GameDevTV.RTS.Player
 
                 var explorationMgr = Environment.ExplorationManager.Instance;
                 if (explorationMgr == null) return false;
+
+                // Orbital Scan opens the next locked sector even when no frontier "?" exists yet.
+                if (scoutingType == ScoutingType.OrbitalScan)
+                {
+                    return explorationMgr.CanOrbitalScan();
+                }
+
                 if (!explorationMgr.HasFrontierNode(out _, out _)) return false;
                 return explorationMgr.CanAffordExploration();
             }
@@ -52,7 +59,7 @@ namespace GameDevTV.RTS.Player
                     case ScoutingType.OrbitalScan:
                         if (explorationMgr != null)
                         {
-                            explorationMgr.TryExploreFrontier();
+                            explorationMgr.TryOrbitalScan();
                         }
                         else
                         {

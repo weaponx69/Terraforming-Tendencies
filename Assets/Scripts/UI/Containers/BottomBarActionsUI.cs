@@ -34,6 +34,7 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingDeathEvent>.OnEvent[owner] += HandleRefresh;
             Bus<BuildingSpawnEvent>.OnEvent[owner] += HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] += HandleRefresh;
+            CardDeckController.OnHandChanged += RefreshBar;
         }
 
         private void OnDisable()
@@ -45,6 +46,7 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingDeathEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<BuildingSpawnEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] -= HandleRefresh;
+            CardDeckController.OnHandChanged -= RefreshBar;
         }
 
         private void Awake()

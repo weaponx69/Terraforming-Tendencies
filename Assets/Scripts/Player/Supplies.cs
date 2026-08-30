@@ -297,6 +297,7 @@ namespace GameDevTV.RTS.Player
             _biomass = new Dictionary<Owner, float>();
             _food = new Dictionary<Owner, float>();
             _power = new Dictionary<Owner, float>();
+            _energy = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
             _oxygen = new Dictionary<Owner, float>();
@@ -312,6 +313,7 @@ namespace GameDevTV.RTS.Player
                 _biomass[owner] = 0f;
                 _food[owner] = (owner == Owner.Player1) ? 50f : 0f;
                 _power[owner] = 0f;
+                _energy[owner] = (owner == Owner.Player1) ? 5f : 0f;
                 _population[owner] = 0;
                 _populationLimit[owner] = 0;
                 _oxygen[owner] = initialOxygen;
@@ -330,6 +332,7 @@ namespace GameDevTV.RTS.Player
             _biomass = new Dictionary<Owner, float>();
             _food = new Dictionary<Owner, float>();
             _power = new Dictionary<Owner, float>();
+            _energy = new Dictionary<Owner, float>();
             _population = new Dictionary<Owner, int>();
             _populationLimit = new Dictionary<Owner, int>();
             _oxygen = new Dictionary<Owner, float>();
@@ -344,6 +347,7 @@ namespace GameDevTV.RTS.Player
                 _biomass.Add(owner, 0f);
                 _food.Add(owner, (owner == Owner.Player1) ? 50f : 0f);
                 _power.Add(owner, 0f);
+                _energy.Add(owner, (owner == Owner.Player1) ? 5f : 0f);
                 _population.Add(owner, 0);
                 _populationLimit.Add(owner, 0);
                 _oxygen.Add(owner, startingOxygen);
@@ -361,6 +365,7 @@ namespace GameDevTV.RTS.Player
             
             Owner displayOwner = GameOverManager.MonitoredOwner;
             RaiseMaterialsChanged(displayOwner, Materials[displayOwner]);
+            OnEnergyChanged?.Invoke(displayOwner, Energy[displayOwner]);
         }
 
         private void Start()

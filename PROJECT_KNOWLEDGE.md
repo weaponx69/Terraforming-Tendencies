@@ -35,6 +35,12 @@ This document serves as a persistent memory bank for AI context, detailing the c
 #### 5. UI & Selection Indicators
 
 #### 6. Recent Fixes Changelog
+* **Reserved-site card builds (2026-08-30):** Building cards (Command Post → Solar Panel → Oxygen Processor / other paired buildings) play onto pre-placed pads, not free placement. See **§36 Reserved Site Pads**. Ghosts must stay paused/translucent and must never occupy a pad. Sector 0 guarantees a CP pad + solar/oxygen cluster + minerals inside the starting fog reveal.
+* **Site ghosts looking like finished buildings:** Instantiating the solid prefab ran `BaseBuilding.Start` → `CompleteConstruction` → `BuildingSpawnEvent`, which locked the Command Post pad (`elig=0`) and made ghosts look solid. `BuildingSiteMarker` now instantiates under an inactive holder, disables simulation, forces `InitializeAsGhost` / Paused, strips colliders, and applies translucent placement materials **after** procedural meshes exist (`SmokestackVisuals` Awake).
+* **Oxygen Processor ghosts stayed 100% opaque:** OP visuals are generated in `SmokestackVisuals.Awake` (URP Lit). Old Standard `_Mode` fade flags were ignored. Ghost materials are reapplied after activate; URP `_Surface=1` transparency is set; idle site tint is ~16–18% alpha. Highlighted pads use a higher alpha so card site-picking is readable.
+* **OP not connecting to solar:** `ConnectToClusterSolar` now registers `PowerNode`s (Start may not have run in the same Instantiate frame) and auto-wires the cluster solar. `ConnectPowerCommand` falls back to the nearest completed building when the Solar Panel prefab has no collider to click.
+* **Colonists entering ghost pads (selection dead):** Completed-looking ghosts were treated as shelter; `EnterBuilding` disabled the colonist collider. `BuildingSiteSlot.IsValidOccupant` is required for shelter/wander, and invalid shelter restores the collider.
+* **Second mining drone unselectable:** Training from the Command Post is correct (including two at once). The invisible Universal Command Center had an 8×4×8 solid box at map center that stole raycasts from air drones. That collider is disabled; left-click selection prefers `AbstractUnit` over `GlobalCommander` / large buildings. Empty-ground click still selects the UCC.
 * **Probe Build Order (race condition):** Added BaseBuilding.IsFirstInQueueProbe(). GreedyAIController and AIController now skip buildings whose first queued item is the Probe. Added regression test ColonyExpansionTests.ColonyExpansion_BuildsProbeDroneFirst.
 * **Curved World Visuals:** Added an "Animal Crossing" style spherical planet illusion without breaking the flat NavMesh. Created CurvedWorld.shader and CurvedWorldUpdater.cs. 
 * **Assorted Compiler Fixes:** Removed duplicate method definitions in PlanetGenerator.cs. Fixed an invalid cast warning by treating FoundryCrawler as an AbstractCommandable. Removed unused isProducing field from FoundryCrawler.cs.
@@ -729,3 +735,25 @@ User right-clicks on map (with units selected)
   7. **Milestones:** Pause and open Upgrade Shop if terraform progress crosses a threshold.
   8. **Win/Lose Check:** Victory or defeat conditions evaluated.
 * **System Integration:** This manager replaced the periodic `UpkeepRoutine` coroutines in buildings. Now, buildings and systems subscribe directly to `GameFlowManager` events (like `OnTurnUpkeep` and `OnTurnIncome`) for synchronized, deterministic economy ticks.
+
+#### 36. Reserved Site Pads (Card → Pad → Instant Build)
+Player building cards do **not** free-place on the terrain. Planet generation drops reserved pads; playing a card picks an eligible pad and `ReservedSiteBuildUtility` instantiates + `CompleteConstruction` immediately (materials cost still applies).
+
+* **Bootstrap (Sector 0):** Inside `HexGridManager.StartingAreaRevealRadius` (~15), planet gen guarantees a Command Post pad, a solar + paired-building cluster (Oxygen Processor preview), and mineral nodes. Markers refresh on planet gen, sector unlock, and starting-area reveal.
+* **Cluster rule:** Each `BuildingSiteCluster` is one solar pad + one consumer pad. `CanPlaceBuilding` requires that cluster's solar to already be occupied. The player picks **which** solar cluster to hook a building to. After build, the consumer is auto-wired to that cluster's solar via `PowerNode.ConnectTo`.
+* **Kinds:** `CommandPost`, `Solar`, `PairedBuilding` (Oxygen Processor and other non-mine/non-CP buildings), `Mine` (resource-typed). Deprecated: `Infrastructure`.
+* **Eligibility vs fog:** `GetEligibleSites` does **not** require hex fog reveal (that blocked all bootstrap builds). Marker *display* requires fog reveal **and** (for idle ghosts) Sector 0 pads inside `StartingAreaRevealRadius` only — do not show site ghosts across fog-cleared map that has not been explored as a frontier.
+* **Occupancy — `BuildingSiteSlot.IsValidOccupant`:** A pad is occupied only by an **active, non-paused, non-ghost** `BaseBuilding` that is **not** parented under a `BuildingSiteMarker`. Inactive completed ghosts (e.g. `Command Post #1` under a marker) must never lock a pad. `RegisterOccupancy` / `GetEligibleSites` / `RefreshAllMarkers` clear invalid occupants.
+* **Site ghosts (`BuildingSiteMarker`):**
+  * Idle preview: only Command Post / Solar / PairedBuilding pads inside Sector 0 starting reveal radius. Mine pads and out-of-radius pads show ghosts only while site-picking (`isSelectable`).
+  * Instantiate under an inactive holder so `Awake`/`Start` do not complete construction.
+  * Disable all `MonoBehaviour`s, force `InitializeAsGhost` (Paused), `DestroyImmediate` colliders/NavMeshObstacles.
+  * Prefer `BuildingSiteGhostUtility.GetGhostPrefab`, then `building.Prefab`. Always swap to `PlacementMaterial` (`Building Ghost Placement`) **after** activation — procedural buildings (`SmokestackVisuals`) create meshes in Awake.
+  * Idle opacity ~0.16–0.18; selected-for-placement slightly brighter. Never set `_Tint` to `Color.white` (that made pads look finished).
+  * Click colliders are triggers, enabled only while `BuildingSiteSelectionController` is picking a pad.
+* **Selection (`PlayerInput.ShouldIgnoreSelectionHit`):** Ignore site markers, `GhostPreview_*`, invalid occupants, disabled `BaseBuilding`, and `GlobalCommander` colliders. Prefer field `AbstractUnit` hits over UCC / bulky building volumes. Empty ground click still selects the UCC.
+* **Do not** let site ghosts raise `BuildingSpawnEvent` or join `BaseBuilding.ActiveBuildings` as real structures. Colonists/engineers must not `EnterBuilding` on site ghosts (that disables their collider and breaks click-select).
+* **Training drones:** Mining drones are trained from the **Command Post** (including multiple in queue). That is intended. The UCC is only the invisible hub for empty-click / global commands — it must not block drone raycasts.
+* **Orbital Scan / Energy:** `Supplies.Energy` must be initialized (Player1 starts with 5). Missing `_energy` made `CanAffordExploration` always fail → Orbital Scan stuck red. Orbital Scan uses `TryOrbitalScan` (frontier "?" or unlock next locked sector). `PlayCardCommand.IsLocked` when `!CanApply`.
+* **Hand draw filter:** Only `CanApply` cards enter the hand. Unplayable draw-pile cards are moved to **discard** (not shown locked/red). `DiscardUnplayableFromHand` runs on build/sector/supply changes and refills. Mining Drone waits until a Command Post exists.
+* **Power grid allocation:** Command Post `powerUpkeep` (20) used to starve cluster consumers when solar auto-wired to CP. Allocation now powers normal consumers before CPs, and self-powered nodes (CP backup cells / battery) do not drain shared generation. `PowerGridManager` auto-spawns if missing.

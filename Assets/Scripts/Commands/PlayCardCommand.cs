@@ -25,6 +25,14 @@ namespace GameDevTV.RTS.Commands
             }
         }
 
-        public override bool IsLocked(CommandContext context) => false;
+        public override bool IsLocked(CommandContext context)
+        {
+            if (CardDeckController.Instance == null) return true;
+            var hand = CardDeckController.Instance.Hand;
+            if (HandIndex < 0 || HandIndex >= hand.Count) return true;
+            var card = hand[HandIndex];
+            if (card == null) return true;
+            return !card.IsGateMet() || !card.CanApply();
+        }
     }
 }

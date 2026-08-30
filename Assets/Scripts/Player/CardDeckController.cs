@@ -55,12 +55,34 @@ namespace GameDevTV.RTS.Player
 
         private void OnEnable()
         {
-            // Draft rounds removed — sector unlock no longer pauses for card pick.
+            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += HandleBuildingSpawned;
+            Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] += HandleBuildingDied;
+            Supplies.OnMaterialsChanged += HandleSupplyGateChanged;
+            Supplies.OnEnergyChanged += HandleSupplyGateChanged;
+            SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
         }
 
         private void OnDisable()
         {
+            Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= HandleBuildingSpawned;
+            Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] -= HandleBuildingDied;
+            Supplies.OnMaterialsChanged -= HandleSupplyGateChanged;
+            Supplies.OnEnergyChanged -= HandleSupplyGateChanged;
+            SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
         }
+
+        private void HandleBuildingSpawned(BuildingSpawnEvent _) => DiscardUnplayableFromHand();
+        private void HandleBuildingDied(BuildingDeathEvent _) => DiscardUnplayableFromHand();
+        private void HandleSupplyGateChanged(Owner owner, int _)
+        {
+            if (owner == Owner.Player1) DiscardUnplayableFromHand();
+        }
+        private void HandleSupplyGateChanged(Owner owner, float _)
+        {
+            if (owner == Owner.Player1) DiscardUnplayableFromHand();
+        }
+        private void HandleSectorUnlocked() => DiscardUnplayableFromHand();
+
 
         // Don't fill the hand in Start() — BlueprintDraftUI may not have
         // populated the deck yet. Instead, RebuildDeck() is called by
@@ -106,19 +128,33 @@ namespace GameDevTV.RTS.Player
             solarCard ??= EnsureStarterCard<UnlockBuildingCardSO>("Cards/SolarPanelCard");
             droneCard ??= EnsureStarterCard<SpawnUnitCardSO>("Cards/MiningDroneCard");
 
-            // 3. Direct-add the guaranteed cards in the desired slot order.
-            //    Command Post → index 0, Solar Panel → index 1, Mining Drone → index 2.
-            if (cmdPostCard != null) { hand.Add(cmdPostCard); drawPile.Remove(cmdPostCard); }
-            if (solarCard != null)   { hand.Add(solarCard);   drawPile.Remove(solarCard); }
-            if (droneCard != null)   { hand.Add(droneCard);   drawPile.Remove(droneCard); }
+            // 3. Direct-add guaranteed starters only when they are playable right now.
+            //    Unplayable starters (e.g. Mining Drone before a Command Post exists) stay in
+            //    the draw pile and enter the hand after their requirements are met.
+            if (cmdPostCard != null && IsPlayableNow(cmdPostCard))
+            {
+                hand.Add(cmdPostCard);
+                drawPile.Remove(cmdPostCard);
+            }
+            if (solarCard != null && IsPlayableNow(solarCard))
+            {
+                hand.Add(solarCard);
+                drawPile.Remove(solarCard);
+            }
+            if (droneCard != null && IsPlayableNow(droneCard))
+            {
+                hand.Add(droneCard);
+                drawPile.Remove(droneCard);
+            }
 
-            Debug.Log($"[CardDeckController] Seeded {hand.Count} guaranteed starter(s). " +
-                      $"CmdPost={(cmdPostCard != null ? "YES" : "NULL")} " +
-                      $"Solar={(solarCard != null ? "YES" : "NULL")} " +
-                      $"Drone={(droneCard != null ? "YES" : "NULL")}");
+            Debug.Log($"[CardDeckController] Seeded {hand.Count} playable starter(s). " +
+                      $"CmdPost={(cmdPostCard != null && hand.Contains(cmdPostCard) ? "YES" : "held")} " +
+                      $"Solar={(solarCard != null && hand.Contains(solarCard) ? "YES" : "held")} " +
+                      $"Drone={(droneCard != null && hand.Contains(droneCard) ? "YES" : "held")}");
 
-            // 4. Fill remaining slots (7 cards → indices 3 through 9)
+            // 4. Fill remaining slots; purge anything that slipped in unplayable.
             FillHand();
+            DiscardUnplayableFromHand();
 
             OnHandChanged?.Invoke();
 
@@ -130,31 +166,85 @@ namespace GameDevTV.RTS.Player
 
         /// <summary>
         /// Fill the hand to handSize by drawing from the draw pile.
-        /// If the draw pile runs out, reshuffle the discard pile.
+        /// Only currently playable cards (<see cref="BlueprintCardSO.CanApply"/>) enter the hand.
+        /// Unplayable cards are moved to the discard pile instead of sitting locked/red in the bar.
         /// </summary>
         public void FillHand()
         {
             if (masterDeck == null || masterDeck.Count == 0) return;
 
-            while (hand.Count < handSize)
+            int safety = drawPile.Count + discardPile.Count + hand.Count + 8;
+            while (hand.Count < handSize && safety-- > 0)
             {
                 if (drawPile.Count == 0)
                 {
-                    if (discardPile.Count == 0) break; // No cards left at all
+                    if (discardPile.Count == 0) break;
                     Reshuffle();
+                    if (!drawPile.Any(IsPlayableNow)) break;
                 }
 
-                // Filter by climate gates
-                var valid = drawPile.Where(c => c != null && c.IsGateMet()).ToList();
-                if (valid.Count == 0) break;
+                // Pull the first playable card; anything ahead of it that cannot be played
+                // goes straight to discard so it is not shown as a locked slot.
+                BlueprintCardSO drawn = null;
+                for (int i = 0; i < drawPile.Count; i++)
+                {
+                    var candidate = drawPile[i];
+                    if (IsPlayableNow(candidate))
+                    {
+                        drawn = candidate;
+                        drawPile.RemoveAt(i);
+                        break;
+                    }
 
-                // Move top valid card from drawPile to hand
-                BlueprintCardSO drawn = valid[0];
-                drawPile.Remove(drawn);
+                    drawPile.RemoveAt(i);
+                    i--;
+                    if (candidate != null)
+                    {
+                        discardPile.Add(candidate);
+                    }
+                }
+
+                if (drawn == null)
+                {
+                    if (discardPile.Count == 0) break;
+                    Reshuffle();
+                    if (!drawPile.Any(IsPlayableNow)) break;
+                    continue;
+                }
+
                 hand.Add(drawn);
             }
 
             OnHandChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Move any hand cards that are no longer playable to discard, then refill.
+        /// Call after builds, sector unlocks, and supply changes that gate cards.
+        /// </summary>
+        public void DiscardUnplayableFromHand()
+        {
+            bool changed = false;
+            for (int i = hand.Count - 1; i >= 0; i--)
+            {
+                var card = hand[i];
+                if (IsPlayableNow(card)) continue;
+
+                hand.RemoveAt(i);
+                if (card != null) discardPile.Add(card);
+                changed = true;
+                Debug.Log($"[CardDeckController] Discarded unplayable card '{card?.cardName}' from hand.");
+            }
+
+            if (changed)
+            {
+                FillHand();
+            }
+        }
+
+        private static bool IsPlayableNow(BlueprintCardSO card)
+        {
+            return card != null && card.IsGateMet() && card.CanApply();
         }
 
         /// <summary>
@@ -186,9 +276,18 @@ namespace GameDevTV.RTS.Player
 
             if (!played.CanApply())
             {
-                if (played is ScoutingCardSO)
+                if (played is ScoutingCardSO scouting)
                 {
-                    ExplorationManager.NotifyExplorationFailed($"Cannot play '{played.cardName}' right now.");
+                    var mgr = ExplorationManager.Instance;
+                    string reason = $"Cannot play '{played.cardName}' right now.";
+                    if (mgr != null && scouting.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    {
+                        if (!mgr.CanAffordExploration())
+                            reason = $"Need {mgr.ExploreEnergyCost:0.#} Energy to play Orbital Scan.";
+                        else if (SectorManager.Instance != null && SectorManager.Instance.GetNextLockedSectorIndex() < 0)
+                            reason = "All sectors are already unlocked.";
+                    }
+                    ExplorationManager.NotifyExplorationFailed(reason);
                 }
                 else
                 {

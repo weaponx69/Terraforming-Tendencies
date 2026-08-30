@@ -104,16 +104,35 @@ namespace GameDevTV.RTS.Environment
         {
             if (Site == null) return false;
 
-            // Always show fog-revealed reserved pads so the bootstrap sites
-            // (Command Post, Solar, Oxygen Processor) stay visible in the starting area.
-            return Site.Kind switch
+            // While the player is picking a pad for a card, show only selectable markers.
+            if (isSelectable) return true;
+
+            // Idle world clutter: only the Sector 0 bootstrap pads inside the starting
+            // reveal radius (Command Post / Solar / Oxygen). Do not paint ghosts across
+            // every fog-cleared hex that has not been explored as a discovery frontier.
+            if (SectorManager.Instance == null || SectorManager.Instance.Sectors.Count == 0)
             {
-                BuildingSiteKind.CommandPost => true,
-                BuildingSiteKind.Solar => true,
-                BuildingSiteKind.PairedBuilding => true,
-                BuildingSiteKind.Mine => isSelectable,
-                _ => isSelectable
-            };
+                return false;
+            }
+
+            if (Site.Sector != SectorManager.Instance.Sectors[0])
+            {
+                return false;
+            }
+
+            float reveal = HexGridManager.Instance != null
+                ? HexGridManager.Instance.StartingAreaRevealRadius
+                : 15f;
+            Vector3 a = Site.Position; a.y = 0f;
+            Vector3 b = Site.Sector.Center; b.y = 0f;
+            if (Vector3.Distance(a, b) > reveal)
+            {
+                return false;
+            }
+
+            return Site.Kind is BuildingSiteKind.CommandPost
+                or BuildingSiteKind.Solar
+                or BuildingSiteKind.PairedBuilding;
         }
 
         private static bool IsSiteVisibleInWorld(BuildingSiteSlot site)

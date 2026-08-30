@@ -13,6 +13,11 @@ namespace GameDevTV.RTS.Player
             {
                 return FindPlayerCommandPost() != null;
             }
+
+            public override bool CanApply()
+            {
+                return IsGateMet();
+            }
     
             public override string GetCardGoal()
             {

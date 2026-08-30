@@ -98,6 +98,17 @@ namespace GameDevTV.RTS.Environment
             return current >= exploreEnergyCost;
         }
 
+        /// <summary>
+        /// Orbital Scan: playable when a locked sector remains and energy is available.
+        /// Unlike frontier scouting, it does not require an existing "?" node.
+        /// </summary>
+        public bool CanOrbitalScan(Owner owner = Owner.Player1)
+        {
+            if (SectorManager.Instance == null) return false;
+            if (SectorManager.Instance.GetNextLockedSectorIndex() < 0) return false;
+            return CanAffordExploration(owner);
+        }
+
         public bool HasFrontierNode(out SectorNode node, out int sectorIndex)
         {
             node = null;
@@ -152,6 +163,65 @@ namespace GameDevTV.RTS.Environment
             }
 
             return TryExploreNode(targetNode, targetSectorIndex, owner);
+        }
+
+        /// <summary>
+        /// Orbital Scan: explore a frontier "?" if one exists; otherwise open the next locked
+        /// sector by exploring its entry node (matches card text: explore + unlock next sector).
+        /// </summary>
+        public bool TryOrbitalScan(Owner owner = Owner.Player1)
+        {
+            if (HasFrontierNode(out SectorNode frontier, out int frontierSector))
+            {
+                return TryExploreNode(frontier, frontierSector, owner);
+            }
+
+            if (SectorManager.Instance == null)
+            {
+                ReportExplorationFailed("No SectorManager — cannot orbital scan.");
+                return false;
+            }
+
+            int next = SectorManager.Instance.GetNextLockedSectorIndex();
+            if (next < 0)
+            {
+                ReportExplorationFailed("All sectors are already unlocked.");
+                return false;
+            }
+
+            var sector = SectorManager.Instance.Sectors[next];
+            if (sector?.Nodes == null || sector.Nodes.Count == 0)
+            {
+                ReportExplorationFailed($"Sector {next} has no nodes to scan.");
+                return false;
+            }
+
+            // Prefer a node already linked from an explored sector; else the first node.
+            SectorNode target = FindCrossSectorEntryNode(next) ?? sector.Nodes[0];
+            target.isDiscovered = true;
+            return TryExploreNode(target, next, owner);
+        }
+
+        private static SectorNode FindCrossSectorEntryNode(int sectorIndex)
+        {
+            if (SectorManager.Instance == null || sectorIndex <= 0) return null;
+            var prev = SectorManager.Instance.Sectors[sectorIndex - 1];
+            var next = SectorManager.Instance.Sectors[sectorIndex];
+            if (prev?.Nodes == null || next?.Nodes == null) return null;
+
+            foreach (var node in prev.Nodes)
+            {
+                if (node == null || !node.isExplored) continue;
+                foreach (var conn in node.connections)
+                {
+                    if (conn != null && next.Nodes.Contains(conn) && !conn.isExplored)
+                    {
+                        return conn;
+                    }
+                }
+            }
+
+            return null;
         }
 
         /// <summary>Backward-compatible alias for scouting cards.</summary>

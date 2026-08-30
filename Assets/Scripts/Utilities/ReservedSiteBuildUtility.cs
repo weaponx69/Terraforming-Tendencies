@@ -229,6 +229,9 @@ namespace GameDevTV.RTS.Utilities
 
             ConnectToClusterSolar(built, site);
 
+            // Force a grid pass after occupancy + wiring so UnpoweredIndicator clears this frame.
+            PowerGridManager.RecalculateGrids();
+
             if (!BuildingSiteRegistry.IsCommandBuilding(building) && !BuildingSiteRegistry.IsSolarBuilding(building))
             {
                 BlueprintDraftManager.LockBuilding(building.Name);

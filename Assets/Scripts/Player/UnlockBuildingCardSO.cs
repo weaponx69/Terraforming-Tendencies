@@ -16,6 +16,15 @@ namespace GameDevTV.RTS.Player
                 return ReservedSiteBuildUtility.CanBuildAtReservedSite(
                     buildingToUnlock, Owner.Player1, out _, requireUnlocked: false);
             }
+
+            public override bool IsGateMet()
+            {
+                // Don't put buildings in the hand when no reserved pad exists for them yet
+                // (e.g. GHG Factory before any solar-powered cluster is open).
+                if (buildingToUnlock == null) return false;
+                if (SectorManager.Instance == null) return true;
+                return BuildingSiteRegistry.HasAvailableSite(buildingToUnlock, Owner.Player1);
+            }
     
             public override string GetCardGoal()
             {

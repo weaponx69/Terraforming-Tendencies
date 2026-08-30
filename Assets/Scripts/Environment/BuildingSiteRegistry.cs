@@ -117,29 +117,14 @@ namespace GameDevTV.RTS.Environment
                 return false;
             }
 
-            // Sector 0 bootstrap guarantee: pads inside the starting reveal radius stay
-            // visible even if hex fog hasn't finished updating yet.
-            if (SectorManager.Instance != null &&
-                SectorManager.Instance.Sectors.Count > 0 &&
-                site.Sector == SectorManager.Instance.Sectors[0])
+            // Hex fog is the display gate — do not show pads in unrevealed shroud.
+            // Starting-area pads appear after HexGridManager.RevealStartingArea + RefreshAllMarkers.
+            if (HexGridManager.Instance != null)
             {
-                float reveal = HexGridManager.Instance != null
-                    ? HexGridManager.Instance.StartingAreaRevealRadius
-                    : 15f;
-                Vector3 a = site.Position; a.y = 0f;
-                Vector3 b = site.Sector.Center; b.y = 0f;
-                if (Vector3.Distance(a, b) <= reveal)
-                {
-                    return true;
-                }
+                return HexGridManager.IsWorldPositionRevealed(site.Position);
             }
 
-            if (HexGridManager.Instance == null)
-            {
-                return true;
-            }
-
-            return HexGridManager.IsWorldPositionRevealed(site.Position);
+            return true;
         }
 
         private static bool IsSiteValidForBuilding(BuildingSO building, BuildingSiteSlot site)

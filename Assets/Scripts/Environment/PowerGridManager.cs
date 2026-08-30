@@ -12,13 +12,28 @@ namespace GameDevTV.RTS.Environment
         private static List<PowerNode> allNodes = new List<PowerNode>();
         private static List<List<PowerNode>> powerGrids = new List<List<PowerNode>>();
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureExists()
+        {
+            if (Instance != null) return;
+            var go = new GameObject("PowerGridManager");
+            DontDestroyOnLoad(go);
+            go.AddComponent<PowerGridManager>();
+        }
+
         private void Awake()
         {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
             Instance = this;
         }
 
         public static void RegisterNode(PowerNode node)
         {
+            if (node == null) return;
             if (!allNodes.Contains(node)) allNodes.Add(node);
             RecalculateGrids();
         }
@@ -31,45 +46,45 @@ namespace GameDevTV.RTS.Environment
 
         public static void RecalculateGrids()
         {
+            // Drop destroyed nodes so stale entries cannot poison allocation.
+            allNodes.RemoveAll(n => n == null);
+
             powerGrids.Clear();
             HashSet<PowerNode> visited = new HashSet<PowerNode>();
 
-            // Track total net power for each owner
             Dictionary<Owner, float> ownerPower = new Dictionary<Owner, float>();
             foreach (Owner owner in System.Enum.GetValues(typeof(Owner)))
             {
                 ownerPower[owner] = 0f;
             }
 
-            foreach(var node in allNodes)
+            foreach (var node in allNodes)
             {
                 if (node == null || visited.Contains(node)) continue;
 
                 List<PowerNode> currentGrid = new List<PowerNode>();
                 Queue<PowerNode> queue = new Queue<PowerNode>();
-                
+
                 queue.Enqueue(node);
                 visited.Add(node);
 
                 float totalGeneration = 0f;
-                float totalUpkeep = 0f;
 
-                while(queue.Count > 0)
+                while (queue.Count > 0)
                 {
                     PowerNode current = queue.Dequeue();
                     currentGrid.Add(current);
 
-                    if (current.Building != null && current.Building.BuildingSO != null && current.Building.BuildingSO.BuildingConfig != null)
+                    if (current.Building != null &&
+                        current.Building.BuildingSO?.BuildingConfig != null &&
+                        current.Building.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
-                        if (current.Building.Progress.State == GameDevTV.RTS.Units.BuildingProgress.BuildingState.Completed)
-                        {
-                            float effectiveGen = current.Building.BuildingSO.BuildingConfig.PowerGeneration * Player.BlueprintDraftManager.PowerGenMultiplier;
-                            totalGeneration += effectiveGen;
-                            totalUpkeep += current.Building.BuildingSO.BuildingConfig.PowerUpkeep;
-                        }
+                        float effectiveGen = current.Building.BuildingSO.BuildingConfig.PowerGeneration
+                            * BlueprintDraftManager.PowerGenMultiplier;
+                        totalGeneration += effectiveGen;
                     }
 
-                    foreach(var neighbor in current.ConnectedNodes)
+                    foreach (var neighbor in current.ConnectedNodes)
                     {
                         if (neighbor != null && !visited.Contains(neighbor))
                         {
@@ -79,27 +94,30 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
-                // Sort grid nodes: Command Posts first
+                // Allocate generation to consumers first (paired buildings / infrastructure),
+                // then Command Posts last. CP starting backup cells must not starve a solar
+                // cluster that was just wired through the auto-connect-to-CP path.
                 var sortedNodes = new List<PowerNode>(currentGrid);
-                sortedNodes.Sort((a, b) =>
-                {
-                    bool aIsCP = a.Building != null && a.Building.BuildingSO != null && a.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-                    bool bIsCP = b.Building != null && b.Building.BuildingSO != null && b.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-                    if (aIsCP && !bIsCP) return -1;
-                    if (!aIsCP && bIsCP) return 1;
-                    return 0;
-                });
+                sortedNodes.Sort((a, b) => AllocationPriority(a).CompareTo(AllocationPriority(b)));
 
                 float remainingPower = totalGeneration;
                 foreach (var gridNode in sortedNodes)
                 {
                     float upkeep = 0f;
-                    if (gridNode.Building != null && gridNode.Building.BuildingSO != null && gridNode.Building.BuildingSO.BuildingConfig != null)
+                    if (gridNode.Building != null &&
+                        gridNode.Building.BuildingSO?.BuildingConfig != null &&
+                        gridNode.Building.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
-                        if (gridNode.Building.Progress.State == GameDevTV.RTS.Units.BuildingProgress.BuildingState.Completed)
-                        {
-                            upkeep = gridNode.Building.BuildingSO.BuildingConfig.PowerUpkeep;
-                        }
+                        upkeep = gridNode.Building.BuildingSO.BuildingConfig.PowerUpkeep;
+                    }
+
+                    // Self-powered nodes (CP backup cells / battery) stay powered without
+                    // draining shared generation — otherwise a 20-upkeep CP eats a 25-gen
+                    // solar and leaves the Oxygen Processor dark despite being connected.
+                    if (gridNode.IsSelfPowered)
+                    {
+                        gridNode.IsGridPowered = remainingPower >= upkeep;
+                        continue;
                     }
 
                     if (upkeep <= remainingPower)
@@ -113,7 +131,6 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
-                // Accumulate the net power to the owner of the first node in the grid
                 if (currentGrid.Count > 0 && currentGrid[0].Building != null)
                 {
                     Owner gridOwner = currentGrid[0].Building.Owner;
@@ -123,11 +140,24 @@ namespace GameDevTV.RTS.Environment
                 powerGrids.Add(currentGrid);
             }
 
-            // Update Supplies with the exact static net power level
             foreach (var kvp in ownerPower)
             {
                 Supplies.UpdatePower(kvp.Key, kvp.Value);
             }
+        }
+
+        /// <summary>
+        /// Lower = earlier allocation. Generators first, then normal consumers, CPs last.
+        /// </summary>
+        private static int AllocationPriority(PowerNode node)
+        {
+            if (node?.Building?.BuildingSO?.BuildingConfig == null) return 1;
+
+            var config = node.Building.BuildingSO.BuildingConfig;
+            if (config.PowerGeneration > 0) return 0;
+
+            bool isCp = node.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            return isCp ? 2 : 1;
         }
     }
 }
