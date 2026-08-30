@@ -453,6 +453,8 @@ namespace GameDevTV.RTS.Player
             }
             lastMousePosition = currentMousePos;
 
+            BuildingSiteSelectionController.ActivatePendingMarkersIfNeeded();
+
             InitializeCurrentHex();
             HandleHexHover();
             HandlePanning();
@@ -894,12 +896,15 @@ namespace GameDevTV.RTS.Player
         {
             if (playerCamera == null) { return ; }
 
-            if (EventSystem.current.IsPointerOverGameObject()) { return; }
-
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
             if (BuildingSiteSelectionController.IsSelecting)
             {
+                if (Time.frameCount <= BuildingSiteSelectionController.AcceptClicksAfterFrame)
+                {
+                    return;
+                }
+
                 RaycastHit[] selectionHits = Physics.RaycastAll(
                     cameraRay, float.MaxValue, ~0, QueryTriggerInteraction.Collide);
                 foreach (RaycastHit hit in selectionHits.OrderBy(h => h.distance))
@@ -912,6 +917,8 @@ namespace GameDevTV.RTS.Player
 
                 return;
             }
+
+            if (EventSystem.current.IsPointerOverGameObject()) { return; }
 
             if (activeCommand == null)
             {

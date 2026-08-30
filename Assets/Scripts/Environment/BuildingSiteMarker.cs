@@ -215,8 +215,8 @@ namespace GameDevTV.RTS.Environment
                 clickCollider.enabled = false;
                 if (clickCollider is BoxCollider fallbackBox)
                 {
-                    fallbackBox.center = Vector3.up * 1f;
-                    fallbackBox.size = new Vector3(6f, 4f, 6f);
+                    fallbackBox.center = Vector3.up * 2f;
+                    fallbackBox.size = new Vector3(10f, 8f, 10f);
                 }
                 return;
             }
@@ -227,8 +227,8 @@ namespace GameDevTV.RTS.Environment
                 clickCollider.enabled = false;
                 if (clickCollider is BoxCollider emptyBox)
                 {
-                    emptyBox.center = Vector3.up * 1f;
-                    emptyBox.size = new Vector3(6f, 4f, 6f);
+                    emptyBox.center = Vector3.up * 2f;
+                    emptyBox.size = new Vector3(10f, 8f, 10f);
                 }
                 return;
             }
@@ -243,7 +243,9 @@ namespace GameDevTV.RTS.Environment
             {
                 box.center = transform.InverseTransformPoint(bounds.center);
                 Vector3 size = bounds.size;
-                size.y = Mathf.Max(size.y, 3f);
+                size.x = Mathf.Max(size.x, 8f);
+                size.z = Mathf.Max(size.z, 8f);
+                size.y = Mathf.Max(size.y, 6f);
                 box.size = size;
             }
         }

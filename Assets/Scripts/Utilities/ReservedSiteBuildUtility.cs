@@ -14,6 +14,7 @@ namespace GameDevTV.RTS.Utilities
     public static class ReservedSiteBuildUtility
     {
         private static bool subscribed;
+        private static bool isBuildingReservedSite;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Subscribe()
@@ -116,6 +117,32 @@ namespace GameDevTV.RTS.Utilities
         }
 
         public static bool TryBuildAtSite(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason)
+        {
+            reason = null;
+            if (isBuildingReservedSite)
+            {
+                reason = "A reserved-site build is already in progress.";
+                return false;
+            }
+
+            if (building == null || site == null)
+            {
+                reason = "No building or site specified.";
+                return false;
+            }
+
+            isBuildingReservedSite = true;
+            try
+            {
+                return TryBuildAtSiteInternal(building, owner, site, out reason);
+            }
+            finally
+            {
+                isBuildingReservedSite = false;
+            }
+        }
+
+        private static bool TryBuildAtSiteInternal(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason)
         {
             reason = null;
             if (building == null || site == null)

@@ -927,6 +927,11 @@ namespace GameDevTV.RTS.Environment
                     Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
                     foreach (var r in renderers)
                     {
+                        if (r.gameObject.name == "Selection Indicator")
+                        {
+                            continue;
+                        }
+
                         Material[] sharedMaterials = r.sharedMaterials;
                         bool changed = false;
                         for (int i = 0; i < sharedMaterials.Length; i++)

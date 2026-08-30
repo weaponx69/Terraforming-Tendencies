@@ -167,16 +167,9 @@ namespace GameDevTV.RTS.Units
                 if (child != null)
                 {
                     selectionIndicator = child.gameObject;
-                    var existingRenderer = selectionIndicator.GetComponent<MeshRenderer>();
-                    if (existingRenderer != null)
-                    {
-                        existingRenderer.material = SelectionIndicatorUtility.GetRingMaterial();
-                    }
                 }
                 else
                 {
-                    Material selectionMat = SelectionIndicatorUtility.GetRingMaterial();
-
                     GameObject indicatorGO = GameObject.CreatePrimitive(PrimitiveType.Quad);
                     indicatorGO.name = "Selection Indicator";
                     var col = indicatorGO.GetComponent<Collider>();
@@ -200,19 +193,12 @@ namespace GameDevTV.RTS.Units
                         }
                     }
                     indicatorGO.transform.localScale = new Vector3(scale, scale, 1f);
-
-                    var mr = indicatorGO.GetComponent<MeshRenderer>();
-                    if (mr != null)
-                    {
-                        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                        mr.receiveShadows = false;
-                        mr.material = selectionMat;
-                    }
-
                     indicatorGO.SetActive(false);
                     selectionIndicator = indicatorGO;
                 }
             }
+
+            EnsureSelectionIndicatorRing();
 
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO != null ? BuildingSO.Health : 1000;

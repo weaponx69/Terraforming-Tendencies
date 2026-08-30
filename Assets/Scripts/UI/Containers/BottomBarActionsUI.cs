@@ -71,6 +71,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void Update()
         {
             if (!Application.isPlaying) return;
+            if (BuildingSiteSelectionController.IsSelecting) return;
             // Periodic refresh every ~0.5s to catch newly completed buildings
             if (Time.frameCount % 30 == 0)
             {
@@ -94,6 +95,7 @@ namespace GameDevTV.RTS.UI.Containers
         public void RefreshBar()
         {
             if (!isBuilt || actionButtons == null) return;
+            if (BuildingSiteSelectionController.IsSelecting) return;
 
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
@@ -201,7 +203,7 @@ namespace GameDevTV.RTS.UI.Containers
 
                         actionButtons[slot].EnableFor(fbBbc, null, () =>
                         {
-                            BeginBuildingSelection(bbc.Building);
+                            BeginBuildingSelection(bbc.Building, cardIndex: -1);
                         });
 
                         filledSlots.Add(slot);
@@ -222,10 +224,10 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            CardDeckController.Instance.PlayCard(cardIndex);
-
             if (BuildingSiteRegistry.IsCommandBuilding(building))
             {
+                CardDeckController.Instance.PlayCard(cardIndex);
+
                 if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(building, owner, out reason))
                 {
                     Debug.LogWarning($"[BottomBarActionsUI] Build failed after playing card: {reason}");
@@ -233,10 +235,10 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            BeginBuildingSelection(building);
+            BeginBuildingSelection(building, cardIndex);
         }
 
-        private void BeginBuildingSelection(BuildingSO building)
+        private void BeginBuildingSelection(BuildingSO building, int cardIndex = -1)
         {
             if (building == null) return;
 
@@ -246,7 +248,7 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            BuildingSiteSelectionController.Begin(building, owner, (ok, selectReason) =>
+            BuildingSiteSelectionController.Begin(building, owner, cardIndex, (ok, selectReason) =>
             {
                 if (!ok)
                 {

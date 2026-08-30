@@ -6,6 +6,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using GameDevTV.RTS.Utilities;
 using GameDevTV.RTS.VisualScriptingStubs;
 
 namespace GameDevTV.RTS.Units
@@ -81,6 +82,8 @@ namespace GameDevTV.RTS.Units
                 GameDevTV.RTS.Environment.PlanetGenerator.Instance.ApplyCurvedWorldShader(gameObject);
             }
 
+            EnsureSelectionIndicatorRing();
+
             if (UnitSO != null && UnitSO.SightConfig != null && VisionTransform != null)
             {
                 float size = UnitSO.SightConfig.SightRadius * 2;
@@ -99,8 +102,27 @@ namespace GameDevTV.RTS.Units
             Bus<UpgradeResearchedEvent>.OnEvent[Owner] -= HandleUpgradeResearched;
         }
 
+        protected void EnsureSelectionIndicatorRing()
+        {
+            if (selectionIndicator == null)
+            {
+                Transform child = transform.Find("Selection Indicator");
+                if (child != null)
+                {
+                    selectionIndicator = child.gameObject;
+                }
+            }
+
+            if (selectionIndicator != null)
+            {
+                SelectionIndicatorUtility.ApplyTo(selectionIndicator);
+            }
+        }
+
         public virtual void Select()
         {
+            EnsureSelectionIndicatorRing();
+
             if (selectionIndicator != null)
             {
                 selectionIndicator.SetActive(true);
