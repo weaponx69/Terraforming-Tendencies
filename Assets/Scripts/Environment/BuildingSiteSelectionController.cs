@@ -39,25 +39,33 @@ namespace GameDevTV.RTS.Environment
             markersPending = true;
 
             eligibleSites.Clear();
-            foreach (var site in BuildingSiteRegistry.GetEligibleSites(building, owner))
-            {
-                if (BuildingSiteRegistry.IsSiteVisibleToPlayer(site))
-                {
-                    eligibleSites.Add(site);
-                }
-            }
+            eligibleSites.AddRange(BuildingSiteRegistry.GetEligibleSites(building, owner));
+
+            // Ensure every eligible pad has an active marker before we highlight / click.
+            BuildingSiteRegistry.RefreshAllMarkers();
 
             if (eligibleSites.Count == 0)
             {
                 string reason = BuildingSiteRegistry.IsSolarBuilding(building)
                     ? "No open solar array sites. Unlock a new sector or wait for a cluster to free up."
                     : "No powered building sites. Build a Solar Panel at a cluster first, then pick that cluster.";
+                NotifyBuildFeedback(reason);
                 callback?.Invoke(false, reason);
                 ClearPending();
                 return;
             }
 
+            FocusCameraOnEligibleSites();
+
+            // Single candidate: build immediately after framing the pad.
+            if (eligibleSites.Count == 1)
+            {
+                TryCommitSite(eligibleSites[0]);
+                return;
+            }
+
             Debug.Log($"[BuildingSiteSelection] Choose a site for {building.Name} ({eligibleSites.Count} option(s)).");
+            NotifyBuildFeedback($"Select a highlighted pad for {building.Name} ({eligibleSites.Count} available). Esc to cancel.");
         }
 
         public static void ActivatePendingMarkersIfNeeded()
@@ -87,16 +95,15 @@ namespace GameDevTV.RTS.Environment
                 return false;
             }
 
-            bool built = ReservedSiteBuildUtility.TryBuildAtSite(pendingBuilding, pendingOwner, site, out string reason);
-            if (built && pendingCardIndex >= 0 && CardDeckController.Instance != null)
-            {
-                CardDeckController.Instance.PlayCard(pendingCardIndex);
-            }
-
-            var callback = onComplete;
-            Cancel();
-            callback?.Invoke(built, reason);
+            TryCommitSite(site);
             return true;
+        }
+
+        /// <summary>Missed all pads — tell the player what to do.</summary>
+        public static void NotifyMissedClick()
+        {
+            if (!IsSelecting || pendingBuilding == null) return;
+            NotifyBuildFeedback($"Click a highlighted pad to build {pendingBuilding.Name}. Esc to cancel.");
         }
 
         public static void Cancel()
@@ -117,6 +124,49 @@ namespace GameDevTV.RTS.Environment
             BuildingSiteRegistry.RefreshAllMarkers();
         }
 
+        private static void TryCommitSite(BuildingSiteSlot site)
+        {
+            bool built = ReservedSiteBuildUtility.TryBuildAtSite(pendingBuilding, pendingOwner, site, out string reason);
+            if (built && pendingCardIndex >= 0 && CardDeckController.Instance != null)
+            {
+                CardDeckController.Instance.PlayCard(pendingCardIndex);
+            }
+
+            if (!built)
+            {
+                NotifyBuildFeedback(string.IsNullOrEmpty(reason)
+                    ? $"Could not build {pendingBuilding?.Name}."
+                    : reason);
+            }
+
+            var callback = onComplete;
+            Cancel();
+            callback?.Invoke(built, reason);
+        }
+
+        private static void FocusCameraOnEligibleSites()
+        {
+            if (eligibleSites.Count == 0) return;
+
+            Vector3 sum = Vector3.zero;
+            int count = 0;
+            foreach (var site in eligibleSites)
+            {
+                if (site == null) continue;
+                sum += site.Position;
+                count++;
+            }
+
+            if (count == 0) return;
+            PlayerInput.FocusCameraOnWorldPosition(sum / count);
+        }
+
+        private static void NotifyBuildFeedback(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return;
+            ExplorationManager.NotifyExplorationFailed(message);
+        }
+
         private static BuildingSiteSlot ResolveSiteFromHit(RaycastHit hit)
         {
             if (hit.collider == null) return null;
@@ -131,6 +181,15 @@ namespace GameDevTV.RTS.Environment
                 return marker.Site;
             }
 
+            // Clicking the pad ghost mesh (child, no marker on collider) after strip/recreate.
+            Transform t = hit.collider.transform;
+            while (t != null)
+            {
+                marker = t.GetComponent<BuildingSiteMarker>();
+                if (marker?.Site != null) return marker.Site;
+                t = t.parent;
+            }
+
             var building = hit.collider.GetComponentInParent<BaseBuilding>();
             if (building == null) return null;
 
@@ -142,7 +201,26 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            return null;
+            // Nearest eligible pad within click radius (ghost meshes can miss marker collider).
+            const float snapRadius = 8f;
+            BuildingSiteSlot nearest = null;
+            float best = snapRadius * snapRadius;
+            Vector3 point = hit.point;
+            foreach (var site in eligibleSites)
+            {
+                if (site == null) continue;
+                float d = (site.Position - point).sqrMagnitude;
+                // Ignore Y for pad snaps.
+                Vector3 flat = site.Position; flat.y = point.y;
+                d = (flat - point).sqrMagnitude;
+                if (d < best)
+                {
+                    best = d;
+                    nearest = site;
+                }
+            }
+
+            return nearest;
         }
 
         private static void ClearPending()

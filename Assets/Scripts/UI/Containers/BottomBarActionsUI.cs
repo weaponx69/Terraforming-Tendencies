@@ -182,11 +182,13 @@ namespace GameDevTV.RTS.UI.Containers
                         alreadyShown.Add(uc.buildingToUnlock.Name);
                 }
 
-                // Find an empty button for each GlobalCommander building not already in hand
+                // Find an empty button for each GlobalCommander building that can actually be built
                 foreach (var cmd in globalCommands)
                 {
                     if (cmd is BuildBuildingCommand bbc && bbc.Building != null
-                        && !alreadyShown.Contains(bbc.Building.Name))
+                        && !alreadyShown.Contains(bbc.Building.Name)
+                        && ReservedSiteBuildUtility.CanBuildAtReservedSite(
+                            bbc.Building, owner, out _, requireUnlocked: true))
                     {
                         // Find the first button slot that is NOT already filled
                         int slot = 0;
@@ -222,18 +224,20 @@ namespace GameDevTV.RTS.UI.Containers
             if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(
                     building, owner, out string reason, requireUnlocked: false))
             {
-                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
+                ExplorationManager.NotifyExplorationFailed(reason);
+                CardDeckController.Instance?.DiscardUnplayableFromHand();
                 return;
             }
 
             if (BuildingSiteRegistry.IsCommandBuilding(building))
             {
-                CardDeckController.Instance.PlayCard(cardIndex);
-
                 if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(building, owner, out reason))
                 {
-                    Debug.LogWarning($"[BottomBarActionsUI] Build failed after playing card: {reason}");
+                    ExplorationManager.NotifyExplorationFailed(reason);
+                    return;
                 }
+
+                CardDeckController.Instance.PlayCard(cardIndex);
                 return;
             }
 
@@ -249,15 +253,16 @@ namespace GameDevTV.RTS.UI.Containers
 
             if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(building, owner, out string reason, requireUnlocked))
             {
-                Debug.LogWarning($"[BottomBarActionsUI] {reason}");
+                ExplorationManager.NotifyExplorationFailed(reason);
+                CardDeckController.Instance?.DiscardUnplayableFromHand();
                 return;
             }
 
             BuildingSiteSelectionController.Begin(building, owner, cardIndex, (ok, selectReason) =>
             {
-                if (!ok)
+                if (!ok && !string.IsNullOrEmpty(selectReason))
                 {
-                    Debug.LogWarning($"[BottomBarActionsUI] {selectReason}");
+                    ExplorationManager.NotifyExplorationFailed(selectReason);
                 }
             });
         }

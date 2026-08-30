@@ -53,6 +53,12 @@ namespace GameDevTV.RTS.Utilities
                 return false;
             }
 
+            if (building.Prefab == null)
+            {
+                reason = $"{building.Name} has no Prefab assigned.";
+                return false;
+            }
+
             if (!BuildingSiteRegistry.HasAvailableSite(building, owner))
             {
                 if (BuildingSiteRegistry.IsMineBuilding(building))
@@ -76,33 +82,15 @@ namespace GameDevTV.RTS.Utilities
 
             if (!HasEnoughMaterials(building, owner))
             {
-                reason = $"Not enough materials to build {building.Name}.";
+                int cost = GetMaterialsCost(building);
+                int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
+                reason = $"Not enough materials for {building.Name} (need {cost}, have {have}).";
                 return false;
             }
 
-            if (!requireUnlocked)
-            {
-                return true;
-            }
-
-            var site = BuildingSiteRegistry.GetAvailableSite(building, owner);
-            var cmd = CreateCommand(building);
-            var context = CreateContext(owner, site.Position);
-            if (cmd.IsLocked(context))
-            {
-                reason = $"Cannot build {building.Name} yet (locked or insufficient materials).";
-                Object.Destroy(cmd);
-                return false;
-            }
-
-            if (!cmd.AllRestrictionsPass(SnapToNavMesh(site.Position), owner, requireWorker: false))
-            {
-                reason = $"Cannot build {building.Name} at the reserved site right now.";
-                Object.Destroy(cmd);
-                return false;
-            }
-
-            Object.Destroy(cmd);
+            // Card plays unlock on apply — never gate reserved-site eligibility on blueprint unlock.
+            // Free-placement command locks / restriction spheres are also skipped here; pads are pre-placed.
+            _ = requireUnlocked;
             return true;
         }
 
@@ -167,29 +155,21 @@ namespace GameDevTV.RTS.Utilities
                 return false;
             }
 
+            if (building.Prefab == null)
+            {
+                reason = $"{building.Name} has no Prefab assigned.";
+                return false;
+            }
+
             if (!HasEnoughMaterials(building, owner))
             {
                 reason = $"Not enough materials to build {building.Name}.";
                 return false;
             }
 
-            var cmd = CreateCommand(building);
-            var context = CreateContext(owner, site.Position);
-            if (cmd.IsLocked(context))
-            {
-                reason = $"Cannot build {building.Name} yet (locked or insufficient materials).";
-                Object.Destroy(cmd);
-                return false;
-            }
-
-            if (!cmd.AllRestrictionsPass(SnapToNavMesh(site.Position), owner, requireWorker: false))
-            {
-                reason = $"Cannot build {building.Name} at the reserved site right now.";
-                Object.Destroy(cmd);
-                return false;
-            }
-
-            Object.Destroy(cmd);
+            // Reserved pads are pre-authored — do not re-run free-placement IsLocked /
+            // AllRestrictionsPass (nearby solar, rocks, and card-not-yet-unlocked all
+            // falsely rejected pad clicks).
 
             Vector3 targetPos = SnapToNavMesh(site.Position);
 

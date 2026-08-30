@@ -61,8 +61,23 @@ namespace GameDevTV.RTS.Player
         private static readonly int TINT = Shader.PropertyToID("_Tint");
         private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
 
+        public static PlayerInput Instance { get; private set; }
+
+        /// <summary>Pan the follow target over a world point (keeps current camera height).</summary>
+        public static void FocusCameraOnWorldPosition(Vector3 worldPosition)
+        {
+            if (Instance == null || Instance.cameraTarget == null) return;
+            worldPosition.y = Instance.cameraTarget.position.y;
+            Instance.cameraTarget.position = worldPosition;
+            Instance.currentHex?.SetHighlighted(false);
+            Instance.currentHex = HexGridManager.Instance?.GetNearestRevealedHex(worldPosition);
+            Instance.currentHex?.SetHighlighted(true);
+        }
+
         private void Awake()
         {
+            Instance = this;
+
             // Scene-serialized true floods the console; keep hover/selection visuals, drop log spam.
             highlightTrace = false;
             HexGridManager.SetHighlightTrace(highlightTrace);
@@ -286,6 +301,7 @@ namespace GameDevTV.RTS.Player
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] -= HandleUnitSelected;
             Bus<UnitDeselectedEvent>.OnEvent[Owner.Player1] -= HandleUnitDeselected;
             Bus<UnitSpawnEvent>.OnEvent[Owner.Player1] -= HandleUnitSpawn;
@@ -958,6 +974,7 @@ namespace GameDevTV.RTS.Player
                     }
                 }
 
+                BuildingSiteSelectionController.NotifyMissedClick();
                 return;
             }
 

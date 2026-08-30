@@ -72,7 +72,21 @@ namespace GameDevTV.RTS.Environment
 
         public void RefreshVisibility()
         {
-            if (Site == null || !IsSiteVisibleInWorld())
+            if (Site == null)
+            {
+                gameObject.SetActive(false);
+                return;
+            }
+
+            // During site-picking, force markers on even if fog has not revealed the hex yet
+            // so the player can click the pad the camera just framed.
+            if (!isSelectable && !IsSiteVisibleInWorld())
+            {
+                gameObject.SetActive(false);
+                return;
+            }
+
+            if (isSelectable && Site.Sector != null && (Site.Sector.IsLocked || !Site.Sector.IsExplored))
             {
                 gameObject.SetActive(false);
                 return;
@@ -96,7 +110,8 @@ namespace GameDevTV.RTS.Environment
                 RebuildGhost();
             }
 
-            gameObject.SetActive(ghostInstance != null);
+            gameObject.SetActive(true);
+            EnsureClickCollider();
             ApplyColliderEnabledState();
         }
 

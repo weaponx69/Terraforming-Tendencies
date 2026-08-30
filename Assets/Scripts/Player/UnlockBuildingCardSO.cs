@@ -19,11 +19,10 @@ namespace GameDevTV.RTS.Player
 
             public override bool IsGateMet()
             {
-                // Don't put buildings in the hand when no reserved pad exists for them yet
-                // (e.g. GHG Factory before any solar-powered cluster is open).
                 if (buildingToUnlock == null) return false;
-                if (SectorManager.Instance == null) return true;
-                return BuildingSiteRegistry.HasAvailableSite(buildingToUnlock, Owner.Player1);
+                // Same rules as playability so gated cards never linger as "almost" drawable.
+                return ReservedSiteBuildUtility.CanBuildAtReservedSite(
+                    buildingToUnlock, Owner.Player1, out _, requireUnlocked: false);
             }
     
             public override string GetCardGoal()
