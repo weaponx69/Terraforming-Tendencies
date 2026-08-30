@@ -63,7 +63,7 @@ namespace GameDevTV.RTS.Environment
 
             foreach (var sector in SectorManager.Instance.Sectors)
             {
-                if (sector == null || sector.IsLocked) continue;
+                if (sector == null || sector.IsLocked || !sector.IsExplored) continue;
                 if (sector.BuildingSites == null) continue;
 
                 foreach (var site in sector.BuildingSites)
@@ -180,6 +180,20 @@ namespace GameDevTV.RTS.Environment
                         site.ClearOccupancy();
                         site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
                     }
+                }
+            }
+        }
+
+        public static void RefreshAllMarkers()
+        {
+            if (SectorManager.Instance == null) return;
+
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector?.BuildingSites == null) continue;
+                foreach (var site in sector.BuildingSites)
+                {
+                    site?.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
                 }
             }
         }

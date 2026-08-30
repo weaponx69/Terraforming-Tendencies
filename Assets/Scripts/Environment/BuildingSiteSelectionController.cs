@@ -86,6 +86,10 @@ namespace GameDevTV.RTS.Environment
             if (hit.collider == null) return null;
 
             var marker = hit.collider.GetComponent<BuildingSiteMarker>();
+            if (marker == null)
+            {
+                marker = hit.collider.GetComponentInParent<BuildingSiteMarker>();
+            }
             if (marker?.Site != null)
             {
                 return marker.Site;

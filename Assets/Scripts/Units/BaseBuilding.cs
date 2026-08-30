@@ -6,6 +6,7 @@ using GameDevTV.RTS.Player;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Commands;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using UnityEngine.AI;
 using GameDevTV.RTS.VisualScriptingStubs;
@@ -166,61 +167,22 @@ namespace GameDevTV.RTS.Units
                 if (child != null)
                 {
                     selectionIndicator = child.gameObject;
+                    var existingRenderer = selectionIndicator.GetComponent<MeshRenderer>();
+                    if (existingRenderer != null)
+                    {
+                        existingRenderer.material = SelectionIndicatorUtility.GetRingMaterial();
+                    }
                 }
                 else
                 {
-                    Material selectionMat = null;
-                    foreach (var cmd in ActiveCommandables)
-                    {
-                        if (cmd != null)
-                        {
-                            var cmdIndicator = cmd.transform.Find("Selection Indicator");
-                            if (cmdIndicator != null)
-                            {
-                                var renderer = cmdIndicator.GetComponent<MeshRenderer>();
-                                if (renderer != null && renderer.sharedMaterial != null)
-                                {
-                                    selectionMat = renderer.sharedMaterial;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (selectionMat == null && GameConfiguration.Instance != null && GameConfiguration.Instance.CommandPostPrefab != null)
-                    {
-                        var cpIndicator = GameConfiguration.Instance.CommandPostPrefab.transform.Find("Selection Indicator");
-                        if (cpIndicator != null)
-                        {
-                            var renderer = cpIndicator.GetComponent<MeshRenderer>();
-                            if (renderer != null)
-                            {
-                                selectionMat = renderer.sharedMaterial;
-                            }
-                        }
-                    }
-
-                    if (selectionMat == null)
-                    {
-                        selectionMat = Resources.Load<Material>("Materials/SelectionIndicator");
-                    }
-                    if (selectionMat == null)
-                    {
-                        selectionMat = Resources.Load<Material>("SelectionIndicator");
-                    }
-#if UNITY_EDITOR
-                    if (selectionMat == null)
-                    {
-                        selectionMat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/SelectionIndicator.mat");
-                    }
-#endif
+                    Material selectionMat = SelectionIndicatorUtility.GetRingMaterial();
 
                     GameObject indicatorGO = GameObject.CreatePrimitive(PrimitiveType.Quad);
                     indicatorGO.name = "Selection Indicator";
                     var col = indicatorGO.GetComponent<Collider>();
                     if (col != null) Destroy(col);
                     indicatorGO.transform.SetParent(transform, false);
-                    indicatorGO.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+                    indicatorGO.transform.localPosition = new Vector3(0f, 0.15f, 0f);
                     indicatorGO.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
                     float scale = 8f;
@@ -244,10 +206,7 @@ namespace GameDevTV.RTS.Units
                     {
                         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                         mr.receiveShadows = false;
-                        if (selectionMat != null)
-                        {
-                            mr.sharedMaterial = selectionMat;
-                        }
+                        mr.material = selectionMat;
                     }
 
                     indicatorGO.SetActive(false);

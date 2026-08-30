@@ -686,7 +686,7 @@ namespace GameDevTV.RTS.Environment
                     var markerComponent = marker.AddComponent<BuildingSiteMarker>();
                     markerComponent.Initialize(site);
 
-                    marker.layer = LayerMask.NameToLayer("TransparentFX");
+                    marker.layer = 0;
                     return marker;
                 }
 

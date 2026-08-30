@@ -22,6 +22,7 @@ namespace GameDevTV.RTS.Utilities
             subscribed = true;
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] += HandleBuildingSpawn;
             Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] += HandleBuildingDeath;
+            SectorManager.OnSectorUnlocked += BuildingSiteRegistry.RefreshAllMarkers;
         }
 
         private static void HandleBuildingSpawn(BuildingSpawnEvent evt)
@@ -288,16 +289,34 @@ namespace GameDevTV.RTS.Utilities
 
         private static bool ConsumeMaterials(BuildingSO building, Owner owner)
         {
-            if (building == null || building.Cost == null) return true;
-            if (Supplies.Materials == null || !Supplies.Materials.TryGetValue(owner, out int materials))
+            if (building == null || building.Cost == null)
+            {
+                return true;
+            }
+
+            _ = Supplies.Materials;
+
+            if (!Supplies.Materials.TryGetValue(owner, out int materials))
             {
                 return false;
             }
 
             int materialsCost = GetMaterialsCost(building);
-            if (materialsCost > materials) return false;
+            if (materialsCost <= 0)
+            {
+                Debug.LogWarning($"[ReservedSiteBuild] {building.Name} has zero materials cost configured.");
+                return true;
+            }
 
-            Supplies.UpdateMaterials(owner, materials - materialsCost);
+            if (materialsCost > materials)
+            {
+                return false;
+            }
+
+            int remaining = materials - materialsCost;
+            Supplies.Materials[owner] = remaining;
+            Supplies.RaiseMaterialsChanged(owner, remaining);
+            Debug.Log($"[ReservedSiteBuild] Spent {materialsCost} materials on {building.Name}. Remaining: {remaining}");
             return true;
         }
 

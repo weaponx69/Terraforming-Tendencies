@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Environment
 
         private GameObject ghostInstance;
         private BuildingSO previewBuilding;
-        private BoxCollider clickCollider;
+        private Collider clickCollider;
         private readonly List<Material> tintedMaterials = new();
         private bool highlighted;
 
@@ -53,6 +53,8 @@ namespace GameDevTV.RTS.Environment
 
         public void SetSelectable(bool selectable)
         {
+            EnsureClickCollider();
+
             if (clickCollider != null)
             {
                 clickCollider.enabled = selectable;
@@ -69,7 +71,7 @@ namespace GameDevTV.RTS.Environment
 
         public void RefreshVisibility()
         {
-            if (Site == null)
+            if (Site == null || !IsSiteVisibleInWorld())
             {
                 gameObject.SetActive(false);
                 return;
@@ -79,6 +81,11 @@ namespace GameDevTV.RTS.Environment
             {
                 gameObject.SetActive(false);
                 return;
+            }
+
+            if (ghostInstance == null && Site.Kind != BuildingSiteKind.PairedBuilding)
+            {
+                RebuildGhost();
             }
 
             if (Site.Kind == BuildingSiteKind.PairedBuilding)
@@ -93,9 +100,29 @@ namespace GameDevTV.RTS.Environment
             gameObject.SetActive(ghostInstance != null);
         }
 
+        private static bool IsSiteVisibleInWorld(BuildingSiteSlot site)
+        {
+            if (site?.Sector == null)
+            {
+                return true;
+            }
+
+            return site.Sector.IsExplored && !site.Sector.IsLocked;
+        }
+
+        private bool IsSiteVisibleInWorld()
+        {
+            return IsSiteVisibleInWorld(Site);
+        }
+
         private void RebuildGhost()
         {
             DestroyGhost();
+
+            if (!IsSiteVisibleInWorld())
+            {
+                return;
+            }
 
             BuildingSO building = BuildingSiteGhostUtility.ResolveBuildingForSite(Site, previewBuilding);
             if (building == null)
@@ -142,15 +169,12 @@ namespace GameDevTV.RTS.Environment
 
         private void StripSimulationComponents(GameObject root)
         {
-            foreach (var col in root.GetComponentsInChildren<Collider>())
+            foreach (var col in root.GetComponentsInChildren<Collider>(true))
             {
-                if (col != clickCollider)
-                {
-                    Destroy(col);
-                }
+                Destroy(col);
             }
 
-            foreach (var nav in root.GetComponentsInChildren<UnityEngine.AI.NavMeshObstacle>())
+            foreach (var nav in root.GetComponentsInChildren<UnityEngine.AI.NavMeshObstacle>(true))
             {
                 Destroy(nav);
             }
@@ -168,29 +192,44 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        private void EnsureClickCollider()
+        {
+            if (clickCollider == null)
+            {
+                FitClickCollider();
+            }
+        }
+
         private void FitClickCollider()
         {
-            clickCollider = GetComponent<BoxCollider>();
+            clickCollider = GetComponent<Collider>();
             if (clickCollider == null)
             {
                 clickCollider = gameObject.AddComponent<BoxCollider>();
             }
 
-            clickCollider.isTrigger = true;
-            clickCollider.enabled = false;
+            clickCollider.isTrigger = false;
 
             if (ghostInstance == null)
             {
-                clickCollider.center = Vector3.zero;
-                clickCollider.size = Vector3.one * 3f;
+                clickCollider.enabled = false;
+                if (clickCollider is BoxCollider fallbackBox)
+                {
+                    fallbackBox.center = Vector3.up * 1f;
+                    fallbackBox.size = new Vector3(6f, 4f, 6f);
+                }
                 return;
             }
 
             Renderer[] renderers = ghostInstance.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0)
             {
-                clickCollider.center = Vector3.zero;
-                clickCollider.size = Vector3.one * 3f;
+                clickCollider.enabled = false;
+                if (clickCollider is BoxCollider emptyBox)
+                {
+                    emptyBox.center = Vector3.up * 1f;
+                    emptyBox.size = new Vector3(6f, 4f, 6f);
+                }
                 return;
             }
 
@@ -200,8 +239,13 @@ namespace GameDevTV.RTS.Environment
                 bounds.Encapsulate(renderers[i].bounds);
             }
 
-            clickCollider.center = transform.InverseTransformPoint(bounds.center);
-            clickCollider.size = bounds.size;
+            if (clickCollider is BoxCollider box)
+            {
+                box.center = transform.InverseTransformPoint(bounds.center);
+                Vector3 size = bounds.size;
+                size.y = Mathf.Max(size.y, 3f);
+                box.size = size;
+            }
         }
 
         private void ApplyTint()

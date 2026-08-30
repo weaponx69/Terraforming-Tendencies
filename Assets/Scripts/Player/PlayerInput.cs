@@ -637,6 +637,16 @@ namespace GameDevTV.RTS.Player
 
         private void HandleMouseUp()
         {
+            if (BuildingSiteSelectionController.IsSelecting)
+            {
+                HandleLeftClick();
+                if (selectionBox != null)
+                {
+                    selectionBox.gameObject.SetActive(false);
+                }
+                return;
+            }
+
             if (!wasMouseDownOnUI && activeCommand == null && !Keyboard.current.shiftKey.isPressed)
             {
                 DeselectAllUnits();
