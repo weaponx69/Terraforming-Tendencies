@@ -44,6 +44,11 @@ namespace GameDevTV.RTS.Utilities
             }
         }
 
+        public static bool CanAffordBuilding(BuildingSO building, Owner owner)
+        {
+            return building != null && building.Prefab != null && HasEnoughMaterials(building, owner);
+        }
+
         public static bool CanBuildAtReservedSite(BuildingSO building, Owner owner, out string reason, bool requireUnlocked = true)
         {
             reason = null;

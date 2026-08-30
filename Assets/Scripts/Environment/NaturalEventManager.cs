@@ -144,10 +144,13 @@ namespace GameDevTV.RTS.Environment
         /// <summary>Chance-based single threat during turn resolution.</summary>
         public void TryTurnThreat(int turnNumber)
         {
+            // WaveLoop already drives the main meteor cadence. Turn threats are a rare extra
+            // beat so they do not stack into near-constant strikes while turns tick fast.
             if (waveRoutine == null) return;
+            if (turnNumber < 20) return;
+            if (turnNumber % 12 != 0) return;
 
-            // Softer early-game pressure: ~3% base, caps at 20%.
-            float chance = Mathf.Clamp(0.03f + turnNumber * 0.01f, 0.03f, 0.20f);
+            float chance = Mathf.Clamp(0.02f + turnNumber * 0.002f, 0.02f, 0.08f);
             if (Random.value > chance) return;
 
             Debug.Log($"[NaturalEventManager] Turn {turnNumber} threat triggered ({chance:P0} chance).");

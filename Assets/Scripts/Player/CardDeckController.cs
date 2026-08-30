@@ -62,6 +62,7 @@ namespace GameDevTV.RTS.Player
             Supplies.OnMaterialsChanged += HandleSupplyGateChanged;
             Supplies.OnEnergyChanged += HandleSupplyGateChanged;
             SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
+            PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
         }
 
         private void OnDisable()
@@ -71,6 +72,7 @@ namespace GameDevTV.RTS.Player
             Supplies.OnMaterialsChanged -= HandleSupplyGateChanged;
             Supplies.OnEnergyChanged -= HandleSupplyGateChanged;
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
+            PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
         }
 
         private void HandleBuildingSpawned(BuildingSpawnEvent _) => DiscardUnplayableFromHand();
@@ -84,6 +86,50 @@ namespace GameDevTV.RTS.Player
             if (owner == Owner.Player1) DiscardUnplayableFromHand();
         }
         private void HandleSectorUnlocked() => DiscardUnplayableFromHand();
+
+        private void HandlePlanetGenerated()
+        {
+            // Pads now exist — pull bootstrap cards back if an early purge dumped them.
+            EnsureBootstrapUnlockInHand("Command Post");
+            EnsureBootstrapUnlockInHand("Solar");
+            DiscardUnplayableFromHand();
+            OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        private void EnsureBootstrapUnlockInHand(string nameContains)
+        {
+            if (hand.Any(c => c is UnlockBuildingCardSO u &&
+                              u.buildingToUnlock != null &&
+                              u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            BlueprintCardSO found = drawPile.FirstOrDefault(c =>
+                c is UnlockBuildingCardSO u &&
+                u.buildingToUnlock != null &&
+                u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+            if (found != null)
+            {
+                drawPile.Remove(found);
+            }
+            else
+            {
+                found = discardPile.FirstOrDefault(c =>
+                    c is UnlockBuildingCardSO u &&
+                    u.buildingToUnlock != null &&
+                    u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+                if (found != null) discardPile.Remove(found);
+            }
+
+            if (found == null || !found.IsGateMet()) return;
+            // Only re-seat if a pad is actually available (otherwise CanApply is still false).
+            if (!found.CanApply()) return;
+
+            hand.Add(found);
+            Debug.Log($"[CardDeckController] Restored bootstrap card '{found.cardName}' after planet gen.");
+        }
 
 
         // Don't fill the hand in Start() — BlueprintDraftUI may not have
@@ -130,15 +176,15 @@ namespace GameDevTV.RTS.Player
             solarCard ??= EnsureStarterCard<UnlockBuildingCardSO>("Cards/SolarPanelCard");
             droneCard ??= EnsureStarterCard<SpawnUnitCardSO>("Cards/MiningDroneCard");
 
-            // 3. Direct-add guaranteed starters only when they are playable right now.
-            //    Unplayable starters (e.g. Mining Drone before a Command Post exists) stay in
-            //    the draw pile and enter the hand after their requirements are met.
-            if (cmdPostCard != null && IsPlayableNow(cmdPostCard))
+            // 3. Always seed Command Post + Solar into the opening hand. RebuildDeck often
+            //    runs before planet pads exist, so CanApply would falsely hold them out.
+            //    Mining Drone waits until a Command Post exists (via FillHand / discard purge).
+            if (cmdPostCard != null)
             {
                 hand.Add(cmdPostCard);
                 drawPile.Remove(cmdPostCard);
             }
-            if (solarCard != null && IsPlayableNow(solarCard))
+            if (solarCard != null)
             {
                 hand.Add(solarCard);
                 drawPile.Remove(solarCard);
@@ -149,19 +195,53 @@ namespace GameDevTV.RTS.Player
                 drawPile.Remove(droneCard);
             }
 
-            Debug.Log($"[CardDeckController] Seeded {hand.Count} playable starter(s). " +
+            Debug.Log($"[CardDeckController] Seeded {hand.Count} starter(s). " +
                       $"CmdPost={(cmdPostCard != null && hand.Contains(cmdPostCard) ? "YES" : "held")} " +
                       $"Solar={(solarCard != null && hand.Contains(solarCard) ? "YES" : "held")} " +
                       $"Drone={(droneCard != null && hand.Contains(droneCard) ? "YES" : "held")}");
 
-            // 4. Fill remaining slots; purge anything that slipped in unplayable.
+            // 4. Fill remaining slots with currently playable cards only.
             FillHand();
-            DiscardUnplayableFromHand();
 
             OnHandChanged?.Invoke();
 
             // Force the bottom bar to refresh so the cards appear immediately
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        /// <summary>
+        /// After a reserved-site build already succeeded, consume the hand card without
+        /// re-checking CanApply (the pad is now occupied so CanApply would fail).
+        /// Still runs Apply() so unlocks/hazards register.
+        /// </summary>
+        public void ConsumeCardAfterBuild(int handIndex)
+        {
+            if (handIndex < 0 || handIndex >= hand.Count) return;
+            BlueprintCardSO played = hand[handIndex];
+            if (played == null) return;
+
+            Debug.Log($"[CardDeckController] Consuming card after build: '{played.cardName}' (index {handIndex})");
+
+            if (played.HazardEventPrefabs != null)
+            {
+                foreach (var hazard in played.HazardEventPrefabs)
+                {
+                    if (hazard != null)
+                    {
+                        NaturalEventManager.RegisterHazard(hazard);
+                    }
+                }
+            }
+
+            played.Apply();
+
+            GameFlowManager.Instance?.PlayerActed();
+
+            hand.RemoveAt(handIndex);
+            discardPile.Add(played);
+            FillHand();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            OnHandChanged?.Invoke();
         }
 
         // ── Hand Management ──────────────────────────────────────────────────
@@ -230,7 +310,7 @@ namespace GameDevTV.RTS.Player
             for (int i = hand.Count - 1; i >= 0; i--)
             {
                 var card = hand[i];
-                if (IsPlayableNow(card)) continue;
+                if (ShouldKeepInHand(card)) continue;
 
                 hand.RemoveAt(i);
                 if (card != null) discardPile.Add(card);
@@ -247,6 +327,17 @@ namespace GameDevTV.RTS.Player
         private static bool IsPlayableNow(BlueprintCardSO card)
         {
             return card != null && card.IsGateMet() && card.CanApply();
+        }
+
+        /// <summary>
+        /// Keep cards that are playable now, plus unlock cards waiting for planet pads
+        /// (RebuildDeck often runs before sites exist).
+        /// </summary>
+        private static bool ShouldKeepInHand(BlueprintCardSO card)
+        {
+            if (card == null || !card.IsGateMet()) return false;
+            if (card.CanApply()) return true;
+            return card is UnlockBuildingCardSO && !BuildingSiteRegistry.HasRegisteredSites();
         }
 
         /// <summary>

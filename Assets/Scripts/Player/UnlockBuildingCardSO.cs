@@ -19,10 +19,10 @@ namespace GameDevTV.RTS.Player
 
             public override bool IsGateMet()
             {
-                if (buildingToUnlock == null) return false;
-                // Same rules as playability so gated cards never linger as "almost" drawable.
-                return ReservedSiteBuildUtility.CanBuildAtReservedSite(
-                    buildingToUnlock, Owner.Player1, out _, requireUnlocked: false);
+                // Materials only — site availability is CanApply. Keeps bootstrap cards
+                // (Command Post / Solar) drawable before PlanetGenerator places pads.
+                if (buildingToUnlock == null || buildingToUnlock.Prefab == null) return false;
+                return ReservedSiteBuildUtility.CanAffordBuilding(buildingToUnlock, Owner.Player1);
             }
     
             public override string GetCardGoal()

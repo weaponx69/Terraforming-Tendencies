@@ -238,7 +238,7 @@ namespace GameDevTV.RTS.UI.Containers
                     return;
                 }
 
-                CardDeckController.Instance.PlayCard(cardIndex);
+                CardDeckController.Instance.ConsumeCardAfterBuild(cardIndex);
                 return;
             }
 

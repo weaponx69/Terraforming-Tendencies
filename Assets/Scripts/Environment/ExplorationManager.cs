@@ -166,16 +166,11 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Orbital Scan: explore a frontier "?" if one exists; otherwise open the next locked
-        /// sector by exploring its entry node (matches card text: explore + unlock next sector).
+        /// Orbital Scan: unlocks / explores into the next locked sector when one remains.
+        /// Falls back to a frontier "?" node only when every sector is already unlocked.
         /// </summary>
         public bool TryOrbitalScan(Owner owner = Owner.Player1)
         {
-            if (HasFrontierNode(out SectorNode frontier, out int frontierSector))
-            {
-                return TryExploreNode(frontier, frontierSector, owner);
-            }
-
             if (SectorManager.Instance == null)
             {
                 ReportExplorationFailed("No SectorManager — cannot orbital scan.");
@@ -183,23 +178,28 @@ namespace GameDevTV.RTS.Environment
             }
 
             int next = SectorManager.Instance.GetNextLockedSectorIndex();
-            if (next < 0)
+            if (next >= 0)
             {
-                ReportExplorationFailed("All sectors are already unlocked.");
-                return false;
+                var sector = SectorManager.Instance.Sectors[next];
+                if (sector?.Nodes == null || sector.Nodes.Count == 0)
+                {
+                    ReportExplorationFailed($"Sector {next} has no nodes to scan.");
+                    return false;
+                }
+
+                SectorNode target = FindCrossSectorEntryNode(next) ?? sector.Nodes[0];
+                target.isDiscovered = true;
+                return TryExploreNode(target, next, owner);
             }
 
-            var sector = SectorManager.Instance.Sectors[next];
-            if (sector?.Nodes == null || sector.Nodes.Count == 0)
+            // All sectors unlocked — spend the card on a remaining frontier "?" if any.
+            if (HasFrontierNode(out SectorNode frontier, out int frontierSector))
             {
-                ReportExplorationFailed($"Sector {next} has no nodes to scan.");
-                return false;
+                return TryExploreNode(frontier, frontierSector, owner);
             }
 
-            // Prefer a node already linked from an explored sector; else the first node.
-            SectorNode target = FindCrossSectorEntryNode(next) ?? sector.Nodes[0];
-            target.isDiscovered = true;
-            return TryExploreNode(target, next, owner);
+            ReportExplorationFailed("All sectors are unlocked and no frontier nodes remain.");
+            return false;
         }
 
         private static SectorNode FindCrossSectorEntryNode(int sectorIndex)

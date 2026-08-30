@@ -72,7 +72,12 @@ namespace GameDevTV.RTS.Units
             visualRoot.SetParent(transform, false);
             visualRoot.localPosition = Vector3.zero;
 
-            Material metalMat = GhostMaterial;
+            // Start opaque. Ghost/placement paths apply GhostMaterial explicitly
+            // (InitializeAsGhost / StartBuilding / site-marker NeutralizeGhostSimulation).
+            // Instant-complete reserved-site builds never go through those paths, so
+            // seeding GhostMaterial here left OP stuck translucent after Start() restored
+            // primaryMaterial captured from this Awake mesh.
+            Material metalMat = FinalMaterial;
 
             GameObject go;
             if (visualPrefab != null)
@@ -221,6 +226,10 @@ namespace GameDevTV.RTS.Units
                 foreach (var r in visualRoot.GetComponentsInChildren<MeshRenderer>())
                     r.material = FinalMaterial;
             }
+
+            // Keep BaseBuilding's restored material in sync so Start() cannot re-apply a
+            // ghost primaryMaterial captured before construction completed.
+            building?.SetPrimaryMaterial(FinalMaterial);
 
             if (smokePS != null && !smokePS.isPlaying)
                 smokePS.Play();

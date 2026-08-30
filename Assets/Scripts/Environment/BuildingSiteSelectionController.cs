@@ -130,7 +130,8 @@ namespace GameDevTV.RTS.Environment
             bool built = ReservedSiteBuildUtility.TryBuildAtSite(pendingBuilding, pendingOwner, site, out string reason);
             if (built && pendingCardIndex >= 0 && CardDeckController.Instance != null)
             {
-                CardDeckController.Instance.PlayCard(pendingCardIndex);
+                // Site is now occupied — normal PlayCard CanApply would fail. Consume directly.
+                CardDeckController.Instance.ConsumeCardAfterBuild(pendingCardIndex);
             }
 
             if (built)

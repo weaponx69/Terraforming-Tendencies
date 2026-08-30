@@ -38,6 +38,18 @@ namespace GameDevTV.RTS.Environment
             return BuildingSiteKind.PairedBuilding;
         }
 
+        /// <summary>True once PlanetGenerator has placed at least one reserved pad.</summary>
+        public static bool HasRegisteredSites()
+        {
+            if (SectorManager.Instance?.Sectors == null) return false;
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector?.BuildingSites != null && sector.BuildingSites.Count > 0)
+                    return true;
+            }
+            return false;
+        }
+
         public static bool HasAvailableSite(BuildingSO building, Owner owner)
         {
             return GetEligibleSites(building, owner).Count > 0;

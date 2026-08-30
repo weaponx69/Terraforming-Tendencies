@@ -351,7 +351,10 @@ namespace GameDevTV.RTS.Units
             // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
             if (Progress.State != BuildingProgress.BuildingState.Paused)
             {
-                if (MainRenderer != null && primaryMaterial != null)
+                // Reserved-site builds call CompleteConstruction before Start. Do not re-apply
+                // primaryMaterial afterward — it may still be the translucent ghost captured
+                // during Awake (SmokestackVisuals), which would undo ActivateSmoke.
+                if (!hasCompletedConstruction && MainRenderer != null && primaryMaterial != null)
                 {
                     MainRenderer.material = primaryMaterial;
                 }
@@ -904,6 +907,20 @@ namespace GameDevTV.RTS.Units
         public void SetMainRenderer(MeshRenderer renderer)
         {
             MainRenderer = renderer;
+        }
+
+        /// <summary>
+        /// Updates the material Start/CompleteConstruction restore to (used when
+        /// SmokestackVisuals swaps from ghost to final opaque metal).
+        /// </summary>
+        public void SetPrimaryMaterial(Material material)
+        {
+            if (material == null) return;
+            primaryMaterial = material;
+            if (MainRenderer != null && Progress.State == BuildingProgress.BuildingState.Completed)
+            {
+                MainRenderer.material = material;
+            }
         }
 
 
