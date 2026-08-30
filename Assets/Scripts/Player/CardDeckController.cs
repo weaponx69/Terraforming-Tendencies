@@ -472,11 +472,6 @@ namespace GameDevTV.RTS.Player
 
         // ── Private Helpers ──────────────────────────────────────────────────
 
-        private void HandleSectorUnlocked()
-        {
-            // Draft rounds removed — no pause/pick on sector unlock.
-        }
-
         private void ShuffleDeck()
         {
             drawPile = masterDeck.OrderBy(_ => UnityEngine.Random.value).ToList();
