@@ -643,13 +643,19 @@ namespace GameDevTV.RTS.Units
         {
             yield return null;
 
-            if (BuildingSiteRegistry.IsClusterSolar(this))
+            // Solar panels power their cluster consumer (Oxygen Processor, etc.).
+            // Never merge them into the Command Post grid — CP upkeep would steal
+            // the only watts those buildings need. CP uses its own backup cells.
+            bool isSolar = BuildingSiteRegistry.IsSolarBuilding(BuildingSO)
+                || BuildingSiteRegistry.IsClusterSolar(this)
+                || (BuildingSO != null && BuildingSO.Name.Contains("Solar", System.StringComparison.OrdinalIgnoreCase));
+            if (isSolar)
             {
-                if (TryGetComponent(out PowerNode clusterSolarNode))
+                if (TryGetComponent(out PowerNode solarNode))
                 {
-                    DisconnectCommandPostLinks(clusterSolarNode);
+                    DisconnectCommandPostLinks(solarNode);
                 }
-                Debug.Log($"[Power] Cluster solar {name} stays on its local pad grid (not auto-wired to Command Post).");
+                Debug.Log($"[Power] Solar {name} stays off the Command Post grid.");
                 yield break;
             }
 

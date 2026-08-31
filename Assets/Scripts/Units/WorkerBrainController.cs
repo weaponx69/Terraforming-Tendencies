@@ -35,10 +35,55 @@ namespace GameDevTV.RTS.Units
         public EnergyPipelineManager CurrentPipeline { get; private set; }
         private Coroutine runningCoroutine;
 
+        [Header("Mining Drone Proximity Repair")]
+        [SerializeField] private float proximityRepairRadius = 14f;
+        [SerializeField] private float proximityRepairInterval = 0.5f;
+        [SerializeField] private int proximityRepairHeal = 10;
+        private float proximityRepairTimer;
+
         private void Awake()
         {
             agent = GetComponent<NavMeshAgent>();
             worker = GetComponent<Worker>();
+        }
+
+        private void Update()
+        {
+            TickProximityRepair();
+        }
+
+        /// <summary>
+        /// Mining drones passively repair damaged friendly buildings while nearby
+        /// (including during gather trips) so decay does not wipe pads they work beside.
+        /// </summary>
+        private void TickProximityRepair()
+        {
+            if (worker == null || worker.UnitSO == null) return;
+            if (!worker.UnitSO.Name.Contains("Mining", System.StringComparison.OrdinalIgnoreCase)) return;
+            if (CurrentState == State.Repairing || CurrentState == State.MovingToRepair) return;
+            if (CurrentState == State.Building || CurrentState == State.MovingToBuild) return;
+
+            proximityRepairTimer += Time.deltaTime;
+            if (proximityRepairTimer < proximityRepairInterval) return;
+            proximityRepairTimer = 0f;
+
+            float radiusSqr = proximityRepairRadius * proximityRepairRadius;
+            Vector3 origin = transform.position;
+
+            foreach (BaseBuilding building in BaseBuilding.ActiveBuildings)
+            {
+                if (building == null || building == worker as BaseBuilding) continue;
+                if (building.Owner != worker.Owner) continue;
+                if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                if (!BuildingSiteSlot.IsValidOccupant(building)) continue;
+                if (building.CurrentHealth >= building.MaxHealth) continue;
+                if (building is GlobalCommander) continue;
+                if (building.GetComponent<DecayStarter>() != null) continue;
+
+                if ((building.transform.position - origin).sqrMagnitude > radiusSqr) continue;
+
+                building.Heal(proximityRepairHeal);
+            }
         }
 
         // Called by Worker after event channels are loaded.

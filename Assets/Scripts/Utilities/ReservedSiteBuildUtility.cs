@@ -195,6 +195,17 @@ namespace GameDevTV.RTS.Utilities
 
             built.enabled = true;
             built.Owner = owner;
+
+            // Occupy before CompleteConstruction so IsClusterSolar / solar-skip logic
+            // sees the pad on the same frame the CP auto-wire coroutine starts.
+            site.SetOccupied(built);
+            site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
+
+            if (site.Cluster?.BuildingSlot?.MarkerGO != null)
+            {
+                site.Cluster.BuildingSlot.MarkerGO.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
+            }
+
             built.CompleteConstruction();
             EnsurePowerNodeReady(built);
 
@@ -205,15 +216,7 @@ namespace GameDevTV.RTS.Utilities
                 EnsurePowerNodeReady(site.Cluster.SolarBuilding);
             }
 
-            site.SetOccupied(built);
-            site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
-
-            if (site.Cluster?.BuildingSlot?.MarkerGO != null)
-            {
-                site.Cluster.BuildingSlot.MarkerGO.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
-            }
-
-            if (site.Kind == BuildingSiteKind.Solar && site.Cluster != null &&
+            if (site.Kind == BuildingSiteKind.Solar &&
                 built.TryGetComponent(out PowerNode solarNode))
             {
                 DisconnectCommandPostLinks(solarNode);
