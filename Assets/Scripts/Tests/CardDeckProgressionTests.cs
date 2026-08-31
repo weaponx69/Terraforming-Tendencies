@@ -40,6 +40,26 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void IsCurrentSectorRoundComplete_FalseAtRoundStart()
+        {
+            var gmObj = new GameObject("GenerationManager");
+            var gm = gmObj.AddComponent<GenerationManager>();
+            var smObj = new GameObject("SectorManager");
+            var sm = smObj.AddComponent<SectorManager>();
+            sm.Sectors = new System.Collections.Generic.List<SectorManager.Sector>
+            {
+                new SectorManager.Sector { IsLocked = false, IsExplored = true },
+            };
+            sm.ActiveSector = sm.Sectors[0];
+
+            Assert.IsFalse(gm.IsCurrentSectorRoundComplete());
+            Assert.Less(gm.CalculateCurrentSectorProgress(out _), 1f);
+
+            Object.DestroyImmediate(gmObj);
+            Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
         public void IsUnmetSectorGoal_TracksClimateShortfallsAtRoundStart()
         {
             Assert.IsTrue(GenerationManager.IsUnmetSectorGoal("TEMPERATURE"));
@@ -102,6 +122,22 @@ namespace GameDevTV.RTS.Tests
 
             Object.DestroyImmediate(gmObj);
             Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
+        public void TerraformingCard_RelaxesAllMinClimateGatesWhenWaterGoalUnmet()
+        {
+            Supplies.Materials[Owner.Player1] = 9999;
+
+            var card = ScriptableObject.CreateInstance<TerraformingCardSO>();
+            card.buildingToUnlock = ScriptableObject.CreateInstance<BuildingSO>();
+            card.buildingToUnlock.Name = "Water Ice Aquifer";
+            card.buildingToUnlock.Prefab = new GameObject("Water Ice Aquifer Prefab");
+            card.minTemperature = -20f;
+            card.maxTemperature = 9999f;
+
+            Assert.IsTrue(card.PassesClimateRequirements());
+            Assert.IsTrue(card.IsGateMet());
         }
 
         [Test]

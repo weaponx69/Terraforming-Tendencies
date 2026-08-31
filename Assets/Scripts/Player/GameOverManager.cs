@@ -241,11 +241,16 @@ namespace GameDevTV.RTS.Player
             if (!recoveryPossible)
             {
                 Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Biomass: {materials}");
-                
-                // Instead of game over, end the generation!
-                if (GenerationManager.Instance != null)
+
+                if (GenerationManager.Instance != null
+                    && GenerationManager.Instance.IsCurrentSectorRoundComplete())
                 {
                     GenerationManager.Instance.TriggerGenerationEnd();
+                }
+                else if (GenerationManager.Instance != null)
+                {
+                    Debug.Log("[GameOverManager] Sector terraforming goals incomplete — map depletion ends the colony.");
+                    TriggerGameOver(GameOverReason.Resources);
                 }
                 else
                 {

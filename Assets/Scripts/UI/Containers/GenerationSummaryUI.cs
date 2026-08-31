@@ -132,7 +132,8 @@ namespace GameDevTV.RTS.UI.Containers
 
                 if (resultsText != null)
                 {
-                    resultsText.text = $"Map Depleted!\n\nUnused materials liquidated for: {earnedTC} TC\nTotal TC Available: {totalTC} TC";
+                    resultsText.text =
+                        $"Sector terraforming goals complete!\n\nUnused materials liquidated for: {earnedTC} TC\nTotal TC Available: {totalTC} TC";
                 }
             }
         }

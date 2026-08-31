@@ -19,27 +19,37 @@ namespace GameDevTV.RTS.Player
             public override bool IsGateMet()
             {
                 if (!base.IsGateMet()) return false;
+                return PassesClimateRequirements();
+            }
 
+            /// <summary>
+            /// Climate / sector-feature gates. When this card's sector goal is still
+            /// unmet, minimum climate requirements and sector features are waived so
+            /// the card can appear in hand (e.g. Water Ice Aquifer at -60°C).
+            /// </summary>
+            public bool PassesClimateRequirements()
+            {
                 string goal = GetCardGoal();
-                bool relaxMinForGoal = GenerationManager.IsUnmetSectorGoal(goal);
+                bool relaxMinGates = GenerationManager.IsUnmetSectorGoal(goal);
 
                 float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
-                if (!PassesClimateBound(currentTemp, minTemperature, maxTemperature, relaxMinForGoal && goal == "TEMPERATURE"))
+                if (!PassesClimateBound(currentTemp, minTemperature, maxTemperature, relaxMinGates))
                     return false;
 
                 float currentOxygen = Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
-                if (!PassesClimateBound(currentOxygen, minOxygen, maxOxygen, relaxMinForGoal && goal == "OXYGEN"))
+                if (!PassesClimateBound(currentOxygen, minOxygen, maxOxygen, relaxMinGates))
                     return false;
 
                 float currentAtmosphere = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
-                if (!PassesClimateBound(currentAtmosphere, minAtmosphere, maxAtmosphere, relaxMinForGoal && goal == "ATMOSPHERE"))
+                if (!PassesClimateBound(currentAtmosphere, minAtmosphere, maxAtmosphere, relaxMinGates))
                     return false;
 
                 float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float w) ? w : 0f;
-                if (!PassesClimateBound(currentWater, minWater, maxWater, relaxMinForGoal && goal == "WATER"))
+                if (!PassesClimateBound(currentWater, minWater, maxWater, relaxMinGates))
                     return false;
 
-                if (requiredSectorFeature != GameDevTV.RTS.Environment.SectorManager.SectorFeature.None)
+                if (requiredSectorFeature != GameDevTV.RTS.Environment.SectorManager.SectorFeature.None
+                    && !relaxMinGates)
                 {
                     if (GameDevTV.RTS.Environment.SectorManager.Instance == null) return false;
                     bool hasFeature = false;

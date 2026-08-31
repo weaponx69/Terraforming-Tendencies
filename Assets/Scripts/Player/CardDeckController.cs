@@ -7,6 +7,7 @@ using GameDevTV.RTS.Units;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.UI.Containers;
+using GameDevTV.RTS.UI;
 
 namespace GameDevTV.RTS.Player
 {
@@ -347,11 +348,26 @@ namespace GameDevTV.RTS.Player
         private static bool IsDrawableNow(BlueprintCardSO card) => ShouldKeepInHand(card);
 
         /// <summary>
-        /// Keep cards that are playable now, plus affordable building unlocks waiting for a pad.
+        /// Keep cards that are playable now, plus building unlocks waiting on a pad or
+        /// materials when they advance an unmet sector terraforming goal.
         /// </summary>
         private static bool ShouldKeepInHand(BlueprintCardSO card)
         {
-            if (card == null || !card.IsGateMet()) return false;
+            if (card == null) return false;
+
+            string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
+            if (!string.IsNullOrEmpty(sectorGoal)
+                && GenerationManager.IsUnmetSectorGoal(sectorGoal)
+                && card is UnlockBuildingCardSO unlock)
+            {
+                if (unlock.buildingToUnlock == null || unlock.buildingToUnlock.Prefab == null)
+                    return false;
+                if (card is TerraformingCardSO terra && !terra.PassesClimateRequirements())
+                    return false;
+                return true;
+            }
+
+            if (!card.IsGateMet()) return false;
             if (card.CanApply()) return true;
             return card is UnlockBuildingCardSO;
         }
