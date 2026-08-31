@@ -35,7 +35,7 @@ This document serves as a persistent memory bank for AI context, detailing the c
 #### 5. UI & Selection Indicators
 
 #### 6. Recent Fixes Changelog
-* **Unity CLI agent rules documented (2026-08-31):** See **§40**. Agents use the experimental Unity CLI + Pipeline package against the **already-open** Editor (`unity status` / `unity command` / `eval`). Do **not** spawn a second Editor via `unity test` / `build` / `run` / `-batchmode` while this heavy project is open.
+* **Unity CLI agent rules documented (2026-08-31):** See **§40**. Agents use the experimental Unity CLI + Pipeline package against the **already-open** Editor (`unity status` / `unity command` / `eval`). Do **not** spawn a second Editor via `unity test` / `build` / `run` / `-batchmode` while this heavy project is open. Sector win automation: `SectorWinAutomation` + `tools/sector-win-cli.sh` (live `eval`), or `unity command run_tests --mode playmode --filter SectorWinAutomationTests` on the connected Editor.
 * **FIFO hand draw + sector-goal colors (2026-08-31):** See **§37 Card Deck FIFO**, **§38 Sector Goal Colors**, and **§39 Colony Integrity Start Gate**. Random shuffle / priority-promote draw was replaced with a stable FIFO queue so sector-finish cards eventually cycle into the hand. Active Objectives and hand buttons share colors **only** for sector-completion terraforming goals. Sector-win cards are **duplicated once** in the draw pile (~2× frequency) without changing shared assets.
 * **Oxygen Processor reserved-site opacity (2026-08-30):** Instant pad builds call `CompleteConstruction` before `Start`. `SmokestackVisuals` now seeds `FinalMaterial` (not ghost) and updates `BaseBuilding.SetPrimaryMaterial`; `Start` skips re-applying a captured ghost `primaryMaterial` after completion.
 * **Resource discovery vs sector unlock (2026-08-30):** Unlocking a sector no longer mass-`ForceDiscover`s known deposit types. Deposits stay hidden until node exploration (`RevealGatherableAtNode`) or a discovery card reveals a type.
@@ -811,3 +811,14 @@ Bug iteration: confirm `status` → enter Play Mode via `eval` → inspect with 
 **Automation output:** Prefer `--format json` / `--json`. Piped default is TSV; errors go to stderr. Project path auto-detects; override with `--project-path` or `UNITY_PROJECT_PATH` if needed.
 
 **Scene note:** The GameObject is often named `PlanetManager`; the generating script is `PlanetGenerator`. “Planet generation” means that script rebuilding the map (Play auto-runs it; optional Editor context menu **Generate Planet (Editor)** for preview).
+
+**Sector win automation (reduce manual playtesting):**
+* Runtime helper: `Assets/Scripts/Player/SectorWinAutomation.cs`
+  * `Report()` — climate / milestone / deck / pad snapshot
+  * `TryWinCurrentSector()` — meet climate + primary milestone targets, then `TriggerGenerationEnd` if complete
+* Shell: `tools/sector-win-cli.sh` (calls `unity command editor_play` + `eval`)
+* Tests: `SectorWinAutomationTests` via connected Editor:
+  ```bash
+  unity command run_tests --mode playmode --filter SectorWinAutomationTests --json
+  ```
+  Never use `unity test` while this Editor is already open.
