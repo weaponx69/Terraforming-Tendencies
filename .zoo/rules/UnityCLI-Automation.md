@@ -1,32 +1,106 @@
 # AI Agent Instructions: Unity CLI Automation
 
-**IMPORTANT FOR ALL AGENTS (Antigravity, Zoo Code, Roo Code, etc.):**
-Whenever you need to run Unity tests, inspect the live scene, or execute C# code without compiling, you MUST use the new Unity CLI (`unity` command) rather than the legacy `-batchmode` headless approach.
+**Authoritative CLI help:** run `unity --help` / `unity <command> --help` for the installed version.
+This project uses the experimental Unity CLI plus the Unity Pipeline package (`com.unity.pipeline`) to talk to a **already-running** Editor.
 
-## How to use the Unity CLI
-The project is already configured with `com.unity.pipeline`. This means you can interact with the Editor in real-time from the terminal!
+## Hard rules for this project
 
-### 1. Live C# Execution (The REPL)
-You can evaluate any C# expression inside the running Editor. This is incredibly fast (milliseconds) and does not require domain reloads. Use `--json` for predictable output.
-* Examples:
-  * `unity command eval "return Application.version;"`
-  * `unity command eval "return UnityEditor.EditorApplication.isPlaying;"`
-  * `unity command eval "return GameObject.Find(\"Camera Target\").transform.position;" --json`
+1. **Prefer the live connected Editor.** Check with:
+   ```bash
+   unity status --format json
+   ```
+2. **Do NOT spawn a second Editor** for tests or inspection while the user's Editor is open.
+   - Forbidden here: `unity test`, `unity build`, `unity run`, and legacy `-batchmode` / `-quit` headless Editor launches.
+   - This project is extremely heavy (large hex grid). A second Editor will OOM-kill both processes on Linux.
+3. **Use `unity command` / `unity list` / `unity mcp` against the connected Editor** for live inspection, Play Mode control, and Editor-side tools.
 
-### 2. Discovering Custom Commands
-The project may expose custom tools via the `[CliCommand]` attribute. 
-* To see what operations are available to you, run: `unity command`
-* To execute a command: `unity command <command-name> --arg Value`
+## Connected-Editor workflow (default for agents)
 
-### 3. Running Automated Tests & Iteration Loop
-**CRITICAL RULE: YOU MUST NEVER USE `unity test run` OR `-batchmode`!** 
-This project is extremely heavy (14,000+ hex tiles). If you launch a background headless Unity Editor to run tests while the user already has the main Editor open, it will consume all system RAM and the Linux OOM Killer will instantly assassinate both Editors!
+### Status and discovery
+```bash
+unity status --format json
+unity command --format json          # list commands the connected Editor exposes
+unity list --format json             # same family: registered Pipeline tools + schemas
+```
 
-You are strictly forbidden from launching background instances. You must ONLY use `unity command eval` to communicate with the single, live Editor.
+### Live C# eval (REPL)
+Fast, no domain reload required for simple queries. Prefer `--json` for parseable output.
+```bash
+unity command eval "return Application.version;" --json
+unity command eval "return UnityEditor.EditorApplication.isPlaying;" --json
+unity command eval "return GameObject.Find(\"Camera Target\").transform.position;" --json
+```
 
-When instructed to fix a bug via a `/goal` or autonomous loop:
-1. Use `unity command eval "UnityEditor.EditorApplication.isPlaying = true;"` to start Play Mode in the user's live Editor.
-2. Use `unity command eval` to inspect the live state of the game, read coordinates, or verify fixes.
-3. Edit the C# files to apply a fix.
-4. Restart Play Mode via `eval` to reload the code, then use `eval` again to verify if your fix worked.
-5. Do not stop iterating until you have verified the fix works using `eval`.
+### Run a registered Editor command
+```bash
+unity command <command-name> --arg Value --json
+```
+Custom project commands may be exposed via `[CliCommand]`. Discover them with `unity command` / `unity list`.
+
+### MCP for AI agents
+```bash
+unity mcp --help
+unity mcp configure ...              # wire agent clients when needed
+```
+Use MCP when the agent client is configured for it; otherwise prefer `unity command`.
+
+### Bugfix / verification loop
+When iterating on a gameplay bug with the live Editor:
+1. Confirm `unity status` shows this project as `ready`.
+2. `unity command eval "UnityEditor.EditorApplication.isPlaying = true;"` to enter Play Mode.
+3. Inspect state with `unity command eval ... --json`.
+4. Edit C# in the repo; let the Editor recompile.
+5. Restart Play Mode via `eval` and re-verify.
+6. Do not stop until live `eval` evidence confirms the fix.
+
+## Safe CLI uses that do NOT open a second Editor
+
+These are fine even with the Editor open:
+
+| Command | Use |
+|---------|-----|
+| `unity status` | Connected Editor health |
+| `unity command` / `unity list` | Live Editor tools |
+| `unity mcp` | MCP server / client config |
+| `unity pipeline` / `unity pipe` | Pipeline package install/upgrade/inspect |
+| `unity doctors` / `unity doctor` | CLI environment diagnostics |
+| `unity logs` | CLI/Hub logs |
+| `unity editors -i` | List installed Editors |
+| `unity auth status` | Login state |
+| `unity upgrade` | Self-update the CLI binary |
+
+## Unsafe for this repo while Editor is open
+
+| Command | Why |
+|---------|-----|
+| `unity test` | Spawns Editor / test runner; OOM risk |
+| `unity build` | Batch-mode Editor spawn |
+| `unity run` | Batch-mode Editor / headless run |
+| `unity open` | May launch another Editor instance |
+
+If automated tests are required and no Editor is open, ask the user first. Prefer verifying behavior through the live Editor + `unity command eval`.
+
+## Output formats (automation)
+
+```bash
+unity status --format json
+unity command eval "return 1;" --json
+```
+
+- Interactive default: `human`
+- Piped default: `tsv`
+- Prefer `--format json` / `--json` for agents
+- Errors go to **stderr**; exit codes are differentiated (`0` ok, `2` usage, `6` command failure, etc.)
+
+## Project path
+
+Commands that need a project usually auto-detect. If not:
+```bash
+export UNITY_PROJECT_PATH="/home/brian/UnityProjects/Terraforming Tendencies"
+# or
+unity command eval "return 1;" --project-path "/home/brian/UnityProjects/Terraforming Tendencies"
+```
+
+## Current expectation
+
+Before using live commands, the user should have this project open in Unity with Pipeline connected. If `unity status` shows nothing `ready`, tell the user to open the project in the Editor rather than launching a second instance.

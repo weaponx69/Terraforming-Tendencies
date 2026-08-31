@@ -5,7 +5,7 @@
 **📚 Central Hub Documentation**
 * **Game Design Document (Lore, Mechanics, Stats):** Read [GDD.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/GDD.md)
 * **Visual Scripting & C# Refactoring:** Read [.zoo/rules/UnityVisualScripting-conversion.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/.zoo/rules/UnityVisualScripting-conversion.md)
-* **AI Unity CLI Automation:** Read [.zoo/rules/UnityCLI-Automation.md](file:///home/brian/UnityProjects/Terraforming%20Tendencies/.zoo/rules/UnityCLI-Automation.md)
+* **AI Unity CLI Automation:** See **§40 Unity CLI & Live Editor Automation** and [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md)
 * **Agent Rules:** See [`AGENTS.md`](AGENTS.md) at the repo root (also mirrored in `.clinerules` and `.zoomodes` for tool-specific configs).
 
 ---
@@ -35,6 +35,7 @@ This document serves as a persistent memory bank for AI context, detailing the c
 #### 5. UI & Selection Indicators
 
 #### 6. Recent Fixes Changelog
+* **Unity CLI agent rules documented (2026-08-31):** See **§40**. Agents use the experimental Unity CLI + Pipeline package against the **already-open** Editor (`unity status` / `unity command` / `eval`). Do **not** spawn a second Editor via `unity test` / `build` / `run` / `-batchmode` while this heavy project is open.
 * **FIFO hand draw + sector-goal colors (2026-08-31):** See **§37 Card Deck FIFO**, **§38 Sector Goal Colors**, and **§39 Colony Integrity Start Gate**. Random shuffle / priority-promote draw was replaced with a stable FIFO queue so sector-finish cards eventually cycle into the hand. Active Objectives and hand buttons share colors **only** for sector-completion terraforming goals.
 * **Oxygen Processor reserved-site opacity (2026-08-30):** Instant pad builds call `CompleteConstruction` before `Start`. `SmokestackVisuals` now seeds `FinalMaterial` (not ghost) and updates `BaseBuilding.SetPrimaryMaterial`; `Start` skips re-applying a captured ghost `primaryMaterial` after completion.
 * **Resource discovery vs sector unlock (2026-08-30):** Unlocking a sector no longer mass-`ForceDiscover`s known deposit types. Deposits stay hidden until node exploration (`RevealGatherableAtNode`) or a discovery card reveals a type.
@@ -784,3 +785,28 @@ Color coding exists to match **sector-completion terraforming** cards to Active 
 * Until it is true: `CalculateIntegrity()` returns **100%**, and `GlobalDecayManager` **skips** damage ticks and integrity recalculation.
 * Becomes true on the first gameplay-placed building that counts toward integrity: `BaseBuilding.CompleteConstruction` → `Supplies.BeginColonyIntegrityIfNeeded` (must be `(Clone)`, not UCC / DecayStarter / 90k+ HP hub).
 * Loss checks in `GameOverManager` still wait for a real Command Post `(Clone)` before evaluating many fail states — that gate is separate from integrity drain start.
+
+#### 40. Unity CLI & Live Editor Automation (Authoritative)
+The experimental **Unity CLI** (`unity`) installs/manages Editors and, with the **Unity Pipeline** package (`com.unity.pipeline`), forwards commands to a **connected** Editor. Authoritative flag lists: `unity --help` / `unity <command> --help`. Full agent procedure: [`.zoo/rules/UnityCLI-Automation.md`](.zoo/rules/UnityCLI-Automation.md). Root [`AGENTS.md`](AGENTS.md) points agents here.
+
+**Hard rules for this repo:**
+* Prefer the **already-running** Editor. Check: `unity status --format json` (expect this project `ready`).
+* **Never** spawn a second Editor while the user’s Editor is open. Forbidden for agent automation here: `unity test`, `unity build`, `unity run`, and legacy `-batchmode` / headless Editor launches. This map is extremely heavy (large hex grid); a second instance will OOM-kill both Editors on Linux.
+* Use live tools instead: `unity command` / `unity list` / `unity command eval "..."` / `unity mcp` when MCP is configured.
+
+**Safe connected-Editor workflow:**
+```bash
+unity status --format json
+unity command --format json          # list Pipeline tools on the connected Editor
+unity command eval "return Application.version;" --json
+unity command eval "return UnityEditor.EditorApplication.isPlaying;" --json
+```
+Bug iteration: confirm `status` → enter Play Mode via `eval` → inspect with `eval --json` → edit C# → recompile → restart Play Mode via `eval` → verify.
+
+**Safe CLI uses that do not open a second Editor:** `status`, `command` / `list`, `mcp`, `pipeline`/`pipe`, `doctor`, `logs`, `editors -i`, `auth status`, `upgrade`.
+
+**Unsafe while Editor is open:** `test`, `build`, `run`, and usually `open` (may launch another instance). If headless tests are truly required, ask the user first with no Editor open.
+
+**Automation output:** Prefer `--format json` / `--json`. Piped default is TSV; errors go to stderr. Project path auto-detects; override with `--project-path` or `UNITY_PROJECT_PATH` if needed.
+
+**Scene note:** The GameObject is often named `PlanetManager`; the generating script is `PlanetGenerator`. “Planet generation” means that script rebuilding the map (Play auto-runs it; optional Editor context menu **Generate Planet (Editor)** for preview).

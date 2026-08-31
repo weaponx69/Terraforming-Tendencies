@@ -212,6 +212,12 @@ namespace GameDevTV.RTS.Utilities
                 site.Cluster.BuildingSlot.MarkerGO.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
             }
 
+            if (site.Kind == BuildingSiteKind.Solar && site.Cluster != null &&
+                built.TryGetComponent(out PowerNode solarNode))
+            {
+                DisconnectCommandPostLinks(solarNode);
+            }
+
             ConnectToClusterSolar(built, site);
 
             // Force a grid pass after occupancy + wiring so UnpoweredIndicator clears this frame.
@@ -250,10 +256,32 @@ namespace GameDevTV.RTS.Utilities
             EnsurePowerNodeReady(built);
             EnsurePowerNodeReady(solar);
 
+            DisconnectCommandPostLinks(solarNode);
+
             if (!consumerNode.ConnectedNodes.Contains(solarNode))
             {
                 consumerNode.ConnectTo(solarNode);
                 Debug.Log($"[ReservedSiteBuild] Connected {built.name} to cluster solar {solar.name}.");
+            }
+        }
+
+        private static void DisconnectCommandPostLinks(PowerNode node)
+        {
+            if (node == null) return;
+
+            var commandLinks = new List<PowerNode>();
+            foreach (var other in node.ConnectedNodes)
+            {
+                if (other?.Building?.BuildingSO?.Name != null &&
+                    other.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    commandLinks.Add(other);
+                }
+            }
+
+            foreach (var commandNode in commandLinks)
+            {
+                node.DisconnectFrom(commandNode);
             }
         }
 

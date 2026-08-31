@@ -643,6 +643,16 @@ namespace GameDevTV.RTS.Units
         {
             yield return null;
 
+            if (BuildingSiteRegistry.IsClusterSolar(this))
+            {
+                if (TryGetComponent(out PowerNode clusterSolarNode))
+                {
+                    DisconnectCommandPostLinks(clusterSolarNode);
+                }
+                Debug.Log($"[Power] Cluster solar {name} stays on its local pad grid (not auto-wired to Command Post).");
+                yield break;
+            }
+
             if (!TryGetComponent(out PowerNode generatorNode)) yield break;
 
             BaseBuilding nearestCommandPost = null;
@@ -669,6 +679,26 @@ namespace GameDevTV.RTS.Units
             {
                 generatorNode.ConnectTo(commandPostNode);
                 Debug.Log($"[Power] Automatically connected {name} to {nearestCommandPost.name}.");
+            }
+        }
+
+        private static void DisconnectCommandPostLinks(PowerNode node)
+        {
+            if (node == null) return;
+
+            var commandLinks = new List<PowerNode>();
+            foreach (var other in node.ConnectedNodes)
+            {
+                if (other?.Building?.BuildingSO?.Name != null &&
+                    other.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    commandLinks.Add(other);
+                }
+            }
+
+            foreach (var commandNode in commandLinks)
+            {
+                node.DisconnectFrom(commandNode);
             }
         }
 

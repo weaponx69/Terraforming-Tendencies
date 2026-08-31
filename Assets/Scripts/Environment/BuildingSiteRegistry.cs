@@ -227,6 +227,39 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        /// <summary>Find the reserved pad this building occupies, if any.</summary>
+        public static bool TryGetSiteForBuilding(BaseBuilding building, out BuildingSiteSlot site)
+        {
+            site = null;
+            if (building == null || SectorManager.Instance == null) return false;
+
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector?.BuildingSites == null) continue;
+                foreach (var candidate in sector.BuildingSites)
+                {
+                    if (candidate?.OccupyingBuilding == building)
+                    {
+                        site = candidate;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Solar on a cluster pad should power the adjacent building slot only,
+        /// not auto-merge into the Command Post grid.
+        /// </summary>
+        public static bool IsClusterSolar(BaseBuilding building)
+        {
+            return TryGetSiteForBuilding(building, out BuildingSiteSlot site)
+                && site.Kind == BuildingSiteKind.Solar
+                && site.Cluster != null;
+        }
+
         public static void RefreshAllMarkers()
         {
             if (SectorManager.Instance == null) return;
