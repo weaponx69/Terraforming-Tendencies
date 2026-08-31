@@ -10,16 +10,17 @@ namespace GameDevTV.RTS.UI
     /// </summary>
     public static class TerraformingGoalColors
     {
-        public static readonly Color Temperature = new Color(1.00f, 0.45f, 0.18f, 1f);
-        public static readonly Color Atmosphere  = new Color(0.35f, 0.70f, 1.00f, 1f);
-        public static readonly Color Water       = new Color(0.15f, 0.85f, 0.90f, 1f);
-        public static readonly Color Oxygen      = new Color(0.35f, 0.95f, 0.75f, 1f);
-        public static readonly Color Biomass     = new Color(0.40f, 0.90f, 0.30f, 1f);
-        public static readonly Color Power       = new Color(1.00f, 0.85f, 0.20f, 1f);
-        public static readonly Color Population  = new Color(0.85f, 0.45f, 1.00f, 1f);
-        public static readonly Color CommandPost = new Color(0.95f, 0.95f, 0.95f, 1f);
-        public static readonly Color Neutral     = new Color(0.75f, 0.78f, 0.82f, 1f);
+        public static readonly Color Temperature = new Color(1.00f, 0.55f, 0.10f, 1f); // amber orange
+        public static readonly Color Atmosphere  = new Color(0.95f, 0.45f, 0.70f, 1f); // magenta / orchid
+        public static readonly Color Water       = new Color(0.15f, 0.35f, 0.95f, 1f); // deep blue
+        public static readonly Color Oxygen      = new Color(0.35f, 0.95f, 0.75f, 1f); // mint
+        public static readonly Color Biomass     = new Color(0.40f, 0.90f, 0.30f, 1f); // green
+        public static readonly Color Power       = new Color(1.00f, 0.85f, 0.20f, 1f); // gold
+        public static readonly Color Population  = new Color(0.55f, 0.40f, 1.00f, 1f); // indigo violet
+        public static readonly Color CommandPost = new Color(0.95f, 0.95f, 0.95f, 1f); // white
+        public static readonly Color Neutral     = new Color(0.75f, 0.78f, 0.82f, 1f); // grey
 
+        /// <summary>Objectives panel only: progress number when the climate target is unmet.</summary>
         public static readonly Color MetValue   = new Color(0.40f, 0.95f, 0.45f, 1f);
         public static readonly Color UnmetValue = new Color(1.00f, 0.40f, 0.40f, 1f);
 

@@ -27,6 +27,23 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void SectorWinCards_AreIdentifiedForDeckDoubling()
+        {
+            var ghg = UnlockCard("GHG Factory");
+            var condenser = UnlockCard("Atmospheric Condenser");
+            var aquifer = UnlockCard("Water Ice Aquifer");
+            var solar = UnlockCard("Solar Panel");
+            var caches = ScriptableObject.CreateInstance<ScoutingCardSO>();
+            caches.scoutingType = ScoutingCardSO.ScoutingType.EmergencyCaches;
+
+            Assert.IsNotNull(TerraformingGoalColors.GetSectorGoalForCard(ghg));
+            Assert.IsNotNull(TerraformingGoalColors.GetSectorGoalForCard(condenser));
+            Assert.IsNotNull(TerraformingGoalColors.GetSectorGoalForCard(aquifer));
+            Assert.IsNotNull(TerraformingGoalColors.GetSectorGoalForCard(solar));
+            Assert.IsNull(TerraformingGoalColors.GetSectorGoalForCard(caches));
+        }
+
+        [Test]
         public void GetCardGoal_ClassifiesSectorTerraformingBuildings()
         {
             Assert.AreEqual("TEMPERATURE", GoalForBuilding("GHG Factory"));
@@ -123,6 +140,9 @@ namespace GameDevTV.RTS.Tests
         {
             Assert.AreNotEqual(
                 TerraformingGoalColors.ForGoal("TEMPERATURE"),
+                TerraformingGoalColors.ForGoal("WATER"));
+            Assert.AreNotEqual(
+                TerraformingGoalColors.ForGoal("ATMOSPHERE"),
                 TerraformingGoalColors.ForGoal("WATER"));
             Assert.AreEqual(
                 TerraformingGoalColors.ForMilestone(MilestoneType.Biomass),

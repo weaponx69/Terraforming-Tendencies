@@ -36,7 +36,7 @@ This document serves as a persistent memory bank for AI context, detailing the c
 
 #### 6. Recent Fixes Changelog
 * **Unity CLI agent rules documented (2026-08-31):** See **§40**. Agents use the experimental Unity CLI + Pipeline package against the **already-open** Editor (`unity status` / `unity command` / `eval`). Do **not** spawn a second Editor via `unity test` / `build` / `run` / `-batchmode` while this heavy project is open.
-* **FIFO hand draw + sector-goal colors (2026-08-31):** See **§37 Card Deck FIFO**, **§38 Sector Goal Colors**, and **§39 Colony Integrity Start Gate**. Random shuffle / priority-promote draw was replaced with a stable FIFO queue so sector-finish cards eventually cycle into the hand. Active Objectives and hand buttons share colors **only** for sector-completion terraforming goals.
+* **FIFO hand draw + sector-goal colors (2026-08-31):** See **§37 Card Deck FIFO**, **§38 Sector Goal Colors**, and **§39 Colony Integrity Start Gate**. Random shuffle / priority-promote draw was replaced with a stable FIFO queue so sector-finish cards eventually cycle into the hand. Active Objectives and hand buttons share colors **only** for sector-completion terraforming goals. Sector-win cards are **duplicated once** in the draw pile (~2× frequency) without changing shared assets.
 * **Oxygen Processor reserved-site opacity (2026-08-30):** Instant pad builds call `CompleteConstruction` before `Start`. `SmokestackVisuals` now seeds `FinalMaterial` (not ghost) and updates `BaseBuilding.SetPrimaryMaterial`; `Start` skips re-applying a captured ghost `primaryMaterial` after completion.
 * **Resource discovery vs sector unlock (2026-08-30):** Unlocking a sector no longer mass-`ForceDiscover`s known deposit types. Deposits stay hidden until node exploration (`RevealGatherableAtNode`) or a discovery card reveals a type.
 * **Reserved-site card builds (2026-08-30):** Building cards (Command Post → Solar Panel → Oxygen Processor / other paired buildings) play onto pre-placed pads, not free placement. See **§36 Reserved Site Pads**. Ghosts must stay paused/translucent and must never occupy a pad. Sector 0 guarantees a CP pad + solar/oxygen cluster + minerals inside the starting fog reveal.
@@ -756,6 +756,7 @@ Players were soft-locked finishing sectors because always-playable "spam" cards 
 
 **Current rules (`CardDeckController`):**
 * **Stable order:** `RebuildDeck` / `InitializeDrawPile` copies `masterDeck` into `drawPile` **without shuffling**.
+* **Sector-win density:** Cards whose `GetCardGoal()` is a sector-completion goal (TEMPERATURE / ATMOSPHERE / WATER / BIOMASS / OXYGEN / POWER / POPULATION / COMMAND POST) are **added a second time** as runtime `Instantiate` clones. Support cards stay single-copy. This roughly doubles how often finishing tools appear without priority-cheat draw.
 * **FIFO:** Draw from index `0` of `drawPile`. Played or skipped cards append to the **back** of `discardPile`.
 * **Recycle:** When `drawPile` is empty, discard is moved onto draw **in the same order** (`RecycleDiscardIntoDraw`) — **no re-shuffle**.
 * **Playable only in hand:** `FillHand` / `RefreshHand` only seat cards that pass `IsGateMet()` and `CanApply()`. Unplayable cards are discarded to the back of the queue (they will reappear later when gates are met).
@@ -772,7 +773,7 @@ Color coding exists to match **sector-completion terraforming** cards to Active 
 
 **What stays neutral:** MATERIALS, EXPLORATION / scouting, MINING, MAINTENANCE, unit spawns, Emergency Caches, discovery/salvage, passive buffs, and other support cards.
 
-**Palette (dark HUD):** Temp=orange, Atmos=sky blue, Water=teal, Oxygen=mint, Biomass=green, Power=gold, Population=violet, Command Post=white.
+**Palette (dark HUD):** Temp=amber orange, Atmos=magenta/orchid, Water=deep blue, Oxygen=mint, Biomass=green, Power=gold, Population=indigo violet, Command Post=white. Objectives **values** still use green/red for met/unmet — that red is not a card color.
 
 **UI wiring:**
 * `ActiveObjectivesUI` — colors the primary Goal label and Temp / Atmos / Water labels (values still green/red for met/unmet).

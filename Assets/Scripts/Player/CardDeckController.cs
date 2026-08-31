@@ -599,11 +599,35 @@ namespace GameDevTV.RTS.Player
 
         // ── Private Helpers ──────────────────────────────────────────────────
 
-        /// <summary>Stable deck order — master deck sequence, no random shuffle.</summary>
+        /// <summary>Stable deck order — master deck sequence, no random shuffle.
+        /// Sector-completion cards (climate + primary milestones) are added a second
+        /// time as runtime clones so finishing tools appear twice as often.</summary>
         private void InitializeDrawPile()
         {
-            drawPile = new List<BlueprintCardSO>(masterDeck);
+            drawPile = new List<BlueprintCardSO>(masterDeck.Count * 2);
             discardPile.Clear();
+
+            foreach (var card in masterDeck)
+            {
+                if (card == null) continue;
+                drawPile.Add(card);
+            }
+
+            // Second pass: duplicate win-path cards without mutating shared assets.
+            int extras = 0;
+            foreach (var card in masterDeck)
+            {
+                if (card == null) continue;
+                if (TerraformingGoalColors.GetSectorGoalForCard(card) == null) continue;
+
+                BlueprintCardSO copy = UnityEngine.Object.Instantiate(card);
+                copy.name = $"{card.name} (Sector Copy)";
+                drawPile.Add(copy);
+                extras++;
+            }
+
+            Debug.Log($"[CardDeckController] Draw pile ready: {drawPile.Count} cards " +
+                      $"({masterDeck.Count} base + {extras} sector-win duplicates).");
         }
 
         /// <summary>Move discard queue onto draw queue, preserving FIFO order.</summary>
