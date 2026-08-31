@@ -362,6 +362,17 @@ namespace GameDevTV.RTS.Environment
             return -1;
         }
 
+        /// <summary>Count map sectors the player has unlocked for building.</summary>
+        public int GetUnlockedSectorCount()
+        {
+            int count = 0;
+            foreach (var sector in Sectors)
+            {
+                if (sector != null && !sector.IsLocked) count++;
+            }
+            return count;
+        }
+
         /// <summary>Get the index of the next locked AND unexplored sector, or -1 if none.</summary>
         public int GetNextUnexploredSectorIndex()
         {

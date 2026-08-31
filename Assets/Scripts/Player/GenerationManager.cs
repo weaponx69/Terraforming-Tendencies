@@ -506,6 +506,24 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// True when the player may scout/unlock the next map sector.
+        /// During normal play: unlocked sector count must catch up to the current generation
+        /// (finish sector N goals, advance to generation N+1, then open sector N+1).
+        /// During expansion: any remaining locked sector may be opened.
+        /// </summary>
+        public static bool CanUnlockNextMapSector()
+        {
+            if (Instance == null || Instance.IsBetweenRounds) return false;
+
+            if (SectorManager.Instance == null) return false;
+            if (SectorManager.Instance.GetNextLockedSectorIndex() < 0) return false;
+
+            if (Instance.IsExpansionPhase) return true;
+
+            return SectorManager.Instance.GetUnlockedSectorCount() < Instance.CurrentGeneration;
+        }
+
+        /// <summary>
         /// True when this card's goal is still required to finish the current sector round
         /// (primary milestone plus temperature, atmosphere, and water).
         /// </summary>

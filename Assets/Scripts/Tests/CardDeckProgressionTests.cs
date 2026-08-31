@@ -1,9 +1,11 @@
 #if UNITY_INCLUDE_TESTS
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.UI;
+using GameDevTV.RTS.Environment;
 
 namespace GameDevTV.RTS.Tests
 {
@@ -74,6 +76,47 @@ namespace GameDevTV.RTS.Tests
                 TerraformingGoalColors.ForMilestone(MilestoneType.Biomass),
                 TerraformingGoalColors.ForGoal("BIOMASS"));
             Assert.AreEqual(TerraformingGoalColors.Neutral, TerraformingGoalColors.ForGoal("MATERIALS"));
+        }
+
+        [Test]
+        public void CanUnlockNextMapSector_RequiresGenerationToAdvance()
+        {
+            var gmObj = new GameObject("GenerationManager");
+            var gm = gmObj.AddComponent<GenerationManager>();
+            var smObj = new GameObject("SectorManager");
+            var sm = smObj.AddComponent<SectorManager>();
+            sm.Sectors = new System.Collections.Generic.List<SectorManager.Sector>
+            {
+                new SectorManager.Sector { IsLocked = false },
+                new SectorManager.Sector { IsLocked = true },
+            };
+
+            Assert.IsFalse(GenerationManager.CanUnlockNextMapSector());
+
+            var genField = typeof(GenerationManager).GetField(
+                "<CurrentGeneration>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            genField?.SetValue(gm, 2);
+
+            Assert.IsTrue(GenerationManager.CanUnlockNextMapSector());
+
+            Object.DestroyImmediate(gmObj);
+            Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
+        public void TerraformingCard_RelaxesMinClimateGateWhenGoalUnmet()
+        {
+            Supplies.Materials[Owner.Player1] = 9999;
+
+            var card = ScriptableObject.CreateInstance<TerraformingCardSO>();
+            card.buildingToUnlock = ScriptableObject.CreateInstance<BuildingSO>();
+            card.buildingToUnlock.Name = "Atmospheric Condenser";
+            card.buildingToUnlock.Prefab = new GameObject("Atmospheric Condenser Prefab");
+            card.minAtmosphere = 0.05f;
+            card.maxAtmosphere = 9999f;
+
+            Assert.IsTrue(card.IsGateMet());
         }
 
         [Test]

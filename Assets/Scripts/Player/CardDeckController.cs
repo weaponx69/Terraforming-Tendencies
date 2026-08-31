@@ -71,6 +71,7 @@ namespace GameDevTV.RTS.Player
             SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
             GenerationManager.OnGenerationStarted += HandleGenerationStarted;
+            GenerationManager.OnGenerationEnded += HandleGenerationEnded;
         }
 
         private void OnDisable()
@@ -89,6 +90,7 @@ namespace GameDevTV.RTS.Player
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
             PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
             GenerationManager.OnGenerationStarted -= HandleGenerationStarted;
+            GenerationManager.OnGenerationEnded -= HandleGenerationEnded;
         }
 
         private void HandleBuildingSpawned(BuildingSpawnEvent _) => RefreshHand();
@@ -103,6 +105,7 @@ namespace GameDevTV.RTS.Player
         }
         private void HandleSectorUnlocked() => RefreshHand();
         private void HandleGenerationStarted(int _, int __) => RefreshHand();
+        private void HandleGenerationEnded(int _, int __) => RefreshHand();
 
         private void HandlePlanetGenerated()
         {
@@ -305,7 +308,7 @@ namespace GameDevTV.RTS.Player
                 BlueprintCardSO candidate = drawPile[0];
                 drawPile.RemoveAt(0);
 
-                if (IsPlayableNow(candidate))
+                if (IsDrawableNow(candidate))
                 {
                     hand.Add(candidate);
                 }
@@ -339,14 +342,18 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Keep cards that are playable now, plus unlock cards waiting for planet pads
-        /// (RebuildDeck often runs before sites exist).
+        /// Cards eligible to enter the hand: playable now, or building unlocks waiting for a pad.
+        /// </summary>
+        private static bool IsDrawableNow(BlueprintCardSO card) => ShouldKeepInHand(card);
+
+        /// <summary>
+        /// Keep cards that are playable now, plus affordable building unlocks waiting for a pad.
         /// </summary>
         private static bool ShouldKeepInHand(BlueprintCardSO card)
         {
             if (card == null || !card.IsGateMet()) return false;
             if (card.CanApply()) return true;
-            return card is UnlockBuildingCardSO && !BuildingSiteRegistry.HasRegisteredSites();
+            return card is UnlockBuildingCardSO;
         }
 
         /// <summary>
@@ -386,6 +393,8 @@ namespace GameDevTV.RTS.Player
                     {
                         if (!mgr.CanAffordExploration())
                             reason = $"Need {mgr.ExploreEnergyCost:0.#} Energy to play Orbital Scan.";
+                        else if (!GenerationManager.CanUnlockNextMapSector())
+                            reason = "Finish this sector's terraforming goals before opening the next sector.";
                         else if (SectorManager.Instance != null && SectorManager.Instance.GetNextLockedSectorIndex() < 0)
                             reason = "All sectors are already unlocked.";
                     }

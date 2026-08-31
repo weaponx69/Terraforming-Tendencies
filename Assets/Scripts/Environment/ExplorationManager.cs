@@ -106,6 +106,7 @@ namespace GameDevTV.RTS.Environment
         {
             if (SectorManager.Instance == null) return false;
             if (SectorManager.Instance.GetNextLockedSectorIndex() < 0) return false;
+            if (!GenerationManager.CanUnlockNextMapSector()) return false;
             return CanAffordExploration(owner);
         }
 
@@ -177,6 +178,12 @@ namespace GameDevTV.RTS.Environment
                 return false;
             }
 
+            if (!GenerationManager.CanUnlockNextMapSector())
+            {
+                ReportExplorationFailed("Finish this sector's terraforming goals before opening the next sector.");
+                return false;
+            }
+
             int next = SectorManager.Instance.GetNextLockedSectorIndex();
             if (next >= 0)
             {
@@ -238,6 +245,16 @@ namespace GameDevTV.RTS.Environment
             if (!IsValidExploreTarget(node))
             {
                 ReportExplorationFailed("That node cannot be explored right now.");
+                return false;
+            }
+
+            if (SectorManager.Instance != null &&
+                sectorIndex >= 0 &&
+                sectorIndex < SectorManager.Instance.Sectors.Count &&
+                SectorManager.Instance.Sectors[sectorIndex].IsLocked &&
+                !GenerationManager.CanUnlockNextMapSector())
+            {
+                ReportExplorationFailed("Finish this sector's terraforming goals before exploring a new sector.");
                 return false;
             }
 

@@ -100,12 +100,19 @@ namespace GameDevTV.RTS.Player
     
             public override bool IsGateMet()
             {
-                // Scouting cards are always valid as long as locked sectors exist
                 if (scoutingType == ScoutingType.EmergencyCaches) return true;
-    
+                if (scoutingType == ScoutingType.PipelineBoost) return true;
+
                 var sectorMgr = Environment.SectorManager.Instance;
                 if (sectorMgr == null) return false;
-                return sectorMgr.GetNextLockedSectorIndex() >= 0;
+                if (sectorMgr.GetNextLockedSectorIndex() < 0) return false;
+
+                if (scoutingType == ScoutingType.OrbitalScan)
+                {
+                    return GenerationManager.CanUnlockNextMapSector();
+                }
+
+                return true;
             }
         }
 }

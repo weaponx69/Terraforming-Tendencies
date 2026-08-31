@@ -18,18 +18,27 @@ namespace GameDevTV.RTS.Player
     
             public override bool IsGateMet()
             {
+                if (!base.IsGateMet()) return false;
+
+                string goal = GetCardGoal();
+                bool relaxMinForGoal = GenerationManager.IsUnmetSectorGoal(goal);
+
                 float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
-                if (currentTemp < minTemperature || currentTemp > maxTemperature) return false;
-    
+                if (!PassesClimateBound(currentTemp, minTemperature, maxTemperature, relaxMinForGoal && goal == "TEMPERATURE"))
+                    return false;
+
                 float currentOxygen = Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
-                if (currentOxygen < minOxygen || currentOxygen > maxOxygen) return false;
-    
+                if (!PassesClimateBound(currentOxygen, minOxygen, maxOxygen, relaxMinForGoal && goal == "OXYGEN"))
+                    return false;
+
                 float currentAtmosphere = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
-                if (currentAtmosphere < minAtmosphere || currentAtmosphere > maxAtmosphere) return false;
-    
+                if (!PassesClimateBound(currentAtmosphere, minAtmosphere, maxAtmosphere, relaxMinForGoal && goal == "ATMOSPHERE"))
+                    return false;
+
                 float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float w) ? w : 0f;
-                if (currentWater < minWater || currentWater > maxWater) return false;
-    
+                if (!PassesClimateBound(currentWater, minWater, maxWater, relaxMinForGoal && goal == "WATER"))
+                    return false;
+
                 if (requiredSectorFeature != GameDevTV.RTS.Environment.SectorManager.SectorFeature.None)
                 {
                     if (GameDevTV.RTS.Environment.SectorManager.Instance == null) return false;
@@ -44,7 +53,14 @@ namespace GameDevTV.RTS.Player
                     }
                     if (!hasFeature) return false;
                 }
-    
+
+                return true;
+            }
+
+            private static bool PassesClimateBound(float current, float min, float max, bool skipMin)
+            {
+                if (!skipMin && current < min) return false;
+                if (current > max) return false;
                 return true;
             }
     
