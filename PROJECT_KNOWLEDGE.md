@@ -35,6 +35,9 @@ This document serves as a persistent memory bank for AI context, detailing the c
 #### 5. UI & Selection Indicators
 
 #### 6. Recent Fixes Changelog
+* **FIFO hand draw + sector-goal colors (2026-08-31):** See **§37 Card Deck FIFO**, **§38 Sector Goal Colors**, and **§39 Colony Integrity Start Gate**. Random shuffle / priority-promote draw was replaced with a stable FIFO queue so sector-finish cards eventually cycle into the hand. Active Objectives and hand buttons share colors **only** for sector-completion terraforming goals.
+* **Oxygen Processor reserved-site opacity (2026-08-30):** Instant pad builds call `CompleteConstruction` before `Start`. `SmokestackVisuals` now seeds `FinalMaterial` (not ghost) and updates `BaseBuilding.SetPrimaryMaterial`; `Start` skips re-applying a captured ghost `primaryMaterial` after completion.
+* **Resource discovery vs sector unlock (2026-08-30):** Unlocking a sector no longer mass-`ForceDiscover`s known deposit types. Deposits stay hidden until node exploration (`RevealGatherableAtNode`) or a discovery card reveals a type.
 * **Reserved-site card builds (2026-08-30):** Building cards (Command Post → Solar Panel → Oxygen Processor / other paired buildings) play onto pre-placed pads, not free placement. See **§36 Reserved Site Pads**. Ghosts must stay paused/translucent and must never occupy a pad. Sector 0 guarantees a CP pad + solar/oxygen cluster + minerals inside the starting fog reveal.
 * **Site ghosts looking like finished buildings:** Instantiating the solid prefab ran `BaseBuilding.Start` → `CompleteConstruction` → `BuildingSpawnEvent`, which locked the Command Post pad (`elig=0`) and made ghosts look solid. `BuildingSiteMarker` now instantiates under an inactive holder, disables simulation, forces `InitializeAsGhost` / Paused, strips colliders, and applies translucent placement materials **after** procedural meshes exist (`SmokestackVisuals` Awake).
 * **Oxygen Processor ghosts stayed 100% opaque:** OP visuals are generated in `SmokestackVisuals.Awake` (URP Lit). Old Standard `_Mode` fade flags were ignored. Ghost materials are reapplied after activate; URP `_Surface=1` transparency is set; idle site tint is ~16–18% alpha. Highlighted pads use a higher alpha so card site-picking is readable.
@@ -56,12 +59,12 @@ This document serves as a persistent memory bank for AI context, detailing the c
 * **Command Post Placement & Invisibility Fix:** Resolved a critical bug where the Command Post would fail to render in the scene upon placement. The issue was two-fold: (1) the `Command Post` prefab had its `UnitSO` and `BuildingSO` fields unassigned (set to `null`), preventing it from identifying itself as a Command Post and scaling its `VisionTransform` to clear the Fog of War, and (2) the prefab's default material for the `Building_02` child mesh was overwritten and saved as the transparent `Building Ghost Placement` material instead of the solid `SciFi Toon` material. This caused the building to render as a transparent ghost permanently even after construction completed. Fixed by programmatically restoring the solid `SciFi Toon` material as the default material on the prefab mesh and correctly assigning the `Command Post` `BuildingSO` asset references.
 * **Command Post Health & Spawn Healing Fix:** Resolved an issue where instant-placed/spawned Command Posts were destroyed by decay almost immediately after placement. Boosted the Command Post's default max health from `200` to `1000` on both its `BuildingSO` asset and its prefab configuration. Also updated `CompleteConstruction()` in `BaseBuilding.cs` to set `CurrentHealth = MaxHealth` unconditionally upon construction completion, ensuring buildings do not spawn near-dead if initialized with non-zero fractional values.
 * **Batch Building Prefab Materials Fix:** Fixed a project-wide rendering bug where almost all buildings (23 prefabs total, including Barracks, Spaceport, Supply Hut, and various themed buildings) were permanently transparent/invisible after placement. Discovered that their main visual child meshes (`Building_02`) had their default materials overwritten and saved as the transparent `Building Ghost Placement` material directly inside the asset files. Executed a batch script to resolve this by mapping each prefab to its correct solid material: assigning the custom themed material (e.g., `Atmospheric CondenserMaterial` for the Atmospheric Condenser) to the themed buildings, and the standard `SciFi Toon` material to the basic buildings (Barracks, Supply Hut, etc.). This restores their unique textures and ensures they render correctly.
-* **Temporary Command Post Startup Power & Grace Period Fix:** Solved a critical deadlock pacing issue at startup. Added a temporary backup power cell system in `PowerNode.cs` that grants the Command Post 90 seconds of startup power upon completion, allowing the player to train their first worker drones and place Solar Panels before the grid drops to negative net power. Also modified `GameOverManager.cs` to ignore editor-placed dummy command centers (e.g. `Universal Command Center` placed at `(0,0,0)`) and suspend all loss and integrity checks until the player's first gameplay-instantiated Command Post (containing `(Clone)` in its name) is placed, eliminating the hardcoded 30-second start timer and allowing unlimited card drafting time.
-* **Colony Integrity Decay Override Removal:** Resolved a bug where colony integrity would automatically collapse and destroy the colony in 10 seconds regardless of player actions. Discovered that a helper component `DecayStarter` was dealing 5 damage to itself every 0.1 seconds and directly overwriting the global integrity metric with its own health ratio. Removed the self-damaging update loop from `DecayStarter.cs`, allowing `GlobalDecayManager` to authoritatively calculate and update colony integrity based on the actual health ratios of all active buildings. **`DecayStarter` and `GlobalCommander` (UCC) are excluded from `Supplies.CalculateIntegrity()`** — the hidden stand-in and invulnerable hub must not inflate or mask the colony bar.
+* **Temporary Command Post Startup Power & Grace Period Fix:** Solved a critical deadlock pacing issue at startup. Added a temporary backup power cell system in `PowerNode.cs` that grants the Command Post 90 seconds of startup power upon completion, allowing the player to train their first worker drones and place Solar Panels before the grid drops to negative net power. Also modified `GameOverManager.cs` to ignore editor-placed dummy command centers (e.g. `Universal Command Center` placed at `(0,0,0)`) and suspend **loss checks** until the player's first gameplay-instantiated Command Post (containing `(Clone)` in its name) is placed. **Colony integrity drain / recalculation** is separately gated by `Supplies.ColonyIntegrityActive` — see **§39** (starts on first real building, not only Command Post).
+* **Colony Integrity Decay Override Removal:** Resolved a bug where colony integrity would automatically collapse and destroy the colony in 10 seconds regardless of player actions. Discovered that a helper component `DecayStarter` was dealing 5 damage to itself every 0.1 seconds and directly overwriting the global integrity metric with its own health ratio. Removed the self-damaging update loop from `DecayStarter.cs`, allowing `GlobalDecayManager` to authoritatively calculate and update colony integrity based on the actual health ratios of all active buildings. **`DecayStarter` and `GlobalCommander` (UCC) are excluded from `Supplies.CalculateIntegrity()`** — the hidden stand-in and invulnerable hub must not inflate or mask the colony bar. Until `ColonyIntegrityActive` is true, `CalculateIntegrity()` returns **100%** and decay does not run.
 * **Consumable Cards & Hand Battler Mechanics:** Implemented a major gameplay shift making both building blueprints and unit production options act as consumable cards that are discarded immediately when played:
   * **Consumable Blueprints:** Modified `Handle()` in `BuildBuildingCommand.cs` to call `BlueprintDraftManager.LockBuilding()` on the building's name immediately when the player places a building ghost (or triggers an orbital drop). This locks the blueprint and removes it from the active actions bar right at the moment of placement, rather than waiting for construction completion.
   * **Consumable Unit Production:** Modified `Handle()` in `BuildUnitCommand.cs` to call `RemoveBuildUnitCommand()` immediately when a unit training order is queued (clicked). This discards the training button from the building's active commands array and refreshes the bar instantly, making unit training buttons one-time consumable cards.
-  * **Play-and-Draw Loop:** Added `DrawCard()` to `CardDeckController.cs`. When a building ghost is placed or a unit training command is queued, `DrawCard()` is automatically invoked. It filters out duplicate building blueprints already in the player's hand, draws a random valid card (whose climate gates are met) from the master deck, and applies it immediately, refilling the player's hand instantly upon card play.
+  * **Play-and-Draw Loop:** Playing / consuming a hand card calls `FillHand()`, which draws the next **playable** card from the **front** of the FIFO draw pile (see **§37**). Unplayable cards are sent to the back of discard and skipped until recycled. There is **no** random reshuffle and **no** priority promotion of sector cards.
   * **Event-Driven UI Refresh & Duplicate Bar Prevention:** Restored the use of the `UpgradeResearchedEvent` broadcast in both `CardDeckController.cs` and `BaseBuilding.cs`. Since this event is handled globally by both the persistent bottom bar (`BottomBarActionsUI`) and the original selection-driven bar (`ActionsUI` via `RuntimeUI`), it keeps both bars perfectly synchronized and updated upon cards playing. Also added a `FindAnyObjectByType()` fallback in `RuntimeUI.cs` `Awake()` before creating a dynamic bottom bar, preventing duplicate bottom bars from spawning when one is already active in the scene. Finally, added critical null guards to `HandleUpgradeResearched()` in `AbstractCommandable.cs` to prevent `NullReferenceExceptions` when upgrades are researched or when commands are updated, safeguarding the game from stability crashes.
   * **Editor-Placed Building Preservation & Busy Worker Fallback:** Removed the forceful destruction check of editor-placed buildings in `BaseBuilding.cs` `Awake()`. The asynchronous cleanup of destroyed starting Command Posts was incorrectly locking the Command Post card at startup (since the old object was still registered in `ActiveBuildings` during the first frame). This restoration allows level designers and testers to lay out starting structures directly in the Unity Editor normally. Also added a fallback in `BuildBuildingCommand.cs` to route placement commands to any active worker drone if no idle workers are available, ensuring placement clicks never fail silently when all drones are busy building.
   * **First Command Post Orbital Drop:** Updated `BuildBuildingCommand.cs` `Handle()` to forcefully bypass worker drone searches and trigger the instant orbital drop (completing construction immediately) for the player's very first Command Post. This ensures that when the player starts the game with 0 worker drones and 0 buildings, they can always place and instantly construct their starting base. Subsequent Command Center expansions placed during the expansion phase will naturally require builder drones.
@@ -357,19 +360,14 @@ To support a massive roguelite Tech Tree, the game features a deep 20-level tech
 * **Building Config Overhaul:** Discovered that almost all buildings were relying on the generic 0-upkeep `Default Building Config`. Generated and assigned dedicated `BuildingConfigSO` assets for the `Command Post`, `Spaceport`, `Supply Hut`, `Oxygen Processor`, `Infantry School`, and `Barracks` to properly assign baseline `powerUpkeep` values across the economy. Adjusted Solar Panel baseline generation to 5.
 * **Double-Construction Bug:** Fixed a logic bug where `BaseBuilding.CompleteConstruction()` was invoked twice per building (once by the `WorkerBrainController`, once by `BaseBuilding.Start()`), which caused `UpkeepRoutine` to launch multiple overlapping coroutines. Implemented a `hasCompletedConstruction` boolean guard.
 
-#### 19. Blueprint Card Deck Drafting & Milestone Progression Loop
-* **1-Sector-Per-Round Paradigm:** Shifted the gameplay loop so that one sector corresponds directly to exactly one generation (round).
-* **Card Deck Drafting System:**
-  * Created `CardDeckController.cs` (monitored by `SectorManager.OnSectorUnlocked`) which manages a player's `masterDeck` of blueprint cards (`BlueprintCardSO`), drawing, shuffling, and discarding hands (default size 3) on sector expansion.
-  * Added `DraftingUI.cs` and `CardSlotUI.cs` to handle full-screen overlay rendering, unscaled fade transitions, and hover pop-scale animations during selection.
-* **Milestone Progression Engine:**
-  * Updated `GenerationManager.cs` to check milestone completion conditions inside `Update()` rather than resource depletion.
-  * Supported milestone requirements: `Biomass` levels, atmospheric `Oxygen` percentages, grid `Power` capacity, `Population` limits, and completed `CommandPosts` built inside the active sector.
-  * Starting a new generation/round calls `SectorManager.Instance.UnlockNextSector()` to unlock the next adjacent sector, which automatically initiates a fresh card draft phase.
+#### 19. Blueprint Card Deck & Sector Milestone Progression
+* **1-Sector-Per-Round Paradigm:** One sector corresponds to one generation (round). Completing the round requires the **primary milestone** (Biomass / Oxygen / Power / Population / Command Posts) **and** temperature, atmosphere, and water targets for that generation (`GenerationManager.CheckMilestones` uses the bottleneck of all four).
+* **Card deck (current):** `CardDeckController` owns a 10-card hand shown in `BottomBarActionsUI`. Cards load from `Resources/Cards` via `BlueprintDraftUI.InitializeDefaultPool()`. **Draft overlay rounds are disabled** (`TriggerDraft` / `ShowDraftSelection` are no-ops). Sector unlock is player-driven via scouting cards (Orbital Scan / Survey Drone), not auto-unlock on generation start.
+* **Milestone Progression Engine:** `GenerationManager` tracks `CurrentMilestoneType` / targets; `UnlockPrerequisitesForMilestone()` unlocks relevant blueprints when a round starts. Climate gates on `TerraformingCardSO` still filter whether a card is playable (`IsGateMet` / `CanApply`).
 
 #### 20. Themed Card Decks, Climate Gates, and Active Structure Abilities
 * **Procedural Card/Building Generation:** Since the 20 themed buildings did not exist as pre-defined asset files, they are instantiated as `BuildingSO` and `TerraformingCardSO` ScriptableObjects at runtime by cloning a default building asset (`SolarPanel` or `Habitat`) and overriding its cost, stats, and configurations.
-* **Climate Gates Filtering:** `TerraformingCardSO` defines environmental constraints (Temperature, Oxygen, Atmosphere) and geological requirements (`LavaTube`, `FaultLine`, `WaterDeposit`). `BlueprintDraftUI.GetRandomCards()` filters the selection pool using `IsGateMet()`.
+* **Climate Gates Filtering:** `TerraformingCardSO` defines environmental constraints (Temperature, Oxygen, Atmosphere) and geological requirements (`LavaTube`, `FaultLine`, `WaterDeposit`). Hand fill only admits cards that pass `IsGateMet()` **and** `CanApply()` (e.g. reserved pad available).
 * **Worker Dynamic Commands Injection:** `Worker.cs` overrides `AvailableCommands` to inject dynamic `BuildBuildingCommand` instances based on drafted building blueprints registered in `BlueprintDraftManager`.
 * **Active Abilities Integration:** `ActiveAbilityCommand.cs` handles active structure actions with cooldowns. `BaseBuilding.CompleteConstruction()` automatically attaches these commands to constructed active structures (*Deep-Core Mining Laser*, *Carbon Dioxide Import Laser*, *Methanogenic Microbe Spreader*, *Genetically Modified Algae Spreader*).
 
@@ -563,20 +561,16 @@ The following is the exhaustive database of all **29 cards** in the game's bluep
 * **Avoiding Duplicate Command Sources:** Both UIs should ideally draw from the **same command instances** rather than creating independent dynamic copies. When they create separate instances (as happens with `BuildBuildingCommand` for buildings), all properties including `GhostPrefab` must be populated identically on both sides. Inconsistencies between the two sources (e.g., GhostPrefab set in one but not the other) are bugs.
 
 #### 29. Card Hand = Bottom Action Bar
-* **The bottom action bar IS the player's hand.** There is no separate hand panel or card UI. If a card is not visible in the bottom bar, it is not in the player's hand.
+* **The bottom action bar IS the player's hand.** There is no separate hand panel. If a card is not visible in the bottom bar, it is not in the player's hand.
 * **Hand size:** 10 cards maximum. The bottom bar has 12 wired slots, so up to 10 cards are displayed.
-* **Guaranteed starting cards:** Command Post, Mining Drone, and Solar Panel are always in the opening hand. They are inserted at the front of the hand, with the remaining slots filled randomly from the deck.
-  * The Command Post card match uses `buildingToUnlock.Name == "Command Post"` (exact match) — NOT `Contains("Command")` which would also match "Sector Command Center" or any other building with "Command" in its name.
-  * Mining Drone matches by `cardName == "Mining Drone"` on a `SpawnUnitCardSO`.
-  * Solar Panel matches by `buildingToUnlock.Name == "Solar Panel"` on an `UnlockBuildingCardSO`.
-* **Play-and-draw:** Using a card removes it from the hand and draws a replacement from the deck. If the deck is empty, the discard pile is reshuffled.
-* **Deck population:** The deck is populated by `BlueprintDraftUI.InitializeDefaultPool()` which creates all card instances at runtime. The `CardDeckController.masterDeck` is filled from this pool.
-* **Initialization order (`CardDeckController` and `BlueprintDraftUI`):**
-  1. `CardDeckController.AutoSpawn()` runs first via `[RuntimeInitializeOnLoadMethod]` — creates the GameObject but does NOT fill the hand yet (deck is empty at this point).
-  2. `BlueprintDraftUI.Awake()` runs next — calls `InitializeDefaultPool()` to populate the `runtimePool` with all 39 cards.
-  3. After populating, `BlueprintDraftUI` calls `CardDeckController.Instance.RebuildDeck()` which: shuffles the deck, fills the 10-card hand, guarantees starting cards, and fires `UpgradeResearchedEvent` to refresh the bottom bar.
-  4. CardDeckController.Start() is deliberately empty — hand initialization is deferred to step 3.
-  * **This order matters.** If `FillHand()` ran before the deck was populated, the hand would be empty. The `RebuildDeck()` method exists specifically to solve this timing dependency.
+* **Guaranteed opening seeds:** Command Post and Solar Panel are always seeded into the opening hand (Mining Drone is added if already playable). Exact name matches: `"Command Post"`, `"Solar Panel"`, `cardName == "Mining Drone"`.
+* **Play-and-draw (FIFO):** Playing a card removes it from the hand, appends it to the **back** of discard, and fills empty slots from the **front** of the draw pile. See **§37**.
+* **Deck population:** `BlueprintDraftUI.InitializeDefaultPool()` loads `Resources/Cards` (+ runtime Deploy Engineer) into `CardDeckController.masterDeck`, then calls `RebuildDeck()`.
+* **Initialization order:**
+  1. `CardDeckController.AutoSpawn()` — empty deck.
+  2. `BlueprintDraftUI.Awake()` → `InitializeDefaultPool()` → `RebuildDeck()` (stable FIFO order, seed starters, `FillHand`).
+  3. `CardDeckController.Start()` is empty on purpose.
+* **Sector-goal colors:** Hand buttons and Active Objectives share colors only for sector-completion terraforming — see **§38**.
 
 #### 30. RTS Memory Cleaner & Monitor Tool
 * **Purpose:** A custom Editor Window utility (`MemoryCleanerWindow.cs` inside `Assets/Scripts/Editor/`) designed to help developers monitor memory usage, warn about leaks, and clean dangling assets directly inside the Unity Editor during active development.
@@ -700,26 +694,25 @@ User right-clicks on map (with units selected)
   2. **Recovery**: Disabled structures tick down toward reactivation.
   3. **Income**: Gain base resources (energy, materials, research) + bonuses from upgrades/deposits.
   4. **Threats**: Random chance (scales with turn number × planet danger). Damages resources or structures.
-  5. **Draw**: Discard hand, draw fresh hand. If deck empty, shuffle discard.
-  6. **Events**: Every 3rd turn: Discovery Draft (pick 1 of 3 rewards). Otherwise: 25% chance of a choice event.
-  7. **Milestones**: If terraform progress crosses a threshold, pause and open Upgrade Shop.
-  8. **Win/Lose Check**: All targets met = victory. Max turns exceeded = defeat.
+  5. **Draw**: `FillHand()` — FIFO draw of playable cards (unplayable cards go to the back of discard). Hand is **not** discarded wholesale every turn in the current `GameFlowPhaseController` path (it only calls `FillHand`).
+  6. **Events**: Legacy design mentioned Discovery Draft / choice events; draft overlays are currently disabled.
+  7. **Milestones**: If terraform progress crosses a threshold, end generation / open summary shop flow.
+  8. **Win/Lose Check**: All sectors occupied + oxygen complete = victory (see `GameOverManager`).
 * **Card Rules**:
-  * **Play-and-draw**: Playing a card immediately draws a replacement (hand stays full during your action window)
-  * **Climate gates**: Some cards locked until terraform stats reach thresholds
-  * **Upkeep**: Deployed cards cost energy each turn to maintain
+  * **Play-and-draw (FIFO):** Playing a card draws the next playable card from the front of the queue — see **§37**.
+  * **Climate / site gates:** Some cards locked until terraform stats / reserved pads allow `CanApply()`.
+  * **Sector-goal colors:** Only sector-completion terraforming goals are color-coded — see **§38**.
 * **Exploration**:
   * Map starts with fog of war, only a few tiles revealed.
   * Adjacent-to-revealed tiles are “discoverable” (marked visually).
   * Revealing a tile also makes its neighbors discoverable (frontier expands outward).
   * Some tiles have resource deposits that boost income when structures are placed on them.
 * **Milestones & Upgrades**:
-  * 3-4 milestones per planet (at ~30%, 50%, 70%, 85% of terraform target).
-  * Hitting one awards meta-currency and opens a shop.
-  * Upgrades are permanent for the mission: cheaper cards, more income, bigger hand, threat resistance, etc.
+  * Per-sector generations: primary milestone + Temp / Atmos / Water must all reach target.
+  * Hitting a generation awards Terra-Coins and opens the summary / tech shop flow.
 * **Key Design Intent**:
   * **RTS pacing without real-time combat**: The idle timer creates urgency. Players batch actions quickly, then watch resolution.
-  * **“Never stuck, always starving”**: Players always have something to do (emergency cards, exploration), but never have enough resources to do everything.
+  * **“Never stuck, always starving”**: Players always have something to do (emergency cards, exploration), but never have enough resources to do everything — FIFO draw ensures sector cards still cycle through.
   * **Escalating pressure**: Threats scale up, upkeep accumulates, structures degrade. The planet fights back harder as you terraform more.
 
 #### 20. GameFlowManager & Turn Resolution Loop
@@ -730,9 +723,9 @@ User right-clicks on map (with units selected)
   2. **Recovery:** Disabled structures tick down toward reactivation.
   3. **Income:** Gain base resources and bonuses.
   4. **Threats:** Random chance of damage/events.
-  5. **Draw:** Discard hand, draw fresh hand.
-  6. **Events:** Discovery Draft or choice events.
-  7. **Milestones:** Pause and open Upgrade Shop if terraform progress crosses a threshold.
+  5. **Draw:** `FillHand()` (FIFO playable cards).
+  6. **Events:** Narrative window stub / draft disabled.
+  7. **Milestones:** Generation progress check.
   8. **Win/Lose Check:** Victory or defeat conditions evaluated.
 * **System Integration:** This manager replaced the periodic `UpkeepRoutine` coroutines in buildings. Now, buildings and systems subscribe directly to `GameFlowManager` events (like `OnTurnUpkeep` and `OnTurnIncome`) for synchronized, deterministic economy ticks.
 
@@ -756,3 +749,38 @@ Player building cards do **not** free-place on the terrain. Planet generation dr
 * **Training drones:** Mining drones are trained from the **Command Post** (including multiple in queue). That is intended. The UCC is only the invisible hub for empty-click / global commands — it must not block drone raycasts.
 * **Reserved-site build path:** Pad builds skip free-placement `IsLocked` / `AllRestrictionsPass` (those falsely blocked card builds: card not unlocked yet, nearby solar overlap). Failures surface via `ExplorationManager.NotifyExplorationFailed` (on-screen). Selecting a building card frames the camera on eligible pads; a single candidate auto-builds.
 * **Power grid allocation:** Command Post `powerUpkeep` (20) used to starve cluster consumers when solar auto-wired to CP. Allocation now powers normal consumers before CPs, and self-powered nodes (CP backup cells / battery) do not drain shared generation. `PowerGridManager` auto-spawns if missing.
+
+#### 37. Card Deck FIFO Draw (Authoritative)
+Players were soft-locked finishing sectors because always-playable "spam" cards (Emergency Caches, shipments, etc.) could dominate a **randomly shuffled** draw, while climate-gated sector cards sat in discard and never returned predictably.
+
+**Current rules (`CardDeckController`):**
+* **Stable order:** `RebuildDeck` / `InitializeDrawPile` copies `masterDeck` into `drawPile` **without shuffling**.
+* **FIFO:** Draw from index `0` of `drawPile`. Played or skipped cards append to the **back** of `discardPile`.
+* **Recycle:** When `drawPile` is empty, discard is moved onto draw **in the same order** (`RecycleDiscardIntoDraw`) — **no re-shuffle**.
+* **Playable only in hand:** `FillHand` / `RefreshHand` only seat cards that pass `IsGateMet()` and `CanApply()`. Unplayable cards are discarded to the back of the queue (they will reappear later when gates are met).
+* **No priority promotion:** Sector cards are **not** pulled out of order or forced into the hand. Fair cycling is the fix.
+* **Opening exception:** Command Post + Solar are seeded into the opening hand so the player can bootstrap; everything after that is FIFO.
+* **Refresh triggers:** Builds, deaths, materials/energy/climate/oxygen/biomass/power/population changes, sector unlock, planet gen, and generation start call `RefreshHand()` so newly-playable cards can enter when they reach the front of a recycle or when unplayable cards leave the hand.
+
+#### 38. Sector Goal Color Coding (Authoritative)
+Color coding exists to match **sector-completion terraforming** cards to Active Objectives — not every card type.
+
+**What gets colored** (`TerraformingGoalColors.IsSectorCompletionGoal`):
+* Climate trio: **TEMPERATURE**, **ATMOSPHERE**, **WATER**
+* Primary milestones: **BIOMASS**, **OXYGEN**, **POWER**, **POPULATION**, **COMMAND POST**
+
+**What stays neutral:** MATERIALS, EXPLORATION / scouting, MINING, MAINTENANCE, unit spawns, Emergency Caches, discovery/salvage, passive buffs, and other support cards.
+
+**Palette (dark HUD):** Temp=orange, Atmos=sky blue, Water=teal, Oxygen=mint, Biomass=green, Power=gold, Population=violet, Command Post=white.
+
+**UI wiring:**
+* `ActiveObjectivesUI` — colors the primary Goal label and Temp / Atmos / Water labels (values still green/red for met/unmet).
+* `BottomBarActionsUI` + `UIActionButton` — outline tint, label tint, and a short goal badge **only** when `GetSectorGoalForCard` returns a sector goal.
+* `UnlockBuildingCardSO.ClassifyBuildingGoal` / `GetCardGoal` — maps buildings (GHG Factory → TEMPERATURE, aquifer → WATER, Oxygen Processor → OXYGEN, etc.).
+* Key file: `Assets/Scripts/UI/TerraformingGoalColors.cs`.
+
+#### 39. Colony Integrity Start Gate (Authoritative)
+* **`Supplies.ColonyIntegrityActive`** starts `false` each scene / `Supplies.Awake`.
+* Until it is true: `CalculateIntegrity()` returns **100%**, and `GlobalDecayManager` **skips** damage ticks and integrity recalculation.
+* Becomes true on the first gameplay-placed building that counts toward integrity: `BaseBuilding.CompleteConstruction` → `Supplies.BeginColonyIntegrityIfNeeded` (must be `(Clone)`, not UCC / DecayStarter / 90k+ HP hub).
+* Loss checks in `GameOverManager` still wait for a real Command Post `(Clone)` before evaluating many fail states — that gate is separate from integrity drain start.

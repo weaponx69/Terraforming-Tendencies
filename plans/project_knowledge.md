@@ -34,8 +34,8 @@
 ## Integrity Bar ↔ Colony Health
 
 ### Authoritative calculation
-1. **`GlobalDecayManager.DecayLoop()`** damages buildings/units outside life support every tick
-2. **`Supplies.CalculateIntegrity()`** aggregates `CurrentHealth / MaxHealth` for player-owned commandables
+1. **`GlobalDecayManager.DecayLoop()`** damages buildings/units outside life support every tick **only after** `Supplies.ColonyIntegrityActive` is true
+2. **`Supplies.CalculateIntegrity()`** aggregates `CurrentHealth / MaxHealth` for player-owned commandables; returns **100%** until integrity is active
 3. **`Supplies.UpdateIntegrity()`** fires `OnIntegrityChanged`
 4. **`ColonyIntegrityBar`** subscribes and updates the HUD fill
 
@@ -44,16 +44,21 @@
 - **`DecayStarter`** — hidden legacy stand-in for the UCC; must never inflate integrity
 - Any commandable with `MaxHealth >= 90000`
 
+### When integrity starts counting
+- Flag: `Supplies.ColonyIntegrityActive` (false on scene load / Supplies Awake)
+- Set by `BeginColonyIntegrityIfNeeded` from `BaseBuilding.CompleteConstruction` on the first real `(Clone)` building that counts toward integrity
+- Until then decay ticks and integrity recalculation are skipped
+
 ### Bug fixed (2026-06-30)
 `SurvivalManager` was recalculating integrity from all commandables every second and overwriting per-tick writes. It now only drains biomass; integrity is owned by `GlobalDecayManager` + `CalculateIntegrity()`.
 
 ### Key files
-- `Assets/Scripts/Environment/GlobalDecayManager.cs` — decay ticks + integrity refresh
-- `Assets/Scripts/Player/Supplies.cs` — `CalculateIntegrity()` + `CountsTowardIntegrity()`
+- `Assets/Scripts/Environment/GlobalDecayManager.cs` — decay ticks + integrity refresh (gated)
+- `Assets/Scripts/Player/Supplies.cs` — `CalculateIntegrity()` + `CountsTowardIntegrity()` + `BeginColonyIntegrityIfNeeded`
 - `Assets/Scripts/UI/Components/ColonyIntegrityBar.cs` — HUD bar
 - `Assets/Scripts/Environment/DecayStarter.cs` — legacy stand-in (excluded from calculation)
 
-See also `PROJECT_KNOWLEDGE.md` § Colony Integrity Decay Override Removal.
+See also `PROJECT_KNOWLEDGE.md` **§39 Colony Integrity Start Gate**.
 
 ---
 
@@ -103,12 +108,13 @@ There are **two card systems** that coexist in the codebase. Both provide card-b
 |---|---|
 | **Nature** | Auto-spawning singleton (`RuntimeInitializeOnLoadMethod.BeforeSceneLoad`) |
 | **Hand Size** | 10 cards |
-| **Deck Management** | `masterDeck` (BlueprintCardSO list), `drawPile`, `discardPile`, `hand` |
-| **Starting Hand** | `RebuildDeck()` — 3 guaranteed starters (Command Post, Solar Panel, Mining Drone) at indices 0-2, then fills remaining 7 slots from draw pile |
-| **Play Mechanics** | `PlayCard(int handIndex)` — registers hazard if present, calls `card.Apply()`, removes from hand, discards, draws replacement via `FillHand()` |
-| **Draft System** | `TriggerDraft()` — pauses game, curates hand for draft (prefers scouting cards for locked sectors), fires `OnDraftStarted` event. `SelectCard()` completes draft via `BlueprintDraftManager.CompleteDraft()`. |
-| **Events** | `OnHandChanged`, `OnDraftStarted` |
-| **Integration** | `SectorManager.OnSectorUnlocked` triggers a draft. `UpgradeResearchedEvent` refreshes bottom bar. |
+| **Deck Management** | `masterDeck`, `drawPile`, `discardPile`, `hand` |
+| **Starting Hand** | `RebuildDeck()` seeds Command Post + Solar (Mining Drone if playable), then FIFO-fills remaining slots |
+| **Draw Mechanics** | **FIFO queue** — front of `drawPile`; played/skipped cards go to back of discard; recycle preserves order (**no shuffle**, no priority promotion). See `PROJECT_KNOWLEDGE.md` §37. |
+| **Play Mechanics** | `PlayCard` / `ConsumeCardAfterBuild` → `Apply()`, discard, `FillHand()` |
+| **Draft System** | **Disabled** — `TriggerDraft()` is a no-op; player uses the normal hand |
+| **Events** | `OnHandChanged` |
+| **Goal colors** | Sector-completion goals only (`TerraformingGoalColors`) — Temp/Atmos/Water + milestone types; support cards stay neutral. See `PROJECT_KNOWLEDGE.md` §38. |
 
 ### BlueprintDraftManager (Static Support for System B)
 
@@ -135,33 +141,27 @@ There are **two card systems** that coexist in the codebase. Both provide card-b
 
 | File | Purpose |
 |---|---|
-| `Assets/Scripts/UI/Containers/BottomBarActionsUI.cs` | Persistent bottom bar showing 10-card hand from `CardDeckController`. Building cards create `BuildBuildingCommand` for placement mode; non-building cards use `PlayCardCommand`. Falls back to GlobalCommander unlocked buildings for empty slots. |
-| `Assets/Scripts/UI/Containers/BlueprintDraftUI.cs` | Draft selection panel shown at generation start. Pauses game (Time.timeScale=0), shows 3 random cards from pool, displays building stats and terraforming requirements. |
-| `Assets/Scripts/UI/CardSlotUI.cs` | Draft card slot with hover scale animation (1.07x) and glow outline. Calls selection callback on click. |
-| `Assets/Scripts/UI/Containers/AbilityHandUI.cs` | Persistent ability hand showing `ActiveAbilityCommand` instances from owned completed/operational buildings. Auto-collects via `BaseBuilding.ActiveBuildings`. |
-| `Assets/Scripts/UI/Components/AbilityCardSlotUI.cs` | Ability card with cooldown overlay (fillAmount), lock overlay, percentage text, hover effects. |
-| `Assets/Scripts/Commands/PlayCardCommand.cs` | Simple command wrapping `CardDeckController.PlayCard(HandIndex)`. `RequiresClickToActivate = false` for immediate fire. |
+| `Assets/Scripts/UI/Containers/BottomBarActionsUI.cs` | Persistent bottom bar showing 10-card hand from `CardDeckController`. Building cards → reserved-site build; others → `PlayCardCommand`. Sector-completion cards get goal color accents. |
+| `Assets/Scripts/UI/Containers/BlueprintDraftUI.cs` | Loads `Resources/Cards` into the deck and calls `RebuildDeck()`. Full-screen draft selection is **disabled**. |
+| `Assets/Scripts/UI/CardSlotUI.cs` | Draft card slot (legacy); colors sector-goal titles when used. |
+| `Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs` | Sector goal + Temp/Atmos/Water with shared goal colors. |
+| `Assets/Scripts/UI/TerraformingGoalColors.cs` | Shared palette for sector-completion goals only. |
+| `Assets/Scripts/UI/Containers/AbilityHandUI.cs` | Persistent ability hand showing `ActiveAbilityCommand` instances from owned completed/operational buildings. |
+| `Assets/Scripts/UI/Components/AbilityCardSlotUI.cs` | Ability card with cooldown overlay, lock overlay, percentage text, hover effects. |
+| `Assets/Scripts/Commands/PlayCardCommand.cs` | Wraps `CardDeckController.PlayCard(HandIndex)`. |
 
 ---
 
 ### Card Data Flow Summary
 
 ```
-Generation Starts
-  ├─ BlueprintDraftUI.ShowDraftSelection() → pause, show 3 cards
-  │   └─ Player picks → BlueprintDraftManager.CompleteDraft() → card.Apply()
-  │
-  ├─ CardDeckController.RebuildDeck() → 3 guaranteed + 7 random → OnHandChanged
-  │   └─ BottomBarActionsUI.RefreshBar() → renders 10 buttons
-  │       ├─ Building cards → BuildBuildingCommand + placement mode
-  │       └─ Other cards → PlayCardCommand → CardDeckController.PlayCard()
-  │
-  ├─ CardDeckManager (if DeckSO assigned) → DrawHand() → OnHandChanged
-  │   └─ CardDeckUI renders hand + CardUI per card
-  │
-  ├─ AbilityHandUI → collects ActiveAbilityCommands from buildings
-  │
-  └─ SectorManager.OnSectorUnlocked → CardDeckController.TriggerDraft()
+Game Start
+  ├─ BlueprintDraftUI.InitializeDefaultPool() → load Resources/Cards
+  │   └─ CardDeckController.RebuildDeck() → FIFO draw pile + seed CP/Solar → OnHandChanged
+  ├─ BottomBarActionsUI shows hand (sector-goal colors on terraforming cards)
+  │       ├─ Building cards → reserved-site selection / instant pad build
+  │       └─ Other cards → PlayCardCommand → FillHand (FIFO)
+  └─ Draft overlays / TriggerDraft are disabled
 ```
 
 ---
@@ -170,7 +170,7 @@ Generation Starts
 
 | File | Purpose |
 |---|---|
-| `Assets/Editor/CardDeckSetup.cs` | Menu items under `Tools/Card Deck/` — `Create Card Assets from Unlockables` (creates CardSO assets from existing UnlockableSOs), `Setup Main Deck` (populates MainDeck.asset with all CardSOs) |
+| `Assets/Editor/CardDeckSetup.cs` | Menu items under `Tools/Card Deck/` — `Create Card Assets from Unlockables`, `Setup Main Deck` |
 
 ---
 
@@ -178,13 +178,5 @@ Generation Starts
 - 2026-06-29: Initial implementation of health bar system
 - 2026-06-29: Visual script version created for easier maintenance
 - 2026-06-30: Fixed SurvivalManager overwriting DecayStarter integrity writes; switched to drain-based approach
-- 2026-07-08: Implemented dual card system architecture:
-  - v2 Tech Tree cards (`CardSO`/`CardDeckSO`/`CardDeckManager`) with weighted draws, rarity, play costs, direct supply effects
-  - Original BlueprintCardSO hierarchy (`UnlockBuildingCardSO`, `SpawnUnitCardSO`, `ResourceShipmentCardSO`, `PassiveBuffCardSO`, `DiscoveryCardSO`, `ScoutingCardSO`, `DrillBreakthroughCardSO`, `TerraformingCardSO`) with single `Apply()` pattern
-  - CardDeckController with 10-card hand, 3 guaranteed starters, play-and-draw replacement
-  - BlueprintDraftManager static unlocking system with buff multipliers
-  - BottomBarActionsUI now renders hand cards with placement mode for buildings
-  - AbilityHandUI for building active abilities with cooldown display
-  - BlueprintDraftUI for generation-start card drafting
-  - CardDeckSetup editor tools for batch card creation
-  - 28+ card asset files in `Assets/Resources/Cards/`
+- 2026-07-08: Documented dual card system architecture
+- 2026-08-31: FIFO deck draw; integrity starts after first building; sector-goal colors only for completion terraforming; draft rounds disabled
