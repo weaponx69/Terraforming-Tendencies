@@ -274,7 +274,8 @@ namespace GameDevTV.RTS.Environment
                     Sectors[i].IsLocked = false;
                     ActiveSector = Sectors[i];
                     Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
-                    DiscoverResourcesInUnlockedSectors();
+                    // Do not mass-reveal deposits here — ExplorationManager.RevealGatherableAtNode
+                    // (and discovery cards) are what uncover materials node-by-node.
                     UpdateSectorBorders();
                     OnSectorUnlocked?.Invoke();
                     return; // Only unlock one at a time
@@ -308,8 +309,10 @@ namespace GameDevTV.RTS.Environment
             Sectors[index].IsDiscovered = true;
             ActiveSector = Sectors[index];
             OnSectorExplored?.Invoke(index);
-            DiscoverResourcesInUnlockedSectors();
+            // Pads/build eligibility unlock with the sector; deposits stay hidden until
+            // the explored node reveals them (or a discovery card reveals a type).
             UpdateSectorBorders();
+            OnSectorUnlocked?.Invoke();
             Debug.Log($"[SectorManager] Sector {index} unlocked via node exploration!");
         }
 
