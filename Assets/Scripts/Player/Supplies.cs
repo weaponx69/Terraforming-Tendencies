@@ -426,7 +426,7 @@ namespace GameDevTV.RTS.Player
         /// <summary>
         /// Climate / terraforming ceilings. Scaled by unlocked sectors, but never below
         /// the current generation's win targets — otherwise gen 1 is soft-locked when
-        /// Command Post hasn't marked the sector occupied yet (occupied=0 → max atmos 0).
+        /// only 1/9 sectors are unlocked (frac≈0.11 atm &lt; 0.25 target → ~42% progress).
         /// </summary>
         public static void GetTerraformingCaps(
             out float maxAtmosphere,
@@ -458,6 +458,13 @@ namespace GameDevTV.RTS.Player
                 maxBiomass = frac * 100f;
                 maxTemperature = frac * 100f;
             }
+
+            // Always floor to at least generation-1 win formulas so caps cannot soft-lock
+            // even if GenerationManager is missing or mid-init.
+            const int fallbackGen = 1;
+            maxAtmosphere = Mathf.Max(maxAtmosphere, 0.25f * fallbackGen);
+            maxWater = Mathf.Max(maxWater, 10f * fallbackGen - 5f);
+            maxTemperature = Mathf.Max(maxTemperature, -60f + 15f * fallbackGen);
 
             var gm = GenerationManager.Instance;
             if (gm != null && !gm.IsExpansionPhase)

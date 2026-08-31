@@ -56,6 +56,31 @@ if [[ "$STATE" != "ready" ]]; then
   exit 1
 fi
 
+# Ensure scripts are compiled before Play Mode (stale DLLs caused false ATMOSPHERE softlock fails).
+echo "== recompile check =="
+unity command recompile --json >/dev/null || true
+for i in $(seq 1 30); do
+  RS="$(unity command recompile_status --json 2>/dev/null || true)"
+  if echo "$RS" | grep -q '"up_to_date"\|"status\":\"up_to_date"\|"failed\":false'; then
+    if echo "$RS" | grep -q '"compiling":true'; then
+      echo "  compiling... ($i)"
+      sleep 1
+      continue
+    fi
+    break
+  fi
+  sleep 1
+done
+EDITOR_STATUS="$(unity command editor_status --json 2>/dev/null || true)"
+if echo "$EDITOR_STATUS" | grep -q '"compiling":true'; then
+  echo "Waiting for script compile to finish..."
+  for i in $(seq 1 60); do
+    sleep 1
+    EDITOR_STATUS="$(unity command editor_status --json 2>/dev/null || true)"
+    echo "$EDITOR_STATUS" | grep -q '"compiling":true' || break
+  done
+fi
+
 PLAYING="$(eval_json 'return UnityEditor.EditorApplication.isPlaying;' 30 | python3 -c "import sys,json; d=json.load(sys.stdin); r=(d.get('data') or {}).get('result') or {}; print(r.get('result', False))" 2>/dev/null || echo false)"
 echo "Play mode: $PLAYING"
 

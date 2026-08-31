@@ -127,25 +127,25 @@ namespace GameDevTV.RTS.Player
             float atmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
             float water = Supplies.Water.TryGetValue(Owner.Player1, out float w) ? w : 0f;
 
+            Supplies.GetTerraformingCaps(out float maxAtmos, out float maxWater, out _, out float maxBio, out float maxTemp);
+            log?.AppendLine($"Caps: Atmos={maxAtmos:F3} Water={maxWater:F1} Bio={maxBio:F1} TempCeil={maxTemp:F1}");
+
             if (temp < targetTemp)
             {
                 Supplies.UpdateTemperature(Owner.Player1, targetTemp);
                 ClimateManager.Instance?.SetTemperatureTarget(targetTemp);
-                log?.AppendLine($"Set Temperature -> {targetTemp:F1}");
             }
 
             if (atmos < targetAtmos)
             {
                 Supplies.UpdateAtmosphere(Owner.Player1, targetAtmos);
                 ClimateManager.Instance?.SetAtmosphereTarget(targetAtmos);
-                log?.AppendLine($"Set Atmosphere -> {targetAtmos:F2}");
             }
 
             if (water < targetWater)
             {
                 Supplies.UpdateWater(Owner.Player1, targetWater);
                 ClimateManager.Instance?.SetWaterTarget(targetWater);
-                log?.AppendLine($"Set Water -> {targetWater:F0}");
             }
 
             MeetPrimaryMilestone(gm, log);
@@ -155,6 +155,14 @@ namespace GameDevTV.RTS.Player
                 Supplies.UpdateMaterials(Owner.Player1, 2000);
                 log?.AppendLine("Granted Materials -> 2000 (automation buffer)");
             }
+
+            float tempAfter = Supplies.Temperature.TryGetValue(Owner.Player1, out float t2) ? t2 : -60f;
+            float atmosAfter = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a2) ? a2 : 0.01f;
+            float waterAfter = Supplies.Water.TryGetValue(Owner.Player1, out float w2) ? w2 : 0f;
+            float bioAfter = Supplies.Biomass.TryGetValue(Owner.Player1, out float b2) ? b2 : 0f;
+            log?.AppendLine(
+                $"After set: Temp={tempAfter:F1}/{targetTemp:F1} Atmos={atmosAfter:F3}/{targetAtmos:F2} " +
+                $"Water={waterAfter:F1}/{targetWater:F0} Bio={bioAfter:F2}/{gm.CurrentMilestoneTarget:F1}");
         }
 
         private static void MeetPrimaryMilestone(GenerationManager gm, StringBuilder log)
