@@ -127,6 +127,12 @@ namespace GameDevTV.RTS.Player
             private set => _integrity = value;
         }
 
+        /// <summary>
+        /// False until the player places their first real building. Integrity stays at 100%
+        /// and decay does not run until then.
+        /// </summary>
+        public static bool ColonyIntegrityActive { get; private set; }
+
         private static Dictionary<Owner, float> _temperature;
         public static Dictionary<Owner, float> Temperature 
         { 
@@ -284,6 +290,7 @@ namespace GameDevTV.RTS.Player
             _populationLimit = null;
             _oxygen = null;
             _integrity = null;
+            ColonyIntegrityActive = false;
             _temperature = null;
             _atmosphere = null;
             _water = null;
@@ -326,6 +333,7 @@ namespace GameDevTV.RTS.Player
         private void Awake()
         {
             Instance = this;
+            ColonyIntegrityActive = false;
 
             // Re-initialize to ensure instance settings (startingMaterials) are applied
             _materials = new Dictionary<Owner, int>();
@@ -500,8 +508,29 @@ namespace GameDevTV.RTS.Player
             OnWaterChanged?.Invoke(owner, Water[owner]);
         }
 
+        /// <summary>
+        /// Starts colony integrity tracking after the first gameplay-placed building completes.
+        /// Editor-placed dummies and the UCC hub are ignored.
+        /// </summary>
+        public static void BeginColonyIntegrityIfNeeded(AbstractCommandable commandable)
+        {
+            if (ColonyIntegrityActive || commandable == null) return;
+            if (commandable is not BaseBuilding building) return;
+            if (!CountsTowardIntegrity(building)) return;
+            if (building.Owner != GameOverManager.MonitoredOwner) return;
+            if (!building.name.Contains("(Clone)")) return;
+
+            ColonyIntegrityActive = true;
+            float integrity = CalculateIntegrity(building.Owner);
+            if (integrity <= 0f) integrity = 100f;
+            UpdateIntegrity(building.Owner, integrity);
+            Debug.Log($"[Supplies] Colony integrity tracking started after '{building.name}' was placed.");
+        }
+
         public static float CalculateIntegrity(Owner owner)
         {
+            if (!ColonyIntegrityActive) return 100f;
+
             var commandables = AbstractCommandable.ActiveCommandables;
             long totalMaxHP = 0;
             long totalCurrentHP = 0;

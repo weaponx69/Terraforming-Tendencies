@@ -55,6 +55,12 @@ namespace GameDevTV.RTS.Environment
             {
                 yield return new WaitForSeconds(decayTickRate);
 
+                Owner monitoredOwner = GameOverManager.MonitoredOwner;
+                if (!Supplies.ColonyIntegrityActive)
+                {
+                    continue;
+                }
+
                 // Accumulate fractional damage from DPS × tick interval.
                 // This allows tuning decayTickRate and damage rates independently without
                 // the Mathf.Max(1, ...) floor that previously made inspector values ineffective.
@@ -122,7 +128,6 @@ namespace GameDevTV.RTS.Environment
                 unitDamageAccumulator -= Mathf.Floor(unitDamageAccumulator);
 
                 // Recalculate colony integrity from actual commandable health and push to the UI bar.
-                Owner monitoredOwner = GameOverManager.MonitoredOwner;
                 float integrity = Supplies.CalculateIntegrity(monitoredOwner);
                 Supplies.UpdateIntegrity(monitoredOwner, integrity);
             }

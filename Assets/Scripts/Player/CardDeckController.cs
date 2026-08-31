@@ -11,9 +11,9 @@ using GameDevTV.RTS.UI.Containers;
 namespace GameDevTV.RTS.Player
 {
     /// <summary>
-    /// Manages the player's deck and 5-card hand. The hand is shown in the
-    /// bottom action bar. Playing a card removes it and draws a replacement
-    /// from the deck. If the deck runs out, the discard pile reshuffles.
+    /// Manages the player's deck and hand. Cards are drawn first-in-first-out from
+    /// the draw pile; played or skipped cards go to the back of the discard queue.
+    /// When the draw pile empties, discard recycles in the same order (no re-shuffle).
     ///
     /// Auto-spawns on scene load — no manual scene setup needed.
     /// </summary>
@@ -61,8 +61,16 @@ namespace GameDevTV.RTS.Player
             Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] += HandleBuildingDied;
             Supplies.OnMaterialsChanged += HandleSupplyGateChanged;
             Supplies.OnEnergyChanged += HandleSupplyGateChanged;
+            Supplies.OnTemperatureChanged += HandleSupplyGateChanged;
+            Supplies.OnAtmosphereChanged += HandleSupplyGateChanged;
+            Supplies.OnWaterChanged += HandleSupplyGateChanged;
+            Supplies.OnOxygenChanged += HandleSupplyGateChanged;
+            Supplies.OnBiomassChanged += HandleSupplyGateChanged;
+            Supplies.OnPowerChanged += HandleSupplyGateChanged;
+            Supplies.OnPopulationChanged += HandleSupplyGateChanged;
             SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
+            GenerationManager.OnGenerationStarted += HandleGenerationStarted;
         }
 
         private void OnDisable()
@@ -71,28 +79,37 @@ namespace GameDevTV.RTS.Player
             Bus<BuildingDeathEvent>.OnEvent[Owner.Player1] -= HandleBuildingDied;
             Supplies.OnMaterialsChanged -= HandleSupplyGateChanged;
             Supplies.OnEnergyChanged -= HandleSupplyGateChanged;
+            Supplies.OnTemperatureChanged -= HandleSupplyGateChanged;
+            Supplies.OnAtmosphereChanged -= HandleSupplyGateChanged;
+            Supplies.OnWaterChanged -= HandleSupplyGateChanged;
+            Supplies.OnOxygenChanged -= HandleSupplyGateChanged;
+            Supplies.OnBiomassChanged -= HandleSupplyGateChanged;
+            Supplies.OnPowerChanged -= HandleSupplyGateChanged;
+            Supplies.OnPopulationChanged -= HandleSupplyGateChanged;
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
             PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
+            GenerationManager.OnGenerationStarted -= HandleGenerationStarted;
         }
 
-        private void HandleBuildingSpawned(BuildingSpawnEvent _) => DiscardUnplayableFromHand();
-        private void HandleBuildingDied(BuildingDeathEvent _) => DiscardUnplayableFromHand();
+        private void HandleBuildingSpawned(BuildingSpawnEvent _) => RefreshHand();
+        private void HandleBuildingDied(BuildingDeathEvent _) => RefreshHand();
         private void HandleSupplyGateChanged(Owner owner, int _)
         {
-            if (owner == Owner.Player1) DiscardUnplayableFromHand();
+            if (owner == Owner.Player1) RefreshHand();
         }
         private void HandleSupplyGateChanged(Owner owner, float _)
         {
-            if (owner == Owner.Player1) DiscardUnplayableFromHand();
+            if (owner == Owner.Player1) RefreshHand();
         }
-        private void HandleSectorUnlocked() => DiscardUnplayableFromHand();
+        private void HandleSectorUnlocked() => RefreshHand();
+        private void HandleGenerationStarted(int _, int __) => RefreshHand();
 
         private void HandlePlanetGenerated()
         {
             // Pads now exist — pull bootstrap cards back if an early purge dumped them.
             EnsureBootstrapUnlockInHand("Command Post");
             EnsureBootstrapUnlockInHand("Solar");
-            DiscardUnplayableFromHand();
+            RefreshHand();
             OnHandChanged?.Invoke();
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
         }
@@ -142,12 +159,12 @@ namespace GameDevTV.RTS.Player
         /// 1. Clears the hand.
         /// 2. Direct-adds the three guaranteed starter cards (Command Post, Solar Panel,
         ///    Mining Drone) using hand.Add() so they are seated at indices 0, 1, 2.
-        /// 3. Fills the remaining slots (3 through 9) with random cards from the draw pile.
+        /// 3. Fills the remaining slots from the front of the draw queue.
         /// No shifting or eviction occurs.
         /// </summary>
         public void RebuildDeck()
         {
-            ShuffleDeck();
+            InitializeDrawPile();
 
             // 1. Clear the hand
             hand.Clear();
@@ -200,7 +217,7 @@ namespace GameDevTV.RTS.Player
                       $"Solar={(solarCard != null && hand.Contains(solarCard) ? "YES" : "held")} " +
                       $"Drone={(droneCard != null && hand.Contains(droneCard) ? "YES" : "held")}");
 
-            // 4. Fill remaining slots with currently playable cards only.
+            // 4. Fill remaining slots from the front of the draw queue.
             FillHand();
 
             OnHandChanged?.Invoke();
@@ -247,11 +264,31 @@ namespace GameDevTV.RTS.Player
         // ── Hand Management ──────────────────────────────────────────────────
 
         /// <summary>
-        /// Fill the hand to handSize by drawing from the draw pile.
-        /// Only currently playable cards (<see cref="BlueprintCardSO.CanApply"/>) enter the hand.
-        /// Unplayable cards are moved to the discard pile instead of sitting locked/red in the bar.
+        /// Drop cards that can no longer be played, then draw replacements from
+        /// the front of the FIFO queue.
+        /// </summary>
+        public void RefreshHand()
+        {
+            var before = hand.ToArray();
+            DiscardUnplayableFromHand();
+            FillHandInternal();
+            if (before.Length != hand.Count || !before.SequenceEqual(hand))
+            {
+                OnHandChanged?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// Fill the hand to handSize by drawing from the front of the draw pile.
+        /// Unplayable cards are sent to the back of discard and skipped for now.
         /// </summary>
         public void FillHand()
+        {
+            FillHandInternal();
+            OnHandChanged?.Invoke();
+        }
+
+        private void FillHandInternal()
         {
             if (masterDeck == null || masterDeck.Count == 0) return;
 
@@ -261,52 +298,30 @@ namespace GameDevTV.RTS.Player
                 if (drawPile.Count == 0)
                 {
                     if (discardPile.Count == 0) break;
-                    Reshuffle();
-                    if (!drawPile.Any(IsPlayableNow)) break;
+                    RecycleDiscardIntoDraw();
+                    if (drawPile.Count == 0) break;
                 }
 
-                // Pull the first playable card; anything ahead of it that cannot be played
-                // goes straight to discard so it is not shown as a locked slot.
-                BlueprintCardSO drawn = null;
-                for (int i = 0; i < drawPile.Count; i++)
+                BlueprintCardSO candidate = drawPile[0];
+                drawPile.RemoveAt(0);
+
+                if (IsPlayableNow(candidate))
                 {
-                    var candidate = drawPile[i];
-                    if (IsPlayableNow(candidate))
-                    {
-                        drawn = candidate;
-                        drawPile.RemoveAt(i);
-                        break;
-                    }
-
-                    drawPile.RemoveAt(i);
-                    i--;
-                    if (candidate != null)
-                    {
-                        discardPile.Add(candidate);
-                    }
+                    hand.Add(candidate);
                 }
-
-                if (drawn == null)
+                else if (candidate != null)
                 {
-                    if (discardPile.Count == 0) break;
-                    Reshuffle();
-                    if (!drawPile.Any(IsPlayableNow)) break;
-                    continue;
+                    discardPile.Add(candidate);
                 }
-
-                hand.Add(drawn);
             }
-
-            OnHandChanged?.Invoke();
         }
 
         /// <summary>
-        /// Move any hand cards that are no longer playable to discard, then refill.
-        /// Call after builds, sector unlocks, and supply changes that gate cards.
+        /// Move any hand cards that are no longer playable to discard.
+        /// Call <see cref="RefreshHand"/> after builds, sector unlocks, and supply changes.
         /// </summary>
         public void DiscardUnplayableFromHand()
         {
-            bool changed = false;
             for (int i = hand.Count - 1; i >= 0; i--)
             {
                 var card = hand[i];
@@ -314,13 +329,7 @@ namespace GameDevTV.RTS.Player
 
                 hand.RemoveAt(i);
                 if (card != null) discardPile.Add(card);
-                changed = true;
                 Debug.Log($"[CardDeckController] Discarded unplayable card '{card?.cardName}' from hand.");
-            }
-
-            if (changed)
-            {
-                FillHand();
             }
         }
 
@@ -565,17 +574,18 @@ namespace GameDevTV.RTS.Player
 
         // ── Private Helpers ──────────────────────────────────────────────────
 
-        private void ShuffleDeck()
+        /// <summary>Stable deck order — master deck sequence, no random shuffle.</summary>
+        private void InitializeDrawPile()
         {
-            drawPile = masterDeck.OrderBy(_ => UnityEngine.Random.value).ToList();
+            drawPile = new List<BlueprintCardSO>(masterDeck);
             discardPile.Clear();
         }
 
-        private void Reshuffle()
+        /// <summary>Move discard queue onto draw queue, preserving FIFO order.</summary>
+        private void RecycleDiscardIntoDraw()
         {
             drawPile.AddRange(discardPile);
             discardPile.Clear();
-            drawPile = drawPile.OrderBy(_ => UnityEngine.Random.value).ToList();
         }
 
         private T EnsureStarterCard<T>(string resourcePath) where T : BlueprintCardSO

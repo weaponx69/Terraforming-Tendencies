@@ -22,60 +22,79 @@ namespace GameDevTV.RTS.UI.Components
         private bool isActive;
         private RectTransform rectTransform;
         private Button button;
+        private Image buttonImage;
+        private Outline goalOutline;
+        private TextMeshProUGUI goalBadge;
+        private Color defaultButtonColor = Color.white;
+        private string goalKey = string.Empty;
 
-    private static readonly string BIOMASS_FORMAT = "{0} <color=#7A5A00>Biomass</color>. ";
+        private static readonly string BIOMASS_FORMAT = "{0} <color=#7A5A00>Biomass</color>. ";
         private static readonly string DEPENDENCY_FORMAT_NO_COMMA = "<color=#AC0000>{0}</color>.";
         private static readonly string DEPENDENCY_FORMAT_COMMA = "<color=#AC0000>{0}</color>, ";
 
-private void Awake()
-{
-    button = GetComponent<Button>();
-    rectTransform = GetComponent<RectTransform>();
-    if (button == null)
-    {
-        Debug.LogWarning($"[UIActionButton] Missing Button component on {name}. The [RequireComponent] attribute should auto-add one.", this);
-    }
-    Disable();
-}
-
-public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> selectedUnits, UnityAction onClick)
-{
-    if (button == null) return;
-
-    button.onClick.RemoveAllListeners();
-    SetIcon(command.Icon);
-    SetLabel(command.Name);
-    // If selectedUnits is null, make the button interactive (for bottom bar commands)
-    // Otherwise, check if any unit can handle the command
-    button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
-    button.onClick.AddListener(onClick);
-    isActive = true;
-
-    if (tooltip != null)
-    {
-        try
+        private void Awake()
         {
-            tooltip.SetText(GetTooltipText(command));
+            button = GetComponent<Button>();
+            rectTransform = GetComponent<RectTransform>();
+            buttonImage = GetComponent<Image>();
+            if (buttonImage != null)
+            {
+                defaultButtonColor = buttonImage.color;
+            }
+            if (button == null)
+            {
+                Debug.LogWarning($"[UIActionButton] Missing Button component on {name}. The [RequireComponent] attribute should auto-add one.", this);
+            }
+            Disable();
         }
-        catch (System.Exception)
-        {
-            // Tooltip text component may not be properly set up — ignore
-        }
-    }
-}
 
-public void Disable()
-{
-    SetIcon(null);
-    SetLabel(null);
-    if (button != null)
-    {
-        button.interactable = false;
-        button.onClick.RemoveAllListeners();
-    }
-    isActive = false;
-    CancelInvoke();
-}
+        public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> selectedUnits, UnityAction onClick)
+        {
+            EnableFor(command, selectedUnits, onClick, null);
+        }
+
+        public void EnableFor(
+            BaseCommand command,
+            IEnumerable<AbstractCommandable> selectedUnits,
+            UnityAction onClick,
+            string cardGoal)
+        {
+            if (button == null) return;
+
+            button.onClick.RemoveAllListeners();
+            SetIcon(command.Icon);
+            SetLabel(command.Name);
+            button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
+            button.onClick.AddListener(onClick);
+            isActive = true;
+            ApplyGoalAccent(cardGoal);
+
+            if (tooltip != null)
+            {
+                try
+                {
+                    tooltip.SetText(GetTooltipText(command, cardGoal));
+                }
+                catch (System.Exception)
+                {
+                    // Tooltip text component may not be properly set up — ignore
+                }
+            }
+        }
+
+        public void Disable()
+        {
+            SetIcon(null);
+            SetLabel(null);
+            ClearGoalAccent();
+            if (button != null)
+            {
+                button.interactable = false;
+                button.onClick.RemoveAllListeners();
+            }
+            isActive = false;
+            CancelInvoke();
+        }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
@@ -108,7 +127,6 @@ public void Disable()
 
         private void SetLabel(string text)
         {
-            // Create a label at runtime if none is wired in the Inspector
             if (label == null)
             {
                 GameObject labelGO = new GameObject("Label", typeof(TextMeshProUGUI));
@@ -117,6 +135,7 @@ public void Disable()
                 label.fontSize = 14;
                 label.alignment = TextAlignmentOptions.Center;
                 label.color = Color.white;
+                label.richText = true;
                 RectTransform rt = label.GetComponent<RectTransform>();
                 rt.anchorMin = new Vector2(0, 0);
                 rt.anchorMax = new Vector2(1, 0);
@@ -145,9 +164,101 @@ public void Disable()
             }
         }
 
-        private string GetTooltipText(BaseCommand command)
+        private void ApplyGoalAccent(string goal)
+        {
+            goalKey = goal ?? string.Empty;
+            Color accent = TerraformingGoalColors.ForGoal(goalKey);
+
+            if (label != null)
+            {
+                label.color = accent;
+                label.richText = true;
+            }
+
+            if (buttonImage != null)
+            {
+                buttonImage.color = Color.Lerp(defaultButtonColor, accent, 0.35f);
+            }
+
+            EnsureGoalOutline();
+            if (goalOutline != null)
+            {
+                goalOutline.enabled = !string.IsNullOrEmpty(goalKey);
+                goalOutline.effectColor = accent;
+            }
+
+            EnsureGoalBadge();
+            if (goalBadge != null)
+            {
+                bool show = !string.IsNullOrEmpty(goalKey);
+                goalBadge.gameObject.SetActive(show);
+                if (show)
+                {
+                    goalBadge.color = accent;
+                    goalBadge.SetText(TerraformingGoalColors.ShortLabel(goalKey));
+                }
+            }
+        }
+
+        private void ClearGoalAccent()
+        {
+            goalKey = string.Empty;
+            if (label != null) label.color = Color.white;
+            if (buttonImage != null) buttonImage.color = defaultButtonColor;
+            if (goalOutline != null) goalOutline.enabled = false;
+            if (goalBadge != null) goalBadge.gameObject.SetActive(false);
+        }
+
+        private void EnsureGoalOutline()
+        {
+            if (goalOutline != null) return;
+            goalOutline = GetComponent<Outline>();
+            if (goalOutline == null)
+            {
+                goalOutline = gameObject.AddComponent<Outline>();
+            }
+            goalOutline.effectDistance = new Vector2(2f, -2f);
+            goalOutline.useGraphicAlpha = true;
+        }
+
+        private void EnsureGoalBadge()
+        {
+            if (goalBadge != null) return;
+
+            GameObject badgeGO = new GameObject("Goal Badge", typeof(TextMeshProUGUI));
+            badgeGO.transform.SetParent(transform, false);
+            goalBadge = badgeGO.GetComponent<TextMeshProUGUI>();
+            goalBadge.fontSize = 10f;
+            goalBadge.fontStyle = FontStyles.Bold;
+            goalBadge.alignment = TextAlignmentOptions.TopRight;
+            goalBadge.richText = true;
+            goalBadge.raycastTarget = false;
+
+            RectTransform rt = goalBadge.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 1f);
+            rt.anchoredPosition = new Vector2(-2f, -2f);
+            rt.sizeDelta = new Vector2(-4f, 14f);
+
+            if (label != null && label.font != null)
+            {
+                goalBadge.font = label.font;
+            }
+
+            badgeGO.SetActive(false);
+        }
+
+        private string GetTooltipText(BaseCommand command, string cardGoal)
         {
             string tooltipText = command.Name + "\n";
+
+            if (!string.IsNullOrEmpty(cardGoal))
+            {
+                tooltipText =
+                    $"{TerraformingGoalColors.Colorize(TerraformingGoalColors.ShortLabel(cardGoal), cardGoal)}\n" +
+                    $"{command.Name}\n";
+            }
 
             SupplyCostSO supplyCost = null;
             if (command is BuildUnitCommand unitCommand)
@@ -161,7 +272,7 @@ public void Disable()
 
             if (supplyCost != null)
             {
-                int cost = Mathf.FloorToInt(supplyCost.Minerals * Supplies.MineralsToMaterialsRateStatic 
+                int cost = Mathf.FloorToInt(supplyCost.Minerals * Supplies.MineralsToMaterialsRateStatic
                                       + supplyCost.Gas * Supplies.GasToMaterialsRateStatic);
                 if (cost > 0)
                 {
@@ -179,7 +290,7 @@ public void Disable()
                     tooltipText += "\nRequires: ";
                 }
 
-                for(int i = 0; i < dependencies.Length; i++)
+                for (int i = 0; i < dependencies.Length; i++)
                 {
                     tooltipText += i == dependencies.Length - 1
                         ? string.Format(DEPENDENCY_FORMAT_NO_COMMA, dependencies[i].Name)
@@ -187,10 +298,11 @@ public void Disable()
                 }
             }
 
-            // Handle PlayCardCommand — show card name as tooltip
             if (command is PlayCardCommand)
             {
-                return command.Name;
+                return string.IsNullOrEmpty(cardGoal)
+                    ? command.Name
+                    : $"{TerraformingGoalColors.Colorize(TerraformingGoalColors.ShortLabel(cardGoal), cardGoal)}\n{command.Name}";
             }
 
             return tooltipText;

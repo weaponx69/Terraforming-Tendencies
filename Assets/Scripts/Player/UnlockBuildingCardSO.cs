@@ -27,35 +27,49 @@ namespace GameDevTV.RTS.Player
     
             public override string GetCardGoal()
             {
-                if (buildingToUnlock != null)
+                return ClassifyBuildingGoal(buildingToUnlock);
+            }
+
+            public static string ClassifyBuildingGoal(BuildingSO building)
+            {
+                if (building == null) return "CONSTRUCTION";
+
+                string name = building.Name != null
+                    ? building.Name.ToLowerInvariant()
+                    : string.Empty;
+
+                if (name.Contains("command post")) return "COMMAND POST";
+                if (name.Contains("algae") || name.Contains("oxygen processor") || name.Contains("atmosphere processor"))
+                    return "OXYGEN";
+                if (name.Contains("ghg") || name.Contains("microbe") || name.Contains("geothermal"))
+                    return "TEMPERATURE";
+                if (name.Contains("condenser") || name.Contains("import"))
+                    return "ATMOSPHERE";
+                if (name.Contains("aquifer") || name.Contains("water"))
+                    return "WATER";
+                if (name.Contains("greenhouse") || name.Contains("nursery") || name.Contains("greenery")
+                    || name.Contains("biosphere") || name.Contains("biomass"))
+                    return "BIOMASS";
+                if (name.Contains("habitat") || name.Contains("bio-dome") || name.Contains("biodome")
+                    || name.Contains("commons") || name.Contains("apartment") || name.Contains("housing"))
+                    return "POPULATION";
+                if (name.Contains("solar") || name.Contains("magnetic shield") || name.Contains("power"))
+                    return "POWER";
+                if (name.Contains("mine") || name.Contains("strip") || name.Contains("laser"))
+                    return "MATERIALS";
+
+                var config = building.BuildingConfig;
+                if (config != null)
                 {
-                    string name = buildingToUnlock.Name.ToLower();
-                    if (name.Contains("algae") || name.Contains("oxygen") || name.Contains("atmosphere processor"))
-                        return "OXYGEN";
-                    if (name.Contains("solar") || name.Contains("geothermal") || name.Contains("magnetic shield") || name.Contains("power"))
-                        return "POWER";
-                    if (name.Contains("habitat") || name.Contains("bio-dome") || name.Contains("commons") || name.Contains("apartment") || name.Contains("housing") || name.Contains("command center"))
-                        return "POPULATION";
-                    if (name.Contains("aquifer") || name.Contains("greenhouse") || name.Contains("extractor") || name.Contains("nursery") || name.Contains("greenery") || name.Contains("biosphere") || name.Contains("biomass"))
-                        return "BIOMASS";
-                    if (name.Contains("mine") || name.Contains("laser"))
-                        return "MATERIALS";
-                    if (name.Contains("GHG") || name.Contains("microbe"))
-                        return "TEMPERATURE";
-                    if (name.Contains("condenser") || name.Contains("import"))
-                        return "ATMOSPHERE";
-                    if (name.Contains("command post"))
-                        return "COMMAND POST";
-    
-                    // Fallback check on config stats
-                    var config = buildingToUnlock.BuildingConfig;
-                    if (config != null)
-                    {
-                        if (config.PowerGeneration > 0) return "POWER";
-                        if (config.BiomassGeneration > 0) return "BIOMASS";
-                        if (config.HousingCapacity > 0) return "POPULATION";
-                    }
+                    if (config.TemperatureGeneration > 0f) return "TEMPERATURE";
+                    if (config.AtmosphereGeneration > 0f) return "ATMOSPHERE";
+                    if (config.WaterGeneration > 0f) return "WATER";
+                    if (config.PowerGeneration > 0f) return "POWER";
+                    if (config.BiomassGeneration > 0f) return "BIOMASS";
+                    if (config.HousingCapacity > 0) return "POPULATION";
                 }
+
+                if (name.Contains("command")) return "COMMAND POST";
                 return "CONSTRUCTION";
             }
     

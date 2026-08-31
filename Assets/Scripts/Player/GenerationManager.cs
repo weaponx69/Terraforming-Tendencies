@@ -504,5 +504,105 @@ namespace GameDevTV.RTS.Player
             }
             return false;
         }
+
+        /// <summary>
+        /// True when this card's goal is still required to finish the current sector round
+        /// (primary milestone plus temperature, atmosphere, and water).
+        /// </summary>
+        public static bool IsUnmetSectorGoal(string goal)
+        {
+            if (string.IsNullOrEmpty(goal)) return false;
+            if (Instance != null && Instance.IsBetweenRounds) return false;
+
+            int generation = Instance != null ? Mathf.Max(1, Instance.CurrentGeneration) : 1;
+            bool expansion = Instance != null && Instance.IsExpansionPhase;
+
+            if (expansion)
+            {
+                if (goal == "EXPLORATION")
+                {
+                    return SectorManager.Instance != null && SectorManager.Instance.GetNextLockedSectorIndex() >= 0;
+                }
+
+                if (goal == "COMMAND POST")
+                {
+                    if (SectorManager.Instance?.Sectors == null) return false;
+                    foreach (var sector in SectorManager.Instance.Sectors)
+                    {
+                        if (sector != null && !sector.IsLocked && !sector.IsOccupied) return true;
+                    }
+                    return false;
+                }
+
+                if (goal == "OXYGEN")
+                {
+                    float oxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
+                    return oxygen < 99.9f;
+                }
+
+                return false;
+            }
+
+            float temp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
+            float atmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
+            float water = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
+
+            float targetTemp = Instance != null ? Instance.GetTargetTemperature(generation) : -60f + 15f * generation;
+            float targetAtmos = Instance != null ? Instance.GetTargetAtmosphere(generation) : 0.25f * generation;
+            float targetWater = Instance != null ? Instance.GetTargetWater(generation) : 10f * generation - 5f;
+
+            if (goal == "TEMPERATURE") return temp < targetTemp;
+            if (goal == "ATMOSPHERE") return atmos < targetAtmos;
+            if (goal == "WATER") return water < targetWater;
+
+            MilestoneType type = Instance != null ? Instance.CurrentMilestoneType : MilestoneType.Biomass;
+            float target = Instance != null ? Instance.CurrentMilestoneTarget : 25f;
+            if (!GoalMatchesMilestone(goal, type)) return false;
+            return ReadMilestoneValue(type) < target;
+        }
+
+        private static bool GoalMatchesMilestone(string goal, MilestoneType type)
+        {
+            return type switch
+            {
+                MilestoneType.Biomass => goal == "BIOMASS",
+                MilestoneType.Oxygen => goal == "OXYGEN",
+                MilestoneType.Power => goal == "POWER",
+                MilestoneType.Population => goal == "POPULATION",
+                MilestoneType.CommandPosts => goal == "COMMAND POST",
+                _ => false
+            };
+        }
+
+        private static float ReadMilestoneValue(MilestoneType type)
+        {
+            switch (type)
+            {
+                case MilestoneType.Biomass:
+                    return Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float bio) ? bio : 0f;
+                case MilestoneType.Oxygen:
+                    return Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox) ? ox : 0f;
+                case MilestoneType.Power:
+                    float power = Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow) ? pow : 0f;
+                    return Instance != null ? power - Instance.baselinePower : power;
+                case MilestoneType.Population:
+                    float pop = Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int p) ? p : 0f;
+                    return Instance != null ? pop - Instance.baselinePopulation : pop;
+                case MilestoneType.CommandPosts:
+                    int cpCount = 0;
+                    foreach (var building in BaseBuilding.ActiveBuildings)
+                    {
+                        if (building != null && building.BuildingSO != null &&
+                            building.BuildingSO.Name.Contains("Command", StringComparison.OrdinalIgnoreCase) &&
+                            building.Progress.State == BuildingProgress.BuildingState.Completed)
+                        {
+                            cpCount++;
+                        }
+                    }
+                    return cpCount;
+                default:
+                    return 0f;
+            }
+        }
     }
 }

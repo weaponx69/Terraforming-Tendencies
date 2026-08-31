@@ -120,6 +120,8 @@ namespace GameDevTV.RTS.UI.Containers
                     int cardIndex = i; // Capture for closure
 
                     // Create a BuildBuildingCommand for building cards so placement works
+                    string cardGoal = card.GetCardGoal();
+
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
                     {
                         var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
@@ -131,7 +133,7 @@ namespace GameDevTV.RTS.UI.Containers
                         actionButtons[i].EnableFor(buildCmd, null, () =>
                         {
                             PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
-                        });
+                        }, cardGoal);
                     }
                     else
                     {
@@ -158,7 +160,7 @@ namespace GameDevTV.RTS.UI.Containers
                             // The actual play happens in PlayCardCommand.Handle()
                             // The onClick just needs to route through PlayerInput
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
-                        });
+                        }, cardGoal);
                     }
                 }
                 else
@@ -206,10 +208,12 @@ namespace GameDevTV.RTS.UI.Containers
                         fbBbc.Building = bbc.Building;
                         fbBbc.GhostPrefab = bbc.GhostPrefab ?? bbc.Building?.Prefab;
 
+                        string fallbackGoal = UnlockBuildingCardSO.ClassifyBuildingGoal(bbc.Building);
+
                         actionButtons[slot].EnableFor(fbBbc, null, () =>
                         {
                             BeginBuildingSelection(bbc.Building, cardIndex: -1);
-                        });
+                        }, fallbackGoal);
 
                         filledSlots.Add(slot);
                         alreadyShown.Add(bbc.Building.Name);

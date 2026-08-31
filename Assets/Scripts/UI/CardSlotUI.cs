@@ -55,7 +55,14 @@ namespace GameDevTV.RTS.UI
             onSelected = selectionCallback;
 
             if (cardNameText != null)
-                cardNameText.SetText(card.cardName);
+            {
+                string goal = card.GetCardGoal();
+                Color accent = TerraformingGoalColors.ForGoal(goal);
+                cardNameText.color = accent;
+                cardNameText.richText = true;
+                cardNameText.SetText(
+                    $"{TerraformingGoalColors.Colorize("[" + TerraformingGoalColors.ShortLabel(goal) + "]", goal)} {card.cardName}");
+            }
 
             if (descriptionText != null)
                 descriptionText.SetText(card.cardDescription);
@@ -70,7 +77,10 @@ namespace GameDevTV.RTS.UI
                 selectButton.onClick.AddListener(HandleClick);
 
             if (glowOutline != null)
+            {
                 glowOutline.enabled = false;
+                glowOutline.color = TerraformingGoalColors.ForGoal(card.GetCardGoal());
+            }
         }
 
         // ── Hover ──────────────────────────────────────────────────────────────────

@@ -404,6 +404,7 @@ namespace GameDevTV.RTS.Units
             CurrentHealth = MaxHealth;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
+            Supplies.BeginColonyIntegrityIfNeeded(this);
 
             // Turn on vision when completed
             if (VisionTransform != null)
