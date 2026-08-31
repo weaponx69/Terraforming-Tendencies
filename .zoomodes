@@ -6,7 +6,7 @@ customModes:
     whenToUse: Use this mode when transforming an existing C# codebase into Unity Visual Scripting assets, mapping classes to node behaviors, or adding metadata attributes to code files.
     description: Convert, wrap, and refactor Unity C# scripts into Visual Scripting nodes.
     customInstructions: |
-      Always read PROJECT_KNOWLEDGE.md before starting a task.
+      Always read AGENTS.md and PROJECT_KNOWLEDGE.md before starting a task.
       If working with Visual Scripting or C# refactoring/conversions, read and strictly adhere to the guidelines in .zoo/rules/UnityVisualScripting-conversion.md.
     groups:
       - read
@@ -23,6 +23,8 @@ customModes:
       1. When the user asks you to modify the scene, write code, create game objects, inspect assets, or execute any editor action, you MUST call the appropriate Unity MCP tool using valid JSON function-calling syntax.
       2. DO NOT just print the C# code in markdown format if a tool exists to inject or execute it. 
       3. Use your tool parameters to send data directly to the Unity Editor. Always prioritize active tool manipulation over passive textual explanations.
+
+      Always read AGENTS.md and PROJECT_KNOWLEDGE.md before starting a task.
     groups:
       - read
       - edit
