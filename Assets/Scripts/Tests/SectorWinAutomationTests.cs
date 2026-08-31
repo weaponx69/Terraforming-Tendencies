@@ -20,6 +20,42 @@ namespace GameDevTV.RTS.Tests
     public class SectorWinAutomationTests
     {
         [Test]
+        public void TerraformingCaps_AllowCurrentGenerationTargetsWithoutOccupiedSectors()
+        {
+            var gmObj = new GameObject("GenerationManager");
+            var gm = gmObj.AddComponent<GenerationManager>();
+            var smObj = new GameObject("SectorManager");
+            var sm = smObj.AddComponent<SectorManager>();
+            sm.Sectors = new System.Collections.Generic.List<SectorManager.Sector>
+            {
+                new SectorManager.Sector { IsLocked = false, IsExplored = true, IsOccupied = false },
+                new SectorManager.Sector { IsLocked = true, IsExplored = false, IsOccupied = false },
+                new SectorManager.Sector { IsLocked = true, IsExplored = false, IsOccupied = false },
+                new SectorManager.Sector { IsLocked = true, IsExplored = false, IsOccupied = false },
+                new SectorManager.Sector { IsLocked = true, IsExplored = false, IsOccupied = false },
+            };
+            sm.ActiveSector = sm.Sectors[0];
+
+            // Sync milestone fields used by caps.
+            gm.CalculateCurrentSectorProgress(out _);
+
+            Supplies.GetTerraformingCaps(
+                out float maxAtmos, out float maxWater, out _, out float maxBio, out float maxTemp);
+
+            float targetAtmos = gm.GetTargetAtmosphere(gm.CurrentGeneration);
+            float targetWater = gm.GetTargetWater(gm.CurrentGeneration);
+            float targetTemp = gm.GetTargetTemperature(gm.CurrentGeneration);
+
+            Assert.GreaterOrEqual(maxAtmos, targetAtmos, "Atmosphere cap must allow gen target with 0 occupied");
+            Assert.GreaterOrEqual(maxWater, targetWater, "Water cap must allow gen target with 0 occupied");
+            Assert.GreaterOrEqual(maxTemp, targetTemp, "Temperature ceiling must allow gen target");
+            Assert.GreaterOrEqual(maxBio, gm.CurrentMilestoneTarget - 0.001f);
+
+            Object.DestroyImmediate(gmObj);
+            Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
         public void SectorWinCards_AreDoubledInDrawPileLogic()
         {
             // Contract: finishing goals are identified so CardDeckController can duplicate them.

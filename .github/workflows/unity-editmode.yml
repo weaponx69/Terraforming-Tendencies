@@ -1,0 +1,74 @@
+# Sector / card contract checks on push (Edit Mode only).
+#
+# Full Play Mode "sector win bot" needs a live Unity Editor + Pipeline and is too heavy
+# for typical cloud runners while a second Editor would OOM this project. That bot stays
+# local: ./tools/sector-win-cli.sh
+#
+# This workflow runs lightweight EditMode tests that do not require Play Mode / planet gen.
+# Requires GameCI secrets on the repo (or disable the job until they exist):
+#   UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD  (or UNITY_LICENSE only for ULF)
+#
+# Docs: https://game.ci/docs/github/test-runner
+
+name: Unity EditMode Checks
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  editmode:
+    name: EditMode card / goal contracts
+    runs-on: ubuntu-latest
+    # Skip automatically until Unity license secrets are configured.
+    if: ${{ secrets.UNITY_LICENSE != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/packages-lock.json') }}-${{ hashFiles('ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            Library-
+
+      - name: Run EditMode tests (filtered)
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.4.0f1
+          testMode: EditMode
+          customParameters: -testFilter SectorWinAutomationTests.SectorWinCards_AreDoubledInDrawPileLogic;SectorWinAutomationTests.AtmosphereAndWater_HaveDistinctColors;CardDeckProgressionTests
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editmode-results
+          path: artifacts
+
+  # Optional: run the live sector-win bot on a self-hosted machine that already has
+  # this project open in Unity with Pipeline connected. Enable by adding a runner
+  # with label `unity-pipeline-live`.
+  live-sector-bot:
+    name: Live sector win bot (self-hosted)
+    runs-on: [self-hosted, unity-pipeline-live]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run sector-win CLI against connected Editor
+        run: |
+          chmod +x tools/sector-win-cli.sh
+          ./tools/sector-win-cli.sh

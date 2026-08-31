@@ -130,18 +130,21 @@ namespace GameDevTV.RTS.Player
             if (temp < targetTemp)
             {
                 Supplies.UpdateTemperature(Owner.Player1, targetTemp);
+                ClimateManager.Instance?.SetTemperatureTarget(targetTemp);
                 log?.AppendLine($"Set Temperature -> {targetTemp:F1}");
             }
 
             if (atmos < targetAtmos)
             {
                 Supplies.UpdateAtmosphere(Owner.Player1, targetAtmos);
+                ClimateManager.Instance?.SetAtmosphereTarget(targetAtmos);
                 log?.AppendLine($"Set Atmosphere -> {targetAtmos:F2}");
             }
 
             if (water < targetWater)
             {
                 Supplies.UpdateWater(Owner.Player1, targetWater);
+                ClimateManager.Instance?.SetWaterTarget(targetWater);
                 log?.AppendLine($"Set Water -> {targetWater:F0}");
             }
 
@@ -162,20 +165,22 @@ namespace GameDevTV.RTS.Player
                 case MilestoneType.Biomass:
                 {
                     float bio = Supplies.Biomass.TryGetValue(Owner.Player1, out float b) ? b : 0f;
-                    if (bio < target)
+                    float needed = target + 0.05f; // clear float edge below TargetValue
+                    if (bio < needed)
                     {
-                        Supplies.UpdateBiomass(Owner.Player1, target);
-                        log?.AppendLine($"Set Biomass -> {target:F0}");
+                        Supplies.UpdateBiomass(Owner.Player1, needed);
+                        log?.AppendLine($"Set Biomass -> {needed:F2}");
                     }
                     break;
                 }
                 case MilestoneType.Oxygen:
                 {
                     float ox = Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
-                    if (ox < target)
+                    float needed = target + 0.05f;
+                    if (ox < needed)
                     {
-                        Supplies.UpdateOxygen(Owner.Player1, target);
-                        log?.AppendLine($"Set Oxygen -> {target:F0}");
+                        Supplies.UpdateOxygen(Owner.Player1, needed);
+                        log?.AppendLine($"Set Oxygen -> {needed:F2}");
                     }
                     break;
                 }

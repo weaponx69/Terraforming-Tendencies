@@ -230,15 +230,7 @@ namespace GameDevTV.RTS.Player
         {
             if (Biomass != null && Biomass.ContainsKey(owner))
             {
-                float maxBiomass = 100f;
-                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-                {
-                    int total = SectorManager.Instance.Sectors.Count;
-                    int occupied = 0;
-                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
-                    maxBiomass = ((float)occupied / total) * 100f;
-                }
-
+                GetTerraformingCaps(out _, out _, out _, out float maxBiomass, out _);
                 Biomass[owner] = Mathf.Clamp(value, 0f, maxBiomass);
                 OnBiomassChanged?.Invoke(owner, Biomass[owner]);
             }
@@ -395,15 +387,7 @@ namespace GameDevTV.RTS.Player
         {
             if (Oxygen != null && Oxygen.ContainsKey(owner))
             {
-                float maxOxygen = 100f;
-                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-                {
-                    int total = SectorManager.Instance.Sectors.Count;
-                    int occupied = 0;
-                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
-                    maxOxygen = ((float)occupied / total) * 100f;
-                }
-
+                GetTerraformingCaps(out _, out _, out float maxOxygen, out _, out _);
                 Oxygen[owner] = Mathf.Clamp(value, 0f, maxOxygen);
                 OnOxygenChanged?.Invoke(owner, Oxygen[owner]);
             }
@@ -413,15 +397,7 @@ namespace GameDevTV.RTS.Player
         {
             if (Temperature != null && Temperature.ContainsKey(owner))
             {
-                float maxTemperature = 100f;
-                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-                {
-                    int total = SectorManager.Instance.Sectors.Count;
-                    int occupied = 0;
-                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
-                    maxTemperature = ((float)occupied / total) * 100f;
-                }
-
+                GetTerraformingCaps(out _, out _, out _, out _, out float maxTemperature);
                 Temperature[owner] = Mathf.Min(value, maxTemperature);
                 OnTemperatureChanged?.Invoke(owner, Temperature[owner]);
             }
@@ -431,15 +407,7 @@ namespace GameDevTV.RTS.Player
         {
             if (Atmosphere != null && Atmosphere.ContainsKey(owner))
             {
-                float maxAtmosphere = 1f; // default max atmosphere (e.g., 1 atm)
-                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-                {
-                    int total = SectorManager.Instance.Sectors.Count;
-                    int occupied = 0;
-                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
-                    maxAtmosphere = ((float)occupied / total) * 1f; // scale up to 1 atm
-                }
-
+                GetTerraformingCaps(out float maxAtmosphere, out _, out _, out _, out _);
                 Atmosphere[owner] = Mathf.Clamp(value, 0f, maxAtmosphere);
                 OnAtmosphereChanged?.Invoke(owner, Atmosphere[owner]);
             }
@@ -449,17 +417,63 @@ namespace GameDevTV.RTS.Player
         {
             if (Water != null && Water.ContainsKey(owner))
             {
-                float maxWater = 100f;
-                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-                {
-                    int total = SectorManager.Instance.Sectors.Count;
-                    int occupied = 0;
-                    foreach (var s in SectorManager.Instance.Sectors) if (s.IsOccupied) occupied++;
-                    maxWater = ((float)occupied / total) * 100f;
-                }
-
+                GetTerraformingCaps(out _, out float maxWater, out _, out _, out _);
                 Water[owner] = Mathf.Max(0f, Mathf.Min(value, maxWater));
                 OnWaterChanged?.Invoke(owner, Water[owner]);
+            }
+        }
+
+        /// <summary>
+        /// Climate / terraforming ceilings. Scaled by unlocked sectors, but never below
+        /// the current generation's win targets — otherwise gen 1 is soft-locked when
+        /// Command Post hasn't marked the sector occupied yet (occupied=0 → max atmos 0).
+        /// </summary>
+        public static void GetTerraformingCaps(
+            out float maxAtmosphere,
+            out float maxWater,
+            out float maxOxygen,
+            out float maxBiomass,
+            out float maxTemperature)
+        {
+            maxAtmosphere = 1f;
+            maxWater = 100f;
+            maxOxygen = 100f;
+            maxBiomass = 100f;
+            maxTemperature = 100f;
+
+            if (SectorManager.Instance?.Sectors != null && SectorManager.Instance.Sectors.Count > 0)
+            {
+                int total = SectorManager.Instance.Sectors.Count;
+                int unlocked = 0;
+                foreach (var s in SectorManager.Instance.Sectors)
+                {
+                    if (s != null && !s.IsLocked) unlocked++;
+                }
+
+                unlocked = Mathf.Max(1, unlocked);
+                float frac = unlocked / (float)total;
+                maxAtmosphere = frac;
+                maxWater = frac * 100f;
+                maxOxygen = frac * 100f;
+                maxBiomass = frac * 100f;
+                maxTemperature = frac * 100f;
+            }
+
+            var gm = GenerationManager.Instance;
+            if (gm != null && !gm.IsExpansionPhase)
+            {
+                int gen = Mathf.Max(1, gm.CurrentGeneration);
+                maxAtmosphere = Mathf.Max(maxAtmosphere, gm.GetTargetAtmosphere(gen));
+                maxWater = Mathf.Max(maxWater, gm.GetTargetWater(gen));
+                maxTemperature = Mathf.Max(maxTemperature, gm.GetTargetTemperature(gen));
+
+                if (gm.CurrentMilestoneTarget > 0f)
+                {
+                    if (gm.CurrentMilestoneType == MilestoneType.Biomass)
+                        maxBiomass = Mathf.Max(maxBiomass, gm.CurrentMilestoneTarget);
+                    if (gm.CurrentMilestoneType == MilestoneType.Oxygen)
+                        maxOxygen = Mathf.Max(maxOxygen, gm.CurrentMilestoneTarget);
+                }
             }
         }
 
