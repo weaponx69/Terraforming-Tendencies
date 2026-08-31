@@ -72,7 +72,7 @@ namespace GameDevTV.RTS.Units
 
             foreach (BaseBuilding building in BaseBuilding.ActiveBuildings)
             {
-                if (building == null || building == worker as BaseBuilding) continue;
+                if (building == null) continue;
                 if (building.Owner != worker.Owner) continue;
                 if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
                 if (!BuildingSiteSlot.IsValidOccupant(building)) continue;

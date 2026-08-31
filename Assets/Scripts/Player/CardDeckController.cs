@@ -8,6 +8,7 @@ using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.UI;
+using GameDevTV.RTS.Utilities;
 
 namespace GameDevTV.RTS.Player
 {
@@ -275,7 +276,9 @@ namespace GameDevTV.RTS.Player
         {
             var before = hand.ToArray();
             DiscardUnplayableFromHand();
+            EnsureSolarPrereqInHand();
             FillHandInternal();
+            EnsureSolarPrereqInHand();
             if (before.Length != hand.Count || !before.SequenceEqual(hand))
             {
                 OnHandChanged?.Invoke();
@@ -288,8 +291,83 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void FillHand()
         {
+            EnsureSolarPrereqInHand();
             FillHandInternal();
+            EnsureSolarPrereqInHand();
             OnHandChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Climate/paired buildings (water, atmosphere, etc.) sit in hand while unmet even
+        /// before their cluster has solar. That used to fill the hand and bury Solar in
+        /// discard so the player could never power the pad. Whenever an open solar site
+        /// exists, force Solar Panel back into the hand (make room if needed).
+        /// </summary>
+        private void EnsureSolarPrereqInHand()
+        {
+            if (IsSolarUnlockCardInHand()) return;
+
+            BuildingSO solarSO = BlueprintDraftManager.GetBuildingSOByName("Solar Panel");
+            if (solarSO == null) return;
+            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(solarSO, Owner.Player1, out _, requireUnlocked: false))
+                return;
+
+            // Prefer injecting when a paired/climate unlock is already waiting on solar,
+            // or whenever open solar pads exist and Solar is simply missing from hand.
+            bool blockedPairedWaiting = hand.OfType<UnlockBuildingCardSO>().Any(NeedsSolarPoweredPad);
+            if (!blockedPairedWaiting && hand.Count >= handSize)
+            {
+                // Hand full of playable cards — still try to seat Solar by swapping a
+                // pad-blocked unlock if one exists; otherwise leave hand alone.
+                return;
+            }
+
+            if (hand.Count >= handSize)
+            {
+                int dropIdx = hand.FindIndex(c =>
+                    c is UnlockBuildingCardSO unlock
+                    && !IsSolarUnlockCard(c)
+                    && NeedsSolarPoweredPad(unlock));
+                if (dropIdx < 0)
+                {
+                    dropIdx = hand.FindIndex(c =>
+                        c is UnlockBuildingCardSO unlock
+                        && !IsSolarUnlockCard(c)
+                        && !unlock.CanApply());
+                }
+
+                if (dropIdx < 0) return;
+
+                discardPile.Add(hand[dropIdx]);
+                hand.RemoveAt(dropIdx);
+                Debug.Log($"[CardDeckController] Made room for Solar Panel (hand was full of pad-blocked unlocks).");
+            }
+
+            EnsureBootstrapUnlockInHand("Solar");
+        }
+
+        private static bool IsSolarUnlockCard(BlueprintCardSO card)
+        {
+            return card is UnlockBuildingCardSO unlock
+                && unlock.buildingToUnlock != null
+                && BuildingSiteRegistry.IsSolarBuilding(unlock.buildingToUnlock);
+        }
+
+        private bool IsSolarUnlockCardInHand() => hand.Any(IsSolarUnlockCard);
+
+        /// <summary>
+        /// True for unlock cards that place on a solar-powered cluster pad and cannot
+        /// apply yet (typically missing cluster solar).
+        /// </summary>
+        private static bool NeedsSolarPoweredPad(UnlockBuildingCardSO unlock)
+        {
+            if (unlock?.buildingToUnlock == null) return false;
+            BuildingSO b = unlock.buildingToUnlock;
+            if (BuildingSiteRegistry.IsSolarBuilding(b)) return false;
+            if (BuildingSiteRegistry.IsCommandBuilding(b)) return false;
+            if (BuildingSiteRegistry.IsMineBuilding(b)) return false;
+            if (unlock.CanApply()) return false;
+            return unlock.IsGateMet();
         }
 
         private void FillHandInternal()
@@ -626,8 +704,26 @@ namespace GameDevTV.RTS.Player
                 extras++;
             }
 
+            // Extra Solar Panel copies: infrastructure prerequisite for every paired
+            // climate building. Sector-win doubling alone is not enough while POWER is
+            // not the active milestone (Solar sits behind climate unlocks in FIFO).
+            BlueprintCardSO solarTemplate = masterDeck.FirstOrDefault(c =>
+                c is UnlockBuildingCardSO u
+                && u.buildingToUnlock != null
+                && BuildingSiteRegistry.IsSolarBuilding(u.buildingToUnlock));
+            if (solarTemplate != null)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    BlueprintCardSO extraSolar = UnityEngine.Object.Instantiate(solarTemplate);
+                    extraSolar.name = $"{solarTemplate.name} (Infra Copy {i + 1})";
+                    drawPile.Add(extraSolar);
+                    extras += 1;
+                }
+            }
+
             Debug.Log($"[CardDeckController] Draw pile ready: {drawPile.Count} cards " +
-                      $"({masterDeck.Count} base + {extras} sector-win duplicates).");
+                      $"({masterDeck.Count} base + {extras} sector-win/infra duplicates).");
         }
 
         /// <summary>Move discard queue onto draw queue, preserving FIFO order.</summary>

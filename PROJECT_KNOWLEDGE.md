@@ -35,6 +35,7 @@ This document serves as a persistent memory bank for AI context, detailing the c
 #### 5. UI & Selection Indicators
 
 #### 6. Recent Fixes Changelog
+* **Solar prereq hand softlock (2026-08-31):** Unmet climate unlocks (e.g. blue WATER buildings) stayed in hand before their cluster had solar, filling all slots so Solar Panel never cycled back from discard. `EnsureSolarPrereqInHand` now reseats Solar whenever open solar pads exist (makes room by dropping a pad-blocked unlock if needed). Draw pile also gets +2 Solar infra copies.
 * **Solar never auto-wires to Command Post (2026-08-31):** `ConnectPowerGeneratorToCommandPost` skips all solar panels (not only cluster-flagged ones) and severs any CP links. Reserved-site builds occupy the pad **before** `CompleteConstruction` so cluster solar is recognized the same frame. Cluster consumers still auto-wire to their pad solar.
 * **Mining drone proximity repair (2026-08-31):** Mining drones passively heal damaged friendly buildings within ~14m while gathering/idling (`WorkerBrainController.TickProximityRepair`), without abandoning their gather loop.
 * **Unity CLI agent rules documented (2026-08-31):** See **§40**. Agents use the experimental Unity CLI + Pipeline package against the **already-open** Editor (`unity status` / `unity command` / `eval`). Do **not** spawn a second Editor via `unity test` / `build` / `run` / `-batchmode` while this heavy project is open. Sector win automation: `SectorWinAutomation` + `tools/sector-win-cli.sh` (live `eval`), or `unity command run_tests --mode playmode --filter SectorWinAutomationTests` on the connected Editor.
@@ -766,6 +767,7 @@ Players were soft-locked finishing sectors because always-playable "spam" cards 
 * **Playable only in hand:** `FillHand` / `RefreshHand` only seat cards that pass `IsGateMet()` and `CanApply()`. Unplayable cards are discarded to the back of the queue (they will reappear later when gates are met).
 * **No priority promotion:** Sector cards are **not** pulled out of order or forced into the hand. Fair cycling is the fix.
 * **Opening exception:** Command Post + Solar are seeded into the opening hand so the player can bootstrap; everything after that is FIFO.
+* **Solar infrastructure:** Whenever open solar pads exist, `EnsureSolarPrereqInHand` keeps a Solar Panel card in hand (climate/paired unlocks can sit in hand before their pad is powered; without this, they clog the hand and Solar never returns). Draw pile also includes +2 Solar infra copies beyond sector-win doubling.
 * **Refresh triggers:** Builds, deaths, materials/energy/climate/oxygen/biomass/power/population changes, sector unlock, planet gen, and generation start call `RefreshHand()` so newly-playable cards can enter when they reach the front of a recycle or when unplayable cards leave the hand.
 
 #### 38. Sector Goal Color Coding (Authoritative)

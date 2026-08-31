@@ -80,6 +80,16 @@ namespace GameDevTV.RTS.Tests
             Assert.GreaterOrEqual(toppedUp, SectorResourceBudget.MinGatherableMaterialsPerSector);
         }
 
+        [Test]
+        public void WaterAndAtmosphereGoals_AreDistinctFromPowerSolar()
+        {
+            Assert.AreEqual("WATER", GoalForBuilding("Water Ice Aquifer"));
+            Assert.AreEqual("POWER", GoalForBuilding("Solar Panel"));
+            Assert.AreNotEqual(
+                TerraformingGoalColors.ForGoal("WATER"),
+                TerraformingGoalColors.ForGoal("POWER"));
+        }
+
         private static void SetSupplyMax(SupplySO so, int max)
         {
             var field = typeof(SupplySO).GetField(
