@@ -40,6 +40,38 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void SectorResourceBudget_MeetsMinimumForTypicalSectorLayout()
+        {
+            var sector = new SectorManager.Sector();
+            var minerals = ScriptableObject.CreateInstance<SupplySO>();
+            SetSupplyMax(minerals, 250);
+
+            for (int i = 0; i < 9; i++)
+            {
+                sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, Vector3.zero, "", "Minerals"));
+            }
+
+            int baseYield = SectorResourceBudget.CalculateGatherableYield(sector, minerals, minerals, minerals, minerals);
+            Assert.Less(baseYield, SectorResourceBudget.MinGatherableMaterialsPerSector);
+
+            for (int i = 0; i < 8; i++)
+            {
+                sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, Vector3.zero, "", "Minerals"));
+            }
+
+            int toppedUp = SectorResourceBudget.CalculateGatherableYield(sector, minerals, minerals, minerals, minerals);
+            Assert.GreaterOrEqual(toppedUp, SectorResourceBudget.MinGatherableMaterialsPerSector);
+        }
+
+        private static void SetSupplyMax(SupplySO so, int max)
+        {
+            var field = typeof(SupplySO).GetField(
+                "<MaxAmount>k__BackingField",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            field?.SetValue(so, max);
+        }
+
+        [Test]
         public void IsCurrentSectorRoundComplete_FalseAtRoundStart()
         {
             var gmObj = new GameObject("GenerationManager");

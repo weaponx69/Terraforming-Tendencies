@@ -465,13 +465,17 @@ namespace GameDevTV.RTS.Environment
                             return new Vector3(rx, 0, rz);
                         };
 
-                        // 2 Minerals — Sector 0 guarantees the first deposit inside the starting reveal.
-                        for (int i = 0; i < 2; i++)
+                        // 3 Minerals — Sector 0 keeps two deposits inside the starting reveal.
+                        for (int i = 0; i < 3; i++)
                         {
                             Vector3 pos;
                             if (isStartingSector && i == 0)
                             {
                                 pos = sector.Center + new Vector3(-bootstrapRadius * 0.55f, 0f, bootstrapRadius * 0.4f);
+                            }
+                            else if (isStartingSector && i == 1)
+                            {
+                                pos = sector.Center + new Vector3(bootstrapRadius * 0.5f, 0f, -bootstrapRadius * 0.35f);
                             }
                             else
                             {
@@ -489,18 +493,16 @@ namespace GameDevTV.RTS.Environment
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, pos, "Vaporous gases seep from fissures in the ground.", "Gas"));
                         }
 
-                        // 1-2 Iron
-                        int ironCount = Random.Range(1, 3);
-                        for (int i = 0; i < ironCount; i++)
+                        // 2 Iron
+                        for (int i = 0; i < 2; i++)
                         {
                             Vector3 pos = randomPos();
                             if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, pos, "A rich iron ore deposit, suitable for smelting.", "Iron"));
                         }
 
-                        // 1-2 Regolith
-                        int regCount = Random.Range(1, 3);
-                        for (int i = 0; i < regCount; i++)
+                        // 2 Regolith
+                        for (int i = 0; i < 2; i++)
                         {
                             Vector3 pos = randomPos();
                             if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
@@ -545,6 +547,7 @@ namespace GameDevTV.RTS.Environment
                             sector.Nodes.Add(nexusNode);
                         }
 
+                        EnsureMinimumSectorResources(sector, sectorIndex, sector.Center, exclusionRadius, randomPos);
                     }
 
                     // Build connection graph between nodes
@@ -575,6 +578,39 @@ namespace GameDevTV.RTS.Environment
                     PlaceSectorBuildingSites();
 
                     Debug.Log($"[PlanetGenerator] Placed sector resource nodes across {SectorManager.Instance.Sectors.Count} sectors.");
+                }
+
+                /// <summary>
+                /// Top up gatherable nodes until the sector meets the completion budget.
+                /// </summary>
+                private void EnsureMinimumSectorResources(
+                    SectorManager.Sector sector,
+                    int sectorIndex,
+                    Vector3 sectorCenter,
+                    float exclusionRadius,
+                    System.Func<Vector3> randomPos)
+                {
+                    SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
+                    SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
+
+                    int safety = 0;
+                    while (SectorResourceBudget.CalculateGatherableYield(
+                               sector, MineralsSupplySO, GasSupplySO, ironSO, regolithSO)
+                           < SectorResourceBudget.MinGatherableMaterialsPerSector
+                           && safety++ < 16)
+                    {
+                        Vector3 pos = randomPos();
+                        if (Vector3.Distance(pos, sectorCenter) < exclusionRadius) pos = randomPos();
+                        sector.Nodes.Add(new SectorNode(
+                            SectorNode.NodeType.Minerals,
+                            pos,
+                            "A crystalline mineral deposit glistens in the light.",
+                            "Minerals"));
+                    }
+
+                    int yield = SectorResourceBudget.CalculateGatherableYield(
+                        sector, MineralsSupplySO, GasSupplySO, ironSO, regolithSO);
+                    Debug.Log($"[PlanetGenerator] Sector {sectorIndex} gatherable budget: {yield} / {SectorResourceBudget.MinGatherableMaterialsPerSector} materials.");
                 }
 
                 /// <summary>
