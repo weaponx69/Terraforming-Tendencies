@@ -52,12 +52,12 @@ namespace GameDevTV.RTS.Environment
 
         public static bool HasAvailableSite(BuildingSO building, Owner owner)
         {
-            return GetEligibleSites(building, owner).Count > 0;
+            return GetEligibleSites(building, owner, visibleToPlayerOnly: true).Count > 0;
         }
 
         public static BuildingSiteSlot GetAvailableSite(BuildingSO building, Owner owner)
         {
-            var eligible = GetEligibleSites(building, owner);
+            var eligible = GetEligibleSites(building, owner, visibleToPlayerOnly: true);
             if (eligible.Count == 0) return null;
 
             Vector3 reference = GetReferencePosition(owner);
@@ -66,7 +66,10 @@ namespace GameDevTV.RTS.Environment
             return eligible[0];
         }
 
-        public static List<BuildingSiteSlot> GetEligibleSites(BuildingSO building, Owner owner)
+        public static List<BuildingSiteSlot> GetEligibleSites(
+            BuildingSO building,
+            Owner owner,
+            bool visibleToPlayerOnly = true)
         {
             var candidates = new List<BuildingSiteSlot>();
             if (building == null || SectorManager.Instance == null) return candidates;
@@ -81,6 +84,7 @@ namespace GameDevTV.RTS.Environment
                 foreach (var site in sector.BuildingSites)
                 {
                     if (site == null) continue;
+                    if (visibleToPlayerOnly && !IsSiteVisibleToPlayer(site)) continue;
                     if (site.OccupyingBuilding != null && !BuildingSiteSlot.IsValidOccupant(site.OccupyingBuilding))
                     {
                         site.ClearOccupancy();

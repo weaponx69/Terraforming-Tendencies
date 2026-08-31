@@ -164,7 +164,7 @@ namespace GameDevTV.RTS.Environment
         {
             DestroyGhost();
 
-            if (!IsSiteVisibleInWorld() || !ShouldShowGhostPreview())
+            if ((!isSelectable && !IsSiteVisibleInWorld()) || !ShouldShowGhostPreview())
             {
                 return;
             }

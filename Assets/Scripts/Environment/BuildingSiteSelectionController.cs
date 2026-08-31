@@ -156,17 +156,28 @@ namespace GameDevTV.RTS.Environment
         {
             if (eligibleSites.Count == 0) return;
 
-            Vector3 sum = Vector3.zero;
-            int count = 0;
+            Vector3 cameraPos = PlayerInput.GetCameraFocusPosition();
+            cameraPos.y = 0f;
+
+            BuildingSiteSlot nearest = null;
+            float bestDist = float.MaxValue;
             foreach (var site in eligibleSites)
             {
                 if (site == null) continue;
-                sum += site.Position;
-                count++;
+                Vector3 flat = site.Position;
+                flat.y = 0f;
+                float dist = (flat - cameraPos).sqrMagnitude;
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    nearest = site;
+                }
             }
 
-            if (count == 0) return;
-            PlayerInput.FocusCameraOnWorldPosition(sum / count);
+            if (nearest != null)
+            {
+                PlayerInput.FocusCameraOnWorldPosition(nearest.Position);
+            }
         }
 
         private static void NotifyBuildFeedback(string message)

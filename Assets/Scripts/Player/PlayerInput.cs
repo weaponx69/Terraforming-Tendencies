@@ -74,6 +74,13 @@ namespace GameDevTV.RTS.Player
             Instance.currentHex?.SetHighlighted(true);
         }
 
+        /// <summary>Current camera follow target on the map (XZ focus point).</summary>
+        public static Vector3 GetCameraFocusPosition()
+        {
+            if (Instance?.cameraTarget != null) return Instance.cameraTarget.position;
+            return Vector3.zero;
+        }
+
         private void Awake()
         {
             Instance = this;
