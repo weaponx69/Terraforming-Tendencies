@@ -4,6 +4,7 @@ using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -166,7 +167,13 @@ namespace GameDevTV.RTS.UI.Components
 
         private void ApplyGoalAccent(string goal)
         {
-            goalKey = goal ?? string.Empty;
+            goalKey = TerraformingGoalColors.IsSectorCompletionGoal(goal) ? goal : string.Empty;
+            if (string.IsNullOrEmpty(goalKey))
+            {
+                ClearGoalAccent();
+                return;
+            }
+
             Color accent = TerraformingGoalColors.ForGoal(goalKey);
 
             if (label != null)
@@ -253,7 +260,7 @@ namespace GameDevTV.RTS.UI.Components
         {
             string tooltipText = command.Name + "\n";
 
-            if (!string.IsNullOrEmpty(cardGoal))
+            if (!string.IsNullOrEmpty(cardGoal) && TerraformingGoalColors.IsSectorCompletionGoal(cardGoal))
             {
                 tooltipText =
                     $"{TerraformingGoalColors.Colorize(TerraformingGoalColors.ShortLabel(cardGoal), cardGoal)}\n" +
@@ -300,7 +307,7 @@ namespace GameDevTV.RTS.UI.Components
 
             if (command is PlayCardCommand)
             {
-                return string.IsNullOrEmpty(cardGoal)
+                return string.IsNullOrEmpty(cardGoal) || !TerraformingGoalColors.IsSectorCompletionGoal(cardGoal)
                     ? command.Name
                     : $"{TerraformingGoalColors.Colorize(TerraformingGoalColors.ShortLabel(cardGoal), cardGoal)}\n{command.Name}";
             }

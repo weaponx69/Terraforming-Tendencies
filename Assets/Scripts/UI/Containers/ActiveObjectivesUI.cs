@@ -118,7 +118,7 @@ namespace GameDevTV.RTS.UI.Containers
                         "{0:F0}% / {1:F0}%");
 
                     sb.AppendLine();
-                    sb.AppendLine("<size=12><color=#AAAAAA>Matching hand cards use the same colors.</color></size>");
+                    sb.AppendLine("<size=12><color=#AAAAAA>Colored cards advance sector terraforming goals.</color></size>");
                 }
             }
             else

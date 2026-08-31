@@ -47,18 +47,40 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
-        public void TerraformingGoalColors_MatchDistinctGoals()
+        public void IsSectorCompletionGoal_OnlyCoversSectorTerraforming()
+        {
+            Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("TEMPERATURE"));
+            Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("BIOMASS"));
+            Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("COMMAND POST"));
+            Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("MATERIALS"));
+            Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("EXPLORATION"));
+            Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("MINING"));
+
+            var ghg = UnlockCard("GHG Factory");
+            var caches = ScriptableObject.CreateInstance<ScoutingCardSO>();
+            caches.scoutingType = ScoutingCardSO.ScoutingType.EmergencyCaches;
+
+            Assert.AreEqual("TEMPERATURE", TerraformingGoalColors.GetSectorGoalForCard(ghg));
+            Assert.IsNull(TerraformingGoalColors.GetSectorGoalForCard(caches));
+        }
+
+        [Test]
+        public void TerraformingGoalColors_MatchDistinctSectorGoals()
         {
             Assert.AreNotEqual(
                 TerraformingGoalColors.ForGoal("TEMPERATURE"),
                 TerraformingGoalColors.ForGoal("WATER"));
-            Assert.AreNotEqual(
-                TerraformingGoalColors.ForGoal("ATMOSPHERE"),
-                TerraformingGoalColors.ForGoal("OXYGEN"));
             Assert.AreEqual(
                 TerraformingGoalColors.ForMilestone(MilestoneType.Biomass),
                 TerraformingGoalColors.ForGoal("BIOMASS"));
-            Assert.AreEqual("#FF732E", TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature));
+            Assert.AreEqual(TerraformingGoalColors.Neutral, TerraformingGoalColors.ForGoal("MATERIALS"));
+        }
+
+        [Test]
+        public void Integrity_StaysFull_UntilColonyIntegrityStarts()
+        {
+            Assert.IsFalse(Supplies.ColonyIntegrityActive);
+            Assert.AreEqual(100f, Supplies.CalculateIntegrity(Owner.Player1), 0.01f);
         }
 
         private static string GoalForBuilding(string buildingName)

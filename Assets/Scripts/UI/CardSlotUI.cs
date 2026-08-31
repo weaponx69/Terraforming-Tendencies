@@ -56,12 +56,19 @@ namespace GameDevTV.RTS.UI
 
             if (cardNameText != null)
             {
-                string goal = card.GetCardGoal();
-                Color accent = TerraformingGoalColors.ForGoal(goal);
-                cardNameText.color = accent;
-                cardNameText.richText = true;
-                cardNameText.SetText(
-                    $"{TerraformingGoalColors.Colorize("[" + TerraformingGoalColors.ShortLabel(goal) + "]", goal)} {card.cardName}");
+                string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
+                if (!string.IsNullOrEmpty(sectorGoal))
+                {
+                    cardNameText.color = TerraformingGoalColors.ForGoal(sectorGoal);
+                    cardNameText.richText = true;
+                    cardNameText.SetText(
+                        $"{TerraformingGoalColors.Colorize("[" + TerraformingGoalColors.ShortLabel(sectorGoal) + "]", sectorGoal)} {card.cardName}");
+                }
+                else
+                {
+                    cardNameText.color = Color.white;
+                    cardNameText.SetText(card.cardName);
+                }
             }
 
             if (descriptionText != null)
@@ -79,7 +86,10 @@ namespace GameDevTV.RTS.UI
             if (glowOutline != null)
             {
                 glowOutline.enabled = false;
-                glowOutline.color = TerraformingGoalColors.ForGoal(card.GetCardGoal());
+                string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
+                glowOutline.color = string.IsNullOrEmpty(sectorGoal)
+                    ? Color.white
+                    : TerraformingGoalColors.ForGoal(sectorGoal);
             }
         }
 

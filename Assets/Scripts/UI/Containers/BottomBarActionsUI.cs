@@ -120,7 +120,7 @@ namespace GameDevTV.RTS.UI.Containers
                     int cardIndex = i; // Capture for closure
 
                     // Create a BuildBuildingCommand for building cards so placement works
-                    string cardGoal = card.GetCardGoal();
+                    string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
 
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
                     {
@@ -133,7 +133,7 @@ namespace GameDevTV.RTS.UI.Containers
                         actionButtons[i].EnableFor(buildCmd, null, () =>
                         {
                             PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
-                        }, cardGoal);
+                        }, sectorGoal);
                     }
                     else
                     {
@@ -160,7 +160,7 @@ namespace GameDevTV.RTS.UI.Containers
                             // The actual play happens in PlayCardCommand.Handle()
                             // The onClick just needs to route through PlayerInput
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
-                        }, cardGoal);
+                        }, sectorGoal);
                     }
                 }
                 else
@@ -209,6 +209,10 @@ namespace GameDevTV.RTS.UI.Containers
                         fbBbc.GhostPrefab = bbc.GhostPrefab ?? bbc.Building?.Prefab;
 
                         string fallbackGoal = UnlockBuildingCardSO.ClassifyBuildingGoal(bbc.Building);
+                        if (!TerraformingGoalColors.IsSectorCompletionGoal(fallbackGoal))
+                        {
+                            fallbackGoal = null;
+                        }
 
                         actionButtons[slot].EnableFor(fbBbc, null, () =>
                         {
