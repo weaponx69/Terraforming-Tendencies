@@ -382,15 +382,16 @@ namespace GameDevTV.RTS.Commands
                     return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
                 }
 
-                // If they already have a player Command Post, restrict building more:
-                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase)
+                // If they already have a player Command Post, allow another when an
+                // unlocked sector still needs claiming (exploration opened it). Expansion
+                // phase also allows this. Do not lock mid-run after Orbital Scan / Survey.
+                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase
+                    && !GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
                 {
-                    // Only allow building new Command Posts during the expansion phase
                     return true;
                 }
 
-                // During expansion phase, check if there's an unoccupied sector to place the Command Post in.
-                // The player must play an exploration card (Orbital Scan, Survey Drone) to unlock a new sector first.
+                // During expansion / colonization, check if there's an unoccupied sector.
                 var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
                 if (sectorMgr != null && sectorMgr.Sectors.Count > 0)
                 {

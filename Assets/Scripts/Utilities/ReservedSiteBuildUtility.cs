@@ -112,7 +112,7 @@ namespace GameDevTV.RTS.Utilities
             return TryBuildAtSite(building, owner, site, out reason);
         }
 
-        public static bool TryBuildAtSite(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason)
+        public static bool TryBuildAtSite(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason, bool waiveCost = false)
         {
             reason = null;
             if (isBuildingReservedSite)
@@ -130,7 +130,7 @@ namespace GameDevTV.RTS.Utilities
             isBuildingReservedSite = true;
             try
             {
-                return TryBuildAtSiteInternal(building, owner, site, out reason);
+                return TryBuildAtSiteInternal(building, owner, site, out reason, waiveCost);
             }
             finally
             {
@@ -138,7 +138,7 @@ namespace GameDevTV.RTS.Utilities
             }
         }
 
-        private static bool TryBuildAtSiteInternal(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason)
+        private static bool TryBuildAtSiteInternal(BuildingSO building, Owner owner, BuildingSiteSlot site, out string reason, bool waiveCost = false)
         {
             reason = null;
             if (building == null || site == null)
@@ -153,7 +153,9 @@ namespace GameDevTV.RTS.Utilities
                 return false;
             }
 
-            if (!BuildingSiteRegistry.GetEligibleSites(building, owner).Contains(site))
+            // Auto-claim colonization may target a pad that is not yet fog-visible;
+            // skip the normal eligibility list when waiving cost for that path.
+            if (!waiveCost && !BuildingSiteRegistry.GetEligibleSites(building, owner).Contains(site))
             {
                 reason = BuildingSiteRegistry.IsSolarBuilding(building)
                     ? "That solar site is not available."
@@ -167,7 +169,7 @@ namespace GameDevTV.RTS.Utilities
                 return false;
             }
 
-            if (!HasEnoughMaterials(building, owner))
+            if (!waiveCost && !HasEnoughMaterials(building, owner))
             {
                 reason = $"Not enough materials to build {building.Name}.";
                 return false;
@@ -179,7 +181,7 @@ namespace GameDevTV.RTS.Utilities
 
             Vector3 targetPos = SnapToNavMesh(site.Position);
 
-            if (!ConsumeMaterials(building, owner))
+            if (!waiveCost && !ConsumeMaterials(building, owner))
             {
                 reason = $"Not enough materials to build {building.Name}.";
                 return false;

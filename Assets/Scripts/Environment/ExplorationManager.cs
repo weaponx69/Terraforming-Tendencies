@@ -260,7 +260,7 @@ namespace GameDevTV.RTS.Environment
 
             if (!TrySpendExplorationEnergy(owner)) return false;
 
-            ExploreNodeInternal(node, sectorIndex);
+            ExploreNodeInternal(node, sectorIndex, owner);
             return true;
         }
 
@@ -271,10 +271,10 @@ namespace GameDevTV.RTS.Environment
         public void ExploreNode(SectorNode node, int sectorIndex)
         {
             if (!IsValidExploreTarget(node)) return;
-            ExploreNodeInternal(node, sectorIndex);
+            ExploreNodeInternal(node, sectorIndex, Owner.Player1);
         }
 
-        private void ExploreNodeInternal(SectorNode node, int sectorIndex)
+        private void ExploreNodeInternal(SectorNode node, int sectorIndex, Owner owner)
         {
             if (node == null || node.isExplored) return;
 
@@ -286,7 +286,7 @@ namespace GameDevTV.RTS.Environment
             // 2. If this is the first explored node in a locked sector, unlock the sector
             if (sector.IsLocked)
             {
-                SectorManager.Instance.OnFirstNodeExploredInSector(sectorIndex);
+                SectorManager.Instance.OnFirstNodeExploredInSector(sectorIndex, owner);
             }
 
             // 3. Reveal hidden gatherable resources at this node's position

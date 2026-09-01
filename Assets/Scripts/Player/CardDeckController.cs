@@ -105,7 +105,6 @@ namespace GameDevTV.RTS.Player
         {
             if (owner == Owner.Player1) RefreshHand();
         }
-        private void HandleSectorUnlocked() => RefreshHand();
         private void HandleGenerationStarted(int _, int __) => RefreshHand();
         private void HandleGenerationEnded(int _, int __) => RefreshHand();
 
@@ -117,6 +116,15 @@ namespace GameDevTV.RTS.Player
             RefreshHand();
             OnHandChanged?.Invoke();
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        private void HandleSectorUnlocked()
+        {
+            EnsureBootstrapUnlockInHand("Solar");
+            // Fallback only — SectorManager auto-places a CP before this event fires.
+            if (GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
+                EnsureBootstrapUnlockInHand("Command Post");
+            RefreshHand();
         }
 
         private void EnsureBootstrapUnlockInHand(string nameContains)

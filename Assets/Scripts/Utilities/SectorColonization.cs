@@ -1,0 +1,118 @@
+using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Units;
+using UnityEngine;
+
+namespace GameDevTV.RTS.Utilities
+{
+    /// <summary>
+    /// After a sector unlocks via exploration, reveal its build pads and claim it with
+    /// a Command Post so solar/climate sites become playable immediately.
+    /// </summary>
+    public static class SectorColonization
+    {
+        /// <summary>
+        /// Reveal fog over reserved pads and auto-place a Command Post on the sector's
+        /// CP pad (waives materials — the exploration card already paid to open the sector).
+        /// </summary>
+        public static void PrepareNewlyUnlockedSector(int sectorIndex, Owner owner = Owner.Player1)
+        {
+            if (SectorManager.Instance == null) return;
+            if (sectorIndex < 0 || sectorIndex >= SectorManager.Instance.Sectors.Count) return;
+
+            PrepareNewlyUnlockedSector(SectorManager.Instance.Sectors[sectorIndex], owner, sectorIndex);
+        }
+
+        public static void PrepareNewlyUnlockedSector(SectorManager.Sector sector, Owner owner = Owner.Player1, int sectorIndex = -1)
+        {
+            if (sector == null || sector.IsLocked) return;
+
+            RevealSectorBuildSites(sector);
+            bool placed = TryAutoPlaceCommandPost(sector, owner, out string failureReason);
+            BuildingSiteRegistry.RefreshAllMarkers();
+            CardDeckController.Instance?.RefreshHand();
+
+            Debug.Log(placed
+                ? $"[SectorColonization] Sector {sectorIndex} claimed with Command Post; pads revealed."
+                : $"[SectorColonization] Sector {sectorIndex} pads revealed; Command Post not placed ({failureReason ?? "unknown"}).");
+        }
+
+        public static void RevealSectorBuildSites(SectorManager.Sector sector)
+        {
+            if (sector == null || HexGridManager.Instance == null) return;
+
+            float radius = HexGridManager.Instance.StartingAreaRevealRadius;
+            HexGridManager.Instance.RevealHexesAroundPosition(sector.Center, Mathf.Max(radius * 1.75f, 22f));
+
+            if (sector.BuildingSites == null) return;
+            foreach (var site in sector.BuildingSites)
+            {
+                if (site == null) continue;
+                HexGridManager.Instance.RevealHexesAroundPosition(site.Position, Mathf.Max(radius * 0.6f, 10f));
+            }
+        }
+
+        public static bool TryAutoPlaceCommandPost(SectorManager.Sector sector, Owner owner, out string failureReason)
+        {
+            failureReason = null;
+            if (sector?.BuildingSites == null)
+            {
+                failureReason = "Sector has no building sites.";
+                return false;
+            }
+
+            BuildingSiteSlot cpSite = null;
+            foreach (var site in sector.BuildingSites)
+            {
+                if (site != null && site.Kind == BuildingSiteKind.CommandPost && !site.IsOccupied)
+                {
+                    cpSite = site;
+                    break;
+                }
+            }
+
+            if (cpSite == null)
+            {
+                failureReason = "No open Command Post pad on sector.";
+                return false;
+            }
+
+            BuildingSO commandPost = BlueprintDraftManager.GetBuildingSOByName("Command Post");
+            if (commandPost == null)
+            {
+                failureReason = "Command Post BuildingSO missing.";
+                Debug.LogWarning("[SectorColonization] Command Post BuildingSO missing — cannot auto-claim sector.");
+                return false;
+            }
+
+            BlueprintDraftManager.UnlockBuilding("Command Post");
+            bool placed = ReservedSiteBuildUtility.TryBuildAtSite(commandPost, owner, cpSite, out failureReason, waiveCost: true);
+            if (placed)
+            {
+                sector.IsOccupied = true;
+                if (cpSite.OccupyingBuilding != null)
+                    sector.OccupyingBuilding = cpSite.OccupyingBuilding;
+            }
+
+            return placed;
+        }
+
+        /// <summary>True when an unlocked, unoccupied sector still needs a Command Post claim.</summary>
+        public static bool HasUnclaimedUnlockedSector()
+        {
+            if (SectorManager.Instance?.Sectors == null) return false;
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector == null || sector.IsLocked || sector.IsOccupied) continue;
+                if (sector.BuildingSites == null) continue;
+                foreach (var site in sector.BuildingSites)
+                {
+                    if (site != null && site.Kind == BuildingSiteKind.CommandPost && !site.IsOccupied)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+    }
+}

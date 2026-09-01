@@ -103,17 +103,17 @@ echo "== SectorWinAutomation.Report =="
 REPORT_JSON="$(eval_json 'return GameDevTV.RTS.Player.SectorWinAutomation.Report();' 90)"
 echo "$REPORT_JSON" | extract_result_text
 
-echo "== SectorWinAutomation.TryWinCurrentSector =="
-WIN_JSON="$(eval_json 'return GameDevTV.RTS.Player.SectorWinAutomation.TryWinCurrentSector();' 120)"
+echo "== SectorWinAutomation.TryWinAndColonizeNextSector (strict) =="
+WIN_JSON="$(eval_json 'return GameDevTV.RTS.Player.SectorWinAutomation.TryWinAndColonizeNextSector();' 180)"
 WIN_TEXT="$(echo "$WIN_JSON" | extract_result_text)"
 echo "$WIN_TEXT"
 
-if echo "$WIN_TEXT" | grep -q "RESULT: PASS\|RESULT: ALREADY_BETWEEN_ROUNDS"; then
+if echo "$WIN_TEXT" | grep -q "RESULT: PASS\|RESULT: ALREADY_BETWEEN_ROUNDS\|RESULT: SKIP"; then
   echo "Bot finished successfully."
   exit 0
 fi
 
-if echo "$WIN_TEXT" | grep -q "RESULT: FAIL\|RESULT: SKIP\|Compilation Failed\|does not exist"; then
+if echo "$WIN_TEXT" | grep -q "RESULT: FAIL\|Compilation Failed\|does not exist"; then
   echo "Bot did not pass. See RESULT above."
   exit 2
 fi

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Utilities;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -276,6 +277,7 @@ namespace GameDevTV.RTS.Environment
                     Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
                     // Do not mass-reveal deposits here — ExplorationManager.RevealGatherableAtNode
                     // (and discovery cards) are what uncover materials node-by-node.
+                    SectorColonization.PrepareNewlyUnlockedSector(Sectors[i], Owner.Player1, i);
                     UpdateSectorBorders();
                     OnSectorUnlocked?.Invoke();
                     return; // Only unlock one at a time
@@ -299,7 +301,7 @@ namespace GameDevTV.RTS.Environment
         /// Mark a specific sector as having its first node explored.
         /// This is called by ExplorationManager when a node in a locked sector is explored.
         /// </summary>
-        public void OnFirstNodeExploredInSector(int index)
+        public void OnFirstNodeExploredInSector(int index, Owner owner = Owner.Player1)
         {
             if (index < 0 || index >= Sectors.Count) return;
             if (!Sectors[index].IsLocked) return;
@@ -311,6 +313,8 @@ namespace GameDevTV.RTS.Environment
             OnSectorExplored?.Invoke(index);
             // Pads/build eligibility unlock with the sector; deposits stay hidden until
             // the explored node reveals them (or a discovery card reveals a type).
+            // Reveal pads and auto-place a Command Post before hand refresh listeners run.
+            SectorColonization.PrepareNewlyUnlockedSector(Sectors[index], owner, index);
             UpdateSectorBorders();
             OnSectorUnlocked?.Invoke();
             Debug.Log($"[SectorManager] Sector {index} unlocked via node exploration!");

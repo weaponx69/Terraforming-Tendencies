@@ -648,6 +648,9 @@ namespace GameDevTV.RTS.Environment
                         commandSite.MarkerGO = CreateSiteMarker(markerRoot.transform, commandPos, BuildingSiteKind.CommandPost, commandSite);
 
                         int clustersPlaced = 0;
+                        // Enough solar/paired clusters for climate goals (temp/atmos/water/oxygen/biomass)
+                        // without exhausting pads before the sector can be finished.
+                        const int clustersPerSector = 6;
 
                         if (isStartingSector)
                         {
@@ -664,7 +667,7 @@ namespace GameDevTV.RTS.Environment
                             clustersPlaced++;
                         }
 
-                        for (int attempt = 0; attempt < 12 && clustersPlaced < 3; attempt++)
+                        for (int attempt = 0; attempt < 24 && clustersPlaced < clustersPerSector; attempt++)
                         {
                             Vector3 clusterCenter = SnapSitePosition(new Vector3(
                                 Random.Range(sectorMin.x, sectorMax.x),

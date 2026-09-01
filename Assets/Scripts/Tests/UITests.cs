@@ -1,4 +1,3 @@
-#if UNITY_INCLUDE_TESTS
 using System.Collections;
 using System.Collections.Generic;   // Added generic collections support
 using NUnit.Framework;
@@ -285,4 +284,3 @@ namespace GameDevTV.RTS.Tests
         }
     }
 }
-#endif

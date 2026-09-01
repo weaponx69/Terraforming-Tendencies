@@ -1,4 +1,3 @@
-#if UNITY_INCLUDE_TESTS
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -238,4 +237,3 @@ namespace GameDevTV.RTS.Tests
         }
     }
 }
-#endif

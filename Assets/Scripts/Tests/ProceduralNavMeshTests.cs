@@ -1,4 +1,3 @@
-#if UNITY_INCLUDE_TESTS
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
@@ -118,6 +117,5 @@ namespace GameDevTV.RTS.Tests
 
             Assert.IsTrue(foundGhost, "Test setup failed: No ghost objects were created to verify.");
         }
-        }
-        }
-#endif
+    }
+}

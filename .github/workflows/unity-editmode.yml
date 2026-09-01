@@ -47,7 +47,7 @@ jobs:
         with:
           unityVersion: 6000.4.0f1
           testMode: EditMode
-          customParameters: -testFilter SectorWinAutomationTests.SectorWinCards_AreDoubledInDrawPileLogic;SectorWinAutomationTests.AtmosphereAndWater_HaveDistinctColors;CardDeckProgressionTests
+          customParameters: -testFilter SectorColonizationTests;SectorWinAutomationTests;CardDeckProgressionTests
 
       - name: Upload test results
         if: always()

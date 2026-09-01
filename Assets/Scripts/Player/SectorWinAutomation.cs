@@ -3,6 +3,7 @@ using System.Text;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Player
@@ -104,6 +105,207 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"After TriggerGenerationEnd: BetweenRounds={gm.IsBetweenRounds}");
             sb.AppendLine(gm.IsBetweenRounds ? "RESULT: PASS" : "RESULT: FAIL (generation did not end)");
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Stricter live check: finish current sector, advance generation, unlock the next
+        /// map sector via Orbital Scan, and verify a Command Post + open solar pads exist
+        /// there so climate buildings remain placeable.
+        /// </summary>
+        public static string TryWinAndColonizeNextSector()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(Report());
+
+            if (!Application.isPlaying)
+            {
+                sb.AppendLine("RESULT: FAIL (not playing)");
+                return sb.ToString();
+            }
+
+            var gm = GenerationManager.Instance;
+            if (gm == null)
+            {
+                sb.AppendLine("RESULT: FAIL (no GenerationManager)");
+                return sb.ToString();
+            }
+
+            if (gm.IsExpansionPhase)
+            {
+                sb.AppendLine("RESULT: SKIP (already in expansion)");
+                return sb.ToString();
+            }
+
+            // --- Pad headroom before cheats ---
+            CountPads(out int solarOpen, out _, out int pairedPowered);
+            sb.AppendLine($"Precheck pads: openSolar={solarOpen} pairedWithSolar={pairedPowered}");
+            if (solarOpen < 1 && pairedPowered < 1)
+            {
+                sb.AppendLine("RESULT: FAIL (no open solar or powered paired pads — climate buildings softlocked)");
+                return sb.ToString();
+            }
+
+            if (!gm.IsBetweenRounds)
+            {
+                MeetCurrentSectorGoals(sb);
+                if (!gm.IsCurrentSectorRoundComplete())
+                {
+                    gm.CalculateCurrentSectorProgress(out string bottleneck);
+                    sb.AppendLine($"RESULT: FAIL (could not complete sector — bottleneck {bottleneck})");
+                    return sb.ToString();
+                }
+
+                gm.TriggerGenerationEnd();
+                sb.AppendLine($"Ended generation → BetweenRounds={gm.IsBetweenRounds}");
+            }
+
+            if (!gm.IsBetweenRounds)
+            {
+                sb.AppendLine("RESULT: FAIL (expected between-rounds after win)");
+                return sb.ToString();
+            }
+
+            int unlockedBefore = SectorManager.Instance != null
+                ? SectorManager.Instance.GetUnlockedSectorCount()
+                : 0;
+
+            gm.StartNextGeneration();
+            sb.AppendLine($"Started next → Gen={gm.CurrentGeneration} Expansion={gm.IsExpansionPhase} Unlocked={SectorManager.Instance?.GetUnlockedSectorCount()}");
+
+            if (gm.IsExpansionPhase)
+            {
+                // Final gen → expansion: still require exploration to open next sector.
+            }
+
+            if (!GenerationManager.CanUnlockNextMapSector())
+            {
+                sb.AppendLine("RESULT: FAIL (CanUnlockNextMapSector false after advancing)");
+                return sb.ToString();
+            }
+
+            var exploration = ExplorationManager.Instance;
+            if (exploration == null)
+            {
+                sb.AppendLine("RESULT: FAIL (no ExplorationManager)");
+                return sb.ToString();
+            }
+
+            // Ensure energy for the scan.
+            if (Supplies.Energy != null)
+            {
+                float energy = Supplies.Energy.TryGetValue(Owner.Player1, out float e) ? e : 0f;
+                if (energy < 10f) Supplies.UpdateEnergy(Owner.Player1, 50f);
+            }
+
+            bool scanned = exploration.TryOrbitalScan(Owner.Player1);
+            sb.AppendLine($"OrbitalScan success={scanned}");
+            if (!scanned)
+            {
+                sb.AppendLine("RESULT: FAIL (Orbital Scan did not unlock next sector)");
+                return sb.ToString();
+            }
+
+            int unlockedAfter = SectorManager.Instance.GetUnlockedSectorCount();
+            sb.AppendLine($"Unlocked sectors: {unlockedBefore} → {unlockedAfter}");
+            if (unlockedAfter <= unlockedBefore)
+            {
+                sb.AppendLine("RESULT: FAIL (unlocked sector count did not increase)");
+                return sb.ToString();
+            }
+
+            // Find newest unlocked sector and verify CP + solar pads.
+            SectorManager.Sector newest = null;
+            for (int i = SectorManager.Instance.Sectors.Count - 1; i >= 0; i--)
+            {
+                var s = SectorManager.Instance.Sectors[i];
+                if (s != null && !s.IsLocked && s.IsExplored)
+                {
+                    newest = s;
+                    if (i > 0) break; // prefer non-starting if available; keep last unlocked
+                }
+            }
+
+            // Prefer the active sector set by unlock.
+            newest = SectorManager.Instance.ActiveSector ?? newest;
+            if (newest == null)
+            {
+                sb.AppendLine("RESULT: FAIL (no active unlocked sector after scan)");
+                return sb.ToString();
+            }
+
+            bool hasCp = newest.IsOccupied || HasCommandPostInSector(newest);
+            CountPadsInSector(newest, out int sectorSolar, out _, out int sectorPowered);
+            sb.AppendLine($"New sector: occupied={newest.IsOccupied} hasCP={hasCp} openSolar={sectorSolar} pairedWithSolar={sectorPowered}");
+
+            if (!hasCp)
+            {
+                sb.AppendLine("RESULT: FAIL (no Command Post in newly unlocked sector after scan)");
+                return sb.ToString();
+            }
+
+            if (sectorSolar < 1)
+            {
+                sb.AppendLine("RESULT: FAIL (newly unlocked sector has no open solar pads)");
+                return sb.ToString();
+            }
+
+            // Solar card must be placeable now.
+            BuildingSO solarSO = BlueprintDraftManager.GetBuildingSOByName("Solar Panel");
+            string solarReason = solarSO == null ? "Solar Panel SO missing" : null;
+            bool solarCanBuild = solarSO != null &&
+                ReservedSiteBuildUtility.CanBuildAtReservedSite(solarSO, Owner.Player1, out solarReason, requireUnlocked: false);
+            sb.AppendLine($"Solar CanBuild={solarCanBuild} ({solarReason ?? "ok"})");
+            if (!solarCanBuild)
+            {
+                sb.AppendLine("RESULT: FAIL (Solar Panel still not placeable after colonization)");
+                return sb.ToString();
+            }
+
+            sb.AppendLine("RESULT: PASS");
+            return sb.ToString();
+        }
+
+        private static bool HasCommandPostInSector(SectorManager.Sector sector)
+        {
+            if (sector == null) return false;
+            foreach (var building in BaseBuilding.ActiveBuildings)
+            {
+                if (building == null || building.BuildingSO == null) continue;
+                if (!building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)) continue;
+                if (SectorManager.Instance.GetNearestSector(building.transform.position) == sector)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void CountPads(out int solarOpen, out int pairedOpen, out int pairedPoweredOpen)
+        {
+            solarOpen = pairedOpen = pairedPoweredOpen = 0;
+            if (SectorManager.Instance?.Sectors == null) return;
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector == null || sector.IsLocked || !sector.IsExplored) continue;
+                CountPadsInSector(sector, out int s, out int p, out int pw);
+                solarOpen += s;
+                pairedOpen += p;
+                pairedPoweredOpen += pw;
+            }
+        }
+
+        private static void CountPadsInSector(SectorManager.Sector sector, out int solarOpen, out int pairedOpen, out int pairedPoweredOpen)
+        {
+            solarOpen = pairedOpen = pairedPoweredOpen = 0;
+            if (sector?.BuildingClusters == null) return;
+            foreach (var cluster in sector.BuildingClusters)
+            {
+                if (cluster == null) continue;
+                if (cluster.CanPlaceSolar) solarOpen++;
+                if (cluster.BuildingSlot != null && !cluster.BuildingSlot.IsOccupied)
+                {
+                    pairedOpen++;
+                    if (cluster.SolarBuilding != null) pairedPoweredOpen++;
+                }
+            }
         }
 
         /// <summary>

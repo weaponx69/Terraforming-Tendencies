@@ -1,4 +1,3 @@
-#if UNITY_INCLUDE_TESTS
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
@@ -67,6 +66,27 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void HasUnclaimedUnlockedSector_DetectsEmptyCommandPostPad()
+        {
+            foreach (var existing in Object.FindObjectsByType<SectorManager>(FindObjectsInactive.Include))
+            {
+                Object.DestroyImmediate(existing.gameObject);
+            }
+
+            var smObj = new GameObject("SectorManager");
+            var sm = smObj.AddComponent<SectorManager>();
+            var sector = new SectorManager.Sector { IsLocked = false, IsExplored = true, IsOccupied = false };
+            var cpSite = new BuildingSiteSlot(BuildingSiteKind.CommandPost, Vector3.zero, sector);
+            sector.BuildingSites.Add(cpSite);
+            sm.Sectors = new System.Collections.Generic.List<SectorManager.Sector> { sector };
+
+            Assert.AreSame(sm, SectorManager.Instance, "Test SectorManager must be the active singleton.");
+            Assert.IsTrue(GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector());
+
+            Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
         public void AtmosphereAndWater_HaveDistinctColors()
         {
             Assert.AreNotEqual(
@@ -115,4 +135,3 @@ namespace GameDevTV.RTS.Tests
         }
     }
 }
-#endif
