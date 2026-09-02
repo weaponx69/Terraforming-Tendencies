@@ -186,6 +186,47 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void Gen2Progress_DoesNotCreditGen1TerraformingAfterBaselines()
+        {
+            var gmObj = new GameObject("GenerationManager");
+            var gm = gmObj.AddComponent<GenerationManager>();
+            var smObj = new GameObject("SectorManager");
+            var sm = smObj.AddComponent<SectorManager>();
+            sm.Sectors = new System.Collections.Generic.List<SectorManager.Sector>
+            {
+                new SectorManager.Sector { IsLocked = false, IsExplored = true, IsOccupied = true, CompletedGenerationRound = 1, TerraformingCompletionPercent = 1f },
+                new SectorManager.Sector { IsLocked = false, IsExplored = true, IsOccupied = true },
+            };
+            sm.ActiveSector = sm.Sectors[1];
+
+            typeof(GenerationManager).GetMethod(
+                    "InitializeDefaultMilestones",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(gm, null);
+
+            Supplies.UpdateTemperature(Owner.Player1, gm.GetTargetTemperature(1));
+            Supplies.UpdateAtmosphere(Owner.Player1, gm.GetTargetAtmosphere(1));
+            Supplies.UpdateWater(Owner.Player1, gm.GetTargetWater(1));
+
+            typeof(GenerationManager).GetField(
+                    "<CurrentGeneration>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.SetValue(gm, 2);
+
+            typeof(GenerationManager).GetMethod(
+                    "RecordBaselines",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(gm, null);
+
+            float progress = gm.CalculateCurrentSectorProgress(out string bottleneck);
+            Assert.Less(progress, 0.05f, $"Gen 2 should start at ~0% after gen 1 targets met; bottleneck={bottleneck}");
+            Assert.IsFalse(gm.IsCurrentSectorRoundComplete());
+
+            Object.DestroyImmediate(gmObj);
+            Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
         public void TerraformingCard_RelaxesAllMinClimateGatesWhenWaterGoalUnmet()
         {
             Supplies.Materials[Owner.Player1] = 9999;

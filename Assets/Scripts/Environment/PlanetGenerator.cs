@@ -93,8 +93,12 @@ namespace GameDevTV.RTS.Environment
             private void BakeAllNavMeshes()
             {
                 // Ensure physics system is aware of feature colliders before bake
-                Physics.SyncTransforms(); 
+                Physics.SyncTransforms();
 
+                var disabledBakeInterference = DisableNavMeshBakeInterferenceSources();
+
+                try
+                {
                 int agentTypeCount = NavMesh.GetSettingsCount();
 
                 // Create or find FlyZone child for Air Units
@@ -213,6 +217,38 @@ namespace GameDevTV.RTS.Environment
                 foreach (var renderer in tempRenderers)
                 {
                     renderer.enabled = false;
+                }
+                }
+                finally
+                {
+                    RestoreNavMeshBakeInterferenceSources(disabledBakeInterference);
+                }
+            }
+
+            /// <summary>
+            /// Screen-space / world TMP canvases use dynamic meshes that NavMeshSurface
+            /// (CollectObjects.All) cannot bake — disable them for the duration of the bake.
+            /// </summary>
+            private static System.Collections.Generic.List<Behaviour> DisableNavMeshBakeInterferenceSources()
+            {
+                var disabled = new System.Collections.Generic.List<Behaviour>();
+                foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include))
+                {
+                    if (canvas == null || !canvas.enabled) continue;
+                    canvas.enabled = false;
+                    disabled.Add(canvas);
+                }
+
+                return disabled;
+            }
+
+            private static void RestoreNavMeshBakeInterferenceSources(System.Collections.Generic.List<Behaviour> disabled)
+            {
+                if (disabled == null) return;
+                foreach (var behaviour in disabled)
+                {
+                    if (behaviour != null)
+                        behaviour.enabled = true;
                 }
             }
 

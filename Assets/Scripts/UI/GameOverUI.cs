@@ -8,25 +8,19 @@ namespace GameDevTV.RTS.UI
 {
     /// <summary>
     /// Listens for GameOverManager.OnGameOver and reveals a full-screen overlay.
-    ///
-    /// Wire in Inspector:
-    ///   - overlayPanel     : a Canvas > Panel (CanvasGroup for fade)
-    ///   - headlineText     : "MISSION FAILED" TextMeshProUGUI
-    ///   - reasonText       : subtitle TextMeshProUGUI
-    ///   - restartButton    : Button that reloads the active scene
-    ///   - quitButton       : Button that quits the application
-    ///
-    /// The panel should start INACTIVE in the scene so it's hidden until triggered.
+    /// Keep this component on an always-active object (e.g. Game Over Canvas root).
+    /// Hiding the overlay must not disable this behaviour or event subscriptions are lost.
     /// </summary>
     public class GameOverUI : MonoBehaviour
     {
-        // ── Inspector ──────────────────────────────────────────────────────────────
         [Header("Overlay Panel")]
         [SerializeField] private GameObject overlayPanel;
         [SerializeField] private CanvasGroup canvasGroup;
         [SerializeField] private float fadeDuration = 1.2f;
 
-        public bool IsVisible => overlayPanel != null && overlayPanel.activeInHierarchy;
+        public bool IsVisible =>
+            canvasGroup != null && canvasGroup.alpha > 0.01f && canvasGroup.blocksRaycasts
+            || (overlayPanel != null && overlayPanel.activeInHierarchy);
 
         [Header("Text")]
         [SerializeField] private TextMeshProUGUI headlineText;
@@ -36,24 +30,38 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private Button restartButton;
         [SerializeField] private Button quitButton;
 
-        // ── Lifecycle ──────────────────────────────────────────────────────────────
+        public static void EnsureAllSubscribed()
+        {
+            var uis = Resources.FindObjectsOfTypeAll<GameOverUI>();
+            foreach (var ui in uis)
+            {
+                if (ui == null || ui.gameObject.scene.name == null) continue;
+                ui.ActivateHierarchy();
+                ui.ResolveReferences();
+                ui.EnsureSubscribed();
+            }
+        }
+
+        private void Awake()
+        {
+            ResolveReferences();
+            EnsureSubscribed();
+        }
+
         private void OnEnable()
         {
-            Debug.Log("[GameOverUI] OnEnable called. Subscribing to GameOverManager events.");
-            GameOverManager.OnGameOver += HandleGameOver;
-            GameOverManager.OnVictory += HandleVictory;
+            EnsureSubscribed();
         }
 
         private void OnDisable()
         {
-            Debug.Log("[GameOverUI] OnDisable called. Stack trace:\n" + System.Environment.StackTrace);
             GameOverManager.OnGameOver -= HandleGameOver;
             GameOverManager.OnVictory -= HandleVictory;
         }
 
         private void Start()
         {
-            if (overlayPanel != null) overlayPanel.SetActive(false);
+            SetPanelHidden();
 
             if (restartButton != null)
                 restartButton.onClick.AddListener(RestartScene);
@@ -62,7 +70,70 @@ namespace GameDevTV.RTS.UI
                 quitButton.onClick.AddListener(QuitGame);
         }
 
-        // ── Handlers ────────────────────────────────────────────────────────────────
+        public void ActivateHierarchy()
+        {
+            Transform current = transform;
+            while (current != null)
+            {
+                if (!current.gameObject.activeSelf)
+                    current.gameObject.SetActive(true);
+                current = current.parent;
+            }
+
+            gameObject.SetActive(true);
+        }
+
+        public void EnsureSubscribed()
+        {
+            GameOverManager.OnGameOver -= HandleGameOver;
+            GameOverManager.OnGameOver += HandleGameOver;
+            GameOverManager.OnVictory -= HandleVictory;
+            GameOverManager.OnVictory += HandleVictory;
+        }
+
+        private void ResolveReferences()
+        {
+            if (overlayPanel == null)
+            {
+                var t = transform.Find("Game Over Panel");
+                if (t == null) t = transform.Find("Panel");
+                if (t == null) t = transform.Find("Overlay Panel");
+                if (t != null) overlayPanel = t.gameObject;
+            }
+
+            if (canvasGroup == null)
+            {
+                if (overlayPanel != null)
+                    canvasGroup = overlayPanel.GetComponent<CanvasGroup>();
+                if (canvasGroup == null)
+                    canvasGroup = GetComponent<CanvasGroup>();
+            }
+
+            if (headlineText == null || reasonText == null || restartButton == null)
+            {
+                var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (var text in texts)
+                {
+                    if (headlineText == null && text.name.Contains("Headline", System.StringComparison.OrdinalIgnoreCase))
+                        headlineText = text;
+                    if (reasonText == null && text.name.Contains("Reason", System.StringComparison.OrdinalIgnoreCase))
+                        reasonText = text;
+                }
+            }
+
+            if (restartButton == null || quitButton == null)
+            {
+                var buttons = GetComponentsInChildren<Button>(true);
+                foreach (var button in buttons)
+                {
+                    if (restartButton == null && button.name.Contains("Restart", System.StringComparison.OrdinalIgnoreCase))
+                        restartButton = button;
+                    if (quitButton == null && button.name.Contains("Quit", System.StringComparison.OrdinalIgnoreCase))
+                        quitButton = button;
+                }
+            }
+        }
+
         private void HandleVictory()
         {
             if (headlineText != null)
@@ -106,26 +177,44 @@ namespace GameDevTV.RTS.UI
         private void ShowGameOverUI()
         {
             Debug.Log("[GameOverUI] Showing Game Over UI. Panel: " + (overlayPanel != null ? overlayPanel.name : "NULL"));
-            if (overlayPanel != null)
+            ActivateHierarchy();
+
+            if (overlayPanel != null && overlayPanel != gameObject)
                 overlayPanel.SetActive(true);
 
-            // Pause the simulation
+            if (canvasGroup != null)
+            {
+                canvasGroup.blocksRaycasts = true;
+                canvasGroup.interactable = true;
+            }
+
             Time.timeScale = 0f;
 
-            // Fade in
             if (canvasGroup != null)
                 StartCoroutine(FadeIn());
             else
                 Debug.LogWarning("[GameOverUI] CanvasGroup is null, no fade will occur.");
         }
 
-        // ── Helpers ────────────────────────────────────────────────────────────────
+        private void SetPanelHidden()
+        {
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 0f;
+                canvasGroup.blocksRaycasts = false;
+                canvasGroup.interactable = false;
+                return;
+            }
+
+            if (overlayPanel != null && overlayPanel != gameObject)
+                overlayPanel.SetActive(false);
+        }
+
         private IEnumerator FadeIn()
         {
             canvasGroup.alpha = 0f;
             float elapsed = 0f;
 
-            // Use unscaled time so the fade still runs after Time.timeScale = 0
             while (elapsed < fadeDuration)
             {
                 elapsed += Time.unscaledDeltaTime;

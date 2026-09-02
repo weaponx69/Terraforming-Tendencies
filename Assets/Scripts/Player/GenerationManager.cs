@@ -95,6 +95,9 @@ namespace GameDevTV.RTS.Player
         private float baselinePower = 0f;
         private float baselineOxygen = 0f;
         private float baselinePopulation = 0f;
+        private float baselineTemperature = -60f;
+        private float baselineAtmosphere = 0.01f;
+        private float baselineWater = 0f;
 
         public static event Action<int, int> OnGenerationStarted; // current, max
         public static event Action<int, int> OnGenerationEnded;   // earnedTC, totalTC
@@ -181,34 +184,26 @@ namespace GameDevTV.RTS.Player
                 };
             }
 
-            // Dynamically scale the Oxygen and Biomass milestone targets to (100% / number of sectors) * unlocked sectors count
+            // Milestone primary targets are an incremental slice per generation round,
+            // not a cumulative total that jumps when another sector unlocks.
             if (SectorManager.Instance != null && SectorManager.Instance.Sectors != null && SectorManager.Instance.Sectors.Count > 0)
             {
-                int unlockedCount = 0;
-                foreach (var sector in SectorManager.Instance.Sectors)
-                {
-                    if (sector != null && !sector.IsLocked)
-                    {
-                        unlockedCount++;
-                    }
-                }
-                unlockedCount = Mathf.Max(1, unlockedCount);
-
-                float targetValue = (100f / SectorManager.Instance.Sectors.Count) * unlockedCount;
+                int totalSectors = SectorManager.Instance.Sectors.Count;
+                float slicePerSector = 100f / totalSectors;
                 for (int i = 0; i < milestones.Count; i++)
                 {
                     if (milestones[i].Type == MilestoneType.Oxygen)
                     {
                         var m = milestones[i];
-                        m.TargetValue = targetValue;
-                        m.GoalDescription = $"Reach {targetValue:F0}% Atmospheric Oxygen";
+                        m.TargetValue = slicePerSector;
+                        m.GoalDescription = $"Raise oxygen by {slicePerSector:F0}% this sector";
                         milestones[i] = m;
                     }
                     else if (milestones[i].Type == MilestoneType.Biomass)
                     {
                         var m = milestones[i];
-                        m.TargetValue = targetValue;
-                        m.GoalDescription = $"Reach {targetValue:F0}% Biomass";
+                        m.TargetValue = slicePerSector;
+                        m.GoalDescription = $"Raise biomass by {slicePerSector:F0}% this sector";
                         milestones[i] = m;
                     }
                 }
@@ -232,6 +227,36 @@ namespace GameDevTV.RTS.Player
             baselinePopulation = 0f;
             if (Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int pop))
                 baselinePopulation = pop;
+
+            baselineTemperature = -60f;
+            if (Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float temp))
+                baselineTemperature = temp;
+
+            baselineAtmosphere = 0.01f;
+            if (Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float atmos))
+                baselineAtmosphere = atmos;
+
+            baselineWater = 0f;
+            if (Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float water))
+                baselineWater = water;
+        }
+
+        /// <summary>Progress toward target from the round-start baseline (0–1).</summary>
+        private static float IncrementalProgress(float current, float baseline, float target)
+        {
+            float delta = target - baseline;
+            if (Mathf.Abs(delta) <= 0.0001f)
+                return current >= target - 0.0001f ? 1f : 0f;
+            return Mathf.Clamp01((current - baseline) / delta);
+        }
+
+        private void MarkActiveSectorRoundComplete()
+        {
+            if (SectorManager.Instance?.ActiveSector == null) return;
+            var sector = SectorManager.Instance.ActiveSector;
+            sector.TerraformingCompletionPercent = 1f;
+            sector.CompletedGenerationRound = CurrentGeneration;
+            Debug.Log($"[GenerationManager] Sector at {sector.Center} marked complete for generation {CurrentGeneration}.");
         }
 
         private void Update()
@@ -265,6 +290,8 @@ namespace GameDevTV.RTS.Player
             Time.timeScale = 0f;
 
             Debug.Log($"[GenerationManager] Generation {CurrentGeneration} ended. Earned {earnedTC} TC. Total TC: {TotalTerraCoins}");
+
+            MarkActiveSectorRoundComplete();
             
             // Robust auto-activation of any GenerationSummaryUI in the scene
             var summaryUIs = Resources.FindObjectsOfTypeAll<GameDevTV.RTS.UI.Containers.GenerationSummaryUI>();
@@ -328,21 +355,15 @@ namespace GameDevTV.RTS.Player
 
             float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
             float targetTemp = GetTargetTemperature(CurrentGeneration);
-            float tempDenom = targetTemp - (-60f);
-            float tempProgress = tempDenom > 0f
-                ? Mathf.Clamp01((currentTemp - (-60f)) / tempDenom)
-                : 1f;
+            float tempProgress = IncrementalProgress(currentTemp, baselineTemperature, targetTemp);
 
             float currentAtmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
             float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
-            float atmosDenom = targetAtmos - 0.01f;
-            float atmosProgress = atmosDenom > 0f
-                ? Mathf.Clamp01((currentAtmos - 0.01f) / atmosDenom)
-                : 1f;
+            float atmosProgress = IncrementalProgress(currentAtmos, baselineAtmosphere, targetAtmos);
 
             float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
             float targetWater = GetTargetWater(CurrentGeneration);
-            float waterProgress = targetWater > 0f ? Mathf.Clamp01(currentWater / targetWater) : 1f;
+            float waterProgress = IncrementalProgress(currentWater, baselineWater, targetWater);
 
             float progress = Mathf.Min(primaryProgress, Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress)));
 
@@ -686,9 +707,12 @@ namespace GameDevTV.RTS.Player
             float targetAtmos = Instance != null ? Instance.GetTargetAtmosphere(generation) : 0.25f * generation;
             float targetWater = Instance != null ? Instance.GetTargetWater(generation) : 10f * generation - 5f;
 
-            if (goal == "TEMPERATURE") return temp < targetTemp;
-            if (goal == "ATMOSPHERE") return atmos < targetAtmos;
-            if (goal == "WATER") return water < targetWater;
+            if (goal == "TEMPERATURE")
+                return Instance != null && IncrementalProgress(temp, Instance.baselineTemperature, targetTemp) < 1f;
+            if (goal == "ATMOSPHERE")
+                return Instance != null && IncrementalProgress(atmos, Instance.baselineAtmosphere, targetAtmos) < 1f;
+            if (goal == "WATER")
+                return Instance != null && IncrementalProgress(water, Instance.baselineWater, targetWater) < 1f;
 
             MilestoneType type = Instance != null ? Instance.CurrentMilestoneType : MilestoneType.Biomass;
             float target = Instance != null ? Instance.CurrentMilestoneTarget : 25f;
@@ -716,27 +740,29 @@ namespace GameDevTV.RTS.Player
             switch (type)
             {
                 case MilestoneType.Biomass:
-                    return Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float bio) ? bio : 0f;
+                {
+                    float bio = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float b) ? b : 0f;
+                    return bio - Instance.baselineBiomass;
+                }
                 case MilestoneType.Oxygen:
-                    return Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float ox) ? ox : 0f;
+                {
+                    float ox = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
+                    return ox - Instance.baselineOxygen;
+                }
                 case MilestoneType.Power:
+                {
                     float power = Supplies.Power != null && Supplies.Power.TryGetValue(Owner.Player1, out float pow) ? pow : 0f;
                     return power - Instance.baselinePower;
+                }
                 case MilestoneType.Population:
+                {
                     float pop = Supplies.Population != null && Supplies.Population.TryGetValue(Owner.Player1, out int p) ? p : 0f;
                     return pop - Instance.baselinePopulation;
+                }
                 case MilestoneType.CommandPosts:
-                    int cpCount = 0;
-                    foreach (var building in BaseBuilding.ActiveBuildings)
-                    {
-                        if (building != null && building.BuildingSO != null &&
-                            building.BuildingSO.Name.Contains("Command", StringComparison.OrdinalIgnoreCase) &&
-                            building.Progress.State == BuildingProgress.BuildingState.Completed)
-                        {
-                            cpCount++;
-                        }
-                    }
-                    return cpCount;
+                    if (SectorManager.Instance?.ActiveSector != null && SectorManager.Instance.ActiveSector.IsOccupied)
+                        return 1f;
+                    return 0f;
                 default:
                     return 0f;
             }

@@ -2,6 +2,7 @@ using System.Collections;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 
@@ -95,7 +96,8 @@ namespace GameDevTV.RTS.Player
         {
             isPlanetGenerated = true;
             Debug.Log("[GameOverManager] Planet generation detected. Monitoring for loss conditions.");
-            
+            GameOverUI.EnsureAllSubscribed();
+
             CancelInvoke(nameof(CheckNoRecovery));
             InvokeRepeating(nameof(CheckNoRecovery), 30f, checkInterval);
         }
@@ -219,6 +221,7 @@ namespace GameDevTV.RTS.Player
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
+            if (!AnyCommandPostsExist()) return;
             CheckNoRecovery();
         }
 
@@ -226,6 +229,7 @@ namespace GameDevTV.RTS.Player
         {
             if (isQuitting || gameOverTriggered || !isPlanetGenerated) return;
             if (GenerationManager.Instance == null || GenerationManager.Instance.IsBetweenRounds || GenerationManager.Instance.IsExpansionPhase) return;
+            if (!AnyCommandPostsExist()) return;
 
             if (Supplies.Materials == null)
             {
@@ -329,6 +333,14 @@ namespace GameDevTV.RTS.Player
             Debug.Log($"[GameOverManager] TriggerGameOver called. Reason: {reason}. Initializing shutdown sequence...");
             
             CancelInvoke(nameof(CheckNoRecovery));
+
+            GameOverUI.EnsureAllSubscribed();
+            var gameOverUIs = Resources.FindObjectsOfTypeAll<GameDevTV.RTS.UI.GameOverUI>();
+            foreach (var ui in gameOverUIs)
+            {
+                if (ui == null || ui.gameObject == null || ui.gameObject.scene.name == null) continue;
+                ui.ActivateHierarchy();
+            }
             
             // Note: We don't stop ALL coroutines here to avoid breaking UI transitions 
             // that might be running on this object.
