@@ -357,17 +357,44 @@ namespace GameDevTV.RTS.Utilities
 
         private static Vector3 SnapToNavMesh(Vector3 approximate)
         {
+            Vector3 grounded = SnapToGround(approximate);
+
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             {
                 agentTypeID = 0,
                 areaMask = UnityEngine.AI.NavMesh.AllAreas
             };
-            if (UnityEngine.AI.NavMesh.SamplePosition(approximate, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+            if (UnityEngine.AI.NavMesh.SamplePosition(grounded, out UnityEngine.AI.NavMeshHit navHit, 8f, filter))
             {
-                return navHit.position;
+                // Prefer NavMesh XZ, but never adopt an elevated/air sample — that leaves
+                // buildings (esp. Oxygen Processor) hovering above the terrain.
+                Vector3 navPos = navHit.position;
+                if (Mathf.Abs(navPos.y - grounded.y) <= 1.25f)
+                    return new Vector3(navPos.x, grounded.y, navPos.z);
             }
 
-            return approximate;
+            return grounded;
+        }
+
+        private static Vector3 SnapToGround(Vector3 approximate)
+        {
+            Vector3 origin = approximate + Vector3.up * 80f;
+            int mask = LayerMask.GetMask("Default", "Terrain");
+            if (mask == 0) mask = Physics.DefaultRaycastLayers;
+
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 200f, mask, QueryTriggerInteraction.Ignore))
+            {
+                return hit.point;
+            }
+
+            // Fallback: unrestricted raycast, but reject hits that are clearly elevated meshes.
+            if (Physics.Raycast(origin, Vector3.down, out hit, 200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.point.y <= approximate.y + 2f)
+                    return hit.point;
+            }
+
+            return new Vector3(approximate.x, approximate.y, approximate.z);
         }
 
         private static bool HasEnoughMaterials(BuildingSO building, Owner owner)

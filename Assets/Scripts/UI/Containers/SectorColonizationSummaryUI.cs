@@ -1,8 +1,8 @@
-using GameDevTV.RTS.Environment;
+using System.Collections;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Utilities;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI.Containers
@@ -10,6 +10,7 @@ namespace GameDevTV.RTS.UI.Containers
     /// <summary>
     /// Shown after the generation summary when advancing to the next round.
     /// Confirms that the closest sector will receive an auto-built Command Post.
+    /// Uses its own overlay Canvas so other UI cannot steal clicks while paused.
     /// </summary>
     public class SectorColonizationSummaryUI : MonoBehaviour
     {
@@ -19,6 +20,7 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private Button primaryButton;
         [SerializeField] private TextMeshProUGUI primaryButtonLabel;
 
+        private Canvas overlayCanvas;
         private bool _hasAdvancedGeneration;
         private bool _showRequested;
 
@@ -45,6 +47,23 @@ namespace GameDevTV.RTS.UI.Containers
             BindPrimaryButton();
         }
 
+        private void Update()
+        {
+            // timeScale is 0 during this overlay — still allow Enter/Space/click via unscaled input.
+            if (!IsVisible) return;
+
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            {
+                OnPrimaryClicked();
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0) && primaryButton != null && IsPointerOverPrimaryButton())
+            {
+                OnPrimaryClicked();
+            }
+        }
+
         public void ShowAfterGenerationSummary()
         {
             _showRequested = true;
@@ -52,11 +71,11 @@ namespace GameDevTV.RTS.UI.Containers
             ActivateHierarchy();
             EnsurePanelBuilt();
             BindPrimaryButton();
+            EnsureEventSystem();
             Time.timeScale = 0f;
             ShowPreview();
         }
 
-        /// <summary>Deferred show avoids Start() on a freshly created instance hiding the panel.</summary>
         public void ShowAfterGenerationSummaryDeferred(MonoBehaviour host)
         {
             if (host != null && host.isActiveAndEnabled)
@@ -65,7 +84,7 @@ namespace GameDevTV.RTS.UI.Containers
                 ShowAfterGenerationSummary();
         }
 
-        private System.Collections.IEnumerator ShowAfterGenerationSummaryNextFrame()
+        private IEnumerator ShowAfterGenerationSummaryNextFrame()
         {
             yield return null;
             ShowAfterGenerationSummary();
@@ -116,11 +135,8 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             SetPrimaryButtonLabel(preview.WillColonize ? "Deploy Command Post" : "Continue");
-            if (panel != null)
-            {
-                panel.transform.SetAsLastSibling();
-                panel.SetActive(true);
-            }
+            BringToFront();
+            if (panel != null) panel.SetActive(true);
 
             Debug.Log($"[SectorColonizationSummaryUI] Preview shown. WillColonize={preview.WillColonize} " +
                       $"TargetSector={preview.TargetSectorIndex} Visible={IsVisible}");
@@ -175,6 +191,7 @@ namespace GameDevTV.RTS.UI.Containers
             SetPrimaryButtonLabel(gm.IsExpansionPhase
                 ? "Begin Expansion"
                 : $"Continue to Generation {gm.CurrentGeneration}");
+            BringToFront();
         }
 
         private void OnPrimaryClicked()
@@ -200,7 +217,6 @@ namespace GameDevTV.RTS.UI.Containers
             Hide();
         }
 
-        /// <summary>Automation hook for Play Mode bots (invokes the primary button path).</summary>
         public void InvokePrimaryAction()
         {
             OnPrimaryClicked();
@@ -209,6 +225,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void Hide()
         {
             if (panel != null) panel.SetActive(false);
+            if (overlayCanvas != null) overlayCanvas.gameObject.SetActive(false);
         }
 
         private void SetPrimaryButtonLabel(string label)
@@ -236,29 +253,75 @@ namespace GameDevTV.RTS.UI.Containers
             gameObject.SetActive(true);
         }
 
+        private void BringToFront()
+        {
+            if (overlayCanvas != null)
+            {
+                overlayCanvas.gameObject.SetActive(true);
+                overlayCanvas.sortingOrder = 5000;
+            }
+
+            if (panel != null)
+                panel.transform.SetAsLastSibling();
+
+            if (primaryButton != null)
+                primaryButton.transform.SetAsLastSibling();
+        }
+
         private void BindPrimaryButton()
         {
             if (primaryButton == null) return;
             primaryButton.onClick.RemoveListener(OnPrimaryClicked);
             primaryButton.onClick.AddListener(OnPrimaryClicked);
+            primaryButton.interactable = true;
+        }
+
+        private bool IsPointerOverPrimaryButton()
+        {
+            if (primaryButton == null) return false;
+            var rt = primaryButton.transform as RectTransform;
+            if (rt == null) return false;
+
+            Canvas canvas = overlayCanvas != null
+                ? overlayCanvas
+                : primaryButton.GetComponentInParent<Canvas>();
+            Camera eventCam = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+            return RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition, eventCam);
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (EventSystem.current != null) return;
+            var es = new GameObject("EventSystem");
+            es.AddComponent<EventSystem>();
+            es.AddComponent<StandaloneInputModule>();
         }
 
         private void EnsurePanelBuilt()
         {
             if (panel != null && titleText != null && bodyText != null && primaryButton != null)
-                return;
-
-            Canvas canvas = Object.FindAnyObjectByType<Canvas>();
-            if (canvas == null)
             {
-                Debug.LogError("[SectorColonizationSummaryUI] No Canvas found — cannot build colonization summary UI.");
+                BringToFront();
                 return;
+            }
+
+            if (overlayCanvas == null)
+            {
+                var canvasGo = new GameObject("Sector Colonization Overlay Canvas");
+                canvasGo.transform.SetParent(transform, false);
+                overlayCanvas = canvasGo.AddComponent<Canvas>();
+                overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                overlayCanvas.sortingOrder = 5000;
+                canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                canvasGo.AddComponent<GraphicRaycaster>();
             }
 
             if (panel == null)
             {
                 panel = new GameObject("Sector Colonization Summary Panel");
-                panel.transform.SetParent(canvas.transform, false);
+                panel.transform.SetParent(overlayCanvas.transform, false);
 
                 var panelRt = panel.AddComponent<RectTransform>();
                 panelRt.anchorMin = Vector2.zero;
@@ -290,6 +353,7 @@ namespace GameDevTV.RTS.UI.Containers
 
                     var cardImage = cardGo.AddComponent<Image>();
                     cardImage.color = new Color(0.08f, 0.12f, 0.18f, 0.96f);
+                    cardImage.raycastTarget = true;
                 }
                 else
                 {
@@ -303,8 +367,8 @@ namespace GameDevTV.RTS.UI.Containers
 
                 if (bodyText == null)
                     bodyText = CreateText(cardGo.transform, "Body", 24, FontStyles.Normal,
-                        new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                        new Vector2(0f, 20f), new Vector2(680f, 250f), TextAlignmentOptions.TopLeft);
+                        new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.5f),
+                        new Vector2(0f, 10f), new Vector2(680f, 200f), TextAlignmentOptions.TopLeft);
 
                 if (primaryButton == null)
                 {
@@ -315,17 +379,21 @@ namespace GameDevTV.RTS.UI.Containers
                     buttonRt.anchorMax = new Vector2(0.5f, 0f);
                     buttonRt.pivot = new Vector2(0.5f, 0f);
                     buttonRt.anchoredPosition = new Vector2(0f, 28f);
-                    buttonRt.sizeDelta = new Vector2(320f, 56f);
+                    buttonRt.sizeDelta = new Vector2(360f, 64f);
 
                     var buttonImage = buttonGo.AddComponent<Image>();
                     buttonImage.color = new Color(0.16f, 0.55f, 0.35f, 1f);
+                    buttonImage.raycastTarget = true;
                     primaryButton = buttonGo.AddComponent<Button>();
+                    primaryButton.targetGraphic = buttonImage;
 
                     primaryButtonLabel = CreateText(buttonGo.transform, "Label", 24, FontStyles.Bold,
                         Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
                         Vector2.zero, Vector2.zero, TextAlignmentOptions.Center);
                 }
             }
+
+            BringToFront();
         }
 
         private static TextMeshProUGUI CreateText(
@@ -360,6 +428,8 @@ namespace GameDevTV.RTS.UI.Containers
             text.alignment = alignment;
             text.color = Color.white;
             text.textWrappingMode = TextWrappingModes.Normal;
+            // Critical: TMP defaults to raycastTarget=true and will steal clicks from the button.
+            text.raycastTarget = false;
             return text;
         }
     }

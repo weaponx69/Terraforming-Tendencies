@@ -19,8 +19,8 @@ namespace GameDevTV.RTS.UI
         [SerializeField] private float fadeDuration = 1.2f;
 
         public bool IsVisible =>
-            canvasGroup != null && canvasGroup.alpha > 0.01f && canvasGroup.blocksRaycasts
-            || (overlayPanel != null && overlayPanel.activeInHierarchy);
+            (canvasGroup != null && canvasGroup.alpha > 0.01f && canvasGroup.blocksRaycasts)
+            || (canvasGroup == null && overlayPanel != null && overlayPanel.activeInHierarchy);
 
         [Header("Text")]
         [SerializeField] private TextMeshProUGUI headlineText;

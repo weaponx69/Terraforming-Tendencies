@@ -784,8 +784,11 @@ namespace GameDevTV.RTS.Environment
                 private Vector3 SnapSitePosition(Vector3 approximate)
                 {
                     Vector3 pos = approximate;
-                    if (Physics.Raycast(pos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f,
-                            LayerMask.GetMask("Default", "Terrain")))
+                    int mask = LayerMask.GetMask("Default", "Terrain");
+                    if (mask == 0) mask = Physics.DefaultRaycastLayers;
+
+                    if (Physics.Raycast(pos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f, mask,
+                            QueryTriggerInteraction.Ignore))
                     {
                         pos = hit.point;
                     }
@@ -795,9 +798,10 @@ namespace GameDevTV.RTS.Environment
                         agentTypeID = 0,
                         areaMask = UnityEngine.AI.NavMesh.AllAreas
                     };
-                    if (UnityEngine.AI.NavMesh.SamplePosition(pos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+                    if (UnityEngine.AI.NavMesh.SamplePosition(pos, out UnityEngine.AI.NavMeshHit navHit, 8f, filter))
                     {
-                        pos = navHit.position;
+                        // Keep terrain Y so pads never sit on elevated / air bake samples.
+                        pos = new Vector3(navHit.position.x, pos.y, navHit.position.z);
                     }
 
                     return pos;
