@@ -20,10 +20,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             Debug.Log("[GenerationSummaryUI] OnEnable called. Subscribing to OnGenerationEnded.");
             GenerationManager.OnGenerationEnded += ShowSummary;
-            if (nextGenerationButton != null)
-            {
-                nextGenerationButton.onClick.AddListener(OnNextClicked);
-            }
+            EnsureButtonBindings();
             if (viewTechTreeButton != null)
             {
                 viewTechTreeButton.onClick.AddListener(OnViewTechTreeClicked);
@@ -95,6 +92,7 @@ namespace GameDevTV.RTS.UI.Containers
                     }
                 }
             }
+            EnsureButtonBindings();
         }
 
         private void Start()
@@ -110,6 +108,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void ShowSummary(int earnedTC, int totalTC)
         {
             Debug.Log($"[GenerationSummaryUI] ShowSummary called! Earned TC: {earnedTC}, Total: {totalTC}");
+            EnsureButtonBindings();
             if (panel != null) 
             {
                 panel.SetActive(true);
@@ -140,8 +139,36 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void OnNextClicked()
         {
+            Debug.Log("[GenerationSummaryUI] Continue clicked — opening colonization confirmation.");
             if (panel != null) panel.SetActive(false);
-            SectorColonizationSummaryUI.EnsureInstance().ShowAfterGenerationSummary();
+            SectorColonizationSummaryUI.EnsureInstance().ShowAfterGenerationSummaryDeferred(this);
+        }
+
+        private void EnsureButtonBindings()
+        {
+            if (nextGenerationButton == null)
+            {
+                var buttons = GetComponentsInChildren<Button>(true);
+                foreach (var b in buttons)
+                {
+                    if (b.name.Contains("Next", System.StringComparison.OrdinalIgnoreCase) ||
+                        b.name.Contains("Gen", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        nextGenerationButton = b;
+                        break;
+                    }
+                }
+            }
+
+            if (nextGenerationButton != null)
+            {
+                nextGenerationButton.onClick.RemoveListener(OnNextClicked);
+                nextGenerationButton.onClick.AddListener(OnNextClicked);
+            }
+            else
+            {
+                Debug.LogWarning("[GenerationSummaryUI] Next generation button not found — colonization flow unavailable.");
+            }
         }
 
         private void OnViewTechTreeClicked()

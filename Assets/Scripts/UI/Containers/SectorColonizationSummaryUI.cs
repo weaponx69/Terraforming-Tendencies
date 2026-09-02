@@ -20,40 +20,55 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private TextMeshProUGUI primaryButtonLabel;
 
         private bool _hasAdvancedGeneration;
+        private bool _showRequested;
 
         public bool IsVisible => panel != null && panel.activeInHierarchy;
 
         public static SectorColonizationSummaryUI EnsureInstance()
         {
             var existing = Object.FindAnyObjectByType<SectorColonizationSummaryUI>(FindObjectsInactive.Include);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                existing.ActivateHierarchy();
+                return existing;
+            }
 
             var controller = new GameObject("Sector Colonization Summary UI Controller");
-            return controller.AddComponent<SectorColonizationSummaryUI>();
+            var ui = controller.AddComponent<SectorColonizationSummaryUI>();
+            ui.ActivateHierarchy();
+            return ui;
         }
 
         private void Awake()
         {
             EnsurePanelBuilt();
-            if (primaryButton != null)
-            {
-                primaryButton.onClick.RemoveListener(OnPrimaryClicked);
-                primaryButton.onClick.AddListener(OnPrimaryClicked);
-            }
-        }
-
-        private void Start()
-        {
-            if (panel != null) panel.SetActive(false);
+            BindPrimaryButton();
         }
 
         public void ShowAfterGenerationSummary()
         {
-            EnsurePanelBuilt();
+            _showRequested = true;
             _hasAdvancedGeneration = false;
             ActivateHierarchy();
+            EnsurePanelBuilt();
+            BindPrimaryButton();
             Time.timeScale = 0f;
             ShowPreview();
+        }
+
+        /// <summary>Deferred show avoids Start() on a freshly created instance hiding the panel.</summary>
+        public void ShowAfterGenerationSummaryDeferred(MonoBehaviour host)
+        {
+            if (host != null && host.isActiveAndEnabled)
+                host.StartCoroutine(ShowAfterGenerationSummaryNextFrame());
+            else
+                ShowAfterGenerationSummary();
+        }
+
+        private System.Collections.IEnumerator ShowAfterGenerationSummaryNextFrame()
+        {
+            yield return null;
+            ShowAfterGenerationSummary();
         }
 
         private void ShowPreview()
@@ -101,7 +116,14 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             SetPrimaryButtonLabel(preview.WillColonize ? "Deploy Command Post" : "Continue");
-            if (panel != null) panel.SetActive(true);
+            if (panel != null)
+            {
+                panel.transform.SetAsLastSibling();
+                panel.SetActive(true);
+            }
+
+            Debug.Log($"[SectorColonizationSummaryUI] Preview shown. WillColonize={preview.WillColonize} " +
+                      $"TargetSector={preview.TargetSectorIndex} Visible={IsVisible}");
         }
 
         private void ShowVerification()
@@ -178,6 +200,12 @@ namespace GameDevTV.RTS.UI.Containers
             Hide();
         }
 
+        /// <summary>Automation hook for Play Mode bots (invokes the primary button path).</summary>
+        public void InvokePrimaryAction()
+        {
+            OnPrimaryClicked();
+        }
+
         private void Hide()
         {
             if (panel != null) panel.SetActive(false);
@@ -208,6 +236,13 @@ namespace GameDevTV.RTS.UI.Containers
             gameObject.SetActive(true);
         }
 
+        private void BindPrimaryButton()
+        {
+            if (primaryButton == null) return;
+            primaryButton.onClick.RemoveListener(OnPrimaryClicked);
+            primaryButton.onClick.AddListener(OnPrimaryClicked);
+        }
+
         private void EnsurePanelBuilt()
         {
             if (panel != null && titleText != null && bodyText != null && primaryButton != null)
@@ -233,7 +268,11 @@ namespace GameDevTV.RTS.UI.Containers
 
                 var dimmer = panel.AddComponent<Image>();
                 dimmer.color = new Color(0f, 0f, 0f, 0.72f);
+                dimmer.raycastTarget = true;
             }
+
+            if (panel != null && !_showRequested)
+                panel.SetActive(false);
 
             if (titleText == null || bodyText == null || primaryButton == null)
             {

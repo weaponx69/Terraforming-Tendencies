@@ -44,6 +44,12 @@ namespace GameDevTV.RTS.Utilities
                 if (summary != null && summary.IsVisible) return true;
             }
 
+            var colonizationSummaries = Object.FindObjectsByType<SectorColonizationSummaryUI>(FindObjectsInactive.Exclude);
+            foreach (var colonization in colonizationSummaries)
+            {
+                if (colonization != null && colonization.IsVisible) return true;
+            }
+
             var discoveries = Object.FindObjectsByType<ExplorationDiscoveryUI>(FindObjectsInactive.Exclude);
             foreach (var discovery in discoveries)
             {

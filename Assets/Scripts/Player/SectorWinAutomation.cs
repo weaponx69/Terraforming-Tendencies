@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.UI;
+using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
@@ -104,6 +105,89 @@ namespace GameDevTV.RTS.Player
             gm.TriggerGenerationEnd();
             sb.AppendLine($"After TriggerGenerationEnd: BetweenRounds={gm.IsBetweenRounds}");
             sb.AppendLine(gm.IsBetweenRounds ? "RESULT: PASS" : "RESULT: FAIL (generation did not end)");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Player-UI path: finish sector, open colonization confirmation (same as Continue
+        /// on the generation summary), deploy, and verify CP in the new sector.
+        /// </summary>
+        public static string TryWinAndColonizeViaPlayerUi()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(Report());
+
+            if (!Application.isPlaying)
+            {
+                sb.AppendLine("RESULT: FAIL (not playing)");
+                return sb.ToString();
+            }
+
+            var gm = GenerationManager.Instance;
+            if (gm == null)
+            {
+                sb.AppendLine("RESULT: FAIL (no GenerationManager)");
+                return sb.ToString();
+            }
+
+            if (!gm.IsBetweenRounds)
+            {
+                MeetCurrentSectorGoals(sb);
+                if (!gm.IsCurrentSectorRoundComplete())
+                {
+                    gm.CalculateCurrentSectorProgress(out string bottleneck);
+                    sb.AppendLine($"RESULT: FAIL (could not complete sector — bottleneck {bottleneck})");
+                    return sb.ToString();
+                }
+
+                gm.TriggerGenerationEnd();
+            }
+
+            if (!gm.IsBetweenRounds)
+            {
+                sb.AppendLine("RESULT: FAIL (expected between-rounds after win)");
+                return sb.ToString();
+            }
+
+            var summaryUi = Object.FindAnyObjectByType<GenerationSummaryUI>(FindObjectsInactive.Include);
+            if (summaryUi == null)
+            {
+                sb.AppendLine("RESULT: FAIL (GenerationSummaryUI missing)");
+                return sb.ToString();
+            }
+
+            int unlockedBefore = SectorManager.Instance?.GetUnlockedSectorCount() ?? 0;
+            var colonUi = SectorColonizationSummaryUI.EnsureInstance();
+            colonUi.ShowAfterGenerationSummary();
+            sb.AppendLine($"Colonization UI after show: visible={colonUi.IsVisible} previewWillColonize={gm.PreviewColonizationBeforeAdvance().WillColonize}");
+
+            if (!colonUi.IsVisible)
+            {
+                sb.AppendLine("RESULT: FAIL (colonization confirmation UI not visible after Continue flow)");
+                return sb.ToString();
+            }
+
+            colonUi.InvokePrimaryAction();
+            sb.AppendLine($"After deploy: Gen={gm.CurrentGeneration} Unlocked={SectorManager.Instance?.GetUnlockedSectorCount()} " +
+                          $"ColonizationSucceeded={gm.LastColonizationResult.Succeeded} verificationVisible={colonUi.IsVisible}");
+
+            if (colonUi.IsVisible)
+            {
+                colonUi.InvokePrimaryAction();
+                sb.AppendLine($"After verification dismiss: verificationVisible={colonUi.IsVisible} timeScale={Time.timeScale}");
+            }
+
+            int unlockedAfter = SectorManager.Instance?.GetUnlockedSectorCount() ?? 0;
+            if (unlockedAfter <= unlockedBefore)
+            {
+                sb.AppendLine("RESULT: FAIL (unlocked sector count did not increase)");
+                return sb.ToString();
+            }
+
+            var active = SectorManager.Instance?.ActiveSector;
+            bool hasCp = active != null && (active.IsOccupied || HasCommandPostInSector(active));
+            sb.AppendLine($"Active sector CP verified={hasCp}");
+            sb.AppendLine(hasCp && gm.LastColonizationResult.Succeeded ? "RESULT: PASS" : "RESULT: FAIL (UI colonization path)");
             return sb.ToString();
         }
 
