@@ -6,11 +6,50 @@ using UnityEngine;
 namespace GameDevTV.RTS.Utilities
 {
     /// <summary>
-    /// After a sector unlocks via exploration, reveal its build pads and claim it with
-    /// a Command Post so solar/climate sites become playable immediately.
+    /// After a sector unlocks, reveal its build pads and claim it with a Command Post
+    /// so solar/climate sites become playable immediately.
     /// </summary>
     public static class SectorColonization
     {
+        /// <summary>
+        /// Unlock (if needed) and claim the map sector closest to the player's current
+        /// colony front — used when a terraforming round completes.
+        /// </summary>
+        public static bool TryColonizeClosestSectorNeedingCommandPost(Owner owner = Owner.Player1)
+        {
+            if (SectorManager.Instance == null) return false;
+
+            Vector3 origin = GetColonizationOrigin();
+            int index = SectorManager.Instance.GetClosestSectorNeedingCommandPostIndex(origin);
+            if (index < 0) return false;
+
+            var sector = SectorManager.Instance.Sectors[index];
+            if (sector == null) return false;
+
+            if (sector.IsLocked)
+                return SectorManager.Instance.UnlockAndColonizeSector(index, owner);
+
+            PrepareNewlyUnlockedSector(sector, owner, index);
+            return sector.IsOccupied;
+        }
+
+        private static Vector3 GetColonizationOrigin()
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.ActiveSector != null) return sm.ActiveSector.Center;
+
+            if (sm?.Sectors != null)
+            {
+                foreach (var sector in sm.Sectors)
+                {
+                    if (sector != null && sector.IsOccupied)
+                        return sector.Center;
+                }
+            }
+
+            return Vector3.zero;
+        }
+
         /// <summary>
         /// Reveal fog over reserved pads and auto-place a Command Post on the sector's
         /// CP pad (waives materials — the exploration card already paid to open the sector).

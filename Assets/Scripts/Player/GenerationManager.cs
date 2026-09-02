@@ -399,6 +399,8 @@ namespace GameDevTV.RTS.Player
             // Reset progress bar to 0% for the new generation
             OnGenerationProgressChanged?.Invoke(0f);
 
+            TryAutoColonizeClosestSectorAfterRoundComplete();
+
             if (CurrentGeneration > MaxGenerations)
             {
                 Debug.Log("[GenerationManager] All Milestones Completed! Sector Completed.");
@@ -413,9 +415,8 @@ namespace GameDevTV.RTS.Player
                     Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
                 }
 
-                // Sector unlocking is now handled entirely through exploration cards
-                // (Orbital Scan, Survey Drone). The player must play a scouting card to
-                // explore and unlock the next sector before building a Command Post there.
+                // Sector unlocking is now automatic: finishing a terraforming round
+                // colonizes the closest sector that still needs a Command Post.
 
                 // Explicitly unlock the Command Post blueprint for the expansion phase
                 BlueprintDraftManager.UnlockBuilding("Command Post");
@@ -442,7 +443,7 @@ namespace GameDevTV.RTS.Player
                 Supplies.RaiseMaterialsChanged(Owner.Player1, Supplies.Materials[Owner.Player1]);
             }
 
-            // NOTE: Sector unlocking is now handled by ExplorationManager via scouting cards.
+            // NOTE: Additional map sectors unlock automatically when advancing generations.
             // Resources are no longer auto-replenished — they persist across rounds.
             roundStartTime = Time.time; // Start the grace period
 
@@ -451,6 +452,33 @@ namespace GameDevTV.RTS.Player
 
             // Fire event
             OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
+        }
+
+        /// <summary>
+        /// When a terraforming round completes, open and claim the geographically closest
+        /// sector that still needs a Command Post (if progression requires another sector).
+        /// </summary>
+        private void TryAutoColonizeClosestSectorAfterRoundComplete()
+        {
+            if (SectorManager.Instance == null) return;
+            if (SectorManager.Instance.GetNextLockedSectorIndex() < 0
+                && !GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
+            {
+                return;
+            }
+
+            // Normal play: unlocked map sectors must keep pace with the generation index.
+            // Expansion: any remaining sector may be claimed.
+            bool shouldColonize = IsExpansionPhase
+                || SectorManager.Instance.GetUnlockedSectorCount() < CurrentGeneration;
+
+            if (!shouldColonize) return;
+
+            bool colonized = GameDevTV.RTS.Utilities.SectorColonization.TryColonizeClosestSectorNeedingCommandPost(Owner.Player1);
+            if (colonized)
+            {
+                Debug.Log($"[GenerationManager] Auto-colonized closest sector after completing generation {CurrentGeneration - 1}.");
+            }
         }
 
         private void UnlockPrerequisitesForMilestone()

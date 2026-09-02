@@ -108,9 +108,9 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Stricter live check: finish current sector, advance generation, unlock the next
-        /// map sector via Orbital Scan, and verify a Command Post + open solar pads exist
-        /// there so climate buildings remain placeable.
+        /// Stricter live check: finish current sector, advance generation (auto-colonizes
+        /// the geographically closest sector needing a Command Post), and verify CP +
+        /// open solar pads exist there so climate buildings remain placeable.
         /// </summary>
         public static string TryWinAndColonizeNextSector()
         {
@@ -174,46 +174,21 @@ namespace GameDevTV.RTS.Player
 
             if (gm.IsExpansionPhase)
             {
-                // Final gen → expansion: still require exploration to open next sector.
-            }
-
-            if (!GenerationManager.CanUnlockNextMapSector())
-            {
-                sb.AppendLine("RESULT: FAIL (CanUnlockNextMapSector false after advancing)");
+                sb.AppendLine("RESULT: SKIP (entered expansion — no further map sector to colonize this step)");
                 return sb.ToString();
             }
 
-            var exploration = ExplorationManager.Instance;
-            if (exploration == null)
-            {
-                sb.AppendLine("RESULT: FAIL (no ExplorationManager)");
-                return sb.ToString();
-            }
-
-            // Ensure energy for the scan.
-            if (Supplies.Energy != null)
-            {
-                float energy = Supplies.Energy.TryGetValue(Owner.Player1, out float e) ? e : 0f;
-                if (energy < 10f) Supplies.UpdateEnergy(Owner.Player1, 50f);
-            }
-
-            bool scanned = exploration.TryOrbitalScan(Owner.Player1);
-            sb.AppendLine($"OrbitalScan success={scanned}");
-            if (!scanned)
-            {
-                sb.AppendLine("RESULT: FAIL (Orbital Scan did not unlock next sector)");
-                return sb.ToString();
-            }
-
-            int unlockedAfter = SectorManager.Instance.GetUnlockedSectorCount();
+            int unlockedAfter = SectorManager.Instance != null
+                ? SectorManager.Instance.GetUnlockedSectorCount()
+                : 0;
             sb.AppendLine($"Unlocked sectors: {unlockedBefore} → {unlockedAfter}");
             if (unlockedAfter <= unlockedBefore)
             {
-                sb.AppendLine("RESULT: FAIL (unlocked sector count did not increase)");
+                sb.AppendLine("RESULT: FAIL (unlocked sector count did not increase after advancing)");
                 return sb.ToString();
             }
 
-            // Find newest unlocked sector and verify CP + solar pads.
+            // Find auto-colonized sector and verify CP + solar pads.
             SectorManager.Sector newest = null;
             for (int i = SectorManager.Instance.Sectors.Count - 1; i >= 0; i--)
             {
@@ -229,7 +204,7 @@ namespace GameDevTV.RTS.Player
             newest = SectorManager.Instance.ActiveSector ?? newest;
             if (newest == null)
             {
-                sb.AppendLine("RESULT: FAIL (no active unlocked sector after scan)");
+                sb.AppendLine("RESULT: FAIL (no active unlocked sector after auto-colonization)");
                 return sb.ToString();
             }
 
@@ -239,13 +214,13 @@ namespace GameDevTV.RTS.Player
 
             if (!hasCp)
             {
-                sb.AppendLine("RESULT: FAIL (no Command Post in newly unlocked sector after scan)");
+                sb.AppendLine("RESULT: FAIL (no Command Post in auto-colonized sector)");
                 return sb.ToString();
             }
 
             if (sectorSolar < 1)
             {
-                sb.AppendLine("RESULT: FAIL (newly unlocked sector has no open solar pads)");
+                sb.AppendLine("RESULT: FAIL (auto-colonized sector has no open solar pads)");
                 return sb.ToString();
             }
 

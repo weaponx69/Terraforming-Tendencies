@@ -46,6 +46,12 @@ namespace GameDevTV.RTS.Environment
             Instance = this;
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
+        }
+
         private void OnEnable()
         {
             PlanetGenerator.OnPlanetGenerated += InitializeSectors;
@@ -286,6 +292,95 @@ namespace GameDevTV.RTS.Environment
             Debug.Log("[SectorManager] All sectors are already unlocked!");
         }
 
+        /// <summary>Index of the locked sector whose center is closest to <paramref name="fromPosition"/>.</summary>
+        public int GetClosestLockedSectorIndex(Vector3 fromPosition)
+        {
+            if (Sectors == null || Sectors.Count == 0) return -1;
+
+            int closest = -1;
+            float minDistSq = float.MaxValue;
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                var sector = Sectors[i];
+                if (sector == null || !sector.IsLocked) continue;
+                float distSq = (sector.Center - fromPosition).sqrMagnitude;
+                if (distSq < minDistSq)
+                {
+                    minDistSq = distSq;
+                    closest = i;
+                }
+            }
+
+            return closest;
+        }
+
+        public int GetClosestLockedSectorIndex(Sector fromSector)
+        {
+            if (fromSector == null) return GetClosestLockedSectorIndex(Vector3.zero);
+            return GetClosestLockedSectorIndex(fromSector.Center);
+        }
+
+        /// <summary>
+        /// Index of the nearest sector that still needs a Command Post claim
+        /// (locked, or unlocked with an empty CP pad).
+        /// </summary>
+        public int GetClosestSectorNeedingCommandPostIndex(Vector3 fromPosition)
+        {
+            if (Sectors == null || Sectors.Count == 0) return -1;
+
+            int closest = -1;
+            float minDistSq = float.MaxValue;
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                var sector = Sectors[i];
+                if (sector == null || !SectorNeedsCommandPost(sector)) continue;
+
+                float distSq = (sector.Center - fromPosition).sqrMagnitude;
+                if (distSq < minDistSq)
+                {
+                    minDistSq = distSq;
+                    closest = i;
+                }
+            }
+
+            return closest;
+        }
+
+        public static bool SectorNeedsCommandPost(Sector sector)
+        {
+            if (sector == null || sector.IsOccupied) return false;
+            if (sector.BuildingSites == null || sector.BuildingSites.Count == 0) return sector.IsLocked;
+
+            foreach (var site in sector.BuildingSites)
+            {
+                if (site != null && site.Kind == BuildingSiteKind.CommandPost && !site.IsOccupied)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Unlock a sector for building and auto-place its Command Post (no exploration card required).
+        /// </summary>
+        public bool UnlockAndColonizeSector(int index, Owner owner = Owner.Player1)
+        {
+            if (index < 0 || index >= Sectors.Count) return false;
+            var sector = Sectors[index];
+            if (sector == null || !sector.IsLocked) return false;
+
+            sector.IsLocked = false;
+            sector.IsExplored = true;
+            sector.IsDiscovered = true;
+            ActiveSector = sector;
+            OnSectorExplored?.Invoke(index);
+            SectorColonization.PrepareNewlyUnlockedSector(sector, owner, index);
+            UpdateSectorBorders();
+            OnSectorUnlocked?.Invoke();
+            Debug.Log($"[SectorManager] Sector {index} auto-unlocked and colonized.");
+            return true;
+        }
+
         /// <summary>Mark a sector as discovered (partial visibility — shows "???" markers).</summary>
         public void DiscoverSector(int index)
         {
@@ -306,17 +401,7 @@ namespace GameDevTV.RTS.Environment
             if (index < 0 || index >= Sectors.Count) return;
             if (!Sectors[index].IsLocked) return;
 
-            Sectors[index].IsLocked = false;
-            Sectors[index].IsExplored = true;
-            Sectors[index].IsDiscovered = true;
-            ActiveSector = Sectors[index];
-            OnSectorExplored?.Invoke(index);
-            // Pads/build eligibility unlock with the sector; deposits stay hidden until
-            // the explored node reveals them (or a discovery card reveals a type).
-            // Reveal pads and auto-place a Command Post before hand refresh listeners run.
-            SectorColonization.PrepareNewlyUnlockedSector(Sectors[index], owner, index);
-            UpdateSectorBorders();
-            OnSectorUnlocked?.Invoke();
+            UnlockAndColonizeSector(index, owner);
             Debug.Log($"[SectorManager] Sector {index} unlocked via node exploration!");
         }
 
