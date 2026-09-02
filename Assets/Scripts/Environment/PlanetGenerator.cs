@@ -95,7 +95,7 @@ namespace GameDevTV.RTS.Environment
                 // Ensure physics system is aware of feature colliders before bake
                 Physics.SyncTransforms();
 
-                var disabledBakeInterference = DisableNavMeshBakeInterferenceSources();
+                DisableNavMeshBakeInterferenceSources(out var disabledBehaviours, out var disabledRenderers);
 
                 try
                 {
@@ -221,34 +221,62 @@ namespace GameDevTV.RTS.Environment
                 }
                 finally
                 {
-                    RestoreNavMeshBakeInterferenceSources(disabledBakeInterference);
+                    RestoreNavMeshBakeInterferenceSources(disabledBehaviours, disabledRenderers);
                 }
             }
 
             /// <summary>
-            /// Screen-space / world TMP canvases use dynamic meshes that NavMeshSurface
-            /// (CollectObjects.All) cannot bake — disable them for the duration of the bake.
+            /// Screen-space / world TMP meshes are invalid NavMesh sources. Disabling
+            /// Canvas alone is not enough — CollectObjects.All still gathers enabled
+            /// MeshRenderers on TMP objects, so disable those renderers too.
             /// </summary>
-            private static System.Collections.Generic.List<Behaviour> DisableNavMeshBakeInterferenceSources()
+            private static void DisableNavMeshBakeInterferenceSources(
+                out System.Collections.Generic.List<Behaviour> disabledBehaviours,
+                out System.Collections.Generic.List<Renderer> disabledRenderers)
             {
-                var disabled = new System.Collections.Generic.List<Behaviour>();
+                disabledBehaviours = new System.Collections.Generic.List<Behaviour>();
+                disabledRenderers = new System.Collections.Generic.List<Renderer>();
+
                 foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include))
                 {
                     if (canvas == null || !canvas.enabled) continue;
                     canvas.enabled = false;
-                    disabled.Add(canvas);
+                    disabledBehaviours.Add(canvas);
                 }
 
-                return disabled;
+                foreach (var tmp in Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsInactive.Include))
+                {
+                    if (tmp == null) continue;
+                    var renderers = tmp.GetComponentsInChildren<Renderer>(true);
+                    foreach (var renderer in renderers)
+                    {
+                        if (renderer == null || !renderer.enabled) continue;
+                        renderer.enabled = false;
+                        disabledRenderers.Add(renderer);
+                    }
+                }
             }
 
-            private static void RestoreNavMeshBakeInterferenceSources(System.Collections.Generic.List<Behaviour> disabled)
+            private static void RestoreNavMeshBakeInterferenceSources(
+                System.Collections.Generic.List<Behaviour> disabledBehaviours,
+                System.Collections.Generic.List<Renderer> disabledRenderers)
             {
-                if (disabled == null) return;
-                foreach (var behaviour in disabled)
+                if (disabledBehaviours != null)
                 {
-                    if (behaviour != null)
-                        behaviour.enabled = true;
+                    foreach (var behaviour in disabledBehaviours)
+                    {
+                        if (behaviour != null)
+                            behaviour.enabled = true;
+                    }
+                }
+
+                if (disabledRenderers != null)
+                {
+                    foreach (var renderer in disabledRenderers)
+                    {
+                        if (renderer != null)
+                            renderer.enabled = true;
+                    }
                 }
             }
 
