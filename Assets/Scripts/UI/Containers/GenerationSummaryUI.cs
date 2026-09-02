@@ -141,10 +141,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void OnNextClicked()
         {
             if (panel != null) panel.SetActive(false);
-            if (GenerationManager.Instance != null)
-            {
-                GenerationManager.Instance.StartNextGeneration();
-            }
+            SectorColonizationSummaryUI.EnsureInstance().ShowAfterGenerationSummary();
         }
 
         private void OnViewTechTreeClicked()

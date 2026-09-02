@@ -50,6 +50,34 @@ namespace GameDevTV.RTS.Utilities
             return Vector3.zero;
         }
 
+        /// <summary>Index of the sector that would be colonized next, or -1 if none.</summary>
+        public static int GetClosestSectorNeedingCommandPostIndex()
+        {
+            if (SectorManager.Instance == null) return -1;
+            return SectorManager.Instance.GetClosestSectorNeedingCommandPostIndex(GetColonizationOrigin());
+        }
+
+        public static bool SectorHasCommandPost(SectorManager.Sector sector)
+        {
+            if (sector == null) return false;
+            if (sector.IsOccupied && sector.OccupyingBuilding != null) return true;
+
+            if (sector.BuildingSites != null)
+            {
+                foreach (var site in sector.BuildingSites)
+                {
+                    if (site == null || site.Kind != BuildingSiteKind.CommandPost || !site.IsOccupied) continue;
+                    if (site.OccupyingBuilding != null
+                        && site.OccupyingBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Reveal fog over reserved pads and auto-place a Command Post on the sector's
         /// CP pad (waives materials — the exploration card already paid to open the sector).

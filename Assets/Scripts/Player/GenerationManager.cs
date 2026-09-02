@@ -24,6 +24,21 @@ namespace GameDevTV.RTS.Player
         public string GoalDescription;
     }
 
+    public struct ColonizationAdvancePreview
+    {
+        public bool WillColonize;
+        public int TargetSectorIndex;
+        public bool EnteringExpansion;
+    }
+
+    public struct ColonizationAdvanceResult
+    {
+        public bool Attempted;
+        public bool Succeeded;
+        public int SectorIndex;
+        public string Message;
+    }
+
     public class GenerationManager : MonoBehaviour
     {
         public static GenerationManager Instance { get; private set; }
@@ -33,6 +48,7 @@ namespace GameDevTV.RTS.Player
         public int TotalTerraCoins { get; private set; } = 0;
         public bool IsBetweenRounds { get; private set; } = false;
         public bool IsExpansionPhase { get; private set; } = false;
+        public ColonizationAdvanceResult LastColonizationResult { get; private set; }
 
         public float CurrentMilestoneValue { get; private set; }
         public float CurrentMilestoneTarget { get; private set; }
@@ -455,11 +471,45 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// Predict whether advancing to the next generation will auto-deploy a Command Post.
+        /// </summary>
+        public ColonizationAdvancePreview PreviewColonizationBeforeAdvance()
+        {
+            var preview = new ColonizationAdvancePreview();
+            if (!IsBetweenRounds || SectorManager.Instance == null) return preview;
+
+            int nextGeneration = CurrentGeneration + 1;
+            preview.EnteringExpansion = nextGeneration > MaxGenerations;
+
+            if (SectorManager.Instance.GetNextLockedSectorIndex() < 0
+                && !GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
+            {
+                return preview;
+            }
+
+            bool shouldColonize = IsExpansionPhase
+                || preview.EnteringExpansion
+                || SectorManager.Instance.GetUnlockedSectorCount() < nextGeneration
+                || GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector();
+
+            if (!shouldColonize) return preview;
+
+            int index = GameDevTV.RTS.Utilities.SectorColonization.GetClosestSectorNeedingCommandPostIndex();
+            if (index < 0) return preview;
+
+            preview.WillColonize = true;
+            preview.TargetSectorIndex = index;
+            return preview;
+        }
+
+        /// <summary>
         /// When a terraforming round completes, open and claim the geographically closest
         /// sector that still needs a Command Post (if progression requires another sector).
         /// </summary>
         private void TryAutoColonizeClosestSectorAfterRoundComplete()
         {
+            LastColonizationResult = default;
+
             if (SectorManager.Instance == null) return;
             if (SectorManager.Instance.GetNextLockedSectorIndex() < 0
                 && !GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
@@ -470,14 +520,43 @@ namespace GameDevTV.RTS.Player
             // Normal play: unlocked map sectors must keep pace with the generation index.
             // Expansion: any remaining sector may be claimed.
             bool shouldColonize = IsExpansionPhase
-                || SectorManager.Instance.GetUnlockedSectorCount() < CurrentGeneration;
+                || SectorManager.Instance.GetUnlockedSectorCount() < CurrentGeneration
+                || GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector();
 
             if (!shouldColonize) return;
 
+            int targetIndex = GameDevTV.RTS.Utilities.SectorColonization.GetClosestSectorNeedingCommandPostIndex();
+            LastColonizationResult = new ColonizationAdvanceResult
+            {
+                Attempted = targetIndex >= 0,
+                SectorIndex = targetIndex
+            };
+
             bool colonized = GameDevTV.RTS.Utilities.SectorColonization.TryColonizeClosestSectorNeedingCommandPost(Owner.Player1);
-            if (colonized)
+            bool verified = colonized
+                && targetIndex >= 0
+                && targetIndex < SectorManager.Instance.Sectors.Count
+                && GameDevTV.RTS.Utilities.SectorColonization.SectorHasCommandPost(SectorManager.Instance.Sectors[targetIndex]);
+
+            LastColonizationResult = new ColonizationAdvanceResult
+            {
+                Attempted = targetIndex >= 0,
+                Succeeded = verified,
+                SectorIndex = targetIndex,
+                Message = verified
+                    ? $"Command Post deployed in Sector {targetIndex + 1}."
+                    : colonized
+                        ? "Sector updated, but the Command Post could not be verified."
+                        : "Could not colonize the next sector."
+            };
+
+            if (verified)
             {
                 Debug.Log($"[GenerationManager] Auto-colonized closest sector after completing generation {CurrentGeneration - 1}.");
+            }
+            else if (LastColonizationResult.Attempted)
+            {
+                Debug.LogWarning($"[GenerationManager] Colonization issue after generation {CurrentGeneration - 1}: {LastColonizationResult.Message}");
             }
         }
 
