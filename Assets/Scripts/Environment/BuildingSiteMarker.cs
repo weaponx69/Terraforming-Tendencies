@@ -119,35 +119,8 @@ namespace GameDevTV.RTS.Environment
         {
             if (Site == null) return false;
 
-            // While the player is picking a pad for a card, show only selectable markers.
-            if (isSelectable) return true;
-
-            // Idle world clutter: only the Sector 0 bootstrap pads inside the starting
-            // reveal radius (Command Post / Solar / Oxygen). Do not paint ghosts across
-            // every fog-cleared hex that has not been explored as a discovery frontier.
-            if (SectorManager.Instance == null || SectorManager.Instance.Sectors.Count == 0)
-            {
-                return false;
-            }
-
-            if (Site.Sector != SectorManager.Instance.Sectors[0])
-            {
-                return false;
-            }
-
-            float reveal = HexGridManager.Instance != null
-                ? HexGridManager.Instance.StartingAreaRevealRadius
-                : 15f;
-            Vector3 a = Site.Position; a.y = 0f;
-            Vector3 b = Site.Sector.Center; b.y = 0f;
-            if (Vector3.Distance(a, b) > reveal)
-            {
-                return false;
-            }
-
-            return Site.Kind is BuildingSiteKind.CommandPost
-                or BuildingSiteKind.Solar
-                or BuildingSiteKind.PairedBuilding;
+            // Ghosts only appear while the player is actively picking a pad for a card.
+            return isSelectable;
         }
 
         private static bool IsSiteVisibleInWorld(BuildingSiteSlot site)
