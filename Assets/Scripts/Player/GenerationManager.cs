@@ -257,9 +257,12 @@ namespace GameDevTV.RTS.Player
         /// <summary>Progress toward target from the round-start baseline (0–1).</summary>
         private static float IncrementalProgress(float current, float baseline, float target)
         {
+            // Higher-is-better metrics: already at the absolute target counts as done.
+            // Prevents softlocks when a sector reset records a baseline above the formula target.
+            if (current >= target - 0.0001f) return 1f;
+
             float delta = target - baseline;
-            if (Mathf.Abs(delta) <= 0.0001f)
-                return current >= target - 0.0001f ? 1f : 0f;
+            if (delta <= 0.0001f) return 1f;
             return Mathf.Clamp01((current - baseline) / delta);
         }
 
@@ -472,9 +475,14 @@ namespace GameDevTV.RTS.Player
 
                 // Explicitly unlock the Command Post blueprint for the expansion phase
                 BlueprintDraftManager.UnlockBuilding("Command Post");
+                BlueprintDraftManager.UnlockBuilding("Solar Panel");
 
                 // Reset progress bar to 0% for the expansion phase
                 OnGenerationProgressChanged?.Invoke(0f);
+
+                // Keep hand/UI in sync even though we skip normal milestone advance.
+                CardDeckController.Instance?.RefreshHand();
+                OnGenerationStarted?.Invoke(CurrentGeneration, MaxGenerations);
 
                 return;
             }

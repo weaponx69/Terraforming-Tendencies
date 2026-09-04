@@ -127,6 +127,133 @@ namespace GameDevTV.RTS.Player
             RefreshHand();
         }
 
+        /// <summary>
+        /// After auto-colonizing a sector and the player acknowledges the handoff UI,
+        /// seat Solar + unmet climate/primary tools so the new Command Post is immediately playable.
+        /// Exception to FIFO only at this handoff moment.
+        /// </summary>
+        public void PrepareHandForColonizedSector()
+        {
+            DiscardUnplayableFromHand();
+
+            EnsureBootstrapUnlockInHand("Solar");
+
+            // Mining drones become useful as soon as the new CP exists.
+            EnsureNamedCardInHand(c =>
+                c is SpawnUnitCardSO spawn &&
+                spawn.cardName != null &&
+                spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase),
+                requirePlayable: true);
+
+            if (GenerationManager.Instance == null || !GenerationManager.Instance.IsExpansionPhase)
+            {
+                EnsureUnmetSectorGoalCardInHand("TEMPERATURE");
+                EnsureUnmetSectorGoalCardInHand("ATMOSPHERE");
+                EnsureUnmetSectorGoalCardInHand("WATER");
+
+                if (GenerationManager.Instance != null)
+                {
+                    string primary = TerraformingGoalColors.GoalKeyForMilestone(
+                        GenerationManager.Instance.CurrentMilestoneType);
+                    if (!string.IsNullOrEmpty(primary)
+                        && primary != "TEMPERATURE"
+                        && primary != "ATMOSPHERE"
+                        && primary != "WATER")
+                    {
+                        EnsureUnmetSectorGoalCardInHand(primary);
+                    }
+                }
+            }
+
+            EnsureSolarPrereqInHand();
+            FillHandInternal();
+            EnsureSolarPrereqInHand();
+
+            OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            Debug.Log($"[CardDeckController] Prepared colonized-sector hand ({hand.Count} cards).");
+        }
+
+        private void EnsureUnmetSectorGoalCardInHand(string goal)
+        {
+            if (string.IsNullOrEmpty(goal)) return;
+            if (!GenerationManager.IsUnmetSectorGoal(goal)) return;
+
+            if (hand.Any(c =>
+                    string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            BlueprintCardSO found = FindCardInPiles(c =>
+                string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)
+                && c.IsGateMet()
+                && ShouldKeepInHand(c));
+
+            if (found == null) return;
+
+            MakeHandRoomForHandoffCard(found);
+            if (hand.Count >= handSize) return;
+
+            hand.Add(found);
+            Debug.Log($"[CardDeckController] Seated unmet sector-goal card '{found.cardName}' ({goal}) for handoff.");
+        }
+
+        private void EnsureNamedCardInHand(Func<BlueprintCardSO, bool> predicate, bool requirePlayable)
+        {
+            if (hand.Any(predicate)) return;
+
+            BlueprintCardSO found = FindCardInPiles(c =>
+                predicate(c) && (!requirePlayable || IsPlayableNow(c)));
+            if (found == null) return;
+
+            MakeHandRoomForHandoffCard(found);
+            if (hand.Count >= handSize) return;
+
+            hand.Add(found);
+            Debug.Log($"[CardDeckController] Seated handoff card '{found.cardName}'.");
+        }
+
+        private BlueprintCardSO FindCardInPiles(Func<BlueprintCardSO, bool> predicate)
+        {
+            BlueprintCardSO found = drawPile.FirstOrDefault(predicate);
+            if (found != null)
+            {
+                drawPile.Remove(found);
+                return found;
+            }
+
+            found = discardPile.FirstOrDefault(predicate);
+            if (found != null)
+            {
+                discardPile.Remove(found);
+                return found;
+            }
+
+            return null;
+        }
+
+        private void MakeHandRoomForHandoffCard(BlueprintCardSO incoming)
+        {
+            if (hand.Count < handSize || incoming == null) return;
+
+            // Prefer dropping support cards / pad-blocked unlocks that are not sector goals.
+            int dropIdx = hand.FindIndex(c =>
+                c != null
+                && TerraformingGoalColors.GetSectorGoalForCard(c) == null
+                && !IsSolarUnlockCard(c));
+            if (dropIdx < 0)
+            {
+                dropIdx = hand.FindIndex(c =>
+                    c is UnlockBuildingCardSO unlock
+                    && !IsSolarUnlockCard(c)
+                    && NeedsSolarPoweredPad(unlock));
+            }
+
+            if (dropIdx < 0) return;
+
+            discardPile.Add(hand[dropIdx]);
+            hand.RemoveAt(dropIdx);
+        }
+
         private void EnsureBootstrapUnlockInHand(string nameContains)
         {
             if (hand.Any(c => c is UnlockBuildingCardSO u &&

@@ -1,6 +1,7 @@
 using System.Collections;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Utilities;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -214,10 +215,37 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             FocusCameraOnColonizedCommandPost();
+            RunColonizedSectorHandoff();
 
             if (GenerationManager.Instance != null && !GenerationManager.Instance.IsBetweenRounds)
                 Time.timeScale = 1f;
             Hide();
+        }
+
+        private static void RunColonizedSectorHandoff()
+        {
+            BuildingSiteRegistry.RefreshAllMarkers();
+
+            var deck = CardDeckController.Instance;
+            if (deck != null)
+            {
+                deck.PrepareHandForColonizedSector();
+            }
+
+            // Prefer selecting the new CP so train/drone cards route correctly immediately.
+            var gm = GenerationManager.Instance;
+            if (gm != null
+                && gm.LastColonizationResult.Succeeded
+                && SectorManager.Instance != null
+                && gm.LastColonizationResult.SectorIndex >= 0
+                && gm.LastColonizationResult.SectorIndex < SectorManager.Instance.Sectors.Count)
+            {
+                var sector = SectorManager.Instance.Sectors[gm.LastColonizationResult.SectorIndex];
+                if (sector?.OccupyingBuilding != null)
+                {
+                    sector.OccupyingBuilding.Select();
+                }
+            }
         }
 
         private static void FocusCameraOnColonizedCommandPost()
@@ -231,15 +259,14 @@ namespace GameDevTV.RTS.UI.Containers
                 // Fallback: newest active sector if colonization metadata is missing.
                 if (SectorManager.Instance?.ActiveSector != null)
                 {
-                    GameDevTV.RTS.Utilities.SectorColonization.TryGetCommandPostFocusPosition(
+                    SectorColonization.TryGetCommandPostFocusPosition(
                         SectorManager.Instance.ActiveSector, out Vector3 fallback);
                     PlayerInput.FocusCameraOnWorldPosition(fallback);
                 }
                 return;
             }
 
-            if (GameDevTV.RTS.Utilities.SectorColonization.TryGetCommandPostFocusPosition(
-                    sectorIndex, out Vector3 focus))
+            if (SectorColonization.TryGetCommandPostFocusPosition(sectorIndex, out Vector3 focus))
             {
                 PlayerInput.FocusCameraOnWorldPosition(focus);
             }

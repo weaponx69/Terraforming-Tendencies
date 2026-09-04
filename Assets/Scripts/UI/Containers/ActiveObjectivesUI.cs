@@ -148,7 +148,8 @@ namespace GameDevTV.RTS.UI.Containers
             float target,
             string valueFormat)
         {
-            bool met = current >= target;
+            // Match GenerationManager win checks (baseline-aware), not absolute-only compare.
+            bool met = !GenerationManager.IsUnmetSectorGoal(goalKey);
             Color valueColor = met ? TerraformingGoalColors.MetValue : TerraformingGoalColors.UnmetValue;
             string valueText = string.Format(valueFormat, current, target);
             string label = TerraformingGoalColors.DisplayName(goalKey);
