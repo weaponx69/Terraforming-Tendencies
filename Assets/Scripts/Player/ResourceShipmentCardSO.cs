@@ -17,7 +17,7 @@ namespace GameDevTV.RTS.Player
                 if (temperatureAmount > 0f) return "TEMPERATURE";
                 if (atmosphereAmount > 0f) return "ATMOSPHERE";
                 if (waterAmount > 0f) return "WATER";
-                if (biomassAmount > 0) return "BIOMASS";
+                if (biomassAmount > 0) return "RESOURCES"; // Biomass terraforming deprecated
                 if (oxygenAmount > 0) return "OXYGEN";
                 if (materialsAmount > 0) return "MATERIALS";
                 return "RESOURCES";

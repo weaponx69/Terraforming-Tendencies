@@ -4,21 +4,23 @@ using GameDevTV.RTS.Player;
 namespace GameDevTV.RTS.UI
 {
     /// <summary>
-    /// Colors for sector completion terraforming only — the primary milestone plus
-    /// temperature, atmosphere, and water. Support cards (materials, scans, units)
-    /// stay neutral.
+    /// Colors for sector completion terraforming only — climate basics
+    /// (temperature, atmosphere, water) plus primary milestones (oxygen/power/etc).
+    /// Biomass is deprecated as a terraforming goal. Support cards stay neutral.
     /// </summary>
     public static class TerraformingGoalColors
     {
-        public static readonly Color Temperature = new Color(1.00f, 0.55f, 0.10f, 1f); // amber orange
-        public static readonly Color Atmosphere  = new Color(0.95f, 0.45f, 0.70f, 1f); // magenta / orchid
-        public static readonly Color Water       = new Color(0.15f, 0.35f, 0.95f, 1f); // deep blue
-        public static readonly Color Oxygen      = new Color(0.35f, 0.95f, 0.75f, 1f); // mint
-        public static readonly Color Biomass     = new Color(0.40f, 0.90f, 0.30f, 1f); // green
-        public static readonly Color Power       = new Color(1.00f, 0.85f, 0.20f, 1f); // gold
-        public static readonly Color Population  = new Color(0.55f, 0.40f, 1.00f, 1f); // indigo violet
+        // Palette tuned for dark HUD contrast and pairwise distinguishability
+        // (especially Oxygen cyan vs Biomass green, Temp amber vs Atmos fuchsia).
+        public static readonly Color Temperature = new Color(1.00f, 0.58f, 0.12f, 1f); // amber orange
+        public static readonly Color Atmosphere  = new Color(1.00f, 0.35f, 0.72f, 1f); // hot fuchsia
+        public static readonly Color Water       = new Color(0.25f, 0.55f, 1.00f, 1f); // bright blue
+        public static readonly Color Oxygen      = new Color(0.15f, 0.85f, 1.00f, 1f); // cyan
+        public static readonly Color Biomass     = new Color(0.45f, 0.92f, 0.20f, 1f); // lime green
+        public static readonly Color Power       = new Color(1.00f, 0.88f, 0.20f, 1f); // gold
+        public static readonly Color Population  = new Color(0.65f, 0.45f, 1.00f, 1f); // indigo violet
         public static readonly Color CommandPost = new Color(0.95f, 0.95f, 0.95f, 1f); // white
-        public static readonly Color Neutral     = new Color(0.75f, 0.78f, 0.82f, 1f); // grey
+        public static readonly Color Neutral     = new Color(0.82f, 0.86f, 0.90f, 1f); // light grey
 
         /// <summary>Objectives panel only: progress number when the climate target is unmet.</summary>
         public static readonly Color MetValue   = new Color(0.40f, 0.95f, 0.45f, 1f);
@@ -33,8 +35,10 @@ namespace GameDevTV.RTS.UI
 
             return goal.ToUpperInvariant() switch
             {
+                // Climate basics + remaining primary sector milestones.
+                // Biomass is deprecated and is not a sector-completion goal.
                 "TEMPERATURE" or "ATMOSPHERE" or "WATER" or
-                "BIOMASS" or "OXYGEN" or "POWER" or "POPULATION" or "COMMAND POST" => true,
+                "OXYGEN" or "POWER" or "POPULATION" or "COMMAND POST" => true,
                 _ => false
             };
         }
@@ -59,7 +63,6 @@ namespace GameDevTV.RTS.UI
                 "ATMOSPHERE" => Atmosphere,
                 "WATER" => Water,
                 "OXYGEN" => Oxygen,
-                "BIOMASS" => Biomass,
                 "POWER" => Power,
                 "POPULATION" => Population,
                 "COMMAND POST" => CommandPost,
@@ -73,11 +76,12 @@ namespace GameDevTV.RTS.UI
         {
             return type switch
             {
-                MilestoneType.Biomass => "BIOMASS",
+                MilestoneType.Temperature => "TEMPERATURE",
                 MilestoneType.Oxygen => "OXYGEN",
                 MilestoneType.Power => "POWER",
                 MilestoneType.Population => "POPULATION",
                 MilestoneType.CommandPosts => "COMMAND POST",
+                MilestoneType.Biomass => string.Empty, // deprecated
                 _ => string.Empty
             };
         }
@@ -101,8 +105,46 @@ namespace GameDevTV.RTS.UI
             return goal.ToUpperInvariant() switch
             {
                 "COMMAND POST" => "COMMAND",
+                "TEMPERATURE" => "TEMP",
+                "ATMOSPHERE" => "ATMOS",
                 _ => goal.ToUpperInvariant()
             };
+        }
+
+        public static string DisplayName(string goal)
+        {
+            if (string.IsNullOrEmpty(goal)) return string.Empty;
+
+            return goal.ToUpperInvariant() switch
+            {
+                "TEMPERATURE" => "Temperature",
+                "ATMOSPHERE" => "Atmosphere",
+                "WATER" => "Water",
+                "OXYGEN" => "Oxygen",
+                "BIOMASS" => "Biomass",
+                "POWER" => "Power",
+                "POPULATION" => "Population",
+                "COMMAND POST" => "Command Post",
+                _ => goal
+            };
+        }
+
+        /// <summary>Compact rich-text legend for Active Objectives / HUD help.</summary>
+        public static string BuildLegendLine(params string[] goals)
+        {
+            if (goals == null || goals.Length == 0) return string.Empty;
+
+            var parts = new System.Collections.Generic.List<string>(goals.Length);
+            var seen = new System.Collections.Generic.HashSet<string>();
+            foreach (string goal in goals)
+            {
+                if (!IsSectorCompletionGoal(goal)) continue;
+                string key = goal.ToUpperInvariant();
+                if (!seen.Add(key)) continue;
+                parts.Add(Colorize(DisplayName(goal), goal));
+            }
+
+            return parts.Count == 0 ? string.Empty : string.Join("  ·  ", parts);
         }
     }
 }

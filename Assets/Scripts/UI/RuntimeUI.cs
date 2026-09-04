@@ -254,6 +254,9 @@ namespace GameDevTV.RTS.UI
             FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
+            FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
+            FindAndLinkUI("Gas Container", ref biomassLabelText, ref biomassValueText, "Biomass Header", "Gas Header");
+            FindAndLinkUI("Sectors Container", ref sectorsLabelText, ref sectorsValueText, "Sectors Header");
             
             // Setup layouts and alignments dynamically (Power, Temp, Atmos)
             GameObject integrityContainerGo = GameObject.Find("Integrity Container");
@@ -479,6 +482,7 @@ namespace GameDevTV.RTS.UI
             {
                 InitializeUI();
                 RebuildLayouts();
+                ApplyHudReadability();
             }
         }
 
@@ -561,6 +565,7 @@ namespace GameDevTV.RTS.UI
             if (!Application.isPlaying) return;
             InitializeUI();
             RebuildLayouts();
+            ApplyHudReadability();
             RefreshUI();
         }
 
@@ -572,6 +577,7 @@ namespace GameDevTV.RTS.UI
             {
                 layoutRebuilt = true;
                 RebuildLayouts();
+                ApplyHudReadability();
             }
         }
 
@@ -592,6 +598,155 @@ namespace GameDevTV.RTS.UI
                     LayoutRebuilder.ForceRebuildLayoutImmediate(parentRt);
                 }
             }
+        }
+
+        /// <summary>
+        /// Darken the top resource strip and tint climate/milestone headers so
+        /// values stay readable over terrain and match Active Objectives colors.
+        /// </summary>
+        private void ApplyHudReadability()
+        {
+            Transform stripParent = null;
+            GameObject integrityContainerGo = GameObject.Find("Integrity Container");
+            if (integrityContainerGo == null)
+            {
+                Transform t = FindChildRecursive(transform, "Integrity Container");
+                if (t != null) integrityContainerGo = t.gameObject;
+            }
+            if (integrityContainerGo != null)
+            {
+                stripParent = integrityContainerGo.transform.parent;
+            }
+            else
+            {
+                GameObject mineralsGo = GameObject.Find("Minerals Container");
+                if (mineralsGo == null)
+                {
+                    Transform t = FindChildRecursive(transform, "Minerals Container");
+                    if (t != null) mineralsGo = t.gameObject;
+                }
+                if (mineralsGo != null) stripParent = mineralsGo.transform.parent;
+            }
+
+            if (stripParent != null)
+            {
+                EnsureResourceBarBackdrop(stripParent);
+            }
+
+            StyleMetric(materialsLabelText, materialsValueText, null, "Materials");
+            StyleMetric(biomassLabelText, biomassValueText, null, "Biomass");
+            StyleMetric(oxygenLabelText, oxygenValueText, "OXYGEN", "Oxygen");
+            StyleMetric(powerLabelText, powerValueText, "POWER", "Power");
+            StyleMetric(integrityLabelText, integrityValueText, null, "Integrity");
+            StyleMetric(sectorsLabelText, sectorsValueText, null, "Sectors");
+            StyleMetric(temperatureLabelText, temperatureValueText, "TEMPERATURE", "Temp");
+            StyleMetric(atmosphereLabelText, atmosphereValueText, "ATMOSPHERE", "Atmos");
+            StyleMetric(waterLabelText, waterValueText, "WATER", "Water");
+
+            if (populationText != null)
+            {
+                StyleValueText(populationText);
+                populationText.color = TerraformingGoalColors.Population;
+            }
+        }
+
+        private static void EnsureResourceBarBackdrop(Transform stripParent)
+        {
+            if (stripParent == null) return;
+
+            const string backdropName = "Resource Bar Backdrop";
+            Transform existing = stripParent.Find(backdropName);
+            Image backdrop;
+            if (existing == null)
+            {
+                var go = new GameObject(backdropName, typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(stripParent, false);
+                go.transform.SetAsFirstSibling();
+                existing = go.transform;
+                backdrop = go.GetComponent<Image>();
+            }
+            else
+            {
+                backdrop = existing.GetComponent<Image>();
+                if (backdrop == null) backdrop = existing.gameObject.AddComponent<Image>();
+            }
+
+            var rt = existing as RectTransform;
+            if (rt == null) rt = existing.gameObject.AddComponent<RectTransform>();
+
+            bool parentIsCanvas = stripParent.GetComponent<Canvas>() != null;
+            if (parentIsCanvas)
+            {
+                // Only darken the top band — never the whole screen.
+                rt.anchorMin = new Vector2(0f, 1f);
+                rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot = new Vector2(0.5f, 1f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = new Vector2(0f, 120f);
+                rt.offsetMin = new Vector2(0f, rt.offsetMin.y);
+                rt.offsetMax = new Vector2(0f, 0f);
+            }
+            else
+            {
+                // Cover the strip container; ignoreLayout keeps HLG from reserving space for it.
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = Vector2.zero;
+                rt.offsetMin = new Vector2(-18f, -14f);
+                rt.offsetMax = new Vector2(18f, 14f);
+            }
+
+            backdrop.color = new Color(0.02f, 0.03f, 0.06f, 0.82f);
+            backdrop.raycastTarget = false;
+
+            var ignoreLayout = existing.GetComponent<LayoutElement>();
+            if (ignoreLayout == null) ignoreLayout = existing.gameObject.AddComponent<LayoutElement>();
+            ignoreLayout.ignoreLayout = true;
+        }
+
+        private static void StyleMetric(TextMeshProUGUI label, TextMeshProUGUI value, string goalKey, string fallbackLabel)
+        {
+            if (label != null)
+            {
+                if (!string.IsNullOrEmpty(fallbackLabel) && string.IsNullOrEmpty(label.text))
+                {
+                    label.SetText(fallbackLabel);
+                }
+
+                label.enableAutoSizing = false;
+                label.fontSize = Mathf.Max(label.fontSize, 16f);
+                label.fontStyle = FontStyles.Bold;
+                label.color = string.IsNullOrEmpty(goalKey)
+                    ? TerraformingGoalColors.Neutral
+                    : TerraformingGoalColors.ForGoal(goalKey);
+                EnsureTextOutline(label, new Color(0f, 0f, 0f, 0.85f), new Vector2(1.25f, -1.25f));
+                label.raycastTarget = false;
+            }
+
+            StyleValueText(value);
+        }
+
+        private static void StyleValueText(TextMeshProUGUI value)
+        {
+            if (value == null) return;
+            value.enableAutoSizing = false;
+            value.fontSize = Mathf.Max(value.fontSize, 24f);
+            value.fontStyle = FontStyles.Bold;
+            value.color = Color.white;
+            EnsureTextOutline(value, new Color(0f, 0f, 0f, 0.9f), new Vector2(1.5f, -1.5f));
+            value.raycastTarget = false;
+        }
+
+        private static void EnsureTextOutline(TextMeshProUGUI text, Color color, Vector2 distance)
+        {
+            if (text == null) return;
+            var outline = text.GetComponent<Outline>();
+            if (outline == null) outline = text.gameObject.AddComponent<Outline>();
+            outline.effectColor = color;
+            outline.effectDistance = distance;
+            outline.useGraphicAlpha = true;
         }
 
         private void UpdateSectorsUI()

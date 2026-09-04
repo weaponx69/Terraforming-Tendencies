@@ -420,10 +420,9 @@ namespace GameDevTV.RTS.Player
             float tempAfter = Supplies.Temperature.TryGetValue(Owner.Player1, out float t2) ? t2 : -60f;
             float atmosAfter = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a2) ? a2 : 0.01f;
             float waterAfter = Supplies.Water.TryGetValue(Owner.Player1, out float w2) ? w2 : 0f;
-            float bioAfter = Supplies.Biomass.TryGetValue(Owner.Player1, out float b2) ? b2 : 0f;
             log?.AppendLine(
                 $"After set: Temp={tempAfter:F1}/{targetTemp:F1} Atmos={atmosAfter:F3}/{targetAtmos:F2} " +
-                $"Water={waterAfter:F1}/{targetWater:F0} Bio={bioAfter:F2}/{gm.CurrentMilestoneTarget:F1}");
+                $"Water={waterAfter:F1}/{targetWater:F0} Primary={gm.CurrentMilestoneType}/{gm.CurrentMilestoneTarget:F1}");
         }
 
         private static void MeetPrimaryMilestone(GenerationManager gm, StringBuilder log)
@@ -431,17 +430,20 @@ namespace GameDevTV.RTS.Player
             float target = gm.CurrentMilestoneTarget;
             switch (gm.CurrentMilestoneType)
             {
-                case MilestoneType.Biomass:
+                case MilestoneType.Temperature:
                 {
-                    float bio = Supplies.Biomass.TryGetValue(Owner.Player1, out float b) ? b : 0f;
-                    float needed = target + 0.05f; // clear float edge below TargetValue
-                    if (bio < needed)
+                    float temp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
+                    if (temp < target)
                     {
-                        Supplies.UpdateBiomass(Owner.Player1, needed);
-                        log?.AppendLine($"Set Biomass -> {needed:F2}");
+                        Supplies.UpdateTemperature(Owner.Player1, target);
+                        ClimateManager.Instance?.SetTemperatureTarget(target);
+                        log?.AppendLine($"Set Temperature -> {target:F1}");
                     }
                     break;
                 }
+                case MilestoneType.Biomass:
+                    // Deprecated — climate Temperature already handled above.
+                    break;
                 case MilestoneType.Oxygen:
                 {
                     float ox = Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
@@ -552,7 +554,7 @@ namespace GameDevTV.RTS.Player
             string[] goals =
             {
                 "TEMPERATURE", "ATMOSPHERE", "WATER",
-                "BIOMASS", "OXYGEN", "POWER", "POPULATION", "COMMAND POST"
+                "OXYGEN", "POWER", "POPULATION", "COMMAND POST"
             };
 
             var unmet = new List<string>();

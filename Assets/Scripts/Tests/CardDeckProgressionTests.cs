@@ -130,8 +130,10 @@ namespace GameDevTV.RTS.Tests
         public void IsSectorCompletionGoal_OnlyCoversSectorTerraforming()
         {
             Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("TEMPERATURE"));
-            Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("BIOMASS"));
+            Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("ATMOSPHERE"));
+            Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("WATER"));
             Assert.IsTrue(TerraformingGoalColors.IsSectorCompletionGoal("COMMAND POST"));
+            Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("BIOMASS"));
             Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("MATERIALS"));
             Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("EXPLORATION"));
             Assert.IsFalse(TerraformingGoalColors.IsSectorCompletionGoal("MINING"));
@@ -154,8 +156,9 @@ namespace GameDevTV.RTS.Tests
                 TerraformingGoalColors.ForGoal("ATMOSPHERE"),
                 TerraformingGoalColors.ForGoal("WATER"));
             Assert.AreEqual(
-                TerraformingGoalColors.ForMilestone(MilestoneType.Biomass),
-                TerraformingGoalColors.ForGoal("BIOMASS"));
+                TerraformingGoalColors.ForMilestone(MilestoneType.Temperature),
+                TerraformingGoalColors.ForGoal("TEMPERATURE"));
+            Assert.AreEqual(TerraformingGoalColors.Neutral, TerraformingGoalColors.ForGoal("BIOMASS"));
             Assert.AreEqual(TerraformingGoalColors.Neutral, TerraformingGoalColors.ForGoal("MATERIALS"));
         }
 

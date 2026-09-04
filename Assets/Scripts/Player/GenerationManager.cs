@@ -9,11 +9,13 @@ namespace GameDevTV.RTS.Player
 {
     public enum MilestoneType
     {
-        Biomass,
-        Oxygen,
-        Power,
-        Population,
-        CommandPosts
+        /// <summary>Deprecated — Biomass is not a terraforming goal. Prefer Temperature.</summary>
+        Biomass = 0,
+        Oxygen = 1,
+        Power = 2,
+        Population = 3,
+        CommandPosts = 4,
+        Temperature = 5,
     }
 
     [System.Serializable]
@@ -176,12 +178,21 @@ namespace GameDevTV.RTS.Player
             {
                 milestones = new List<SectorMilestone>
                 {
-                    new SectorMilestone { Type = MilestoneType.Biomass, TargetValue = 25f, GoalDescription = "Reach 25% Biomass" },
+                    new SectorMilestone { Type = MilestoneType.Temperature, TargetValue = -45f, GoalDescription = "Raise Temperature to -45°C" },
                     new SectorMilestone { Type = MilestoneType.Power, TargetValue = 20f, GoalDescription = "Generate 20 Grid Power" },
                     new SectorMilestone { Type = MilestoneType.Oxygen, TargetValue = 30f, GoalDescription = "Reach 30% Atmospheric Oxygen" },
                     new SectorMilestone { Type = MilestoneType.Population, TargetValue = 10f, GoalDescription = "Establish 10 Colonists" },
                     new SectorMilestone { Type = MilestoneType.CommandPosts, TargetValue = 1f, GoalDescription = "Establish a Command Post in the sector" }
                 };
+            }
+
+            // Migrate deprecated Biomass primaries → Temperature.
+            for (int i = 0; i < milestones.Count; i++)
+            {
+                if (milestones[i].Type != MilestoneType.Biomass) continue;
+                var migrated = milestones[i];
+                migrated.Type = MilestoneType.Temperature;
+                milestones[i] = migrated;
             }
 
             // Milestone primary targets are an incremental slice per generation round,
@@ -192,6 +203,7 @@ namespace GameDevTV.RTS.Player
                 float slicePerSector = 100f / totalSectors;
                 for (int i = 0; i < milestones.Count; i++)
                 {
+                    int generation = i + 1;
                     if (milestones[i].Type == MilestoneType.Oxygen)
                     {
                         var m = milestones[i];
@@ -199,11 +211,12 @@ namespace GameDevTV.RTS.Player
                         m.GoalDescription = $"Raise oxygen by {slicePerSector:F0}% this sector";
                         milestones[i] = m;
                     }
-                    else if (milestones[i].Type == MilestoneType.Biomass)
+                    else if (milestones[i].Type == MilestoneType.Temperature)
                     {
+                        float targetTemp = GetTargetTemperature(generation);
                         var m = milestones[i];
-                        m.TargetValue = slicePerSector;
-                        m.GoalDescription = $"Raise biomass by {slicePerSector:F0}% this sector";
+                        m.TargetValue = targetTemp;
+                        m.GoalDescription = $"Raise Temperature to {targetTemp:F0}°C";
                         milestones[i] = m;
                     }
                 }
@@ -349,9 +362,11 @@ namespace GameDevTV.RTS.Player
             CurrentMilestoneType = milestone.Type;
             CurrentMilestoneValue = currentValue;
 
-            float primaryProgress = milestone.TargetValue > 0
-                ? Mathf.Clamp01(currentValue / milestone.TargetValue)
-                : 1f;
+            float primaryProgress = milestone.Type == MilestoneType.Temperature
+                ? IncrementalProgress(currentValue, baselineTemperature, milestone.TargetValue)
+                : milestone.TargetValue > 0
+                    ? Mathf.Clamp01(currentValue / milestone.TargetValue)
+                    : 1f;
 
             float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
             float targetTemp = GetTargetTemperature(CurrentGeneration);
@@ -589,7 +604,11 @@ namespace GameDevTV.RTS.Player
 
             switch (milestone.Type)
             {
-                case MilestoneType.Biomass:
+                case MilestoneType.Temperature:
+                    BlueprintDraftManager.UnlockBuilding("GHG Factory");
+                    BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
+                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
+                    break;
                 case MilestoneType.Oxygen:
                     BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
                     BlueprintDraftManager.UnlockBuilding("Solar Panel");
@@ -603,6 +622,12 @@ namespace GameDevTV.RTS.Player
                     break;
                 case MilestoneType.CommandPosts:
                     BlueprintDraftManager.UnlockBuilding("Command Post");
+                    break;
+                case MilestoneType.Biomass:
+                    // Deprecated terraforming goal — treat like Temperature bootstrap.
+                    BlueprintDraftManager.UnlockBuilding("GHG Factory");
+                    BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
+                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
                     break;
             }
         }
@@ -714,8 +739,8 @@ namespace GameDevTV.RTS.Player
             if (goal == "WATER")
                 return Instance != null && IncrementalProgress(water, Instance.baselineWater, targetWater) < 1f;
 
-            MilestoneType type = Instance != null ? Instance.CurrentMilestoneType : MilestoneType.Biomass;
-            float target = Instance != null ? Instance.CurrentMilestoneTarget : 25f;
+            MilestoneType type = Instance != null ? Instance.CurrentMilestoneType : MilestoneType.Temperature;
+            float target = Instance != null ? Instance.CurrentMilestoneTarget : -45f;
             if (!GoalMatchesMilestone(goal, type)) return false;
             return ReadMilestoneValue(type) < target;
         }
@@ -724,11 +749,12 @@ namespace GameDevTV.RTS.Player
         {
             return type switch
             {
-                MilestoneType.Biomass => goal == "BIOMASS",
+                MilestoneType.Temperature => goal == "TEMPERATURE",
                 MilestoneType.Oxygen => goal == "OXYGEN",
                 MilestoneType.Power => goal == "POWER",
                 MilestoneType.Population => goal == "POPULATION",
                 MilestoneType.CommandPosts => goal == "COMMAND POST",
+                MilestoneType.Biomass => false, // deprecated
                 _ => false
             };
         }
@@ -739,10 +765,11 @@ namespace GameDevTV.RTS.Player
 
             switch (type)
             {
-                case MilestoneType.Biomass:
+                case MilestoneType.Temperature:
                 {
-                    float bio = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner.Player1, out float b) ? b : 0f;
-                    return bio - Instance.baselineBiomass;
+                    return Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t)
+                        ? t
+                        : -60f;
                 }
                 case MilestoneType.Oxygen:
                 {
@@ -763,6 +790,9 @@ namespace GameDevTV.RTS.Player
                     if (SectorManager.Instance?.ActiveSector != null && SectorManager.Instance.ActiveSector.IsOccupied)
                         return 1f;
                     return 0f;
+                case MilestoneType.Biomass:
+                    // Deprecated — never gates sector completion.
+                    return float.MaxValue;
                 default:
                     return 0f;
             }

@@ -49,7 +49,7 @@ namespace GameDevTV.RTS.Player
                     return "WATER";
                 if (name.Contains("greenhouse") || name.Contains("nursery") || name.Contains("greenery")
                     || name.Contains("biosphere") || name.Contains("biomass"))
-                    return "BIOMASS";
+                    return "CONSTRUCTION"; // Biomass terraforming deprecated
                 if (name.Contains("habitat") || name.Contains("bio-dome") || name.Contains("biodome")
                     || name.Contains("commons") || name.Contains("apartment") || name.Contains("housing"))
                     return "POPULATION";
@@ -65,8 +65,8 @@ namespace GameDevTV.RTS.Player
                     if (config.AtmosphereGeneration > 0f) return "ATMOSPHERE";
                     if (config.WaterGeneration > 0f) return "WATER";
                     if (config.PowerGeneration > 0f) return "POWER";
-                    if (config.BiomassGeneration > 0f) return "BIOMASS";
                     if (config.HousingCapacity > 0) return "POPULATION";
+                    // BiomassGeneration no longer maps to a sector terraforming goal.
                 }
 
                 if (name.Contains("command")) return "COMMAND POST";

@@ -476,11 +476,12 @@ namespace GameDevTV.RTS.Player
 
                 if (gm.CurrentMilestoneTarget > 0f)
                 {
-                    if (gm.CurrentMilestoneType == MilestoneType.Biomass)
-                        maxBiomass = Mathf.Max(maxBiomass, gm.CurrentMilestoneTarget);
                     if (gm.CurrentMilestoneType == MilestoneType.Oxygen)
                         maxOxygen = Mathf.Max(maxOxygen, gm.CurrentMilestoneTarget);
                 }
+
+                if (gm.CurrentMilestoneType == MilestoneType.Temperature)
+                    maxTemperature = Mathf.Max(maxTemperature, gm.CurrentMilestoneTarget);
             }
         }
 
