@@ -30,7 +30,51 @@ namespace GameDevTV.RTS.Utilities
                 return SectorManager.Instance.UnlockAndColonizeSector(index, owner);
 
             PrepareNewlyUnlockedSector(sector, owner, index);
+            if (sector.IsOccupied)
+                SectorManager.Instance.ActiveSector = sector;
             return sector.IsOccupied;
+        }
+
+        /// <summary>
+        /// World position of a sector's Command Post (building, pad, or sector center fallback).
+        /// </summary>
+        public static bool TryGetCommandPostFocusPosition(int sectorIndex, out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            if (SectorManager.Instance == null) return false;
+            if (sectorIndex < 0 || sectorIndex >= SectorManager.Instance.Sectors.Count) return false;
+            return TryGetCommandPostFocusPosition(SectorManager.Instance.Sectors[sectorIndex], out worldPosition);
+        }
+
+        public static bool TryGetCommandPostFocusPosition(SectorManager.Sector sector, out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            if (sector == null) return false;
+
+            if (sector.OccupyingBuilding != null)
+            {
+                worldPosition = sector.OccupyingBuilding.transform.position;
+                return true;
+            }
+
+            if (sector.BuildingSites != null)
+            {
+                foreach (var site in sector.BuildingSites)
+                {
+                    if (site == null || site.Kind != BuildingSiteKind.CommandPost) continue;
+                    if (site.OccupyingBuilding != null)
+                    {
+                        worldPosition = site.OccupyingBuilding.transform.position;
+                        return true;
+                    }
+
+                    worldPosition = site.Position;
+                    return true;
+                }
+            }
+
+            worldPosition = sector.Center;
+            return true;
         }
 
         private static Vector3 GetColonizationOrigin()

@@ -1,4 +1,5 @@
 using System.Collections;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
 using TMPro;
 using UnityEngine;
@@ -212,9 +213,36 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
+            FocusCameraOnColonizedCommandPost();
+
             if (GenerationManager.Instance != null && !GenerationManager.Instance.IsBetweenRounds)
                 Time.timeScale = 1f;
             Hide();
+        }
+
+        private static void FocusCameraOnColonizedCommandPost()
+        {
+            var gm = GenerationManager.Instance;
+            if (gm == null) return;
+
+            int sectorIndex = gm.LastColonizationResult.SectorIndex;
+            if (!gm.LastColonizationResult.Succeeded && sectorIndex < 0)
+            {
+                // Fallback: newest active sector if colonization metadata is missing.
+                if (SectorManager.Instance?.ActiveSector != null)
+                {
+                    GameDevTV.RTS.Utilities.SectorColonization.TryGetCommandPostFocusPosition(
+                        SectorManager.Instance.ActiveSector, out Vector3 fallback);
+                    PlayerInput.FocusCameraOnWorldPosition(fallback);
+                }
+                return;
+            }
+
+            if (GameDevTV.RTS.Utilities.SectorColonization.TryGetCommandPostFocusPosition(
+                    sectorIndex, out Vector3 focus))
+            {
+                PlayerInput.FocusCameraOnWorldPosition(focus);
+            }
         }
 
         public void InvokePrimaryAction()
