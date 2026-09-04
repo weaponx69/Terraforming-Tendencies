@@ -864,17 +864,22 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            if (config.TemperatureGeneration > 0f)
+            // Climate (Temp / Atmos / Water) only counts from the active sector's
+            // buildings so each colonized sector is its own terraforming mini-game.
+            bool countsForSector = SectorManager.Instance == null
+                || SectorManager.Instance.IsBuildingInActiveSector(this);
+
+            if (countsForSector && config.TemperatureGeneration > 0f)
             {
                 float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
                 Supplies.UpdateTemperature(Owner, curTemp + config.TemperatureGeneration);
             }
-            if (config.AtmosphereGeneration > 0f)
+            if (countsForSector && config.AtmosphereGeneration > 0f)
             {
                 float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
                 Supplies.UpdateAtmosphere(Owner, curAtmos + config.AtmosphereGeneration);
             }
-            if (config.WaterGeneration > 0f)
+            if (countsForSector && config.WaterGeneration > 0f)
             {
                 float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner, out float w) ? w : 0f;
                 Supplies.UpdateWater(Owner, curWater + config.WaterGeneration);

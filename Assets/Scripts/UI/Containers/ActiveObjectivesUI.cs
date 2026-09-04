@@ -112,23 +112,24 @@ namespace GameDevTV.RTS.UI.Containers
 
                 if (!gm.IsExpansionPhase)
                 {
+                    float temp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
+                    float atmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
+                    float water = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
+
                     AppendClimateLine(sb, "TEMPERATURE",
-                        Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f,
-                        gm.GetTargetTemperature(gm.CurrentGeneration),
-                        "{0:F1}°C / {1:F1}°C");
+                        temp, gm.BaselineTemperature, gm.GetRoundTemperatureTarget(),
+                        "{0:F1}°C / {1:F1}°C (need +{2:F0})");
 
                     AppendClimateLine(sb, "ATMOSPHERE",
-                        Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f,
-                        gm.GetTargetAtmosphere(gm.CurrentGeneration),
-                        "{0:F2} atm / {1:F2} atm");
+                        atmos, gm.BaselineAtmosphere, gm.GetRoundAtmosphereTarget(),
+                        "{0:F2} atm / {1:F2} atm (need +{2:F2})");
 
                     AppendClimateLine(sb, "WATER",
-                        Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f,
-                        gm.GetTargetWater(gm.CurrentGeneration),
-                        "{0:F0}% / {1:F0}%");
+                        water, gm.BaselineWater, gm.GetRoundWaterTarget(),
+                        "{0:F0}% / {1:F0}% (need +{2:F0})");
 
                     sb.AppendLine();
-                    sb.AppendLine("<size=13><color=#C8D0D8>Color key (matches hand cards):</color></size>");
+                    sb.AppendLine("<size=13><color=#C8D0D8>Each sector needs its own climate gains — prior sectors do not count.</color></size>");
                     sb.AppendLine("<size=13>" + TerraformingGoalColors.BuildLegendLine(
                         milestoneGoal, "TEMPERATURE", "ATMOSPHERE", "WATER") + "</size>");
                 }
@@ -145,13 +146,14 @@ namespace GameDevTV.RTS.UI.Containers
             System.Text.StringBuilder sb,
             string goalKey,
             float current,
-            float target,
+            float baseline,
+            float roundTarget,
             string valueFormat)
         {
-            // Match GenerationManager win checks (baseline-aware), not absolute-only compare.
             bool met = !GenerationManager.IsUnmetSectorGoal(goalKey);
             Color valueColor = met ? TerraformingGoalColors.MetValue : TerraformingGoalColors.UnmetValue;
-            string valueText = string.Format(valueFormat, current, target);
+            float need = Mathf.Max(0f, roundTarget - baseline);
+            string valueText = string.Format(valueFormat, current, roundTarget, need);
             string label = TerraformingGoalColors.DisplayName(goalKey);
             sb.AppendLine(
                 $"  • {TerraformingGoalColors.Colorize(label + ":", goalKey)} " +

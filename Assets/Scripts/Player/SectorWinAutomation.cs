@@ -379,10 +379,9 @@ namespace GameDevTV.RTS.Player
             // Sync CurrentMilestone* from the active generation.
             gm.CalculateCurrentSectorProgress(out _);
 
-            int gen = Mathf.Max(1, gm.CurrentGeneration);
-            float targetTemp = gm.GetTargetTemperature(gen);
-            float targetAtmos = gm.GetTargetAtmosphere(gen);
-            float targetWater = gm.GetTargetWater(gen);
+            float targetTemp = gm.GetRoundTemperatureTarget();
+            float targetAtmos = gm.GetRoundAtmosphereTarget();
+            float targetWater = gm.GetRoundWaterTarget();
 
             float temp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
             float atmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
@@ -390,6 +389,8 @@ namespace GameDevTV.RTS.Player
 
             Supplies.GetTerraformingCaps(out float maxAtmos, out float maxWater, out _, out float maxBio, out float maxTemp);
             log?.AppendLine($"Caps: Atmos={maxAtmos:F3} Water={maxWater:F1} Bio={maxBio:F1} TempCeil={maxTemp:F1}");
+            log?.AppendLine(
+                $"Round targets (from baselines): Temp={targetTemp:F1} Atmos={targetAtmos:F3} Water={targetWater:F1}");
 
             if (temp < targetTemp)
             {
@@ -433,11 +434,12 @@ namespace GameDevTV.RTS.Player
                 case MilestoneType.Temperature:
                 {
                     float temp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
-                    if (temp < target)
+                    float needed = gm.GetRoundTemperatureTarget() + 0.05f;
+                    if (temp < needed)
                     {
-                        Supplies.UpdateTemperature(Owner.Player1, target);
-                        ClimateManager.Instance?.SetTemperatureTarget(target);
-                        log?.AppendLine($"Set Temperature -> {target:F1}");
+                        Supplies.UpdateTemperature(Owner.Player1, needed);
+                        ClimateManager.Instance?.SetTemperatureTarget(needed);
+                        log?.AppendLine($"Set Temperature -> {needed:F1}");
                     }
                     break;
                 }
@@ -447,7 +449,8 @@ namespace GameDevTV.RTS.Player
                 case MilestoneType.Oxygen:
                 {
                     float ox = Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
-                    float needed = target + 0.05f;
+                    // Oxygen milestone is baseline-relative; raise absolute enough to clear the delta.
+                    float needed = ox + target + 0.05f;
                     if (ox < needed)
                     {
                         Supplies.UpdateOxygen(Owner.Player1, needed);

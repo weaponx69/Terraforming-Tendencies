@@ -30,6 +30,13 @@ namespace GameDevTV.RTS.Units
 
                 if (!shouldGenerateOxygen) return;
 
+                // Sector mini-game: only the active sector's processors count toward oxygen goals.
+                if (Environment.SectorManager.Instance != null
+                    && !Environment.SectorManager.Instance.IsBuildingInActiveSector(this))
+                {
+                    return;
+                }
+
                 tickTimer += Time.deltaTime;
                 if (tickTimer >= tickRate)
                 {

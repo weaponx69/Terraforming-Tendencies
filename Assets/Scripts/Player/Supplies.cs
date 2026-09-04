@@ -461,10 +461,9 @@ namespace GameDevTV.RTS.Player
 
             // Always floor to at least generation-1 win formulas so caps cannot soft-lock
             // even if GenerationManager is missing or mid-init.
-            const int fallbackGen = 1;
-            maxAtmosphere = Mathf.Max(maxAtmosphere, 0.25f * fallbackGen);
-            maxWater = Mathf.Max(maxWater, 10f * fallbackGen - 5f);
-            maxTemperature = Mathf.Max(maxTemperature, -60f + 15f * fallbackGen);
+            maxAtmosphere = Mathf.Max(maxAtmosphere, GenerationManager.SectorAtmosphereDelta);
+            maxWater = Mathf.Max(maxWater, GenerationManager.SectorWaterDelta);
+            maxTemperature = Mathf.Max(maxTemperature, -60f + GenerationManager.SectorTemperatureDelta);
 
             var gm = GenerationManager.Instance;
             if (gm != null && !gm.IsExpansionPhase)
@@ -474,6 +473,12 @@ namespace GameDevTV.RTS.Player
                 maxWater = Mathf.Max(maxWater, gm.GetTargetWater(gen));
                 maxTemperature = Mathf.Max(maxTemperature, gm.GetTargetTemperature(gen));
 
+                // Round targets are baseline + fixed sector delta — must clear those caps
+                // even when the planet is already warm from prior sectors.
+                maxAtmosphere = Mathf.Max(maxAtmosphere, gm.GetRoundAtmosphereTarget());
+                maxWater = Mathf.Max(maxWater, gm.GetRoundWaterTarget());
+                maxTemperature = Mathf.Max(maxTemperature, gm.GetRoundTemperatureTarget());
+
                 if (gm.CurrentMilestoneTarget > 0f)
                 {
                     if (gm.CurrentMilestoneType == MilestoneType.Oxygen)
@@ -481,7 +486,7 @@ namespace GameDevTV.RTS.Player
                 }
 
                 if (gm.CurrentMilestoneType == MilestoneType.Temperature)
-                    maxTemperature = Mathf.Max(maxTemperature, gm.CurrentMilestoneTarget);
+                    maxTemperature = Mathf.Max(maxTemperature, gm.GetRoundTemperatureTarget());
             }
         }
 

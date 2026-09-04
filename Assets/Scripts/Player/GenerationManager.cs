@@ -56,20 +56,38 @@ namespace GameDevTV.RTS.Player
         public float CurrentMilestoneTarget { get; private set; }
         public MilestoneType CurrentMilestoneType { get; private set; }
 
+        /// <summary>
+        /// Each sector is a mini-game: from round-start baselines, the player must earn
+        /// these climate deltas again — prior sectors do not satisfy the new round.
+        /// </summary>
+        public const float SectorTemperatureDelta = 15f;
+        public const float SectorAtmosphereDelta = 0.25f;
+        public const float SectorWaterDelta = 5f;
+
+        public float BaselineTemperature => baselineTemperature;
+        public float BaselineAtmosphere => baselineAtmosphere;
+        public float BaselineWater => baselineWater;
+
+        /// <summary>Absolute climate floor used for caps / planet display (cumulative).</summary>
         public float GetTargetTemperature(int generation)
         {
-            return -60f + (15f * generation);
+            return -60f + (SectorTemperatureDelta * generation);
         }
 
         public float GetTargetAtmosphere(int generation)
         {
-            return 0.25f * generation;
+            return SectorAtmosphereDelta * generation;
         }
 
         public float GetTargetWater(int generation)
         {
-            return 10.0f * generation - 5.0f;
+            return SectorWaterDelta * generation;
         }
+
+        /// <summary>This sector round's temperature win target (baseline + fixed delta).</summary>
+        public float GetRoundTemperatureTarget() => baselineTemperature + SectorTemperatureDelta;
+        public float GetRoundAtmosphereTarget() => baselineAtmosphere + SectorAtmosphereDelta;
+        public float GetRoundWaterTarget() => baselineWater + SectorWaterDelta;
 
         public string CurrentMilestoneDescription
         {
@@ -82,10 +100,7 @@ namespace GameDevTV.RTS.Player
                 {
                     return baseDesc;
                 }
-                float targetTemp = GetTargetTemperature(CurrentGeneration);
-                float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
-                float targetWater = GetTargetWater(CurrentGeneration);
-                return $"{baseDesc} (Temp >= {targetTemp:F0}°C, Atmos >= {targetAtmos:F2} atm, Water >= {targetWater:F0}%)";
+                return $"{baseDesc} (+{SectorTemperatureDelta:F0}°C Temp, +{SectorAtmosphereDelta:F2} atm, +{SectorWaterDelta:F0}% Water this sector)";
             }
         }
 
@@ -178,7 +193,7 @@ namespace GameDevTV.RTS.Player
             {
                 milestones = new List<SectorMilestone>
                 {
-                    new SectorMilestone { Type = MilestoneType.Temperature, TargetValue = -45f, GoalDescription = "Raise Temperature to -45°C" },
+                    new SectorMilestone { Type = MilestoneType.Temperature, TargetValue = SectorTemperatureDelta, GoalDescription = $"Raise Temperature by {SectorTemperatureDelta:F0}°C this sector" },
                     new SectorMilestone { Type = MilestoneType.Power, TargetValue = 20f, GoalDescription = "Generate 20 Grid Power" },
                     new SectorMilestone { Type = MilestoneType.Oxygen, TargetValue = 30f, GoalDescription = "Reach 30% Atmospheric Oxygen" },
                     new SectorMilestone { Type = MilestoneType.Population, TargetValue = 10f, GoalDescription = "Establish 10 Colonists" },
@@ -213,10 +228,9 @@ namespace GameDevTV.RTS.Player
                     }
                     else if (milestones[i].Type == MilestoneType.Temperature)
                     {
-                        float targetTemp = GetTargetTemperature(generation);
                         var m = milestones[i];
-                        m.TargetValue = targetTemp;
-                        m.GoalDescription = $"Raise Temperature to {targetTemp:F0}°C";
+                        m.TargetValue = SectorTemperatureDelta;
+                        m.GoalDescription = $"Raise Temperature by {SectorTemperatureDelta:F0}°C this sector";
                         milestones[i] = m;
                     }
                 }
@@ -252,18 +266,19 @@ namespace GameDevTV.RTS.Player
             baselineWater = 0f;
             if (Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float water))
                 baselineWater = water;
+
+            // Stop prior-sector climate card tick-ups from auto-completing this round.
+            ClimateManager.Instance?.ClearPendingTargets();
         }
 
-        /// <summary>Progress toward target from the round-start baseline (0–1).</summary>
-        private static float IncrementalProgress(float current, float baseline, float target)
+        /// <summary>
+        /// Progress for this sector round: only gains above the round-start baseline count.
+        /// Prior-sector absolute climate values never auto-complete the round.
+        /// </summary>
+        private static float RoundDeltaProgress(float current, float baseline, float requiredDelta)
         {
-            // Higher-is-better metrics: already at the absolute target counts as done.
-            // Prevents softlocks when a sector reset records a baseline above the formula target.
-            if (current >= target - 0.0001f) return 1f;
-
-            float delta = target - baseline;
-            if (delta <= 0.0001f) return 1f;
-            return Mathf.Clamp01((current - baseline) / delta);
+            if (requiredDelta <= 0.0001f) return 1f;
+            return Mathf.Clamp01((current - baseline) / requiredDelta);
         }
 
         private void MarkActiveSectorRoundComplete()
@@ -365,23 +380,18 @@ namespace GameDevTV.RTS.Player
             CurrentMilestoneType = milestone.Type;
             CurrentMilestoneValue = currentValue;
 
-            float primaryProgress = milestone.Type == MilestoneType.Temperature
-                ? IncrementalProgress(currentValue, baselineTemperature, milestone.TargetValue)
-                : milestone.TargetValue > 0
-                    ? Mathf.Clamp01(currentValue / milestone.TargetValue)
-                    : 1f;
+            float primaryProgress = milestone.TargetValue > 0
+                ? Mathf.Clamp01(currentValue / milestone.TargetValue)
+                : 1f;
 
             float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
-            float targetTemp = GetTargetTemperature(CurrentGeneration);
-            float tempProgress = IncrementalProgress(currentTemp, baselineTemperature, targetTemp);
+            float tempProgress = RoundDeltaProgress(currentTemp, baselineTemperature, SectorTemperatureDelta);
 
             float currentAtmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
-            float targetAtmos = GetTargetAtmosphere(CurrentGeneration);
-            float atmosProgress = IncrementalProgress(currentAtmos, baselineAtmosphere, targetAtmos);
+            float atmosProgress = RoundDeltaProgress(currentAtmos, baselineAtmosphere, SectorAtmosphereDelta);
 
             float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
-            float targetWater = GetTargetWater(CurrentGeneration);
-            float waterProgress = IncrementalProgress(currentWater, baselineWater, targetWater);
+            float waterProgress = RoundDeltaProgress(currentWater, baselineWater, SectorWaterDelta);
 
             float progress = Mathf.Min(primaryProgress, Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress)));
 
@@ -703,7 +713,6 @@ namespace GameDevTV.RTS.Player
             if (string.IsNullOrEmpty(goal)) return false;
             if (Instance != null && Instance.IsBetweenRounds) return false;
 
-            int generation = Instance != null ? Mathf.Max(1, Instance.CurrentGeneration) : 1;
             bool expansion = Instance != null && Instance.IsExpansionPhase;
 
             if (expansion)
@@ -736,19 +745,15 @@ namespace GameDevTV.RTS.Player
             float atmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
             float water = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
 
-            float targetTemp = Instance != null ? Instance.GetTargetTemperature(generation) : -60f + 15f * generation;
-            float targetAtmos = Instance != null ? Instance.GetTargetAtmosphere(generation) : 0.25f * generation;
-            float targetWater = Instance != null ? Instance.GetTargetWater(generation) : 10f * generation - 5f;
-
             if (goal == "TEMPERATURE")
-                return Instance != null && IncrementalProgress(temp, Instance.baselineTemperature, targetTemp) < 1f;
+                return Instance != null && RoundDeltaProgress(temp, Instance.baselineTemperature, SectorTemperatureDelta) < 1f;
             if (goal == "ATMOSPHERE")
-                return Instance != null && IncrementalProgress(atmos, Instance.baselineAtmosphere, targetAtmos) < 1f;
+                return Instance != null && RoundDeltaProgress(atmos, Instance.baselineAtmosphere, SectorAtmosphereDelta) < 1f;
             if (goal == "WATER")
-                return Instance != null && IncrementalProgress(water, Instance.baselineWater, targetWater) < 1f;
+                return Instance != null && RoundDeltaProgress(water, Instance.baselineWater, SectorWaterDelta) < 1f;
 
             MilestoneType type = Instance != null ? Instance.CurrentMilestoneType : MilestoneType.Temperature;
-            float target = Instance != null ? Instance.CurrentMilestoneTarget : -45f;
+            float target = Instance != null ? Instance.CurrentMilestoneTarget : SectorTemperatureDelta;
             if (!GoalMatchesMilestone(goal, type)) return false;
             return ReadMilestoneValue(type) < target;
         }
@@ -775,9 +780,10 @@ namespace GameDevTV.RTS.Player
             {
                 case MilestoneType.Temperature:
                 {
-                    return Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t)
+                    float temp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t)
                         ? t
                         : -60f;
+                    return temp - Instance.baselineTemperature;
                 }
                 case MilestoneType.Oxygen:
                 {

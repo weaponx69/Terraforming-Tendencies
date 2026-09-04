@@ -36,6 +36,52 @@ namespace GameDevTV.RTS.Environment
         public List<Sector> Sectors = new List<Sector>();
         public Sector ActiveSector { get; set; }
 
+        /// <summary>
+        /// True when this building belongs to the active sector's mini-game
+        /// (on an active-sector pad, or nearer to ActiveSector than any other).
+        /// </summary>
+        public bool IsBuildingInActiveSector(BaseBuilding building)
+        {
+            if (building == null) return false;
+            if (ActiveSector == null) return true;
+
+            if (ActiveSector.BuildingSites != null)
+            {
+                foreach (var site in ActiveSector.BuildingSites)
+                {
+                    if (site != null && site.OccupyingBuilding == building)
+                        return true;
+                }
+            }
+
+            if (ActiveSector.OccupyingBuilding == building)
+                return true;
+
+            Sector nearest = GetNearestSector(building.transform.position);
+            return nearest == ActiveSector;
+        }
+
+        public Sector GetNearestSector(Vector3 worldPosition)
+        {
+            if (Sectors == null || Sectors.Count == 0) return null;
+
+            Sector nearest = null;
+            float minDistSq = float.MaxValue;
+            for (int i = 0; i < Sectors.Count; i++)
+            {
+                var sector = Sectors[i];
+                if (sector == null) continue;
+                float distSq = (sector.Center - worldPosition).sqrMagnitude;
+                if (distSq < minDistSq)
+                {
+                    minDistSq = distSq;
+                    nearest = sector;
+                }
+            }
+
+            return nearest;
+        }
+
         private float secW;
         private float secH;
         private List<GameObject> borderInstances = new List<GameObject>();

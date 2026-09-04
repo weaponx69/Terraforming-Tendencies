@@ -69,6 +69,17 @@ namespace GameDevTV.RTS.Player
         public void SetAtmosphereTarget(float value)   { targetAtmosphere = value; }
         public void SetWaterTarget(float value)        { targetWater = value; }
 
+        /// <summary>
+        /// Clears leftover card tick-up targets so a new sector round does not
+        /// inherit free climate progress from the previous sector's shipments.
+        /// </summary>
+        public void ClearPendingTargets()
+        {
+            targetTemperature = float.MinValue;
+            targetAtmosphere = float.MinValue;
+            targetWater = float.MinValue;
+        }
+
         private IEnumerator ClimateTickLoop()
         {
             while (true)

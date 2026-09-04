@@ -207,9 +207,10 @@ namespace GameDevTV.RTS.Tests
                     BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.Invoke(gm, null);
 
-            Supplies.UpdateTemperature(Owner.Player1, gm.GetTargetTemperature(1));
-            Supplies.UpdateAtmosphere(Owner.Player1, gm.GetTargetAtmosphere(1));
-            Supplies.UpdateWater(Owner.Player1, gm.GetTargetWater(1));
+            // Overshoot gen-1 absolute floors — still must not complete gen 2.
+            Supplies.UpdateTemperature(Owner.Player1, 20f);
+            Supplies.UpdateAtmosphere(Owner.Player1, 2f);
+            Supplies.UpdateWater(Owner.Player1, 50f);
 
             typeof(GenerationManager).GetField(
                     "<CurrentGeneration>k__BackingField",
@@ -222,7 +223,53 @@ namespace GameDevTV.RTS.Tests
                 ?.Invoke(gm, null);
 
             float progress = gm.CalculateCurrentSectorProgress(out string bottleneck);
-            Assert.Less(progress, 0.05f, $"Gen 2 should start at ~0% after gen 1 targets met; bottleneck={bottleneck}");
+            Assert.Less(progress, 0.05f, $"Gen 2 should start at ~0% after prior gains; bottleneck={bottleneck}");
+            Assert.IsFalse(gm.IsCurrentSectorRoundComplete());
+            Assert.IsTrue(GenerationManager.IsUnmetSectorGoal("TEMPERATURE"));
+            Assert.IsTrue(GenerationManager.IsUnmetSectorGoal("ATMOSPHERE"));
+            Assert.IsTrue(GenerationManager.IsUnmetSectorGoal("WATER"));
+
+            Object.DestroyImmediate(gmObj);
+            Object.DestroyImmediate(smObj);
+        }
+
+        [Test]
+        public void Gen2Progress_RequiresFreshClimateDeltaEvenIfPlanetAlreadyWarm()
+        {
+            var gmObj = new GameObject("GenerationManager");
+            var gm = gmObj.AddComponent<GenerationManager>();
+            var smObj = new GameObject("SectorManager");
+            var sm = smObj.AddComponent<SectorManager>();
+            sm.Sectors = new System.Collections.Generic.List<SectorManager.Sector>
+            {
+                new SectorManager.Sector { IsLocked = false, IsExplored = true, IsOccupied = true },
+                new SectorManager.Sector { IsLocked = false, IsExplored = true, IsOccupied = true },
+            };
+            sm.ActiveSector = sm.Sectors[1];
+
+            typeof(GenerationManager).GetMethod(
+                    "InitializeDefaultMilestones",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(gm, null);
+
+            typeof(GenerationManager).GetField(
+                    "<CurrentGeneration>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.SetValue(gm, 2);
+
+            Supplies.UpdateTemperature(Owner.Player1, 0f);
+            Supplies.UpdateAtmosphere(Owner.Player1, 1f);
+            Supplies.UpdateWater(Owner.Player1, 40f);
+            typeof(GenerationManager).GetMethod(
+                    "RecordBaselines",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(gm, null);
+
+            // Tiny bump — far less than a full sector delta.
+            Supplies.UpdateTemperature(Owner.Player1, 1f);
+            float progress = gm.CalculateCurrentSectorProgress(out _);
+            Assert.Greater(progress, 0f);
+            Assert.Less(progress, 0.2f);
             Assert.IsFalse(gm.IsCurrentSectorRoundComplete());
 
             Object.DestroyImmediate(gmObj);
