@@ -606,32 +606,7 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void ApplyHudReadability()
         {
-            Transform stripParent = null;
-            GameObject integrityContainerGo = GameObject.Find("Integrity Container");
-            if (integrityContainerGo == null)
-            {
-                Transform t = FindChildRecursive(transform, "Integrity Container");
-                if (t != null) integrityContainerGo = t.gameObject;
-            }
-            if (integrityContainerGo != null)
-            {
-                stripParent = integrityContainerGo.transform.parent;
-            }
-            else
-            {
-                GameObject mineralsGo = GameObject.Find("Minerals Container");
-                if (mineralsGo == null)
-                {
-                    Transform t = FindChildRecursive(transform, "Minerals Container");
-                    if (t != null) mineralsGo = t.gameObject;
-                }
-                if (mineralsGo != null) stripParent = mineralsGo.transform.parent;
-            }
-
-            if (stripParent != null)
-            {
-                EnsureResourceBarBackdrop(stripParent);
-            }
+            EnsureTopResourceBar();
 
             StyleMetric(materialsLabelText, materialsValueText, null, "Materials");
             StyleMetric(biomassLabelText, biomassValueText, null, "Biomass");
@@ -650,60 +625,103 @@ namespace GameDevTV.RTS.UI
             }
         }
 
-        private static void EnsureResourceBarBackdrop(Transform stripParent)
+        /// <summary>
+        /// Full-width opaque top HUD band so resource metrics stay readable over terrain.
+        /// Parent is always the RuntimeUI / Canvas root — not the metric strip alone.
+        /// </summary>
+        private void EnsureTopResourceBar()
         {
-            if (stripParent == null) return;
+            const string barName = "Top Resource Bar";
+            const float barHeight = 128f;
 
-            const string backdropName = "Resource Bar Backdrop";
-            Transform existing = stripParent.Find(backdropName);
-            Image backdrop;
+            Transform root = transform;
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas != null) root = canvas.transform;
+
+            Transform existing = root.Find(barName);
             if (existing == null)
             {
-                var go = new GameObject(backdropName, typeof(RectTransform), typeof(Image));
-                go.transform.SetParent(stripParent, false);
+                // Also search descendants in case it was parented elsewhere previously.
+                existing = FindChildRecursive(root, barName);
+            }
+
+            Image barImage;
+            RectTransform rt;
+            if (existing == null)
+            {
+                var go = new GameObject(barName, typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+                go.transform.SetParent(root, false);
                 go.transform.SetAsFirstSibling();
                 existing = go.transform;
-                backdrop = go.GetComponent<Image>();
+                barImage = go.GetComponent<Image>();
+                rt = go.GetComponent<RectTransform>();
+                go.GetComponent<LayoutElement>().ignoreLayout = true;
             }
             else
             {
-                backdrop = existing.GetComponent<Image>();
-                if (backdrop == null) backdrop = existing.gameObject.AddComponent<Image>();
+                if (existing.parent != root)
+                {
+                    existing.SetParent(root, false);
+                }
+                existing.SetAsFirstSibling();
+                barImage = existing.GetComponent<Image>();
+                if (barImage == null) barImage = existing.gameObject.AddComponent<Image>();
+                rt = existing as RectTransform;
+                if (rt == null) rt = existing.gameObject.AddComponent<RectTransform>();
+                var le = existing.GetComponent<LayoutElement>();
+                if (le == null) le = existing.gameObject.AddComponent<LayoutElement>();
+                le.ignoreLayout = true;
             }
 
-            var rt = existing as RectTransform;
-            if (rt == null) rt = existing.gameObject.AddComponent<RectTransform>();
+            // Edge-to-edge top band.
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(0f, barHeight);
+            rt.offsetMin = new Vector2(0f, -barHeight);
+            rt.offsetMax = Vector2.zero;
 
-            bool parentIsCanvas = stripParent.GetComponent<Canvas>() != null;
-            if (parentIsCanvas)
+            // Match Active Objectives opacity so the strip reads as a real HUD chrome.
+            barImage.color = new Color(0.02f, 0.03f, 0.07f, 0.94f);
+            barImage.raycastTarget = false;
+
+            // Soft underline so the bar edge separates from the world.
+            const string edgeName = "Top Resource Bar Edge";
+            Transform edgeT = existing.Find(edgeName);
+            Image edgeImage;
+            RectTransform edgeRt;
+            if (edgeT == null)
             {
-                // Only darken the top band — never the whole screen.
-                rt.anchorMin = new Vector2(0f, 1f);
-                rt.anchorMax = new Vector2(1f, 1f);
-                rt.pivot = new Vector2(0.5f, 1f);
-                rt.anchoredPosition = Vector2.zero;
-                rt.sizeDelta = new Vector2(0f, 120f);
-                rt.offsetMin = new Vector2(0f, rt.offsetMin.y);
-                rt.offsetMax = new Vector2(0f, 0f);
+                var edgeGo = new GameObject(edgeName, typeof(RectTransform), typeof(Image));
+                edgeGo.transform.SetParent(existing, false);
+                edgeT = edgeGo.transform;
+                edgeImage = edgeGo.GetComponent<Image>();
+                edgeRt = edgeGo.GetComponent<RectTransform>();
             }
             else
             {
-                // Cover the strip container; ignoreLayout keeps HLG from reserving space for it.
-                rt.anchorMin = Vector2.zero;
-                rt.anchorMax = Vector2.one;
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-                rt.sizeDelta = Vector2.zero;
-                rt.offsetMin = new Vector2(-18f, -14f);
-                rt.offsetMax = new Vector2(18f, 14f);
+                edgeImage = edgeT.GetComponent<Image>();
+                if (edgeImage == null) edgeImage = edgeT.gameObject.AddComponent<Image>();
+                edgeRt = edgeT as RectTransform;
+                if (edgeRt == null) edgeRt = edgeT.gameObject.AddComponent<RectTransform>();
             }
 
-            backdrop.color = new Color(0.02f, 0.03f, 0.06f, 0.82f);
-            backdrop.raycastTarget = false;
+            edgeRt.anchorMin = new Vector2(0f, 0f);
+            edgeRt.anchorMax = new Vector2(1f, 0f);
+            edgeRt.pivot = new Vector2(0.5f, 0f);
+            edgeRt.anchoredPosition = Vector2.zero;
+            edgeRt.sizeDelta = new Vector2(0f, 3f);
+            edgeImage.color = new Color(0.35f, 0.75f, 0.95f, 0.55f);
+            edgeImage.raycastTarget = false;
 
-            var ignoreLayout = existing.GetComponent<LayoutElement>();
-            if (ignoreLayout == null) ignoreLayout = existing.gameObject.AddComponent<LayoutElement>();
-            ignoreLayout.ignoreLayout = true;
+            // Remove any old strip-local backdrop that only covered a small box.
+            Transform legacy = FindChildRecursive(transform, "Resource Bar Backdrop");
+            if (legacy != null && legacy != existing)
+            {
+                if (Application.isPlaying) Destroy(legacy.gameObject);
+                else DestroyImmediate(legacy.gameObject);
+            }
         }
 
         private static void StyleMetric(TextMeshProUGUI label, TextMeshProUGUI value, string goalKey, string fallbackLabel)
@@ -716,12 +734,12 @@ namespace GameDevTV.RTS.UI
                 }
 
                 label.enableAutoSizing = false;
-                label.fontSize = Mathf.Max(label.fontSize, 16f);
+                label.fontSize = Mathf.Max(label.fontSize, 17f);
                 label.fontStyle = FontStyles.Bold;
                 label.color = string.IsNullOrEmpty(goalKey)
                     ? TerraformingGoalColors.Neutral
                     : TerraformingGoalColors.ForGoal(goalKey);
-                EnsureTextOutline(label, new Color(0f, 0f, 0f, 0.85f), new Vector2(1.25f, -1.25f));
+                EnsureTextOutline(label, new Color(0f, 0f, 0f, 0.95f), new Vector2(1.4f, -1.4f));
                 label.raycastTarget = false;
             }
 
@@ -732,10 +750,10 @@ namespace GameDevTV.RTS.UI
         {
             if (value == null) return;
             value.enableAutoSizing = false;
-            value.fontSize = Mathf.Max(value.fontSize, 24f);
+            value.fontSize = Mathf.Max(value.fontSize, 26f);
             value.fontStyle = FontStyles.Bold;
             value.color = Color.white;
-            EnsureTextOutline(value, new Color(0f, 0f, 0f, 0.9f), new Vector2(1.5f, -1.5f));
+            EnsureTextOutline(value, new Color(0f, 0f, 0f, 0.95f), new Vector2(1.6f, -1.6f));
             value.raycastTarget = false;
         }
 
