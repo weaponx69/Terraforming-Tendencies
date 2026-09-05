@@ -28,12 +28,16 @@ namespace GameDevTV.RTS.UI.Containers
         [Tooltip("Playing-card style size for a 5-card hand (width x height).")]
         [SerializeField] private Vector2 cardSize = new Vector2(158f, 220f);
         [SerializeField] private float cardSpacing = 14f;
-        [Tooltip("Distance from the bottom edge of the screen to the bottom of the hand.")]
-        [SerializeField] private float bottomMargin = 16f;
+        [Tooltip("Extra gap above the Bottom Bar HUD so cards do not cover selection info.")]
+        [SerializeField] private float gapAboveBottomBar = 12f;
+        [Tooltip("Fallback Bottom Bar height when the HUD rect cannot be found.")]
+        [SerializeField] private float fallbackBottomBarHeight = 300f;
         [Tooltip("Distance from the left edge of the screen to the left edge of the hand.")]
         [SerializeField] private float leftMargin = 16f;
         [Tooltip("Visible hand capacity — keep in sync with CardDeckController.handSize.")]
         [SerializeField] private int visibleHandSlots = 5;
+
+        private float bottomMargin = 16f;
 
         private bool isBuilt = false;
         private Owner owner = Owner.Player1;
@@ -87,13 +91,14 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
-        /// Resize hand slots to a taller playing-card aspect, pin the strip to the
-        /// bottom-left of the screen, and keep it above leftover bottom-HUD elements for clicks.
+        /// Resize hand slots to a taller playing-card aspect and dock them
+        /// <b>above</b> the Bottom Bar so the middle selection-info panel stays visible.
         /// </summary>
         private void ApplyPlayingCardLayout()
         {
             float width = Mathf.Max(48f, cardSize.x);
             float height = Mathf.Max(width * 1.25f, cardSize.y);
+            bottomMargin = ResolveBottomClearance();
 
             // Cards live on this object; chrome/container may be the parent.
             var cardsRt = transform as RectTransform;
@@ -101,7 +106,7 @@ namespace GameDevTV.RTS.UI.Containers
             if (containerRt == null) containerRt = cardsRt;
             if (containerRt == null) return;
 
-            // Bottom-left dock — grows rightward from the left edge.
+            // Bottom-left dock, raised above the Bottom Bar HUD band.
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
@@ -168,6 +173,36 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
+        /// Place the hand just above the classic Bottom Bar (minimap / selection info / actions).
+        /// </summary>
+        private float ResolveBottomClearance()
+        {
+            RectTransform bottomBar = FindBottomBarRect();
+            if (bottomBar == null)
+                return fallbackBottomBarHeight + gapAboveBottomBar;
+
+            // Prefer layout height; fall back to rect height.
+            float h = bottomBar.rect.height;
+            if (h < 8f) h = bottomBar.sizeDelta.y;
+            if (h < 8f) h = fallbackBottomBarHeight;
+            return h + gapAboveBottomBar;
+        }
+
+        private RectTransform FindBottomBarRect()
+        {
+            Transform t = transform;
+            for (int i = 0; i < 8 && t != null; i++)
+            {
+                if (t.name == "Bottom Bar")
+                    return t as RectTransform;
+                t = t.parent;
+            }
+
+            var go = GameObject.Find("Bottom Bar");
+            return go != null ? go.transform as RectTransform : null;
+        }
+
+        /// <summary>
         /// Collapse disabled slots out of the horizontal layout and size the dock
         /// to the active hand only (left-aligned).
         /// </summary>
@@ -210,6 +245,11 @@ namespace GameDevTV.RTS.UI.Containers
                   + leftPad + rightPad;
             containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
             containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height + topPad + bottomPad);
+
+            // Keep the hand parked above the Bottom Bar (selection info lives in that band).
+            bottomMargin = ResolveBottomClearance();
+            containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+
             LayoutRebuilder.ForceRebuildLayoutImmediate(containerRt);
         }
 
