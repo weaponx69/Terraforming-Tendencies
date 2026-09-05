@@ -523,8 +523,9 @@ namespace GameDevTV.RTS.Utilities
             return true;
         }
 
-        private static int GetMaterialsCost(BuildingSO building)
+        public static int GetMaterialsCost(BuildingSO building)
         {
+            if (building?.Cost == null) return 0;
             return Mathf.FloorToInt(
                 building.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic +
                 building.Cost.Gas * Supplies.GasToMaterialsRateStatic);

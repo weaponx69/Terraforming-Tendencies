@@ -26,7 +26,7 @@ namespace GameDevTV.RTS.Player
         [Header("Deck Configuration")]
         [SerializeField] private List<BlueprintCardSO> masterDeck = new();
         public List<BlueprintCardSO> MasterDeck => masterDeck;
-        [SerializeField] private int handSize = 10;
+        [SerializeField] private int handSize = 5;
 
         private List<BlueprintCardSO> drawPile = new();
         private List<BlueprintCardSO> discardPile = new();
@@ -55,6 +55,8 @@ namespace GameDevTV.RTS.Player
         private void Awake()
         {
             Instance = this;
+            // Keep the hand readable: five larger cards (overrides older serialized 10).
+            handSize = 5;
         }
 
         private void OnEnable()

@@ -5,6 +5,7 @@ using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.UI;
+using GameDevTV.RTS.Utilities;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -27,10 +28,11 @@ namespace GameDevTV.RTS.UI.Components
         private Image buttonImage;
         private Outline goalOutline;
         private TextMeshProUGUI goalBadge;
+        private TextMeshProUGUI costLabel;
         private Color defaultButtonColor = Color.white;
         private string goalKey = string.Empty;
 
-        private static readonly string BIOMASS_FORMAT = "{0} <color=#7A5A00>Biomass</color>. ";
+        private static readonly string MATERIALS_FORMAT = "{0} Materials";
         private static readonly string DEPENDENCY_FORMAT_NO_COMMA = "<color=#AC0000>{0}</color>.";
         private static readonly string DEPENDENCY_FORMAT_COMMA = "<color=#AC0000>{0}</color>, ";
 
@@ -65,16 +67,18 @@ namespace GameDevTV.RTS.UI.Components
 
             button.onClick.RemoveAllListeners();
             SetIcon(command.Icon);
+            EnsureCardTextLayout();
             SetLabel(command.Name);
+            SetCost(ResolveMaterialsCost(command));
             button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
             button.onClick.AddListener(onClick);
             isActive = true;
             if (buttonImage != null)
             {
-                // Icon-forward cards: keep a light hit target, not a solid chrome plate.
+                // Readable card plate — translucent so icon/text stay clear.
                 Color c = defaultButtonColor;
-                c.a = Mathf.Min(c.a, 0.35f);
-                if (c.a < 0.15f) c.a = 0.25f;
+                c.a = Mathf.Clamp(c.a, 0.55f, 0.92f);
+                if (c.a < 0.4f) c.a = 0.7f;
                 buttonImage.color = c;
                 buttonImage.raycastTarget = true;
             }
@@ -97,6 +101,7 @@ namespace GameDevTV.RTS.UI.Components
         {
             SetIcon(null);
             SetLabel(null);
+            SetCost(-1);
             ClearGoalAccent();
             if (button != null)
             {
@@ -145,28 +150,116 @@ namespace GameDevTV.RTS.UI.Components
             }
         }
 
-        private void SetLabel(string text)
+        /// <summary>
+        /// Keep title + cost inside the card face (previous layout hung text below the button).
+        /// </summary>
+        private void EnsureCardTextLayout()
         {
             if (label == null)
             {
                 GameObject labelGO = new GameObject("Label", typeof(TextMeshProUGUI));
                 labelGO.transform.SetParent(transform, false);
                 label = labelGO.GetComponent<TextMeshProUGUI>();
-                label.fontSize = 14;
-                label.alignment = TextAlignmentOptions.Center;
-                label.color = Color.white;
-                label.richText = true;
-                RectTransform rt = label.GetComponent<RectTransform>();
-                rt.anchorMin = new Vector2(0, 0);
-                rt.anchorMax = new Vector2(1, 0);
-                rt.offsetMin = new Vector2(0, -20);
-                rt.offsetMax = new Vector2(0, 0);
             }
 
+            label.fontSize = 15f;
+            label.fontSizeMin = 11f;
+            label.fontSizeMax = 16f;
+            label.enableAutoSizing = true;
+            label.alignment = TextAlignmentOptions.Bottom;
+            label.color = Color.white;
+            label.richText = true;
+            label.raycastTarget = false;
+            label.textWrappingMode = TextWrappingModes.Normal;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.margin = new Vector4(6f, 2f, 6f, 2f);
+
+            RectTransform labelRt = label.rectTransform;
+            labelRt.anchorMin = new Vector2(0.06f, 0.12f);
+            labelRt.anchorMax = new Vector2(0.94f, 0.30f);
+            labelRt.offsetMin = Vector2.zero;
+            labelRt.offsetMax = Vector2.zero;
+            labelRt.pivot = new Vector2(0.5f, 0f);
+
+            if (costLabel == null)
+            {
+                GameObject costGO = new GameObject("Cost", typeof(TextMeshProUGUI));
+                costGO.transform.SetParent(transform, false);
+                costLabel = costGO.GetComponent<TextMeshProUGUI>();
+            }
+
+            costLabel.fontSize = 13f;
+            costLabel.fontStyle = FontStyles.Bold;
+            costLabel.alignment = TextAlignmentOptions.Bottom;
+            costLabel.color = new Color(1f, 0.92f, 0.45f, 1f);
+            costLabel.richText = true;
+            costLabel.raycastTarget = false;
+            costLabel.margin = new Vector4(6f, 0f, 6f, 4f);
+            if (label.font != null) costLabel.font = label.font;
+
+            RectTransform costRt = costLabel.rectTransform;
+            costRt.anchorMin = new Vector2(0.06f, 0.02f);
+            costRt.anchorMax = new Vector2(0.94f, 0.14f);
+            costRt.offsetMin = Vector2.zero;
+            costRt.offsetMax = Vector2.zero;
+            costRt.pivot = new Vector2(0.5f, 0f);
+        }
+
+        private void SetLabel(string text)
+        {
+            EnsureCardTextLayout();
             if (label != null)
             {
                 label.text = text ?? "";
+                label.gameObject.SetActive(!string.IsNullOrEmpty(text));
             }
+        }
+
+        private void SetCost(int materialsCost)
+        {
+            EnsureCardTextLayout();
+            if (costLabel == null) return;
+
+            if (materialsCost < 0)
+            {
+                costLabel.gameObject.SetActive(false);
+                costLabel.text = "";
+                return;
+            }
+
+            costLabel.gameObject.SetActive(true);
+            if (materialsCost == 0)
+            {
+                costLabel.text = "Free";
+                costLabel.color = new Color(0.65f, 0.95f, 0.7f, 1f);
+            }
+            else
+            {
+                bool canAfford = Supplies.Materials != null
+                    && Supplies.Materials.TryGetValue(Owner.Player1, out int have)
+                    && have >= materialsCost;
+                costLabel.text = $"{materialsCost} Mat";
+                costLabel.color = canAfford
+                    ? new Color(1f, 0.92f, 0.45f, 1f)
+                    : new Color(1f, 0.45f, 0.4f, 1f);
+            }
+        }
+
+        private static int ResolveMaterialsCost(BaseCommand command)
+        {
+            if (command is BuildBuildingCommand buildingCommand && buildingCommand.Building != null)
+            {
+                return ReservedSiteBuildUtility.GetMaterialsCost(buildingCommand.Building);
+            }
+
+            if (command is BuildUnitCommand unitCommand && unitCommand.Unit?.Cost != null)
+            {
+                return Mathf.FloorToInt(
+                    unitCommand.Unit.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
+                    + unitCommand.Unit.Cost.Gas * Supplies.GasToMaterialsRateStatic);
+            }
+
+            return 0;
         }
 
         private void SetIcon(Sprite icon)
@@ -203,7 +296,9 @@ namespace GameDevTV.RTS.UI.Components
 
             if (buttonImage != null)
             {
-                buttonImage.color = Color.Lerp(defaultButtonColor, accent, 0.35f);
+                Color plate = Color.Lerp(defaultButtonColor, accent, 0.28f);
+                plate.a = Mathf.Clamp(buttonImage.color.a, 0.55f, 0.92f);
+                buttonImage.color = plate;
             }
 
             EnsureGoalOutline();
@@ -254,18 +349,17 @@ namespace GameDevTV.RTS.UI.Components
             GameObject badgeGO = new GameObject("Goal Badge", typeof(TextMeshProUGUI));
             badgeGO.transform.SetParent(transform, false);
             goalBadge = badgeGO.GetComponent<TextMeshProUGUI>();
-            goalBadge.fontSize = 10f;
+            goalBadge.fontSize = 12f;
             goalBadge.fontStyle = FontStyles.Bold;
             goalBadge.alignment = TextAlignmentOptions.TopRight;
             goalBadge.richText = true;
             goalBadge.raycastTarget = false;
 
             RectTransform rt = goalBadge.rectTransform;
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(1f, 1f);
-            rt.anchoredPosition = new Vector2(-2f, -2f);
-            rt.sizeDelta = new Vector2(-4f, 14f);
+            rt.anchorMin = new Vector2(0.05f, 0.86f);
+            rt.anchorMax = new Vector2(0.95f, 0.98f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
 
             if (label != null && label.font != null)
             {
@@ -286,24 +380,10 @@ namespace GameDevTV.RTS.UI.Components
                     $"{command.Name}\n";
             }
 
-            SupplyCostSO supplyCost = null;
-            if (command is BuildUnitCommand unitCommand)
+            int cost = ResolveMaterialsCost(command);
+            if (cost > 0)
             {
-                supplyCost = unitCommand.Unit.Cost;
-            }
-            else if (command is BuildBuildingCommand buildingCommand)
-            {
-                supplyCost = buildingCommand.Building.Cost;
-            }
-
-            if (supplyCost != null)
-            {
-                int cost = Mathf.FloorToInt(supplyCost.Minerals * Supplies.MineralsToMaterialsRateStatic
-                                      + supplyCost.Gas * Supplies.GasToMaterialsRateStatic);
-                if (cost > 0)
-                {
-                    tooltipText += string.Format(BIOMASS_FORMAT, cost);
-                }
+                tooltipText += string.Format(MATERIALS_FORMAT, cost) + ". ";
             }
 
             if (command.IsLocked(new CommandContext(Owner.Player1, null, new RaycastHit()))

@@ -25,13 +25,15 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private UIActionButton[] actionButtons;
 
         [Header("Card Layout")]
-        [Tooltip("Playing-card style size (width x height). Height should be taller than width.")]
-        [SerializeField] private Vector2 cardSize = new Vector2(120f, 170f);
-        [SerializeField] private float cardSpacing = 12f;
+        [Tooltip("Playing-card style size for a 5-card hand (width x height).")]
+        [SerializeField] private Vector2 cardSize = new Vector2(158f, 220f);
+        [SerializeField] private float cardSpacing = 14f;
         [Tooltip("Distance from the bottom edge of the screen to the bottom of the hand.")]
         [SerializeField] private float bottomMargin = 16f;
         [Tooltip("Distance from the left edge of the screen to the left edge of the hand.")]
         [SerializeField] private float leftMargin = 16f;
+        [Tooltip("Visible hand capacity — keep in sync with CardDeckController.handSize.")]
+        [SerializeField] private int visibleHandSlots = 5;
 
         private bool isBuilt = false;
         private Owner owner = Owner.Player1;
@@ -81,7 +83,7 @@ namespace GameDevTV.RTS.UI.Containers
             isBuilt = true;
             gameObject.SetActive(true);
             RefreshBar();
-            Debug.Log($"[BottomBarActionsUI] Initialized with {actionButtons.Length} wired action buttons. Showing up to 5 hand cards.");
+            Debug.Log($"[BottomBarActionsUI] Initialized with {actionButtons.Length} wired action buttons. Showing up to {visibleHandSlots} hand cards.");
         }
 
         /// <summary>
@@ -154,12 +156,11 @@ namespace GameDevTV.RTS.UI.Containers
                 Transform icon = slot.transform.Find("Icon");
                 if (icon is RectTransform iconRt)
                 {
-                    iconRt.anchorMin = Vector2.zero;
-                    iconRt.anchorMax = Vector2.one;
-                    float insetX = width * 0.12f;
-                    float insetY = height * 0.18f;
-                    iconRt.offsetMin = new Vector2(insetX, insetY);
-                    iconRt.offsetMax = new Vector2(-insetX, -insetY);
+                    // Leave room for title + cost band at the bottom and goal badge at top.
+                    iconRt.anchorMin = new Vector2(0.08f, 0.28f);
+                    iconRt.anchorMax = new Vector2(0.92f, 0.88f);
+                    iconRt.offsetMin = Vector2.zero;
+                    iconRt.offsetMax = Vector2.zero;
                 }
             }
 
@@ -259,10 +260,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void HandleRefresh(UpgradeResearchedEvent evt) { RefreshBar(); }
 
         /// <summary>
-        /// Refresh the bottom bar to show the player's current 10-card hand.
-        /// Cards from the hand take priority. For any slot where the hand
-        /// has no card, we fall through to show unlocked building commands
-        /// from the GlobalCommander (e.g., Solar Panel after its card is played).
+        /// Refresh the bottom bar to show the player's current hand (up to 5 cards).
         /// </summary>
         public void RefreshBar()
         {
@@ -276,8 +274,7 @@ namespace GameDevTV.RTS.UI.Containers
             var globalCmdr = Object.FindAnyObjectByType<GlobalCommander>();
             BaseCommand[] globalCommands = globalCmdr?.AvailableCommands;
 
-            // Show up to 10 cards (or however many buttons are wired)
-            int maxButtons = Mathf.Min(actionButtons.Length, 10);
+            int maxButtons = Mathf.Min(actionButtons.Length, Mathf.Max(1, visibleHandSlots));
 
             for (int i = 0; i < actionButtons.Length; i++)
             {
@@ -294,7 +291,7 @@ namespace GameDevTV.RTS.UI.Containers
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
                     {
                         var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
-                        buildCmd.Name = "Build " + unlockCard.buildingToUnlock.Name;
+                        buildCmd.Name = unlockCard.buildingToUnlock.Name;
                         buildCmd.Building = unlockCard.buildingToUnlock;
                         buildCmd.Icon = unlockCard.buildingToUnlock.Icon;
                         buildCmd.Slot = i;
