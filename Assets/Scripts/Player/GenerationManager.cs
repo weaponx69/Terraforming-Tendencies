@@ -138,18 +138,29 @@ namespace GameDevTV.RTS.Player
         {
             PlanetGenerator.OnPlanetGenerated += InitializeGenerations;
             BlueprintDraftManager.OnDraftCompleted += HandleDraftCompleted;
-            
-            // Subscribe to GameFlowManager's milestone event
-            if (GameFlowManager.Instance != null)
-            {
-                GameFlowManager.Instance.OnTurnMilestones += CheckMilestones;
-            }
+            EnsureMilestoneSubscription();
         }
 
         private void OnDisable()
         {
             PlanetGenerator.OnPlanetGenerated -= InitializeGenerations;
             BlueprintDraftManager.OnDraftCompleted -= HandleDraftCompleted;
+            if (GameFlowManager.Instance != null)
+            {
+                GameFlowManager.Instance.OnTurnMilestones -= CheckMilestones;
+            }
+        }
+
+        private void Start()
+        {
+            EnsureMilestoneSubscription();
+        }
+
+        private void EnsureMilestoneSubscription()
+        {
+            if (GameFlowManager.Instance == null) return;
+            GameFlowManager.Instance.OnTurnMilestones -= CheckMilestones;
+            GameFlowManager.Instance.OnTurnMilestones += CheckMilestones;
         }
 
         private void HandleDraftCompleted()
@@ -269,6 +280,14 @@ namespace GameDevTV.RTS.Player
 
             // Stop prior-sector climate card tick-ups from auto-completing this round.
             ClimateManager.Instance?.ClearPendingTargets();
+
+            // Pin climate focus to the sector this round is played on.
+            if (SectorManager.Instance != null)
+            {
+                var focus = SectorManager.Instance.GetClimateFocusSector();
+                if (focus != null)
+                    SectorManager.Instance.BeginTerraformingOn(focus);
+            }
         }
 
         /// <summary>
@@ -278,13 +297,17 @@ namespace GameDevTV.RTS.Player
         private static float RoundDeltaProgress(float current, float baseline, float requiredDelta)
         {
             if (requiredDelta <= 0.0001f) return 1f;
-            return Mathf.Clamp01((current - baseline) / requiredDelta);
+            // Float targets like 0.26 atm are not binary-exact; treat near-complete as done
+            // so Atmos/Temp/Water can turn green and the sector can advance.
+            float gained = current - baseline;
+            if (gained + 0.0005f >= requiredDelta) return 1f;
+            return Mathf.Clamp01(gained / requiredDelta);
         }
 
         private void MarkActiveSectorRoundComplete()
         {
-            if (SectorManager.Instance?.ActiveSector == null) return;
-            var sector = SectorManager.Instance.ActiveSector;
+            var sector = SectorManager.Instance?.GetClimateFocusSector();
+            if (sector == null) return;
             sector.TerraformingCompletionPercent = 1f;
             sector.CompletedGenerationRound = CurrentGeneration;
             Debug.Log($"[GenerationManager] Sector at {sector.Center} marked complete for generation {CurrentGeneration}.");
@@ -296,8 +319,12 @@ namespace GameDevTV.RTS.Player
             if (IsExpansionPhase) return;
             if (Time.time < roundStartTime + 2f) return;
 
-            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
+            if (SectorManager.Instance == null || SectorManager.Instance.GetClimateFocusSector() == null) return;
             if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
+
+            // Climate ticks in real time; do not wait for idle turn resolution to finish the sector.
+            EnsureMilestoneSubscription();
+            CheckMilestones();
         }
 
         public void TriggerGenerationEnd(bool force = false)
@@ -351,13 +378,13 @@ namespace GameDevTV.RTS.Player
         {
             if (IsBetweenRounds || IsExpansionPhase) return;
 
-            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return;
+            if (SectorManager.Instance == null || SectorManager.Instance.GetClimateFocusSector() == null) return;
             if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
 
             float progress = CalculateCurrentSectorProgress(out _);
             OnGenerationProgressChanged?.Invoke(progress);
 
-            if (progress >= 1f)
+            if (progress >= 0.999f)
             {
                 TriggerGenerationEnd();
             }
@@ -412,8 +439,8 @@ namespace GameDevTV.RTS.Player
         public bool IsCurrentSectorRoundComplete()
         {
             if (IsBetweenRounds || IsExpansionPhase) return false;
-            if (SectorManager.Instance == null || SectorManager.Instance.ActiveSector == null) return false;
-            return CalculateCurrentSectorProgress(out _) >= 1f;
+            if (SectorManager.Instance == null || SectorManager.Instance.GetClimateFocusSector() == null) return false;
+            return CalculateCurrentSectorProgress(out _) >= 0.999f;
         }
 
         public void CheatCompleteGeneration()

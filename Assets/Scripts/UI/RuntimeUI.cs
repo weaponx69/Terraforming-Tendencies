@@ -188,6 +188,55 @@ namespace GameDevTV.RTS.UI
             }
         }
 
+        /// <summary>
+        /// Remove the classic opaque bottom HUD plate. Keep card buttons and selection
+        /// action buttons; hide Border / panel Background images only.
+        /// </summary>
+        private void StripLegacyBottomBarChrome()
+        {
+            Transform bottomBar = FindChildRecursive(transform, "Bottom Bar");
+            if (bottomBar == null)
+            {
+                var found = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include);
+                foreach (var t in found)
+                {
+                    if (t != null && t.name == "Bottom Bar")
+                    {
+                        bottomBar = t;
+                        break;
+                    }
+                }
+            }
+
+            if (bottomBar != null)
+            {
+                Transform border = bottomBar.Find("Border");
+                if (border != null) border.gameObject.SetActive(false);
+
+                ClearUiImage(bottomBar.Find("Actions Container/Background"));
+                ClearUiImage(bottomBar.Find("Minimap Container/Background"));
+                ClearUiImage(bottomBar.Find("Menu Container"));
+            }
+
+            Transform cardContainer = FindChildRecursive(transform, "Bottom Action Bar Container");
+            if (cardContainer != null)
+            {
+                ClearUiImage(cardContainer);
+            }
+        }
+
+        private static void ClearUiImage(Transform target)
+        {
+            if (target == null) return;
+            var image = target.GetComponent<Image>();
+            if (image == null) return;
+            Color c = image.color;
+            c.a = 0f;
+            image.color = c;
+            image.raycastTarget = false;
+            image.enabled = false;
+        }
+
         private void CopyRectTransform(RectTransform source, RectTransform target)
         {
             if (source == null || target == null) return;
@@ -215,6 +264,8 @@ namespace GameDevTV.RTS.UI
 
             // Wire the bottom bar action panel: use Inspector reference first,
             // then search children as fallback, then create as last resort
+            StripLegacyBottomBarChrome();
+
             if (bottomBarActionsUI == null)
             {
                 bottomBarActionsUI = GetComponentInChildren<BottomBarActionsUI>(true);

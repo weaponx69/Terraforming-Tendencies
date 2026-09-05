@@ -37,9 +37,10 @@ namespace GameDevTV.RTS.Environment
         {
             if (building == null) return false;
             if (!building.gameObject.activeInHierarchy) return false;
-            if (building.Progress.State == BuildingProgress.BuildingState.Paused) return false;
-            if (building.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase)) return false;
+            // Site-marker previews are not real occupants.
             if (building.GetComponentInParent<BuildingSiteMarker>() != null) return false;
+            if (building.name.Contains("GhostPreview_", System.StringComparison.OrdinalIgnoreCase)) return false;
+            // Completed buildings and under-construction ghosts (Paused / Building) both reserve the pad.
             return true;
         }
 

@@ -243,7 +243,11 @@ namespace GameDevTV.RTS.Environment
             return hexGrid.TryGetValue(coordinates, out HexTile tile) ? tile : null;
         }
 
-        public HexTile GetRevealedNeighborInDirection(HexTile origin, Vector2Int direction)
+        /// <summary>
+        /// Nearest adjacent hex in a cardinal WASD/arrow direction. Includes shrouded tiles —
+        /// camera pan may look at fog without revealing it.
+        /// </summary>
+        public HexTile GetNeighborInDirection(HexTile origin, Vector2Int direction, bool revealedOnly = false)
         {
             if (origin == null || direction == Vector2Int.zero) return null;
 
@@ -254,7 +258,8 @@ namespace GameDevTV.RTS.Environment
 
             foreach (HexTile candidate in hexGrid.Values)
             {
-                if (candidate == origin || !candidate.IsRevealed) continue;
+                if (candidate == origin) continue;
+                if (revealedOnly && !candidate.IsRevealed) continue;
 
                 Vector3 offset = candidate.WorldPosition - origin.WorldPosition;
                 offset.y = 0f;
@@ -274,14 +279,23 @@ namespace GameDevTV.RTS.Environment
             return nearest;
         }
 
-        public HexTile GetNearestRevealedHex(Vector3 worldPosition)
+        public HexTile GetRevealedNeighborInDirection(HexTile origin, Vector2Int direction)
+        {
+            return GetNeighborInDirection(origin, direction, revealedOnly: true);
+        }
+
+        /// <summary>
+        /// Nearest hex to a world point. Includes shrouded tiles for free camera focus.
+        /// Does not reveal fog.
+        /// </summary>
+        public HexTile GetNearestHex(Vector3 worldPosition, bool revealedOnly = false)
         {
             HexTile nearest = null;
             float nearestDistance = float.MaxValue;
 
             foreach (HexTile tile in hexGrid.Values)
             {
-                if (!tile.IsRevealed) continue;
+                if (revealedOnly && !tile.IsRevealed) continue;
 
                 float distance = (tile.WorldPosition - worldPosition).sqrMagnitude;
                 if (distance < nearestDistance)
@@ -292,6 +306,11 @@ namespace GameDevTV.RTS.Environment
             }
 
             return nearest;
+        }
+
+        public HexTile GetNearestRevealedHex(Vector3 worldPosition)
+        {
+            return GetNearestHex(worldPosition, revealedOnly: true);
         }
         
         /// <summary>

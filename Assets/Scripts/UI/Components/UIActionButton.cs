@@ -21,6 +21,7 @@ namespace GameDevTV.RTS.UI.Components
         [SerializeField] private Tooltip tooltip;
 
         private bool isActive;
+        public bool IsActive => isActive;
         private RectTransform rectTransform;
         private Button button;
         private Image buttonImage;
@@ -68,6 +69,15 @@ namespace GameDevTV.RTS.UI.Components
             button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
             button.onClick.AddListener(onClick);
             isActive = true;
+            if (buttonImage != null)
+            {
+                // Icon-forward cards: keep a light hit target, not a solid chrome plate.
+                Color c = defaultButtonColor;
+                c.a = Mathf.Min(c.a, 0.35f);
+                if (c.a < 0.15f) c.a = 0.25f;
+                buttonImage.color = c;
+                buttonImage.raycastTarget = true;
+            }
             ApplyGoalAccent(cardGoal);
 
             if (tooltip != null)
@@ -95,6 +105,15 @@ namespace GameDevTV.RTS.UI.Components
             }
             isActive = false;
             CancelInvoke();
+
+            // Empty slots should not leave opaque chrome boxes on screen.
+            if (buttonImage != null)
+            {
+                Color c = buttonImage.color;
+                c.a = 0f;
+                buttonImage.color = c;
+                buttonImage.raycastTarget = false;
+            }
         }
 
         public void OnPointerEnter(PointerEventData eventData)

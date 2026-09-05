@@ -21,7 +21,12 @@ namespace GameDevTV.RTS.Environment
         {
             if (building == null || string.IsNullOrEmpty(building.Name)) return false;
             string name = building.Name.ToLowerInvariant();
-            return name.Contains("mine") || name.Contains("laser") || name.Contains("strip");
+            // Atmosphere "Import Laser" must NOT match — that is a climate pad building.
+            if (name.Contains("import") || name.Contains("carbon dioxide")) return false;
+            return name.Contains("mine")
+                || name.Contains("strip")
+                || name.Contains("deep-core mining laser")
+                || name.Contains("mining laser");
         }
 
         public static bool IsCommandBuilding(BuildingSO building)

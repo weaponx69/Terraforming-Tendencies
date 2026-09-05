@@ -276,7 +276,13 @@ namespace GameDevTV.RTS.Environment
 
                 if (SectorManager.Instance != null)
                 {
-                    SectorManager.Instance.ActiveSector = sector;
+                    // Expansion (or first claim) may move climate focus; mid-round CP boot must not.
+                    bool moveFocus = GenerationManager.Instance != null
+                        && GenerationManager.Instance.IsExpansionPhase;
+                    if (moveFocus || SectorManager.Instance.TerraformingSector == null)
+                        SectorManager.Instance.BeginTerraformingOn(sector);
+                    else if (SectorManager.Instance.ActiveSector == null)
+                        SectorManager.Instance.ActiveSector = sector;
                 }
                 
                 if (GenerationManager.Instance != null && GenerationManager.Instance.IsExpansionPhase)

@@ -55,7 +55,7 @@ namespace GameDevTV.RTS.Player
                     return "POPULATION";
                 if (name.Contains("solar") || name.Contains("magnetic shield") || name.Contains("power"))
                     return "POWER";
-                if (name.Contains("mine") || name.Contains("strip") || name.Contains("laser"))
+                if (name.Contains("mine") || name.Contains("strip") || name.Contains("mining laser"))
                     return "MATERIALS";
 
                 var config = building.BuildingConfig;

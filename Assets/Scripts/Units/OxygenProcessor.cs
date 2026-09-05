@@ -17,7 +17,9 @@ namespace GameDevTV.RTS.Units
 
         private void Update()
         {
-            
+            // Climate is driven by ClimateGenerationTicker (and BaseBuilding fallback).
+            // Derived Update replaces BaseBuilding.Update — keep oxygen ticks only.
+
             // Only generate oxygen if the building is fully operating and powered
             if (Owner != Owner.Invalid && IsOperating)
             {

@@ -5,14 +5,17 @@ This project uses the experimental Unity CLI plus the Unity Pipeline package (`c
 
 ## Hard rules for this project
 
-1. **Prefer the live connected Editor.** Check with:
+1. **Unity MCP is deprecated for this project. Do not use it.**
+   - Do not call Cursor/`user-Unity` MCP tools, `mcp_auth` for Unity, or `unity mcp configure` as part of agent workflows.
+   - Live Editor automation is **Unity CLI only**: `unity status`, `unity command`, `unity list`, `unity command eval`.
+2. **Prefer the live connected Editor.** Check with:
    ```bash
    unity status --format json
    ```
-2. **Do NOT spawn a second Editor** for tests or inspection while the user's Editor is open.
+3. **Do NOT spawn a second Editor** for tests or inspection while the user's Editor is open.
    - Forbidden here: `unity test`, `unity build`, `unity run`, and legacy `-batchmode` / `-quit` headless Editor launches.
    - This project is extremely heavy (large hex grid). A second Editor will OOM-kill both processes on Linux.
-3. **Use `unity command` / `unity list` / `unity mcp` against the connected Editor** for live inspection, Play Mode control, and Editor-side tools.
+4. **Use `unity command` / `unity list` / `unity command eval` against the connected Editor** for live inspection, Play Mode control, and Editor-side tools.
 
 ## Connected-Editor workflow (default for agents)
 
@@ -37,13 +40,6 @@ unity command <command-name> --arg Value --json
 ```
 Custom project commands may be exposed via `[CliCommand]`. Discover them with `unity command` / `unity list`.
 
-### MCP for AI agents
-```bash
-unity mcp --help
-unity mcp configure ...              # wire agent clients when needed
-```
-Use MCP when the agent client is configured for it; otherwise prefer `unity command`.
-
 ### Bugfix / verification loop
 When iterating on a gameplay bug with the live Editor:
 1. Confirm `unity status` shows this project as `ready`.
@@ -61,7 +57,6 @@ These are fine even with the Editor open:
 |---------|-----|
 | `unity status` | Connected Editor health |
 | `unity command` / `unity list` | Live Editor tools |
-| `unity mcp` | MCP server / client config |
 | `unity pipeline` / `unity pipe` | Pipeline package install/upgrade/inspect |
 | `unity doctors` / `unity doctor` | CLI environment diagnostics |
 | `unity logs` | CLI/Hub logs |
@@ -69,10 +64,11 @@ These are fine even with the Editor open:
 | `unity auth status` | Login state |
 | `unity upgrade` | Self-update the CLI binary |
 
-## Unsafe for this repo while Editor is open
+## Unsafe / deprecated for agents
 
-| Command | Why |
-|---------|-----|
+| Command / path | Why |
+|----------------|-----|
+| Unity MCP / `user-Unity` / `unity mcp` | **Deprecated** — do not use for agent automation |
 | `unity test` | Spawns Editor / test runner; OOM risk |
 | `unity build` | Batch-mode Editor spawn |
 | `unity run` | Batch-mode Editor / headless run |

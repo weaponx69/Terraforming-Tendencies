@@ -37,49 +37,77 @@ namespace GameDevTV.RTS.Environment
         public Sector ActiveSector { get; set; }
 
         /// <summary>
+        /// Sector climate ticks apply to this round. Mid-round unlocks must not overwrite it
+        /// or atmosphere buildings in the player's colony go silent.
+        /// </summary>
+        public Sector TerraformingSector { get; private set; }
+
+        /// <summary>
+        /// Pin climate focus for the current generation. Use on gen start / post-round handoff.
+        /// </summary>
+        public void BeginTerraformingOn(Sector sector)
+        {
+            if (sector == null) return;
+            TerraformingSector = sector;
+            ActiveSector = sector;
+            Debug.Log($"[SectorManager] Terraforming focus set to sector at {sector.Center}.");
+        }
+
+        /// <summary>Stable climate focus — prefers <see cref="TerraformingSector"/> over last unlock.</summary>
+        public Sector GetClimateFocusSector()
+        {
+            if (TerraformingSector != null && !TerraformingSector.IsLocked)
+                return TerraformingSector;
+            return ActiveSector;
+        }
+
+        /// <summary>
         /// True when this building belongs to the active sector's mini-game
-        /// (on an active-sector pad, or nearer to ActiveSector than any other).
+        /// (on a terraforming-sector pad, or nearer to that sector than any other).
         /// </summary>
         public bool IsBuildingInActiveSector(BaseBuilding building)
         {
             if (building == null) return false;
-            if (ActiveSector == null) return true;
+            Sector focus = GetClimateFocusSector();
+            if (focus == null) return true;
 
-            if (ActiveSector.BuildingSites != null)
+            if (Sectors != null)
             {
-                foreach (var site in ActiveSector.BuildingSites)
+                foreach (var sector in Sectors)
                 {
-                    if (site != null && site.OccupyingBuilding == building)
-                        return true;
+                    if (sector?.BuildingSites == null) continue;
+                    foreach (var site in sector.BuildingSites)
+                    {
+                        if (site == null || site.OccupyingBuilding != building) continue;
+                        return sector == focus;
+                    }
                 }
             }
 
-            if (ActiveSector.OccupyingBuilding == building)
+            if (focus.OccupyingBuilding == building)
                 return true;
 
             Sector nearest = GetNearestSector(building.transform.position);
-            return nearest == ActiveSector;
+            return nearest == focus;
         }
 
-        public Sector GetNearestSector(Vector3 worldPosition)
+        /// <summary>
+        /// Climate contribution check that prefers reserved-pad ownership and falls back to
+        /// geographic sector bounds. Edge pads must not be silenced by nearest-center alone.
+        /// </summary>
+        public bool DoesBuildingCountForActiveClimate(BaseBuilding building)
         {
-            if (Sectors == null || Sectors.Count == 0) return null;
+            if (building == null) return false;
+            Sector focus = GetClimateFocusSector();
+            if (focus == null) return true;
 
-            Sector nearest = null;
-            float minDistSq = float.MaxValue;
-            for (int i = 0; i < Sectors.Count; i++)
+            if (BuildingSiteRegistry.TryGetSiteForBuilding(building, out BuildingSiteSlot site)
+                && site.Sector != null)
             {
-                var sector = Sectors[i];
-                if (sector == null) continue;
-                float distSq = (sector.Center - worldPosition).sqrMagnitude;
-                if (distSq < minDistSq)
-                {
-                    minDistSq = distSq;
-                    nearest = sector;
-                }
+                return site.Sector == focus;
             }
 
-            return nearest;
+            return IsBuildingInActiveSector(building);
         }
 
         private float secW;
@@ -186,7 +214,7 @@ namespace GameDevTV.RTS.Environment
             
             if (Sectors.Count > 0)
             {
-                ActiveSector = Sectors[0];
+                BeginTerraformingOn(Sectors[0]);
 
                 // Force-discover Minerals and Gas in Sector 0 so the player can bootstrap.
                 // All other sectors require discovery cards to reveal resource types.
@@ -330,8 +358,9 @@ namespace GameDevTV.RTS.Environment
                     }
 
                     Sectors[i].IsLocked = false;
-                    ActiveSector = Sectors[i];
-                    Debug.Log($"[SectorManager] Sector {i} unlocked! It is now the active sector.");
+                    // Unlock must not steal TerraformingSector / climate focus mid-round.
+                    if (ActiveSector == null) ActiveSector = Sectors[i];
+                    Debug.Log($"[SectorManager] Sector {i} unlocked (climate focus stays on terraforming sector).");
                     // Do not mass-reveal deposits here — ExplorationManager.RevealGatherableAtNode
                     // (and discovery cards) are what uncover materials node-by-node.
                     SectorColonization.PrepareNewlyUnlockedSector(Sectors[i], Owner.Player1, i);
@@ -414,7 +443,11 @@ namespace GameDevTV.RTS.Environment
         /// <summary>
         /// Unlock a sector for building and auto-place its Command Post (no exploration card required).
         /// </summary>
-        public bool UnlockAndColonizeSector(int index, Owner owner = Owner.Player1)
+        /// <param name="claimTerraformingFocus">
+        /// True when advancing after a finished sector round. False for mid-round scouting unlocks
+        /// so existing pink climate buildings keep counting.
+        /// </param>
+        public bool UnlockAndColonizeSector(int index, Owner owner = Owner.Player1, bool claimTerraformingFocus = false)
         {
             if (index < 0 || index >= Sectors.Count) return false;
             var sector = Sectors[index];
@@ -423,12 +456,15 @@ namespace GameDevTV.RTS.Environment
             sector.IsLocked = false;
             sector.IsExplored = true;
             sector.IsDiscovered = true;
-            ActiveSector = sector;
+            if (claimTerraformingFocus || TerraformingSector == null)
+                BeginTerraformingOn(sector);
+            else if (ActiveSector == null)
+                ActiveSector = sector;
             OnSectorExplored?.Invoke(index);
             SectorColonization.PrepareNewlyUnlockedSector(sector, owner, index);
             UpdateSectorBorders();
             OnSectorUnlocked?.Invoke();
-            Debug.Log($"[SectorManager] Sector {index} auto-unlocked and colonized.");
+            Debug.Log($"[SectorManager] Sector {index} auto-unlocked and colonized (claimFocus={claimTerraformingFocus}).");
             return true;
         }
 

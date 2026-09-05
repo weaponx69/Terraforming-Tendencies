@@ -479,6 +479,21 @@ namespace GameDevTV.RTS.Player
                 maxWater = Mathf.Max(maxWater, gm.GetRoundWaterTarget());
                 maxTemperature = Mathf.Max(maxTemperature, gm.GetRoundTemperatureTarget());
 
+                // Win-line must not freeze the top-bar meters. Sector completion still uses
+                // baselines/deltas; absolute Temp/Atmos/Water may keep rising toward the next
+                // generation's cumulative target so powered climate buildings stay visible.
+                int nextGen = Mathf.Min(gen + 1, Mathf.Max(gen, gm.MaxGenerations + 1));
+                maxAtmosphere = Mathf.Max(maxAtmosphere, gm.GetTargetAtmosphere(nextGen));
+                maxWater = Mathf.Max(maxWater, gm.GetTargetWater(nextGen));
+                maxTemperature = Mathf.Max(maxTemperature, gm.GetTargetTemperature(nextGen));
+
+                if (_atmosphere != null && _atmosphere.TryGetValue(Owner.Player1, out float curAtmos))
+                {
+                    float atmosNeed = gm.GetRoundAtmosphereTarget() - curAtmos;
+                    if (atmosNeed > 0.0001f)
+                        maxAtmosphere = Mathf.Max(maxAtmosphere, gm.GetRoundAtmosphereTarget());
+                }
+
                 if (gm.CurrentMilestoneTarget > 0f)
                 {
                     if (gm.CurrentMilestoneType == MilestoneType.Oxygen)

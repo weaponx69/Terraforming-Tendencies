@@ -1,6 +1,7 @@
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Environment;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
 using System.Linq;
@@ -136,36 +137,20 @@ namespace GameDevTV.RTS.Commands
                             }
                         }
                     }
-
-                    // Fallback: If all workers are busy building, pick the closest worker regardless of IsBuilding state
-                    if (builder == null)
-                    {
-                        foreach (var w in workers)
-                        {
-                            if (w.Owner == context.Owner)
-                            {
-                                float dist = Vector3.Distance(w.transform.position, targetPos);
-                                if (dist < closestDist)
-                                {
-                                    closestDist = dist;
-                                    builder = w;
-                                }
-                            }
-                        }
-                    }
                 }
             }
 
             if (builder == null)
             {
                 isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
-                if (!isCommandPost)
+                if (!isCommandPost || !isFirstCommandPost)
                 {
-                    Debug.LogWarning($"[BuildBuildingCommand] Silent failure: Only Command Centers can be orbital dropped! You must build a worker first. Building name: {Building?.Name}");
+                    ExplorationManager.NotifyExplorationFailed("A drone is needed.");
+                    Debug.LogWarning($"[BuildBuildingCommand] No drone available to build {Building?.Name}.");
                     return;
                 }
 
-                // Instant-build fallback from orbit when player has NO workers at all
+                // Instant orbital drop for the very first Command Post only (no drones yet).
                 GameObject instance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                 if (instance.TryGetComponent(out BaseBuilding newBuilding))
                 {

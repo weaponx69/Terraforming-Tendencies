@@ -460,7 +460,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7732857749247761578}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77dc3c65aec326e48a1029494090bcfc, type: 3}
   m_Name: 
@@ -479,9 +479,9 @@ MonoBehaviour:
   <MainRenderer>k__BackingField: {fileID: 6597130056473468419}
   <Progress>k__BackingField:
     <StartTime>k__BackingField: 0
-    <Completion>k__BackingField: 1
-    <State>k__BackingField: 3
-  <BuildingSO>k__BackingField: {fileID: 0}
+    <Completion>k__BackingField: 0
+    <State>k__BackingField: 1
+  <BuildingSO>k__BackingField: {fileID: 11400000, guid: 94c1926e7b17af5299817655186c434b, type: 2}
   primaryMaterial: {fileID: 2100000, guid: b35c532178876e94f917ff0196f65258, type: 2}
   navMeshObstacle: {fileID: 6783015561787058489}
 --- !u!208 &6783015561787058489

@@ -138,12 +138,8 @@ namespace GameDevTV.RTS.Player
 
             EnsureBootstrapUnlockInHand("Solar");
 
-            // Mining drones become useful as soon as the new CP exists.
-            EnsureNamedCardInHand(c =>
-                c is SpawnUnitCardSO spawn &&
-                spawn.cardName != null &&
-                spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase),
-                requirePlayable: true);
+            // Construction requires drones — keep a Mining Drone card seated after colonization.
+            EnsureMiningDroneInHand();
 
             if (GenerationManager.Instance == null || !GenerationManager.Instance.IsExpansionPhase)
             {
@@ -168,6 +164,7 @@ namespace GameDevTV.RTS.Player
             EnsureSolarPrereqInHand();
             FillHandInternal();
             EnsureSolarPrereqInHand();
+            EnsureMiningDroneInHand();
 
             OnHandChanged?.Invoke();
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
@@ -236,10 +233,12 @@ namespace GameDevTV.RTS.Player
             if (hand.Count < handSize || incoming == null) return;
 
             // Prefer dropping support cards / pad-blocked unlocks that are not sector goals.
+            // Never drop Mining Drone — builds require a drone after the first Command Post.
             int dropIdx = hand.FindIndex(c =>
                 c != null
                 && TerraformingGoalColors.GetSectorGoalForCard(c) == null
-                && !IsSolarUnlockCard(c));
+                && !IsSolarUnlockCard(c)
+                && !IsMiningDroneCard(c));
             if (dropIdx < 0)
             {
                 dropIdx = hand.FindIndex(c =>
@@ -333,9 +332,9 @@ namespace GameDevTV.RTS.Player
             solarCard ??= EnsureStarterCard<UnlockBuildingCardSO>("Cards/SolarPanelCard");
             droneCard ??= EnsureStarterCard<SpawnUnitCardSO>("Cards/MiningDroneCard");
 
-            // 3. Always seed Command Post + Solar into the opening hand. RebuildDeck often
-            //    runs before planet pads exist, so CanApply would falsely hold them out.
-            //    Mining Drone waits until a Command Post exists (via FillHand / discard purge).
+            // 3. Always seed Command Post + Solar + Mining Drone into the opening hand.
+            //    RebuildDeck often runs before planet pads / CP exist; those cards stay in hand
+            //    (see ShouldKeepInHand) and become playable as soon as their gates are met.
             if (cmdPostCard != null)
             {
                 hand.Add(cmdPostCard);
@@ -346,7 +345,7 @@ namespace GameDevTV.RTS.Player
                 hand.Add(solarCard);
                 drawPile.Remove(solarCard);
             }
-            if (droneCard != null && IsPlayableNow(droneCard))
+            if (droneCard != null)
             {
                 hand.Add(droneCard);
                 drawPile.Remove(droneCard);
@@ -427,9 +426,62 @@ namespace GameDevTV.RTS.Player
         public void FillHand()
         {
             EnsureSolarPrereqInHand();
+            EnsureMiningDroneInHand();
             FillHandInternal();
             EnsureSolarPrereqInHand();
+            EnsureMiningDroneInHand();
             OnHandChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Builds require a worker drone. Keep a Mining Drone card in hand whenever one
+        /// exists in the deck (make room by dropping a non-critical support card if needed).
+        /// </summary>
+        private void EnsureMiningDroneInHand()
+        {
+            if (hand.Any(IsMiningDroneCard)) return;
+
+            BlueprintCardSO found = FindCardInPiles(IsMiningDroneCard);
+            if (found == null)
+            {
+                found = EnsureStarterCard<SpawnUnitCardSO>("Cards/MiningDroneCard");
+                drawPile.Remove(found);
+            }
+
+            if (found == null) return;
+
+            if (hand.Count >= handSize)
+            {
+                int dropIdx = hand.FindIndex(c =>
+                    c != null
+                    && !IsMiningDroneCard(c)
+                    && !IsSolarUnlockCard(c)
+                    && TerraformingGoalColors.GetSectorGoalForCard(c) == null);
+                if (dropIdx < 0)
+                {
+                    dropIdx = hand.FindIndex(c =>
+                        c is UnlockBuildingCardSO unlock
+                        && !IsSolarUnlockCard(c)
+                        && NeedsSolarPoweredPad(unlock));
+                }
+
+                if (dropIdx < 0) return;
+
+                discardPile.Add(hand[dropIdx]);
+                hand.RemoveAt(dropIdx);
+            }
+
+            if (hand.Count >= handSize) return;
+
+            hand.Add(found);
+            Debug.Log($"[CardDeckController] Seated Mining Drone card in hand.");
+        }
+
+        private static bool IsMiningDroneCard(BlueprintCardSO card)
+        {
+            return card is SpawnUnitCardSO spawn
+                && spawn.cardName != null
+                && spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -563,10 +615,14 @@ namespace GameDevTV.RTS.Player
         /// <summary>
         /// Keep cards that are playable now, plus building unlocks waiting on a pad or
         /// materials when they advance an unmet sector terraforming goal.
+        /// Mining Drone stays seated even before a Command Post exists (needed for builds).
         /// </summary>
         private static bool ShouldKeepInHand(BlueprintCardSO card)
         {
             if (card == null) return false;
+
+            // Construction requires drones — never purge the Mining Drone starter from hand.
+            if (IsMiningDroneCard(card)) return true;
 
             string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
             if (!string.IsNullOrEmpty(sectorGoal)

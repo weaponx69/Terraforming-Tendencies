@@ -31,9 +31,14 @@ namespace GameDevTV.RTS.Utilities
 
         private static void HandleBuildingSpawn(BuildingSpawnEvent evt)
         {
-            if (evt.Building != null)
+            if (evt.Building == null) return;
+
+            BuildingSiteRegistry.RegisterOccupancy(evt.Building);
+
+            // Drone-built reserved pads finish later — wire cluster power on completion.
+            if (BuildingSiteRegistry.TryGetSiteForBuilding(evt.Building, out _))
             {
-                BuildingSiteRegistry.RegisterOccupancy(evt.Building);
+                EnsureClusterPowerForBuilding(evt.Building);
             }
         }
 
@@ -175,11 +180,19 @@ namespace GameDevTV.RTS.Utilities
                 return false;
             }
 
-            // Reserved pads are pre-authored — do not re-run free-placement IsLocked /
-            // AllRestrictionsPass (nearby solar, rocks, and card-not-yet-unlocked all
-            // falsely rejected pad clicks).
-
             Vector3 targetPos = SnapToNavMesh(site.Position);
+            bool instant = waiveCost || IsFirstPlayerCommandPost(building, owner);
+
+            Worker worker = null;
+            if (!instant)
+            {
+                worker = FindAvailableWorker(owner, targetPos);
+                if (worker == null)
+                {
+                    reason = "A drone is needed.";
+                    return false;
+                }
+            }
 
             if (!waiveCost && !ConsumeMaterials(building, owner))
             {
@@ -197,9 +210,9 @@ namespace GameDevTV.RTS.Utilities
 
             built.enabled = true;
             built.Owner = owner;
+            built.BindBuildingDefinition(building);
 
-            // Occupy before CompleteConstruction so IsClusterSolar / solar-skip logic
-            // sees the pad on the same frame the CP auto-wire coroutine starts.
+            // Occupy before construction so the pad cannot be double-booked.
             site.SetOccupied(built);
             site.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
 
@@ -208,11 +221,88 @@ namespace GameDevTV.RTS.Utilities
                 site.Cluster.BuildingSlot.MarkerGO.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
             }
 
-            built.CompleteConstruction();
-            EnsurePowerNodeReady(built);
+            if (instant)
+            {
+                built.CompleteConstruction();
+                EnsurePowerNodeReady(built);
 
-            // Ensure power nodes are grid-registered before cluster wiring (Start may not
-            // have run yet in the same frame as Instantiate).
+                if (site.Cluster?.SolarBuilding != null)
+                {
+                    EnsurePowerNodeReady(site.Cluster.SolarBuilding);
+                }
+
+                if (site.Kind == BuildingSiteKind.Solar &&
+                    built.TryGetComponent(out PowerNode solarNode))
+                {
+                    DisconnectCommandPostLinks(solarNode);
+                }
+
+                ConnectToClusterSolar(built, site);
+                PowerGridManager.RecalculateGrids();
+            }
+            else
+            {
+                Material ghostMat = building.PlacementMaterial;
+                built.InitializeAsGhost(ghostMat, owner);
+                worker.ResumeBuilding(built);
+                Debug.Log($"[ReservedSiteBuild] {worker.name} assigned to build {building.Name} at {targetPos}");
+            }
+
+            if (!BuildingSiteRegistry.IsCommandBuilding(building) && !BuildingSiteRegistry.IsSolarBuilding(building))
+            {
+                BlueprintDraftManager.LockBuilding(building.Name);
+            }
+
+            return true;
+        }
+
+        private static bool IsFirstPlayerCommandPost(BuildingSO building, Owner owner)
+        {
+            if (!BuildingSiteRegistry.IsCommandBuilding(building)) return false;
+
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b.Owner != owner || b.BuildingSO == null) continue;
+                if (!b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)) continue;
+                if (b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>Idle construction drone nearest to the build site, or null.</summary>
+        private static Worker FindAvailableWorker(Owner owner, Vector3 near)
+        {
+            Worker best = null;
+            float bestDist = float.MaxValue;
+            Worker[] workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+            foreach (var worker in workers)
+            {
+                if (worker == null || worker.Owner != owner) continue;
+                if (worker.IsBuilding) continue;
+
+                float dist = (worker.transform.position - near).sqrMagnitude;
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    best = worker;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// Ensure a reserved-site consumer is wired to its cluster solar and the grid
+        /// has been recalculated. Safe to call after drone construction completes.
+        /// </summary>
+        public static void EnsureClusterPowerForBuilding(BaseBuilding built)
+        {
+            if (built == null) return;
+            if (!BuildingSiteRegistry.TryGetSiteForBuilding(built, out BuildingSiteSlot site)) return;
+
+            EnsurePowerNodeReady(built);
             if (site.Cluster?.SolarBuilding != null)
             {
                 EnsurePowerNodeReady(site.Cluster.SolarBuilding);
@@ -225,23 +315,14 @@ namespace GameDevTV.RTS.Utilities
             }
 
             ConnectToClusterSolar(built, site);
-
-            // Force a grid pass after occupancy + wiring so UnpoweredIndicator clears this frame.
             PowerGridManager.RecalculateGrids();
-
-            if (!BuildingSiteRegistry.IsCommandBuilding(building) && !BuildingSiteRegistry.IsSolarBuilding(building))
-            {
-                BlueprintDraftManager.LockBuilding(building.Name);
-            }
-
-            Debug.Log($"[ReservedSiteBuild] Built {building.Name} at reserved site {targetPos}");
-            return true;
         }
 
         private static void ConnectToClusterSolar(BaseBuilding built, BuildingSiteSlot site)
         {
             if (built == null || site?.Cluster == null) return;
-            if (site.Kind != BuildingSiteKind.PairedBuilding && site.Kind != BuildingSiteKind.Infrastructure) return;
+            // Any consumer pad on a solar cluster should auto-wire (paired, infra, or misc).
+            if (site.Kind == BuildingSiteKind.Solar || site.Kind == BuildingSiteKind.CommandPost) return;
 
             BaseBuilding solar = site.Cluster.SolarBuilding;
             if (solar == null)

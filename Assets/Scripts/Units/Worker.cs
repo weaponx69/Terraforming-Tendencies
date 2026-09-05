@@ -311,6 +311,7 @@ namespace GameDevTV.RTS.Units
             }
 
             // Ensure the building starts in a Paused state so it doesn't immediately function!
+            baseBuilding.BindBuildingDefinition(building);
             baseBuilding.InitializeAsGhost(building.PlacementMaterial, Owner);
 
             // Project the target location onto the Drone's specific NavMesh layer (e.g. Airborne)

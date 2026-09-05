@@ -76,10 +76,10 @@ namespace GameDevTV.RTS.Environment
                     currentGrid.Add(current);
 
                     if (current.Building != null &&
-                        current.Building.BuildingSO?.BuildingConfig != null &&
+                        current.Building.ResolvedBuildingSO?.BuildingConfig != null &&
                         current.Building.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
-                        float effectiveGen = current.Building.BuildingSO.BuildingConfig.PowerGeneration
+                        float effectiveGen = current.Building.ResolvedBuildingSO.BuildingConfig.PowerGeneration
                             * BlueprintDraftManager.PowerGenMultiplier;
                         totalGeneration += effectiveGen;
                     }
@@ -105,10 +105,10 @@ namespace GameDevTV.RTS.Environment
                 {
                     float upkeep = 0f;
                     if (gridNode.Building != null &&
-                        gridNode.Building.BuildingSO?.BuildingConfig != null &&
+                        gridNode.Building.ResolvedBuildingSO?.BuildingConfig != null &&
                         gridNode.Building.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
-                        upkeep = gridNode.Building.BuildingSO.BuildingConfig.PowerUpkeep;
+                        upkeep = gridNode.Building.ResolvedBuildingSO.BuildingConfig.PowerUpkeep;
                     }
 
                     // Self-powered nodes (CP backup cells / battery) stay powered without
@@ -151,12 +151,12 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         private static int AllocationPriority(PowerNode node)
         {
-            if (node?.Building?.BuildingSO?.BuildingConfig == null) return 1;
+            if (node?.Building?.ResolvedBuildingSO?.BuildingConfig == null) return 1;
 
-            var config = node.Building.BuildingSO.BuildingConfig;
+            var config = node.Building.ResolvedBuildingSO.BuildingConfig;
             if (config.PowerGeneration > 0) return 0;
 
-            bool isCp = node.Building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            bool isCp = node.Building.ResolvedBuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
             return isCp ? 2 : 1;
         }
     }

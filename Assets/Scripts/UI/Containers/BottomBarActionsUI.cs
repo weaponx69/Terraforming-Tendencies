@@ -10,11 +10,12 @@ using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
-    /// Persistent bottom-center action bar that shows the player's card hand.
+    /// Persistent bottom-left action bar that shows the player's card hand.
     /// Building cards open site selection so the player picks which solar cluster to use.
     /// </summary>
     public class BottomBarActionsUI : MonoBehaviour
@@ -22,6 +23,15 @@ namespace GameDevTV.RTS.UI.Containers
         [Header("Button Wiring")]
         [Tooltip("Drag pre-placed UIActionButton children here (same pattern as ActionsUI).")]
         [SerializeField] private UIActionButton[] actionButtons;
+
+        [Header("Card Layout")]
+        [Tooltip("Playing-card style size (width x height). Height should be taller than width.")]
+        [SerializeField] private Vector2 cardSize = new Vector2(120f, 170f);
+        [SerializeField] private float cardSpacing = 12f;
+        [Tooltip("Distance from the bottom edge of the screen to the bottom of the hand.")]
+        [SerializeField] private float bottomMargin = 16f;
+        [Tooltip("Distance from the left edge of the screen to the left edge of the hand.")]
+        [SerializeField] private float leftMargin = 16f;
 
         private bool isBuilt = false;
         private Owner owner = Owner.Player1;
@@ -59,6 +69,9 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
+            HideChromeBackground();
+            ApplyPlayingCardLayout();
+
             if (actionButtons == null || actionButtons.Length == 0)
             {
                 Debug.LogError("[BottomBarActionsUI] No action buttons wired in Inspector! Drag UIActionButton children into the 'Action Buttons' array.", this);
@@ -69,6 +82,162 @@ namespace GameDevTV.RTS.UI.Containers
             gameObject.SetActive(true);
             RefreshBar();
             Debug.Log($"[BottomBarActionsUI] Initialized with {actionButtons.Length} wired action buttons. Showing up to 5 hand cards.");
+        }
+
+        /// <summary>
+        /// Resize hand slots to a taller playing-card aspect, pin the strip to the
+        /// bottom-left of the screen, and keep it above leftover bottom-HUD elements for clicks.
+        /// </summary>
+        private void ApplyPlayingCardLayout()
+        {
+            float width = Mathf.Max(48f, cardSize.x);
+            float height = Mathf.Max(width * 1.25f, cardSize.y);
+
+            // Cards live on this object; chrome/container may be the parent.
+            var cardsRt = transform as RectTransform;
+            var containerRt = transform.parent as RectTransform;
+            if (containerRt == null) containerRt = cardsRt;
+            if (containerRt == null) return;
+
+            // Bottom-left dock — grows rightward from the left edge.
+            containerRt.anchorMin = new Vector2(0f, 0f);
+            containerRt.anchorMax = new Vector2(0f, 0f);
+            containerRt.pivot = new Vector2(0f, 0f);
+            containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+            containerRt.SetAsLastSibling();
+
+            if (cardsRt != null && cardsRt != containerRt)
+            {
+                cardsRt.anchorMin = Vector2.zero;
+                cardsRt.anchorMax = Vector2.one;
+                cardsRt.offsetMin = Vector2.zero;
+                cardsRt.offsetMax = Vector2.zero;
+            }
+
+            // Layout group must be on the parent of the card buttons.
+            var hlg = GetComponent<HorizontalLayoutGroup>();
+            if (hlg == null) hlg = gameObject.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = cardSpacing;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
+            hlg.childControlWidth = false;
+            hlg.childControlHeight = false;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            hlg.padding = new RectOffset(8, 8, 6, 6);
+
+            // Disable a parent HLG that only wraps this bar — it fights sizing.
+            if (containerRt != cardsRt)
+            {
+                var parentHlg = containerRt.GetComponent<HorizontalLayoutGroup>();
+                if (parentHlg != null) parentHlg.enabled = false;
+            }
+
+            if (actionButtons == null) return;
+
+            foreach (var slot in actionButtons)
+            {
+                if (slot == null) continue;
+                var rt = slot.transform as RectTransform;
+                if (rt == null) continue;
+                rt.sizeDelta = new Vector2(width, height);
+
+                var le = slot.GetComponent<LayoutElement>();
+                if (le == null) le = slot.gameObject.AddComponent<LayoutElement>();
+                le.preferredWidth = width;
+                le.preferredHeight = height;
+                le.minWidth = width;
+                le.minHeight = height;
+                le.flexibleWidth = 0f;
+                le.flexibleHeight = 0f;
+                // Empty slots are collapsed in FitLayoutToActiveCards after RefreshBar.
+
+                Transform icon = slot.transform.Find("Icon");
+                if (icon is RectTransform iconRt)
+                {
+                    iconRt.anchorMin = Vector2.zero;
+                    iconRt.anchorMax = Vector2.one;
+                    float insetX = width * 0.12f;
+                    float insetY = height * 0.18f;
+                    iconRt.offsetMin = new Vector2(insetX, insetY);
+                    iconRt.offsetMax = new Vector2(-insetX, -insetY);
+                }
+            }
+
+            FitLayoutToActiveCards();
+        }
+
+        /// <summary>
+        /// Collapse disabled slots out of the horizontal layout and size the dock
+        /// to the active hand only (left-aligned).
+        /// </summary>
+        private void FitLayoutToActiveCards()
+        {
+            var cardsRt = transform as RectTransform;
+            var containerRt = transform.parent as RectTransform;
+            if (containerRt == null) containerRt = cardsRt;
+            if (containerRt == null || actionButtons == null) return;
+
+            float width = Mathf.Max(48f, cardSize.x);
+            float height = Mathf.Max(width * 1.25f, cardSize.y);
+            var hlg = GetComponent<HorizontalLayoutGroup>();
+            int leftPad = hlg != null ? hlg.padding.left : 8;
+            int rightPad = hlg != null ? hlg.padding.right : 8;
+            int topPad = hlg != null ? hlg.padding.top : 6;
+            int bottomPad = hlg != null ? hlg.padding.bottom : 6;
+
+            int activeSlots = 0;
+            foreach (var slot in actionButtons)
+            {
+                if (slot == null) continue;
+                bool active = slot.IsActive;
+                var le = slot.GetComponent<LayoutElement>();
+                if (le == null) le = slot.gameObject.AddComponent<LayoutElement>();
+                le.ignoreLayout = !active;
+                if (!active) continue;
+
+                activeSlots++;
+                le.preferredWidth = width;
+                le.preferredHeight = height;
+                le.minWidth = width;
+                le.minHeight = height;
+            }
+
+            float contentWidth = activeSlots <= 0
+                ? leftPad + rightPad
+                : activeSlots * width
+                  + Mathf.Max(0, activeSlots - 1) * cardSpacing
+                  + leftPad + rightPad;
+            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
+            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height + topPad + bottomPad);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(containerRt);
+        }
+
+        /// <summary>
+        /// Hide panel backgrounds so only card / action buttons remain visible.
+        /// </summary>
+        private void HideChromeBackground()
+        {
+            ClearBackgroundImage(GetComponent<Image>());
+            Transform t = transform;
+            for (int i = 0; i < 4 && t != null; i++)
+            {
+                ClearBackgroundImage(t.GetComponent<Image>());
+                if (t.name == "Bottom Action Bar Container" || t.name == "Bottom Bar")
+                {
+                    ClearBackgroundImage(t.GetComponent<Image>());
+                }
+                t = t.parent;
+            }
+        }
+
+        private static void ClearBackgroundImage(Image image)
+        {
+            if (image == null) return;
+            Color c = image.color;
+            c.a = 0f;
+            image.color = c;
+            image.raycastTarget = false;
+            image.enabled = false;
         }
 
         private void Update()
@@ -224,6 +393,8 @@ namespace GameDevTV.RTS.UI.Containers
                     }
                 }
             }
+
+            FitLayoutToActiveCards();
         }
 
         private void PlayBuildingCard(int cardIndex, BuildingSO building)

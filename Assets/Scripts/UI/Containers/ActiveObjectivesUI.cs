@@ -116,19 +116,42 @@ namespace GameDevTV.RTS.UI.Containers
                     float atmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
                     float water = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
 
-                    AppendClimateLine(sb, "TEMPERATURE",
+                    bool tempMet = AppendClimateLine(sb, "TEMPERATURE",
                         temp, gm.BaselineTemperature, gm.GetRoundTemperatureTarget(),
-                        "{0:F1}°C / {1:F1}°C (need +{2:F0})");
+                        "{0:F1}°C / {1:F1}°C ({2})");
 
-                    AppendClimateLine(sb, "ATMOSPHERE",
+                    bool atmosMet = AppendClimateLine(sb, "ATMOSPHERE",
                         atmos, gm.BaselineAtmosphere, gm.GetRoundAtmosphereTarget(),
-                        "{0:F2} atm / {1:F2} atm (need +{2:F2})");
+                        "{0:F2} atm / {1:F2} atm ({2})");
 
-                    AppendClimateLine(sb, "WATER",
+                    bool waterMet = AppendClimateLine(sb, "WATER",
                         water, gm.BaselineWater, gm.GetRoundWaterTarget(),
-                        "{0:F0}% / {1:F0}% (need +{2:F0})");
+                        "{0:F0}% / {1:F0}% ({2})");
 
+                    float progress = gm.CalculateCurrentSectorProgress(out string bottleneck);
                     sb.AppendLine();
+                    if (progress >= 1f || gm.IsBetweenRounds)
+                    {
+                        sb.AppendLine("<color=#66F273><b>All sector goals met — advancing…</b></color>");
+                    }
+                    else
+                    {
+                        var waiting = new System.Collections.Generic.List<string>(3);
+                        if (!tempMet) waiting.Add("Temp");
+                        if (!atmosMet) waiting.Add("Atmos");
+                        if (!waterMet) waiting.Add("Water");
+                        if (waiting.Count > 0)
+                        {
+                            sb.AppendLine(
+                                $"<color=#FFD080>Sector finishes when <b>all three</b> are green. Still need: {string.Join(", ", waiting)}</color>");
+                        }
+                        else if (!string.IsNullOrEmpty(bottleneck))
+                        {
+                            sb.AppendLine(
+                                $"<color=#FFD080>Still need primary goal: {bottleneck}</color>");
+                        }
+                    }
+
                     sb.AppendLine("<size=13><color=#C8D0D8>Each sector needs its own climate gains — prior sectors do not count.</color></size>");
                     sb.AppendLine("<size=13>" + TerraformingGoalColors.BuildLegendLine(
                         milestoneGoal, "TEMPERATURE", "ATMOSPHERE", "WATER") + "</size>");
@@ -142,7 +165,8 @@ namespace GameDevTV.RTS.UI.Containers
             bodyText.SetText(sb.ToString());
         }
 
-        private static void AppendClimateLine(
+        /// <returns>True when this climate line is met (shown green / DONE).</returns>
+        private static bool AppendClimateLine(
             System.Text.StringBuilder sb,
             string goalKey,
             float current,
@@ -152,12 +176,21 @@ namespace GameDevTV.RTS.UI.Containers
         {
             bool met = !GenerationManager.IsUnmetSectorGoal(goalKey);
             Color valueColor = met ? TerraformingGoalColors.MetValue : TerraformingGoalColors.UnmetValue;
-            float need = Mathf.Max(0f, roundTarget - baseline);
-            string valueText = string.Format(valueFormat, current, roundTarget, need);
+            float remaining = Mathf.Max(0f, roundTarget - current);
+            string status = met
+                ? "DONE ✓"
+                : goalKey == "TEMPERATURE"
+                    ? $"need +{remaining:F0} more"
+                    : goalKey == "ATMOSPHERE"
+                        ? $"need +{remaining:F2} more"
+                        : $"need +{remaining:F0} more";
+            string valueText = string.Format(valueFormat, current, roundTarget, status);
             string label = TerraformingGoalColors.DisplayName(goalKey);
             sb.AppendLine(
                 $"  • {TerraformingGoalColors.Colorize(label + ":", goalKey)} " +
                 $"{TerraformingGoalColors.Colorize(valueText, valueColor)}");
+            return met;
         }
     }
 }
+

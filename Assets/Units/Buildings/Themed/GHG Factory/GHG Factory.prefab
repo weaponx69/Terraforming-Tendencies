@@ -181,7 +181,7 @@ MonoBehaviour:
     <StartTime>k__BackingField: 0
     <Completion>k__BackingField: 1
     <State>k__BackingField: 3
-  <BuildingSO>k__BackingField: {fileID: 0}
+  <BuildingSO>k__BackingField: {fileID: 11400000, guid: ebc99338ffaca3fe2b9cdad4908d1646, type: 2}
   primaryMaterial: {fileID: 2100000, guid: b35c532178876e94f917ff0196f65258, type: 2}
   navMeshObstacle: {fileID: 4878014751129346645}
 --- !u!208 &4878014751129346645

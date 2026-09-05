@@ -8,7 +8,7 @@ That document is the authoritative source for implemented architecture, recent d
 
 | Topic | Document |
 |-------|----------|
-| Unity CLI / live Editor commands | [`.zoo/rules/UnityCLI-Automation.md`](.zoo/rules/UnityCLI-Automation.md) |
+| Unity CLI / live Editor commands (**CLI only — Unity MCP deprecated**) | [`.zoo/rules/UnityCLI-Automation.md`](.zoo/rules/UnityCLI-Automation.md) |
 | Visual Scripting conversion | [`.zoo/rules/UnityVisualScripting-conversion.md`](.zoo/rules/UnityVisualScripting-conversion.md) |
 | GitHub Copilot | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) |
 | Zoo custom modes | [`.zoomodes`](.zoomodes) |

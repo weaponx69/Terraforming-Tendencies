@@ -61,6 +61,13 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private Material primaryMaterial;
         [SerializeField] private NavMeshObstacle navMeshObstacle;
 
+        /// <summary>
+        /// Prefabs often leave <see cref="BuildingSO"/> null and only set <see cref="UnitSO"/>.
+        /// Climate / power must resolve the definition either way.
+        /// </summary>
+        public BuildingSO ResolvedBuildingSO =>
+            BuildingSO != null ? BuildingSO : UnitSO as BuildingSO;
+
         public delegate void QueueUpdatedEvent(UnlockableSO[] unitsInQueue);
         public event QueueUpdatedEvent OnQueueUpdated;
 
@@ -97,11 +104,12 @@ namespace GameDevTV.RTS.Units
             get
             {
                 if (Progress.State != BuildingProgress.BuildingState.Completed) return false;
-                
-                bool isCommandPost = BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+
+                BuildingSO def = ResolvedBuildingSO;
+                bool isCommandPost = def != null && def.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
                 if (isCommandPost) return true;
 
-                bool needsPower = BuildingSO != null && BuildingSO.BuildingConfig != null && BuildingSO.BuildingConfig.PowerUpkeep > 0;
+                bool needsPower = def != null && def.BuildingConfig != null && def.BuildingConfig.PowerUpkeep > 0;
                 if (needsPower)
                 {
                     var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
@@ -348,8 +356,12 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            // Only apply material and auto-complete if we are NOT a ghost waiting for a drone
-            if (Progress.State != BuildingProgress.BuildingState.Paused)
+            // Only apply material and auto-complete if we are NOT a ghost / uninitialized prefab.
+            // Prefabs often ship Progress.State = Destroyed — that must NOT auto-complete, or
+            // hasCompletedConstruction latches true and the real drone finish becomes a no-op
+            // (powered-looking building that never ticks climate).
+            if (Progress.State != BuildingProgress.BuildingState.Paused
+                && Progress.State != BuildingProgress.BuildingState.Destroyed)
             {
                 // Reserved-site builds call CompleteConstruction before Start. Do not re-apply
                 // primaryMaterial afterward — it may still be the translucent ghost captured
@@ -404,7 +416,12 @@ namespace GameDevTV.RTS.Units
             CurrentHealth = MaxHealth;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
+            // Prefabs often ship with BaseBuilding disabled — climate / production need Update.
+            enabled = true;
             Supplies.BeginColonyIntegrityIfNeeded(this);
+
+            // Drone builds finish after the reserved-site spawn frame; re-wire cluster solar now.
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.EnsureClusterPowerForBuilding(this);
 
             // Turn on vision when completed
             if (VisionTransform != null)
@@ -465,7 +482,8 @@ namespace GameDevTV.RTS.Units
 
             // Add the dynamic Connect Power command if it doesn't already have one
             bool hasConnectCommand = false;
-            foreach (var cmd in AvailableCommands)
+            BaseCommand[] existingCommands = AvailableCommands ?? System.Array.Empty<BaseCommand>();
+            foreach (var cmd in existingCommands)
             {
                 if (cmd is GameDevTV.RTS.Commands.ConnectPowerCommand)
                 {
@@ -483,7 +501,7 @@ namespace GameDevTV.RTS.Units
                 var iconField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Icon>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                 if (iconField != null) iconField.SetValue(connectCommand, UnityEngine.Resources.Load<UnityEngine.Sprite>("PlugIcon"));
 
-                var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(AvailableCommands);
+                var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(existingCommands);
                 connectCommand.Slot = FindFreeSlot(commandList);
                 commandList.Add(connectCommand);
                 AvailableCommands = commandList.ToArray();
@@ -511,7 +529,8 @@ namespace GameDevTV.RTS.Units
                 // GHG Factory now generates temperature and atmosphere passively — see UpkeepRoutine
                 else if (BuildingSO.Name.Contains("Atmospheric Condenser"))
                 {
-                    AddActiveAbilityCommand("Condense Atmosphere", "Extract and concentrate atmospheric gases to enrich oxygen.", 0f, 0f, 0.5f, 0, 0);
+                    // Passive generation is the primary effect; keep a small oxygen bonus.
+                    AddActiveAbilityCommand("Condense Atmosphere", "Concentrate atmospheric gases.", 0f, 0.05f, 0.1f, 0, 0);
                 }
                 else if (BuildingSO.Name.Contains("Basalt Strip-Mine"))
                 {
@@ -659,6 +678,34 @@ namespace GameDevTV.RTS.Units
                 yield break;
             }
 
+            // Reserved-site cluster consumers (Geothermal, GHG, Aquifer, etc.) are
+            // wired to their pad's solar — do not also auto-link them to the CP.
+            if (BuildingSiteRegistry.TryGetSiteForBuilding(this, out BuildingSiteSlot site)
+                && site.Cluster != null
+                && (site.Kind == BuildingSiteKind.PairedBuilding
+                    || site.Kind == BuildingSiteKind.Infrastructure
+                    || site.Kind == BuildingSiteKind.Solar))
+            {
+                if (TryGetComponent(out PowerNode clusterNode))
+                {
+                    DisconnectCommandPostLinks(clusterNode);
+                }
+                Debug.Log($"[Power] Cluster building {name} stays off the Command Post grid.");
+                yield break;
+            }
+
+            // Geothermal is a paired climate generator even if site lookup races.
+            if (BuildingSO != null &&
+                BuildingSO.Name.Contains("Geothermal", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (TryGetComponent(out PowerNode geoNode))
+                {
+                    DisconnectCommandPostLinks(geoNode);
+                }
+                Debug.Log($"[Power] Geothermal {name} stays off the Command Post grid.");
+                yield break;
+            }
+
             if (!TryGetComponent(out PowerNode generatorNode)) yield break;
 
             BaseBuilding nearestCommandPost = null;
@@ -728,63 +775,37 @@ namespace GameDevTV.RTS.Units
             bool isBiosphere = BuildingSO.Name.Contains("Biosphere Center", System.StringComparison.OrdinalIgnoreCase);
             bool isLake = BuildingSO.Name.Contains("Lake", System.StringComparison.OrdinalIgnoreCase);
 
-            if (isAquifer || isExtractor || isBiosphere || isLake)
+            if (!(isAquifer || isExtractor || isBiosphere || isLake)) return;
+
+            // Abstract marker — a solid geometric shape, not a fake water surface.
+            float size = isBiosphere ? 6f : (isLake ? 5f : (isExtractor ? 4f : 3f));
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            marker.name = "Water Resource Marker";
+            marker.transform.SetParent(transform, false);
+            marker.transform.localPosition = new Vector3(0f, size * 0.55f, 0f);
+            marker.transform.localScale = Vector3.one * size;
+
+            var col = marker.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+
+            var renderer = marker.GetComponent<Renderer>();
+            if (renderer != null)
             {
-                GameObject waterPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                waterPlane.name = "Terraformed Water Body";
+                Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit")
+                    ?? Shader.Find("Standard"));
+                Color blue = new Color(0.2f, 0.55f, 1f, 1f);
+                mat.color = blue;
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", blue);
+                if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.75f);
+                renderer.material = mat;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
 
-                // Position on the ground, slightly offset vertically to avoid z-fighting
-                waterPlane.transform.position = transform.position + new Vector3(0f, 0.1f, 0f);
-
-                float radius = isBiosphere ? 25f : (isLake ? 20f : (isExtractor ? 15f : 8f));
-                float scale = (radius * 2f) / 10f;
-                waterPlane.transform.localScale = new Vector3(scale, 1f, scale);
-
-                var col = waterPlane.GetComponent<Collider>();
-                if (col != null) Destroy(col);
-
-                var renderer = waterPlane.GetComponent<Renderer>();
-                if (renderer != null)
+            if (isLake)
+            {
+                foreach (var r in GetComponentsInChildren<Renderer>(true))
                 {
-                    Material waterMat = Resources.Load<Material>("Materials/Water");
-                    if (waterMat == null)
-                    {
-#if UNITY_EDITOR
-                        waterMat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Water.mat");
-#endif
-                    }
-                    if (waterMat != null)
-                    {
-                        renderer.material = waterMat;
-                    }
-                    else
-                    {
-                        Material fallbackMat = new Material(Shader.Find("Standard"));
-                        fallbackMat.color = new Color(0f, 0.4f, 0.8f, 0.6f);
-                        fallbackMat.SetFloat("_Mode", 3f); // Transparent
-                        fallbackMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                        fallbackMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                        fallbackMat.SetInt("_ZWrite", 0);
-                        fallbackMat.DisableKeyword("_ALPHATEST_ON");
-                        fallbackMat.EnableKeyword("_ALPHABLEND_ON");
-                        fallbackMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                        fallbackMat.renderQueue = 3000;
-                        renderer.material = fallbackMat;
-                    }
-                }
-
-                waterPlane.transform.SetParent(transform, true);
-
-                if (isLake)
-                {
-                    // Hide default metal meshes/structures so that only the water plane is visible
-                    foreach (var r in GetComponentsInChildren<Renderer>(true))
-                    {
-                        if (r != renderer)
-                        {
-                            r.enabled = false;
-                        }
-                    }
+                    if (r != renderer) r.enabled = false;
                 }
             }
         }
@@ -795,11 +816,16 @@ namespace GameDevTV.RTS.Units
             var config = BuildingSO.BuildingConfig;
             if (config == null) return;
 
-            bool isOperating = true;
-
-            // Drains Energy during upkeep if applicable
+            // Grid-powered buildings (solar clusters) are covered by PowerNode — do not
+            // drain/damage them for the separate Energy stockpile currency.
             if (config.PowerUpkeep > 0)
             {
+                var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                if (pNode != null && pNode.IsPowered)
+                {
+                    return;
+                }
+
                 float curEnergy = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float e) ? e : 0f;
                 if (curEnergy >= config.PowerUpkeep)
                 {
@@ -807,25 +833,20 @@ namespace GameDevTV.RTS.Units
                 }
                 else
                 {
-                    // Shortfall -> degrade
-                    isOperating = false;
-                    TakeDamage((int)Mathf.Min(20f, CurrentHealth - 1f)); // Don't instantly destroy, but degrade
+                    TakeDamage((int)Mathf.Min(20f, CurrentHealth - 1f));
                 }
             }
 
-            if (isOperating)
+            if (config.BiomassUpkeep > 0)
             {
-                if (config.BiomassUpkeep > 0)
-                {
-                    float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
-                    Supplies.UpdateBiomass(Owner, Mathf.Max(0f, curBiomass - config.BiomassUpkeep));
-                }
+                float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
+                Supplies.UpdateBiomass(Owner, Mathf.Max(0f, curBiomass - config.BiomassUpkeep));
+            }
 
-                if (config.OxygenUpkeep > 0)
-                {
-                    float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
-                    Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
-                }
+            if (config.OxygenUpkeep > 0)
+            {
+                float curOxygen = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner, out float o) ? o : 0;
+                Supplies.UpdateOxygen(Owner, Mathf.Max(0, curOxygen - config.OxygenUpkeep));
             }
         }
 
@@ -835,11 +856,13 @@ namespace GameDevTV.RTS.Units
             var config = BuildingSO.BuildingConfig;
             if (config == null) return;
 
-            // If Energy upkeep was required and not met, the building is degrading and doesn't generate income
+            // Legacy Energy-stockpile producers only. Climate ticks in real-time via Update.
             float curEnergy = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float e) ? e : 0f;
-            if (config.PowerUpkeep > 0 && curEnergy < config.PowerUpkeep) return;
+            bool energyOk = config.PowerUpkeep <= 0 || curEnergy >= config.PowerUpkeep
+                || IsOperating;
 
-            // Generate Energy
+            if (!energyOk) return;
+
             if (config.PowerGeneration > 0)
             {
                 float curE = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float eng) ? eng : 0f;
@@ -863,26 +886,112 @@ namespace GameDevTV.RTS.Units
                     Supplies.UpdateFood(Owner, curFood + foodGen);
                 }
             }
+        }
 
-            // Climate (Temp / Atmos / Water) only counts from the active sector's
-            // buildings so each colonized sector is its own terraforming mini-game.
-            bool countsForSector = SectorManager.Instance == null
-                || SectorManager.Instance.IsBuildingInActiveSector(this);
+        /// <summary>
+        /// Config climate rates are per-second. Tick in real time while grid-powered so
+        /// atmosphere/temp/water progress while the player is busy (not only on idle turns),
+        /// and only from buildings in the active sector mini-game.
+        /// </summary>
+        public void TickClimateGeneration(float dt)
+        {
+            if (dt <= 0f) return;
+            if (!gameObject.activeInHierarchy) return;
+            if (Progress.State != BuildingProgress.BuildingState.Completed) return;
 
-            if (countsForSector && config.TemperatureGeneration > 0f)
+            BuildingSO def = ResolvedBuildingSO;
+            if (def?.BuildingConfig == null) return;
+
+            var config = def.BuildingConfig;
+            float atmosRate = config.AtmosphereGeneration;
+            float tempRate = config.TemperatureGeneration;
+            float waterRate = config.WaterGeneration;
+
+            // Name-based fallbacks for stale/zeroed configs (apply per-channel).
+            if (def.Name != null)
             {
-                float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner, out float t) ? t : -60f;
-                Supplies.UpdateTemperature(Owner, curTemp + config.TemperatureGeneration);
+                string n = def.Name;
+                if (atmosRate <= 0f
+                    && (n.Contains("Atmospheric Condenser", System.StringComparison.OrdinalIgnoreCase)
+                        || n.Contains("Carbon Dioxide Import", System.StringComparison.OrdinalIgnoreCase)
+                        || n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase)))
+                {
+                    atmosRate = 0.05f;
+                }
+                if (tempRate <= 0f
+                    && (n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase)
+                        || n.Contains("Geothermal", System.StringComparison.OrdinalIgnoreCase)
+                        || n.Contains("Methanogenic", System.StringComparison.OrdinalIgnoreCase)))
+                {
+                    tempRate = 0.5f;
+                }
+                if (waterRate <= 0f
+                    && (n.Contains("Aquifer", System.StringComparison.OrdinalIgnoreCase)
+                        || n.Contains("Subglacial", System.StringComparison.OrdinalIgnoreCase)
+                        || (n.Contains("Water", System.StringComparison.OrdinalIgnoreCase)
+                            && !n.Contains("Processor", System.StringComparison.OrdinalIgnoreCase))))
+                {
+                    waterRate = 0.5f;
+                }
             }
-            if (countsForSector && config.AtmosphereGeneration > 0f)
+
+            if (tempRate <= 0f && atmosRate <= 0f && waterRate <= 0f)
             {
-                float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner, out float a) ? a : 0.01f;
-                Supplies.UpdateAtmosphere(Owner, curAtmos + config.AtmosphereGeneration);
+                return;
             }
-            if (countsForSector && config.WaterGeneration > 0f)
+
+            // Climate buildings on reserved pads often finish before the spawn-event power
+            // wire runs (or after a grid recalc). Retry cluster solar link if unpowered.
+            if (!IsOperating)
             {
-                float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner, out float w) ? w : 0f;
-                Supplies.UpdateWater(Owner, curWater + config.WaterGeneration);
+                if (config.PowerUpkeep > 0f)
+                {
+                    TryRepairClusterPowerLink();
+                }
+                if (!IsOperating) return;
+            }
+
+            // Prefer pad ownership over nearest-center (edge pads were silently ignored).
+            if (SectorManager.Instance != null
+                && !SectorManager.Instance.DoesBuildingCountForActiveClimate(this))
+            {
+                return;
+            }
+
+            Owner climateOwner = Owner != Owner.Invalid ? Owner : Owner.Player1;
+
+            if (tempRate > 0f)
+            {
+                float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(climateOwner, out float t) ? t : -60f;
+                Supplies.UpdateTemperature(climateOwner, curTemp + tempRate * dt);
+            }
+            if (atmosRate > 0f)
+            {
+                float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(climateOwner, out float a) ? a : 0.01f;
+                Supplies.UpdateAtmosphere(climateOwner, curAtmos + atmosRate * dt);
+            }
+            if (waterRate > 0f)
+            {
+                float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(climateOwner, out float w) ? w : 0f;
+                Supplies.UpdateWater(climateOwner, curWater + waterRate * dt);
+            }
+        }
+
+        private float nextClusterPowerRetryTime;
+
+        private void TryRepairClusterPowerLink()
+        {
+            if (Time.time < nextClusterPowerRetryTime) return;
+            nextClusterPowerRetryTime = Time.time + 1f;
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.EnsureClusterPowerForBuilding(this);
+        }
+
+        private void Update()
+        {
+            // Prefer the global ticker when present; keep a local fallback for editor/tests.
+            if (ClimateGenerationTicker.Instance == null)
+            {
+                TickClimateGeneration(Time.deltaTime);
             }
         }
 
@@ -1074,6 +1183,11 @@ namespace GameDevTV.RTS.Units
         public void InitializeAsGhost(Material ghostMaterial, Owner owner)
         {
             Owner = owner;
+            // Prefabs often serialize Progress as Destroyed; Start() used to treat that as
+            // "ready to complete". Always reset completion guards when becoming a ghost so
+            // the drone's later CompleteConstruction actually runs.
+            hasCompletedConstruction = false;
+            hasRaisedSpawnEvent = false;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 0;
             Heal(300);
@@ -1099,6 +1213,36 @@ namespace GameDevTV.RTS.Units
             if (VisionTransform != null)
             {
                 VisionTransform.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Prefer the card/registry BuildingSO (authoritative config) over the prefab's
+        /// cloned UnitSO, which can lose climate generation rates.
+        /// </summary>
+        public void BindBuildingDefinition(BuildingSO definition)
+        {
+            if (definition == null) return;
+            BuildingSO = definition;
+            MaxHealth = definition.Health > 0 ? definition.Health : MaxHealth;
+
+            // Patch zeroed climate rates on runtime clones of stale configs.
+            if (definition.BuildingConfig != null
+                && definition.Name != null)
+            {
+                string n = definition.Name;
+                var cfg = definition.BuildingConfig;
+                if (cfg.AtmosphereGeneration <= 0f
+                    && (n.Contains("Atmospheric Condenser", System.StringComparison.OrdinalIgnoreCase)
+                        || n.Contains("Carbon Dioxide Import", System.StringComparison.OrdinalIgnoreCase)))
+                {
+                    cfg.AtmosphereGeneration = 0.05f;
+                }
+                if (n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    if (cfg.AtmosphereGeneration <= 0f) cfg.AtmosphereGeneration = 0.04f;
+                    if (cfg.TemperatureGeneration <= 0f) cfg.TemperatureGeneration = 0.5f;
+                }
             }
         }
 

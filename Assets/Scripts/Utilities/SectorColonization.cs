@@ -27,11 +27,11 @@ namespace GameDevTV.RTS.Utilities
             if (sector == null) return false;
 
             if (sector.IsLocked)
-                return SectorManager.Instance.UnlockAndColonizeSector(index, owner);
+                return SectorManager.Instance.UnlockAndColonizeSector(index, owner, claimTerraformingFocus: true);
 
             PrepareNewlyUnlockedSector(sector, owner, index);
             if (sector.IsOccupied)
-                SectorManager.Instance.ActiveSector = sector;
+                SectorManager.Instance.BeginTerraformingOn(sector);
             return sector.IsOccupied;
         }
 

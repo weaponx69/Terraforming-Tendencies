@@ -55,9 +55,10 @@ namespace GameDevTV.RTS.Editor
             panelRect.anchoredPosition = Vector2.zero;
             panelRect.sizeDelta = Vector2.zero;
 
-            // Background
+            // Background strip behind cards — keep transparent so only the cards show.
             Image bg = bottomBarGo.AddComponent<Image>();
-            bg.color = new Color(0.1f, 0.12f, 0.15f, 0.85f);
+            bg.color = new Color(0.1f, 0.12f, 0.15f, 0f);
+            bg.raycastTarget = false;
 
             // Layout
             HorizontalLayoutGroup hlg = bottomBarGo.AddComponent<HorizontalLayoutGroup>();
@@ -82,7 +83,7 @@ namespace GameDevTV.RTS.Editor
             {
                 GameObject btnGo = CreateActionButton(bottomBarGo.transform, i);
                 RectTransform btnRect = btnGo.GetComponent<RectTransform>();
-                btnRect.sizeDelta = new Vector2(56, 56);
+                btnRect.sizeDelta = new Vector2(102, 144);
                 buttons[i] = btnGo.GetComponent<UIActionButton>();
             }
 
@@ -121,7 +122,7 @@ namespace GameDevTV.RTS.Editor
             btnGo.layer = parent.gameObject.layer;
 
             RectTransform rt = btnGo.AddComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(56, 56);
+            rt.sizeDelta = new Vector2(102, 144);
 
             Image img = btnGo.AddComponent<Image>();
             img.color = new Color(0.2f, 0.25f, 0.3f, 1f);

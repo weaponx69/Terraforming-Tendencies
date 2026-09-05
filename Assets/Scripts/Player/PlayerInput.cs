@@ -70,7 +70,7 @@ namespace GameDevTV.RTS.Player
             worldPosition.y = Instance.cameraTarget.position.y;
             Instance.cameraTarget.position = worldPosition;
             Instance.currentHex?.SetHighlighted(false);
-            Instance.currentHex = HexGridManager.Instance?.GetNearestRevealedHex(worldPosition);
+            Instance.currentHex = HexGridManager.Instance?.GetNearestHex(worldPosition);
             Instance.currentHex?.SetHighlighted(true);
         }
 
@@ -302,7 +302,7 @@ namespace GameDevTV.RTS.Player
             targetPosition.y = cameraTarget.position.y;
             cameraTarget.position = targetPosition;
             currentHex?.SetHighlighted(false);
-            currentHex = HexGridManager.Instance?.GetNearestRevealedHex(cameraTarget.position);
+            currentHex = HexGridManager.Instance?.GetNearestHex(cameraTarget.position);
             currentHex?.SetHighlighted(true);
         }
 
@@ -1253,10 +1253,10 @@ namespace GameDevTV.RTS.Player
 
             if (direction == Vector2Int.zero) return;
 
-            var destination = HexGridManager.Instance.GetRevealedNeighborInDirection(currentHex, direction);
+            var destination = HexGridManager.Instance.GetNeighborInDirection(currentHex, direction);
             if (destination == null)
             {
-                if (highlightTrace) Debug.Log($"[HexHighlight] No revealed keyboard neighbor from {currentHex.HexCoordinates} in {direction}");
+                if (highlightTrace) Debug.Log($"[HexHighlight] No keyboard neighbor from {currentHex.HexCoordinates} in {direction}");
                 return;
             }
 
@@ -1304,7 +1304,7 @@ namespace GameDevTV.RTS.Player
         {
             if (currentHex != null || cameraTarget == null || HexGridManager.Instance == null) return;
 
-            currentHex = HexGridManager.Instance.GetNearestRevealedHex(cameraTarget.position);
+            currentHex = HexGridManager.Instance.GetNearestHex(cameraTarget.position);
             if (highlightTrace) Debug.Log($"[HexHighlight] Current tile initialized at camera {cameraTarget.position}: {currentHex?.HexCoordinates.ToString() ?? "NULL"}");
             currentHex?.SetHighlighted(true);
         }

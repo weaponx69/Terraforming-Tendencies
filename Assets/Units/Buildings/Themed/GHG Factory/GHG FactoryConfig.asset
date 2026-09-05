@@ -21,6 +21,6 @@ MonoBehaviour:
   biomassGeneration: 0
   powerGeneration: 0
   temperatureGeneration: 1
-  atmosphereGeneration: 0.02
+  atmosphereGeneration: 0.04
   waterGeneration: 0
   housingCapacity: 0
