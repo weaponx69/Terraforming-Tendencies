@@ -3,261 +3,225 @@
 **📚 Central Hub Documentation**
 * **Game Design Document (lore / mechanics intent):** [GDD.md](GDD.md)
 * **Visual Scripting & C# Refactoring:** [.zoo/rules/UnityVisualScripting-conversion.md](.zoo/rules/UnityVisualScripting-conversion.md)
-* **AI Unity CLI Automation:** **§12** and [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md)
+* **AI Unity CLI Automation:** **§10** and [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md)
 * **Agent Rules:** [`AGENTS.md`](AGENTS.md) (mirrored in `.clinerules` / `.zoomodes`)
 
 If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 ---
 
-## 0. Design North Star (Authoritative — 2026-09)
+## 0. Absolute Minimal MVP — “Hamster Planet” (Authoritative)
 
-**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) — a mini roguelike city-builder where buildings are cards, the map is the board, adjacency/cascades drive “number go up,” and runs are paced by **milestones under a clock**.
+**One-sentence game:** Draw building cards → place them on pads anywhere on the planet → watch Temp / Atmos / Water climb → when all three are green, you win the run tier.
 
-**Our translation:** a terraforming city-builder where the fun is **reading the whole board, playing decisive cards, and watching climate + adjacency engines stack** — not exclusive per-sector micromanagement.
+**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) tile-placement dopamine, without requiring combos, guilds, or meta progression for the first shippable slice.
 
-### Core pillars
+### MVP win loop (the only loop that matters)
 
-| Combolands | Terraforming Tendencies |
+1. Open a **5-card hand**.
+2. Play a **building card** → browse planet-wide pads with **Q/E** → **click** to place.
+3. Powered climate buildings tick **Temperature / Atmosphere / Water** on the **whole board**.
+4. When **all three climate lines are met**, the milestone clears (summary / win / next tier).
+5. Playtest target: **~8–15 placements, 10–15 minutes**, feel decisive — not RTS micro.
+
+### MVP milestone triggers
+
+**Win condition = Temp + Atmos + Water all met.** No separate primary (Power / Pop / Oxygen / Command Post) in the MVP path.
+
+| Line | MVP target (use current deltas until retuned) |
 |---|---|
-| Score / population milestones | **Planet terraforming goals** (Temperature / Atmosphere / Water; Oxygen later if needed) |
-| Weeks on the clock | Generation / action budget / idle-turn pressure |
-| Place building → combo cascade | Place climate/infra card → **board-wide climate tick + adjacency multipliers** |
-| Guild pair (run identity) | Climate specialty / tech path (Heat / Air / Water / Industry) — future |
-| Whole island scores | **All completed buildings always contribute** |
-| Cascades | GHG + geothermal, condenser + solar, aquifer + ice, etc. |
+| **Temperature** | +**15°C** from run/tier baseline |
+| **Atmosphere** | +**0.25 atm** from baseline |
+| **Water** | +**5%** from baseline |
 
-### Design rules agents must follow
+**What fires the check:** climate supplies crossing those thresholds (buildings ticking over time). Placing a card alone does not win unless its ticks push the bars over.
 
-1. **Milestones = terraforming goals on the whole planet.** Hitting Temp / Atmos / Water thresholds (absolute or round deltas from run/tier baselines) is the win path for a generation/tier.
-2. **Whole board, not exclusive sectors.** Climate generation must consider **every** powered, completed climate building. Do **not** gate Temp/Atmos/Water on `ActiveSector` / `TerraformingSector` exclusivity going forward.
-3. **Sectors are map flavor and expansion space**, not serial mini-games. Use them for biomes, resource pockets, fog frontiers, and combo-enabling terrain — not “only this sector’s buildings count.”
-4. **Cards + placement remain the primary verb.** The hand is the decision surface; combos and climate pops are the dopamine.
-5. **Avoid the boring micromanage loop.** Prefer decisive card plays and board reading over constant worker babysitting.
+**Near-complete floats count as done** (≥ ~0.999 / `RoundDeltaProgress` headroom) so values like 0.26 atm don’t softlock.
 
-### Target loop (vertical slice)
+### MVP tile kit (must always be drawable)
 
-1. Open hand of cards (buildings / support).
-2. Place onto pads / terrain → power + climate + **adjacency combos**.
-3. Whole-board Temp / Atmos / Water climb toward the next **milestone tier**.
-4. Hit all three climate lines (and any primary) → award progress / shop / next harder targets.
-5. Optional expansion unlocks better land for combos — **not** required to “restart” climate in a fenced sector.
+Enough copies that the player can slowly finish without RNG softlock:
 
-### Explicitly retiring (legacy design)
+| Role | Buildings (use existing) |
+|---|---|
+| **Power** | Solar Panel |
+| **Heat** | GHG Factory (+ Geothermal or Methanogenic as backup) |
+| **Air** | Atmospheric Condenser (+ CO₂ Import Laser as backup) |
+| **Water** | Water Ice Aquifer (+ Subglacial Extractor as backup) |
+| **Bootstrap** | Command Post, Mining Drone (materials / build labor) |
 
-* **Per-sector exclusive climate mini-game** (only ActiveSector buildings contribute; each sector needs a fresh +15°C / +0.25 atm / +5% water delta while prior absolute gains do not count).
-* **Spoke-and-hub “one exclusive sector at a time” as the main fantasy** — colonization may remain, but it is expansion for better boards, not the only climate progress path.
-* Treating Biomass as a sector-completion terraforming goal (already deprecated; Biomass may remain as economy/food).
+**MVP deck rule:** Heat / Air / Water / Solar stay common (double density OK). Soft climate gates that block Water before Heat (e.g. Aquifer at −20°C) must not softlock the MVP.
 
-> **Implementation note:** Much of the codebase still implements the legacy exclusive-sector climate loop. New work should migrate toward §0. When code and this doc conflict on *intent*, follow §0; when documenting *what currently runs*, see §1.
+### In MVP (keep / finish)
+
+* 5-card FIFO hand, materials costs, play-and-draw  
+* Reserved pads, Solar→consumer clusters, drone-required builds  
+* Planet-wide pad pick + **Q/E** cycle + click + Esc  
+* Sector **lock retired** (pads/builds anywhere)  
+* Whole-board climate contribution (**must finish** — see §1)  
+* Objectives UI: three climate lines green = done  
+* Caps leave headroom past the win line so HUD keeps moving  
+
+### Out of MVP (do not build / do not expand until MVP feels fun)
+
+* Adjacency combos / weather tiles / cloud→rain  
+* Guilds, heirlooms, councillors, meta unlocks  
+* Exclusive-sector climate mini-game / colonization as win gate  
+* Combat, deep tech tree, colonists/tubes as required systems  
+* Draft overlays, scouting-as-progression, AI opponents  
+* Extra primaries (Oxygen / Power / Population) on the win path  
+
+> If code and this doc conflict on *intent*, follow **§0**. For *what currently runs*, see **§1**.
 
 ---
 
-## 1. Current Implementation vs Target
+## 1. MVP Status Board (Where To Go From Here)
 
-| Area | Current code (legacy / transitional) | Target (§0) |
+| Piece | Status | Next action |
 |---|---|---|
-| Climate contribution | Focus sector via `TerraformingSector` / `GetClimateFocusSector()`; historically ActiveSector-only | All completed climate buildings always count |
-| Round win | Per-sector generation: primary + Temp/Atmos/Water deltas from baselines | Planet milestones / tiers; whole board |
-| Sector unlock | **Lock retired** — all sectors open; pads planet-wide on card pick | Optional expansion for land / combos |
-| Caps | Floored to round / next-gen cumulative targets | Still need headroom past milestone lines so HUD keeps moving |
-| Cards / hand | FIFO 5-card hand, reserved pads, materials costs | Keep; add adjacency combo feedback |
-| Adjacency combos | Not yet a first-class system | Core dopamine layer to build |
+| Card hand + place on pads | **Done** | Polish only if broken |
+| Planet-wide pads + Q/E browse | **Done** | Keep; don’t reintroduce sector lock |
+| Sector build lock | **Retired** | Do not restore |
+| Climate buildings exist (Heat/Air/Water) | **Done** | Ensure deck density + no softlock gates |
+| Whole-board climate ticks | **Not done** | Remove `TerraformingSector` / focus-sector exclusivity so every powered climate building counts |
+| Win = Temp+Atmos+Water only | **Partial** | Code still requires **primary + three climates**; drop primary from MVP win gate |
+| Baselines / deltas | **Legacy sector-round** | Keep +15 / +0.25 / +5 for now; treat as **planet tier** not “new sector mini-game” |
+| Objectives copy | **Partial** | Say “terraforming milestones,” not “finish this sector” |
+| Adjacency combos | **Post-MVP** | Only after 10–15 min place→win feels good |
+| Live bot / CLI win check | **Legacy** | Retarget to planet Temp/Atmos/Water, not unlock-next-sector |
 
-**Migration priority:** (1) ~~remove exclusive climate gating~~ / remove sector build lock — **sector lock retired**; (2) whole-board climate ticks; (3) redefine milestones as planet tiers; (4) add adjacency combo multipliers + UI pops.
+**Ordered build list (do in order):**
 
----
-
-## 2. Core Systems Still in Play
-
-### 2.1 Card hand & play-and-draw
-* `CardDeckController` + `BottomBarActionsUI`: **5-card** hand, larger faces (~158×220), docked **above** the Bottom Bar so selection info is not covered.
-* Title + materials cost **inside** the card (cost chip top-left). Affordable = gold, unaffordable = red.
-* Playing a card draws the next **playable** card from a **FIFO** pile — see **§5**.
-* Draft overlay rounds are disabled (`TriggerDraft` / `ShowDraftSelection` are no-ops).
-* Cards load from `Resources/Cards` via `BlueprintDraftUI.InitializeDefaultPool()`.
-
-### 2.2 Reserved site pads
-Player building cards primarily play onto **pre-placed pads** (`ReservedSiteBuildUtility`), not free terrain placement.
-
-* **Kinds:** `CommandPost`, `Solar`, `PairedBuilding`, `Mine`. Deprecated: `Infrastructure`.
-* **Cluster rule:** one solar pad + one consumer pad; consumer requires that cluster’s solar occupied, then auto-wires to it. **Solar never auto-wires to the Command Post.**
-* **Builds need an idle drone** (HUD: “A drone is needed.”). Exceptions: waived-cost auto-colonize CP, first Command Post orbital drop.
-* **Pad browse (Q/E):** While a building card is selecting a site, **Q** / **E** cycle the camera across planet-wide eligible pads (sorted west→east). Click places on the focused/clicked pad; Esc cancels. Outside site-picking, Q/E still page Command Posts.
-* Site-marker preview ghosts must never occupy pads or raise `BuildingSpawnEvent`. See historical pad/ghost rules under **§11** if debugging visuals.
-
-### 2.3 Climate buildings & rates
-Themed buildings tick Temp / Atmos / Water from `BuildingConfigSO` (and card propagation fallbacks). Examples: GHG Factory (temp + atmos), Atmospheric Condenser / CO₂ Import Laser (atmos), Geothermal / Methanogenic Spreader (temp), Water Ice Aquifer / Subglacial Extractor (water).
-
-* Climate basics for goals: **Temperature / Atmosphere / Water** only (Biomass not a terraform goal).
-* Float near-complete: treat progress ≥ ~0.999 as done (`RoundDeltaProgress` pattern) so targets like 0.26 don’t softlock.
-* Caps must leave **headroom past the current milestone line** so values don’t freeze on the win threshold.
-
-### 2.4 Power grid
-* Undirected graph: `PowerGridManager` + `PowerNode`. Power is **net capacity**, not a stockpile loop.
-* Command Posts stay operational even when unpowered (life-support recovery); temporary CP backup cells exist for bootstrap.
-* Cluster consumers allocate shared solar before CP drain.
-
-### 2.5 Economy & failure
-* Materials costs: always use `GetMaterialsCost()` / `GetMaterialsPlayCost()` — null `Cost` must not mean free.
-* Scouting costs: Orbital Scan 50, Survey Drone 75, Pipeline Boost 50; Emergency Caches free.
-* `GameOverManager`: suppress false losses on quit/unload; don’t fail while pipelines are still expanding; integrity drain gated by **§7**.
-
-### 2.6 Semi-turn flow
-* No End Turn button. Idle ~2s after player action → turn resolves (`GameFlowManager` / phase controller).
-* Phases (conceptually): Upkeep → Recovery → Income → Threats → Draw (`FillHand`) → Events (stub) → Milestones → Win/Lose.
-* **Key intent:** batch decisive card plays, then watch the board resolve — Combolands pacing, not full RTS micro.
-
-### 2.7 Fog, hexes, camera
-* Hex shroud / reveal for exploration; colonization / vision clear fog.
-* WASD hex camera may focus any hex; movement does **not** auto-`Reveal()`.
-* Starting area reveal (~15) bootstraps Sector 0 pads + minerals.
+1. **Whole-board climate** — all completed powered climate buildings always contribute.  
+2. **MVP win gate** — `IsCurrentSectorRoundComplete` / progress = min(Temp, Atmos, Water) only (no primary).  
+3. **Deck reliability** — Solar + GHG + Condenser + Aquifer (and backups) always cycle; remove Softlocks from climate gates for basics.  
+4. **Objectives / HUD** — three lines, remaining-to-green, milestone language.  
+5. **Playtest** — can a player finish without cheats in ~15 min?  
+6. **Only then:** combos, tiers 2/3, guilds, colonization-as-flavor.
 
 ---
 
-## 3. Sectors — Map Regions (Lock Retired)
+## 2. Current Code vs MVP (Honest)
 
-**Sector lockdown is retired.** At planet init every sector starts `IsLocked = false` and `IsExplored = true`. Building cards offer **eligible pads across the entire planet** (`GetEligibleSites(..., visibleToPlayerOnly: false)`). Movement and free-placement no longer reject “locked” sectors.
+| Area | Current code | MVP target |
+|---|---|---|
+| Climate contribution | Still focus-sector oriented (`GetClimateFocusSector` / historical ActiveSector) | All powered completed climate buildings |
+| Round win | `min(primary, temp, atmos, water)` ≥ 0.999 → generation end | `min(temp, atmos, water)` only |
+| Deltas | +15°C / +0.25 atm / +5% from round baselines | Same numbers OK as Tier 1 |
+| Sector lock | All sectors open; pads planet-wide | Keep |
+| Cards / pads / Q/E | Working | Keep |
+| Combos | None | Post-MVP |
 
-**Still true:**
-* Sectors remain map regions (centers, features, pad lists, borders).
-* Hex fog still hides idle world content; card pad-picking ignores fog so you can jump to distant pads.
-* Resource node discovery stays bootstrap-limited to Sector 0 (`DiscoverStartingSectorResources`) — exploring hexes reveals deposits elsewhere.
-* Optional colonization (Command Post claim) can still expand occupied footprint; it is not required to unlock build rights.
-
-**Do not reintroduce** `IsLocked` gates on pad eligibility, card `CanApply`, or unit movement.
-
----
-
-## 4. Goal Colors & Objectives UI
-
-Color coding ties **terraforming goal** cards to Active Objectives (`TerraformingGoalColors`).
-
-* Colored: TEMPERATURE (amber), ATMOSPHERE (fuchsia), WATER (blue), plus primary types when used (Oxygen cyan, Power gold, Population indigo, Command Post white).
-* Neutral: materials, exploration, mining, emergency caches, buffs, etc.
-* Objectives show remaining need / DONE; all three climate lines must be green to clear a climate milestone set.
-* Mapping: `UnlockBuildingCardSO.ClassifyBuildingGoal` (e.g. GHG → TEMPERATURE).
-
-Rename mentally from “sector-completion goals” → **“milestone / terraforming goals”** as UI copy migrates.
+**Legacy milestone check (today):** `GenerationManager.Update` every frame (after 2s grace) + idle `OnTurnMilestones` → `CheckMilestones` → `TriggerGenerationEnd` when progress ≥ 0.999.
 
 ---
 
-## 5. Card Deck FIFO Draw (Authoritative)
+## 3. Systems To Keep (Support the MVP)
 
-`CardDeckController` rules (keep unless redesigning the deck engine):
+### 3.1 Card hand
+* `CardDeckController` + `BottomBarActionsUI`: **5** cards, faces ~158×220, above Bottom Bar.
+* Cost chip inside card; affordable gold / unaffordable red.
+* FIFO play-and-draw (**§5**). Draft overlays disabled.
 
-* Stable order — **no shuffle** on rebuild.
-* Milestone/climate tools duplicated once in the draw pile (~2× frequency) via runtime clones.
-* Draw from front; played/skipped → back of discard; recycle preserves order.
-* Hand only seats cards that pass `IsGateMet()` + `CanApply()`.
-* Opening hand seeds Command Post + Solar + Mining Drone; `EnsureSolarPrereqInHand` / `EnsureMiningDroneInHand` prevent softlocks.
-* Extra Solar infra copies in the pile when solar pads exist.
+### 3.2 Reserved pads
+* Kinds: `CommandPost`, `Solar`, `PairedBuilding`, `Mine`.
+* Cluster: solar then consumer; solar never auto-wires to Command Post.
+* Idle drone required (except first CP / waived colonize CP).
+* **Q/E** cycles eligible pads west→east while selecting; click places; Esc cancels. Outside picking, Q/E pages Command Posts.
+* Card eligibility uses planet-wide sites (`visibleToPlayerOnly: false`).
 
----
+### 3.3 Climate buildings
+* Config rates on `BuildingConfigSO` (GHG, Condenser, CO₂ Laser, Geothermal, Aquifer, Extractor, etc.).
+* Only Temp / Atmos / Water are terraform goals (Biomass is not).
 
-## 6. Blueprint / Themed Card Pool (Summary)
+### 3.4 Power
+* `PowerGridManager` / `PowerNode` net capacity (not stockpile).
+* CP stays operable unpowered; cluster solar prefers consumers over CP drain.
 
-Default unlocks / support: Solar, Oxygen Processor, Habitat, materials/biomass shipments, Mining Drone, gather/power buffs.
+### 3.5 Light economy
+* Always charge via `GetMaterialsCost()` / `GetMaterialsPlayCost()` (null Cost ≠ free).
+* Integrity gated by **§6** — don’t expand decay design for MVP.
 
-**Themed climate / utility** (procedural `BuildingSO` + cards; costs Materials; many climate-gated): strip-mine, deep-core laser, aquifers/extractors, GHG / geothermal / condensers / CO₂ laser, microbe/algae spreaders, biosphere, etc. Full historical list lived in older §22 notes — assets/runtime pool in `BlueprintDraftUI` remain source of truth for exact names/stats.
-
-**Scouting:** Orbital Scan, Pipeline Boost, Survey Drone, Emergency Caches (+300 Mat).
-
----
-
-## 7. Colony Integrity Start Gate (Authoritative)
-
-* `Supplies.ColonyIntegrityActive` starts false each scene.
-* Until true: integrity reads 100%; `GlobalDecayManager` skips drain.
-* Becomes true on first real gameplay building `(Clone)` completing construction (not UCC / DecayStarter / hub).
-* UCC / GlobalCommander is invulnerable and excluded from integrity math.
-
----
-
-## 8. Prefabs & Ghosts (Critical Rules)
-
-* Prefer building prefabs as variants of `BaseBuilding.prefab`.
-* **Never** overwrite a command’s assigned `GhostPrefab` with a shared “first available” template or solid prefab fallback that makes all ghosts look like Solar.
-* Missing references should fail loudly in editor, not silently degrade.
-* Site ghosts: inactive holder → disable simulation → translucent URP materials after procedural meshes exist.
+### 3.6 Sectors (demoted)
+* Lock retired; regions still hold pad lists / features / borders.
+* Hex fog remains for world vibe; does **not** gate card pads.
+* Do **not** reintroduce `IsLocked` on pads, `CanApply`, or movement.
+* Colonization / scouting = optional flavor, **not** MVP progress.
 
 ---
 
-## 9. UI Philosophy
+## 4. Goal Colors & Objectives
 
-* Universal Bottom Bar mirrors selection ActionsUI; card hand **is** the action surface.
-* `CommandSelectedEvent` → `PlayerInput` executes; keep event-driven refresh (`UpgradeResearchedEvent`) in sync.
-* Tech tree / generation summary: deactivate full-screen raycast blockers when closed.
-
----
-
-## 10. Automated Economy / AI (Secondary)
-
-* `GreedyAIController`: logarithmic spend, force first Probe, assign mining drones to valid `GatherableSupply` under planet gen, respect sector locks while those still exist.
-* Foundry crawler / energy pipeline: expansion logistics (may be demoted as sector fantasy changes).
-* Mining drones: proximity repair (~14m) while gathering.
-
-Treat AI as secondary until the player combo loop feels good.
+* Temp = amber, Atmos = fuchsia, Water = blue (`TerraformingGoalColors`).
+* MVP objectives: those three only; all green = milestone clear.
+* Primary colors (Oxygen / Power / Pop / CP) stay in code for later — **not** MVP win gates.
 
 ---
 
-## 11. Condensed Fix Memory (Do Not Reintroduce)
+## 5. Card Deck FIFO (Authoritative)
 
-Agents should not re-litigate these; details are in git history if needed.
-
-* Climate silent / stuck: focus sector stolen mid-round; caps == win line; float `(0.26-0.01)/0.25 < 1`; CO₂ laser classified as mine; null BuildingSO / Progress=Destroyed ghosts; milestones only on idle turns.
-* Softlocks: solar missing from hand; 3 clusters/sector pad starvation; colonization without CP; integrity DecayStarter self-damage; CP unpowered blocking solar placement.
-* Free builds: null Cost treated as free — always charge via `GetMaterialsCost()`.
-* Site ghosts looking finished / stealing pads / sheltering colonists.
-* UCC collider stealing drone selection.
-* Scene reload singleton / static persistence bugs — overwrite `Instance = this` on load; reset statics on `sceneLoaded`.
-* Instant next-gen completion: grace period after destroy; record baselines **after** draft effects.
-* Power as stockpile from upkeep coroutine — use static net capacity.
-* Unity MCP deprecated — **CLI only** (§12).
-
-Live climate diagnose helpers (legacy sector bot era): `ClimateGenerationTicker.ReportStatus()`, `ClimateGenerationAutomation.DiagnoseAtmosphere()` / `StartAtmosphereWatch()`, `./tools/sector-win-cli.sh` (will need retargeting when milestones go planet-wide).
+* No shuffle on rebuild; recycle preserves order.
+* Climate / milestone tools duplicated once (~2× density).
+* Hand seats only `IsGateMet()` + `CanApply()` cards.
+* Opening: Command Post + Solar + Mining Drone; keep Solar / drone reseated when needed.
+* **MVP:** prefer seating Heat/Air/Water tools; don’t let support spam starve the engine.
 
 ---
 
-## 12. Unity CLI & Live Editor Automation (Authoritative)
+## 6. Colony Integrity Gate
 
-Experimental **Unity CLI** + **Unity Pipeline** against the **already-open** Editor. Full procedure: [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md).
+* `ColonyIntegrityActive` false until first real `(Clone)` building completes.
+* Until then integrity 100% and decay skipped.
+* UCC invulnerable / excluded from integrity math.
 
-**Hard rules:**
-* **Unity MCP deprecated.** Do not use Cursor `user-Unity` / `mcp_auth` for Unity / `unity mcp`.
-* Prefer connected Editor: `unity status --format json`.
-* **Never** spawn a second Editor while the user’s is open (`unity test` / `build` / `run` / `-batchmode` → OOM on this heavy map).
-* Use: `unity command` / `list` / `eval`.
+---
+
+## 7. Prefabs & Ghosts
+
+* Prefer `BaseBuilding` variants.
+* Never overwrite assigned `GhostPrefab` with a shared Solar fallback.
+* Site ghosts must not complete construction, steal pads, or shelter colonists.
+
+---
+
+## 8. Condensed Fix Memory (Do Not Reintroduce)
+
+* Climate stuck: focus sector stolen; caps == win line; float atmos progress; CO₂ laser as mine; null BuildingSO; milestones only on idle turns.
+* Softlocks: Solar missing from hand; pad starvation; null Cost = free; CP unpowered blocking solar.
+* Site ghosts looking finished / occupying pads.
+* Scene reload singleton/static bugs.
+* Unity MCP deprecated — **CLI only** (**§10**).
+
+---
+
+## 9. Post-MVP Backlog (After Hamster Loop Works)
+
+1. Adjacency combo multipliers + pop UX  
+2. Weather / terrain tiles (cloud, ice, vent) as amplifiers  
+3. Harder milestone tiers / action clock  
+4. Guild-like run identity  
+5. Colonization as optional better land, not a softlock  
+6. Retarget `./tools/sector-win-cli.sh` → planet milestone bot  
+
+---
+
+## 10. Unity CLI & Live Editor Automation (Authoritative)
+
+* **Unity MCP deprecated.** CLI only against the **already-open** Editor.
+* Never `unity test` / `build` / `run` / `-batchmode` while this Editor is open (OOM).
+* Full procedure: [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md)
 
 ```bash
 unity status --format json
 unity command eval "return UnityEditor.EditorApplication.isPlaying;" --json
 ```
 
-**CI:** `.github/workflows/unity-editmode.yml` — EditMode via GameCI; live bot only on self-hosted `unity-pipeline-live` with Editor open.
+---
 
-Scene note: GameObject often named `PlanetManager`; script is `PlanetGenerator`.
+## 11. Related Systems (Ignore for MVP)
+
+Curved world, colonists/tubes, deep unit tech trees, combat, AI expansion, vegetation biomass-as-economy — leave alone unless they block the hamster loop.
 
 ---
 
-## 13. What To Build Next (Design Backlog)
-
-1. **Whole-board climate** — delete exclusive sector contribution; keep optional sector fog/colonization.
-2. **Planet milestone table** — Tier 1/2/3 Temp/Atmos/Water targets + clock/action budget.
-3. **Adjacency combo rules** — 2–3 multipliers among existing pink/orange/blue buildings + floating score/climate pop UX.
-4. **Objectives / bot retarget** — Active Objectives and CLI automation speak “planet milestones,” not “finish this sector’s exclusive climate.”
-5. **Guild-like run identity** (later) — pick climate specialties that shape the offer pool.
-
----
-
-## 14. Related Systems (Keep, Don’t Expand Blindly)
-
-* Curved world shader / updater (visual only).
-* Martian colonists / pressurized tubes / habitats.
-* Tech tree 20-level unit decks & infantry upgrades (roguelite shop layer).
-* AudioManager persistent BGM.
-* Vegetation biomass generation (economy, not terraform milestone).
-
----
-
-*Last rewritten: 2026-09-06 — Combolands-style whole-board terraforming milestones as design authority; sector lockdown retired (pads planet-wide).*
+*Last rewritten: 2026-09-06 — Absolute minimal “hamster planet” MVP is design authority; ordered next steps in §1.*
