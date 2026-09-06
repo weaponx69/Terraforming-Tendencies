@@ -184,16 +184,76 @@ namespace GameDevTV.RTS.Player
 
             BlueprintCardSO found = FindCardInPiles(c =>
                 string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)
-                && c.IsGateMet()
                 && ShouldKeepInHand(c));
+
+            // Fallback: any unlock whose building classifies to this goal (gate already relaxed for MVP).
+            if (found == null)
+            {
+                found = FindCardInPiles(c =>
+                    c is UnlockBuildingCardSO unlock
+                    && unlock.buildingToUnlock != null
+                    && string.Equals(
+                        UnlockBuildingCardSO.ClassifyBuildingGoal(unlock.buildingToUnlock),
+                        goal,
+                        StringComparison.OrdinalIgnoreCase)
+                    && ShouldKeepInHand(c));
+            }
 
             if (found == null) return;
 
-            MakeHandRoomForHandoffCard(found);
+            MakeHandRoomForClimateGoal(goal, found);
             if (hand.Count >= handSize) return;
 
             hand.Add(found);
-            Debug.Log($"[CardDeckController] Seated unmet sector-goal card '{found.cardName}' ({goal}) for handoff.");
+            Debug.Log($"[CardDeckController] Seated unmet climate card '{found.cardName}' ({goal}).");
+        }
+
+        /// <summary>
+        /// Make room for a missing climate color. Prefer dropping support cards, then a
+        /// duplicate of another climate color — never Mining Drone / Solar / the only copy of a color.
+        /// </summary>
+        private void MakeHandRoomForClimateGoal(string incomingGoal, BlueprintCardSO incoming)
+        {
+            if (hand.Count < handSize || incoming == null) return;
+
+            int dropIdx = hand.FindIndex(c =>
+                c != null
+                && TerraformingGoalColors.GetSectorGoalForCard(c) == null
+                && !IsSolarUnlockCard(c)
+                && !IsMiningDroneCard(c));
+
+            if (dropIdx < 0)
+            {
+                // Drop a second copy of Temp/Atmos/Water that is not the only one of its color.
+                for (int i = 0; i < hand.Count; i++)
+                {
+                    string g = TerraformingGoalColors.GetSectorGoalForCard(hand[i]);
+                    if (string.IsNullOrEmpty(g)) continue;
+                    if (string.Equals(g, incomingGoal, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (IsSolarUnlockCard(hand[i]) || IsMiningDroneCard(hand[i])) continue;
+                    int copies = hand.Count(c =>
+                        string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), g, StringComparison.OrdinalIgnoreCase));
+                    if (copies >= 2)
+                    {
+                        dropIdx = i;
+                        break;
+                    }
+                }
+            }
+
+            if (dropIdx < 0)
+            {
+                dropIdx = hand.FindIndex(c =>
+                    c is UnlockBuildingCardSO unlock
+                    && !IsSolarUnlockCard(c)
+                    && !IsMiningDroneCard(c)
+                    && NeedsSolarPoweredPad(unlock));
+            }
+
+            if (dropIdx < 0) return;
+
+            discardPile.Add(hand[dropIdx]);
+            hand.RemoveAt(dropIdx);
         }
 
         private void EnsureNamedCardInHand(Func<BlueprintCardSO, bool> predicate, bool requirePlayable)
@@ -413,8 +473,12 @@ namespace GameDevTV.RTS.Player
             var before = hand.ToArray();
             DiscardUnplayableFromHand();
             EnsureSolarPrereqInHand();
+            EnsureMiningDroneInHand();
+            EnsureMvpClimateGoalsInHand();
             FillHandInternal();
             EnsureSolarPrereqInHand();
+            EnsureMiningDroneInHand();
+            EnsureMvpClimateGoalsInHand();
             if (before.Length != hand.Count || !before.SequenceEqual(hand))
             {
                 OnHandChanged?.Invoke();
@@ -429,10 +493,23 @@ namespace GameDevTV.RTS.Player
         {
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
+            EnsureMvpClimateGoalsInHand();
             FillHandInternal();
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
+            EnsureMvpClimateGoalsInHand();
             OnHandChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// MVP: while Temp / Atmos / Water are unmet, keep at least one tool for each in hand
+        /// so FIFO spam cannot bury Water for minutes.
+        /// </summary>
+        private void EnsureMvpClimateGoalsInHand()
+        {
+            EnsureUnmetSectorGoalCardInHand("TEMPERATURE");
+            EnsureUnmetSectorGoalCardInHand("ATMOSPHERE");
+            EnsureUnmetSectorGoalCardInHand("WATER");
         }
 
         /// <summary>

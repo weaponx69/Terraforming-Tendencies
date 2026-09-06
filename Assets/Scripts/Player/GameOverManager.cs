@@ -135,14 +135,9 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // 1. Authoritative Win Check
-            bool oxygenComplete = Supplies.Oxygen != null
-                && Supplies.Oxygen.TryGetValue(monitoredOwner, out float oxygen)
-                && oxygen >= 99.9f;
-
-            bool sectorsComplete = SectorManager.Instance != null && SectorManager.Instance.AreAllSectorsOccupied();
-
-            if (oxygenComplete && sectorsComplete)
+            // 1. Authoritative Win Check — MVP: Temp + Atmos + Water cleared once.
+            if (GenerationManager.Instance != null
+                && GenerationManager.Instance.IsCurrentSectorRoundComplete())
             {
                 TriggerVictory();
                 return;
@@ -249,11 +244,11 @@ namespace GameDevTV.RTS.Player
                 if (GenerationManager.Instance != null
                     && GenerationManager.Instance.IsCurrentSectorRoundComplete())
                 {
-                    GenerationManager.Instance.TriggerGenerationEnd();
+                    TriggerVictory();
                 }
                 else if (GenerationManager.Instance != null)
                 {
-                    Debug.Log("[GameOverManager] Sector terraforming goals incomplete — map depletion ends the colony.");
+                    Debug.Log("[GameOverManager] Climate goals incomplete — map depletion ends the colony.");
                     TriggerGameOver(GameOverReason.Resources);
                 }
                 else
@@ -367,7 +362,8 @@ namespace GameDevTV.RTS.Player
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
-            Debug.Log("[GameOverManager] Victory triggered! All sectors occupied and oxygen complete.");
+            Debug.Log("[GameOverManager] Victory triggered! MVP climate goals (Temp + Atmos + Water) met.");
+            Time.timeScale = 0f;
             CancelInvoke(nameof(CheckNoRecovery));
             StopAllCoroutines();
             OnVictory?.Invoke();

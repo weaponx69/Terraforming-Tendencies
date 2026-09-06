@@ -93,14 +93,8 @@ namespace GameDevTV.RTS.Player
         {
             get
             {
-                if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
-                int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
-                string baseDesc = milestones[milestoneIndex].GoalDescription;
-                if (IsExpansionPhase)
-                {
-                    return baseDesc;
-                }
-                return $"{baseDesc} (+{SectorTemperatureDelta:F0}°C Temp, +{SectorAtmosphereDelta:F2} atm, +{SectorWaterDelta:F0}% Water this sector)";
+                // MVP: one round — clear Temp / Atmos / Water on the whole planet.
+                return $"Terraform the planet (+{SectorTemperatureDelta:F0}°C Temp, +{SectorAtmosphereDelta:F2} atm, +{SectorWaterDelta:F0}% Water)";
             }
         }
 
@@ -178,16 +172,18 @@ namespace GameDevTV.RTS.Player
                 {
                     SectorManager.Instance.InitializeSectors();
                 }
-                MaxGenerations = Mathf.Min(SectorManager.Instance.Sectors.Count, milestones.Count);
             }
+
+            // Absolute hamster MVP: one round — Temp + Atmos + Water, then win.
+            MaxGenerations = 1;
             CurrentGeneration = 1;
             IsBetweenRounds = false;
             IsExpansionPhase = false;
 
             if (milestones != null && milestones.Count > 0)
             {
-                CurrentMilestoneType = milestones[0].Type;
-                CurrentMilestoneTarget = milestones[0].TargetValue;
+                CurrentMilestoneType = MilestoneType.Temperature;
+                CurrentMilestoneTarget = SectorTemperatureDelta;
             }
             CurrentMilestoneValue = 0f;
 
@@ -319,10 +315,9 @@ namespace GameDevTV.RTS.Player
             if (IsExpansionPhase) return;
             if (Time.time < roundStartTime + 2f) return;
 
-            if (SectorManager.Instance == null || SectorManager.Instance.GetClimateFocusSector() == null) return;
             if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
 
-            // Climate ticks in real time; do not wait for idle turn resolution to finish the sector.
+            // Climate ticks in real time; do not wait for idle turn resolution to finish the round.
             EnsureMilestoneSubscription();
             CheckMilestones();
         }
@@ -378,7 +373,6 @@ namespace GameDevTV.RTS.Player
         {
             if (IsBetweenRounds || IsExpansionPhase) return;
 
-            if (SectorManager.Instance == null || SectorManager.Instance.GetClimateFocusSector() == null) return;
             if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
 
             float progress = CalculateCurrentSectorProgress(out _);
@@ -386,46 +380,58 @@ namespace GameDevTV.RTS.Player
 
             if (progress >= 0.999f)
             {
-                TriggerGenerationEnd();
+                // MVP: clearing Temp+Atmos+Water wins the game (one round).
+                TriggerMvpVictory();
+            }
+        }
+
+        /// <summary>Pause and fire victory when the hamster MVP climate goals are met.</summary>
+        private void TriggerMvpVictory()
+        {
+            if (IsBetweenRounds) return;
+            IsBetweenRounds = true;
+            OnGenerationProgressChanged?.Invoke(1f);
+            Time.timeScale = 0f;
+            Debug.Log("[GenerationManager] MVP climate goals met — victory.");
+            if (GameOverManager.Instance != null)
+            {
+                GameOverManager.Instance.TriggerVictory();
+            }
+            else
+            {
+                Debug.LogError("[GenerationManager] GameOverManager missing — cannot show victory UI.");
             }
         }
 
         /// <summary>
-        /// Combined sector progress: primary milestone plus temperature, atmosphere, and water.
-        /// Returns 0–1; the bottleneck metric is written to <paramref name="bottleneck"/>.
+        /// MVP progress: Temperature, Atmosphere, and Water only (no primary gate).
+        /// Returns 0–1; bottleneck is the lowest climate line.
         /// </summary>
         public float CalculateCurrentSectorProgress(out string bottleneck)
         {
             bottleneck = null;
-            if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
 
-            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
-            var milestone = milestones[milestoneIndex];
-
-            float currentValue = ReadMilestoneValue(milestone.Type);
-            CurrentMilestoneTarget = milestone.TargetValue;
-            CurrentMilestoneType = milestone.Type;
-            CurrentMilestoneValue = currentValue;
-
-            float primaryProgress = milestone.TargetValue > 0
-                ? Mathf.Clamp01(currentValue / milestone.TargetValue)
-                : 1f;
-
-            float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
+            float currentTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal)
+                ? tVal : -60f;
             float tempProgress = RoundDeltaProgress(currentTemp, baselineTemperature, SectorTemperatureDelta);
 
-            float currentAtmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
+            float currentAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal)
+                ? aVal : 0.01f;
             float atmosProgress = RoundDeltaProgress(currentAtmos, baselineAtmosphere, SectorAtmosphereDelta);
 
-            float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
+            float currentWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wVal)
+                ? wVal : 0f;
             float waterProgress = RoundDeltaProgress(currentWater, baselineWater, SectorWaterDelta);
 
-            float progress = Mathf.Min(primaryProgress, Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress)));
+            CurrentMilestoneType = MilestoneType.Temperature;
+            CurrentMilestoneTarget = SectorTemperatureDelta;
+            CurrentMilestoneValue = currentTemp - baselineTemperature;
+
+            float progress = Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress));
 
             if (progress < 1f)
             {
-                if (primaryProgress <= progress) bottleneck = milestone.Type.ToString();
-                else if (tempProgress <= progress) bottleneck = "TEMPERATURE";
+                if (tempProgress <= progress) bottleneck = "TEMPERATURE";
                 else if (atmosProgress <= progress) bottleneck = "ATMOSPHERE";
                 else bottleneck = "WATER";
             }
@@ -433,13 +439,10 @@ namespace GameDevTV.RTS.Player
             return progress;
         }
 
-        /// <summary>
-        /// True when the primary milestone and all climate targets for the current generation are met.
-        /// </summary>
+        /// <summary>True when Temp, Atmos, and Water deltas for the MVP round are met.</summary>
         public bool IsCurrentSectorRoundComplete()
         {
             if (IsBetweenRounds || IsExpansionPhase) return false;
-            if (SectorManager.Instance == null || SectorManager.Instance.GetClimateFocusSector() == null) return false;
             return CalculateCurrentSectorProgress(out _) >= 0.999f;
         }
 
@@ -643,38 +646,17 @@ namespace GameDevTV.RTS.Player
 
         private void UnlockPrerequisitesForMilestone()
         {
-            if (milestones == null || milestones.Count == 0) InitializeDefaultMilestones();
-            int milestoneIndex = Mathf.Clamp(CurrentGeneration - 1, 0, milestones.Count - 1);
-            var milestone = milestones[milestoneIndex];
-
-            switch (milestone.Type)
-            {
-                case MilestoneType.Temperature:
-                    BlueprintDraftManager.UnlockBuilding("GHG Factory");
-                    BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
-                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
-                    break;
-                case MilestoneType.Oxygen:
-                    BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
-                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
-                    break;
-                case MilestoneType.Power:
-                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
-                    break;
-                case MilestoneType.Population:
-                    BlueprintDraftManager.UnlockBuilding("Habitat");
-                    BlueprintDraftManager.UnlockBuilding("Spaceport");
-                    break;
-                case MilestoneType.CommandPosts:
-                    BlueprintDraftManager.UnlockBuilding("Command Post");
-                    break;
-                case MilestoneType.Biomass:
-                    // Deprecated terraforming goal — treat like Temperature bootstrap.
-                    BlueprintDraftManager.UnlockBuilding("GHG Factory");
-                    BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
-                    BlueprintDraftManager.UnlockBuilding("Solar Panel");
-                    break;
-            }
+            // MVP tile kit — always available for the one-round climate win.
+            BlueprintDraftManager.UnlockBuilding("Command Post");
+            BlueprintDraftManager.UnlockBuilding("Solar Panel");
+            BlueprintDraftManager.UnlockBuilding("GHG Factory");
+            BlueprintDraftManager.UnlockBuilding("Geothermal Generator");
+            BlueprintDraftManager.UnlockBuilding("Methanogenic Microbe Spreader");
+            BlueprintDraftManager.UnlockBuilding("Atmospheric Condenser");
+            BlueprintDraftManager.UnlockBuilding("Carbon Dioxide Import Laser");
+            BlueprintDraftManager.UnlockBuilding("Water Ice Aquifer");
+            BlueprintDraftManager.UnlockBuilding("Subglacial Water Extractor");
+            BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
         }
 
         public void CompleteExpansion()

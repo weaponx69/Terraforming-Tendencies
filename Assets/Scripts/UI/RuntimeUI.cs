@@ -216,6 +216,9 @@ namespace GameDevTV.RTS.UI
                 ClearUiImage(bottomBar.Find("Actions Container/Background"));
                 ClearUiImage(bottomBar.Find("Minimap Container/Background"));
                 ClearUiImage(bottomBar.Find("Menu Container"));
+
+                // Leave the lower-left corner for the card hand — shove selection info right.
+                ShiftBuildingSelectedPanelRight(bottomBar);
             }
 
             Transform cardContainer = FindChildRecursive(transform, "Bottom Action Bar Container");
@@ -223,6 +226,27 @@ namespace GameDevTV.RTS.UI
             {
                 ClearUiImage(cardContainer);
             }
+        }
+
+        /// <summary>
+        /// Card hand docks bottom-left. Push "Building Selected Container" into the right
+        /// half of the Bottom Bar so the middle status strip is not under the cards.
+        /// </summary>
+        private void ShiftBuildingSelectedPanelRight(Transform bottomBar)
+        {
+            if (bottomBar == null) return;
+            Transform selected = bottomBar.Find("Building Selected Container");
+            if (selected == null)
+                selected = FindChildRecursive(bottomBar, "Building Selected Container");
+            if (selected is not RectTransform rt) return;
+
+            // Right 55% of the bottom bar band.
+            rt.anchorMin = new Vector2(0.45f, 0f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.offsetMin = new Vector2(8f, 4f);
+            rt.offsetMax = new Vector2(-8f, -4f);
         }
 
         private static void ClearUiImage(Transform target)

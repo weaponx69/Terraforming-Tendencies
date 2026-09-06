@@ -82,20 +82,20 @@ Enough copies that the player can slowly finish without RNG softlock:
 | Card hand + place on pads | **Done** | Polish only if broken |
 | Planet-wide pads + Q/E browse | **Done** | Keep; don’t reintroduce sector lock |
 | Sector build lock | **Retired** | Do not restore |
-| Climate buildings exist (Heat/Air/Water) | **Done** | Ensure deck density + no softlock gates |
-| Whole-board climate ticks | **Not done** | Remove `TerraformingSector` / focus-sector exclusivity so every powered climate building counts |
-| Win = Temp+Atmos+Water only | **Partial** | Code still requires **primary + three climates**; drop primary from MVP win gate |
-| Baselines / deltas | **Legacy sector-round** | Keep +15 / +0.25 / +5 for now; treat as **planet tier** not “new sector mini-game” |
-| Objectives copy | **Partial** | Say “terraforming milestones,” not “finish this sector” |
+| Climate buildings exist (Heat/Air/Water) | **Done** | MVP kit unlocked at start |
+| Whole-board climate ticks | **Done** | Every powered climate building counts |
+| Win = Temp+Atmos+Water only | **Done** | One round → victory (no primary gate) |
+| Baselines / deltas | **Done (Tier 1)** | +15°C / +0.25 atm / +5% |
+| Objectives copy | **Done** | Planet terraform / three lines / win |
 | Adjacency combos | **Post-MVP** | Only after 10–15 min place→win feels good |
-| Live bot / CLI win check | **Legacy** | Retarget to planet Temp/Atmos/Water, not unlock-next-sector |
+| Live bot / CLI win check | **Legacy** | Retarget to MVP victory when needed |
 
 **Ordered build list (do in order):**
 
-1. **Whole-board climate** — all completed powered climate buildings always contribute.  
-2. **MVP win gate** — `IsCurrentSectorRoundComplete` / progress = min(Temp, Atmos, Water) only (no primary).  
-3. **Deck reliability** — Solar + GHG + Condenser + Aquifer (and backups) always cycle; remove Softlocks from climate gates for basics.  
-4. **Objectives / HUD** — three lines, remaining-to-green, milestone language.  
+1. ~~**Whole-board climate**~~ **Done**  
+2. ~~**MVP win gate**~~ **Done** (one round → `TriggerVictory`)  
+3. ~~**Deck reliability**~~ **Done** (MVP kit unlocked; climate gates relaxed for Temp/Atmos/Water)  
+4. ~~**Objectives / HUD**~~ **Done**  
 5. **Playtest** — can a player finish without cheats in ~15 min?  
 6. **Only then:** combos, tiers 2/3, guilds, colonization-as-flavor.
 
@@ -105,21 +105,24 @@ Enough copies that the player can slowly finish without RNG softlock:
 
 | Area | Current code | MVP target |
 |---|---|---|
-| Climate contribution | Still focus-sector oriented (`GetClimateFocusSector` / historical ActiveSector) | All powered completed climate buildings |
-| Round win | `min(primary, temp, atmos, water)` ≥ 0.999 → generation end | `min(temp, atmos, water)` only |
-| Deltas | +15°C / +0.25 atm / +5% from round baselines | Same numbers OK as Tier 1 |
+| Climate contribution | **Whole board** (`DoesBuildingCountForActiveClimate` always true) | Same |
+| Round win | `min(temp, atmos, water)` ≥ 0.999 → **victory** | Same |
+| Deltas | +15°C / +0.25 atm / +5% from baselines | Same |
+| Generations | **MaxGenerations = 1** | Same |
 | Sector lock | All sectors open; pads planet-wide | Keep |
-| Cards / pads / Q/E | Working | Keep |
+| Cards / pads / Q/E | Working; MVP climate kit unlocked | Keep |
 | Combos | None | Post-MVP |
 
-**Legacy milestone check (today):** `GenerationManager.Update` every frame (after 2s grace) + idle `OnTurnMilestones` → `CheckMilestones` → `TriggerGenerationEnd` when progress ≥ 0.999.
+**Win path:** `GenerationManager.CheckMilestones` → `TriggerMvpVictory` → `GameOverManager.TriggerVictory` (also mirrored in GameOver win check).
 
 ---
 
 ## 3. Systems To Keep (Support the MVP)
 
 ### 3.1 Card hand
-* `CardDeckController` + `BottomBarActionsUI`: **5** cards, faces ~158×220, above Bottom Bar.
+* `CardDeckController` + `BottomBarActionsUI`: **5** cards, faces ~158×220, docked **lower-left corner**.
+* Selection info (`Building Selected Container`) shifted to the **right** of the bottom band so cards do not cover it.
+* While Temp/Atmos/Water unmet, force-seat one tool of each color (`EnsureMvpClimateGoalsInHand`) so FIFO cannot bury Water.
 * Cost chip inside card; affordable gold / unaffordable red.
 * FIFO play-and-draw (**§5**). Draft overlays disabled.
 
@@ -224,4 +227,4 @@ Curved world, colonists/tubes, deep unit tech trees, combat, AI expansion, veget
 
 ---
 
-*Last rewritten: 2026-09-06 — Absolute minimal “hamster planet” MVP is design authority; ordered next steps in §1.*
+*Last rewritten: 2026-09-06 — Hamster MVP playable: whole-board climate, one-round Temp/Atmos/Water victory.*

@@ -92,22 +92,12 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Climate contribution check that prefers reserved-pad ownership and falls back to
-        /// geographic sector bounds. Edge pads must not be silenced by nearest-center alone.
+        /// MVP: every powered completed climate building on the planet counts.
+        /// Sector focus no longer gates contribution.
         /// </summary>
         public bool DoesBuildingCountForActiveClimate(BaseBuilding building)
         {
-            if (building == null) return false;
-            Sector focus = GetClimateFocusSector();
-            if (focus == null) return true;
-
-            if (BuildingSiteRegistry.TryGetSiteForBuilding(building, out BuildingSiteSlot site)
-                && site.Sector != null)
-            {
-                return site.Sector == focus;
-            }
-
-            return IsBuildingInActiveSector(building);
+            return building != null;
         }
 
         private float secW;

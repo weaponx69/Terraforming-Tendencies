@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: WaterIceAquiferCard
   m_EditorClassIdentifier: 
   cardName: Water Ice Aquifer
-  cardDescription: Extracts subterranean ice reservoirs. REQUIRES Temperature >= -20C.
+  cardDescription: Extracts subterranean ice reservoirs for planetary water.
   materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: 285a6926d731c99298d4fc837a14cbf6, type: 2}
-  minTemperature: -20.0
+  minTemperature: -9999.0
   maxTemperature: 9999.0
   minOxygen: -9999.0
   maxOxygen: 9999.0

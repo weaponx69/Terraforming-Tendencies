@@ -151,7 +151,7 @@ namespace GameDevTV.RTS.Tests
             Assert.IsTrue(building.IsOperating, "Powered atmosphere building should be operating.");
             Assert.IsTrue(
                 sm.DoesBuildingCountForActiveClimate(building),
-                "Pad in ActiveSector must count for climate.");
+                "MVP: any completed climate building must count (whole board).");
 
             float before = Supplies.Atmosphere[Owner.Player1];
             building.TickClimateGeneration(2f);

@@ -24,4 +24,4 @@ MonoBehaviour:
   maxAtmosphere: 9999.0
   minWater: -9999.0
   maxWater: 9999.0
-  requiredSectorFeature: 3
+  requiredSectorFeature: 0

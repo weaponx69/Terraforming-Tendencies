@@ -46,6 +46,10 @@ namespace GameDevTV.RTS.Player
             unlockedBuildings.Add("Solar Panel");
             unlockedBuildings.Add("Oxygen Processor");
             unlockedBuildings.Add("GHG Factory");
+            unlockedBuildings.Add("Geothermal Generator");
+            unlockedBuildings.Add("Methanogenic Microbe Spreader");
+            unlockedBuildings.Add("Atmospheric Condenser");
+            unlockedBuildings.Add("Carbon Dioxide Import Laser");
             unlockedBuildings.Add("Water Ice Aquifer");
             unlockedBuildings.Add("Subglacial Water Extractor");
 

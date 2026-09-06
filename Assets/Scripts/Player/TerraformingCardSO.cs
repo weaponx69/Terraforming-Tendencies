@@ -23,14 +23,14 @@ namespace GameDevTV.RTS.Player
             }
 
             /// <summary>
-            /// Climate / sector-feature gates. When this card's sector goal is still
-            /// unmet, minimum climate requirements and sector features are waived so
-            /// the card can appear in hand (e.g. Water Ice Aquifer at -60°C).
+            /// Climate / sector-feature gates. MVP climate tools (Temp / Atmos / Water) ignore
+            /// minimum climate and sector-feature requirements so the hamster deck never softlocks.
             /// </summary>
             public bool PassesClimateRequirements()
             {
                 string goal = GetCardGoal();
-                bool relaxMinGates = GenerationManager.IsUnmetSectorGoal(goal);
+                bool mvpClimateTool = goal == "TEMPERATURE" || goal == "ATMOSPHERE" || goal == "WATER";
+                bool relaxMinGates = mvpClimateTool || GenerationManager.IsUnmetSectorGoal(goal);
 
                 float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
                 if (!PassesClimateBound(currentTemp, minTemperature, maxTemperature, relaxMinGates))
@@ -48,6 +48,9 @@ namespace GameDevTV.RTS.Player
                 if (!PassesClimateBound(currentWater, minWater, maxWater, relaxMinGates))
                     return false;
 
+                // MVP climate buildings never require a sector feature.
+                if (mvpClimateTool) return true;
+
                 if (requiredSectorFeature != GameDevTV.RTS.Environment.SectorManager.SectorFeature.None
                     && !relaxMinGates)
                 {
@@ -55,7 +58,7 @@ namespace GameDevTV.RTS.Player
                     bool hasFeature = false;
                     foreach (var sector in GameDevTV.RTS.Environment.SectorManager.Instance.Sectors)
                     {
-                        if (!sector.IsLocked && sector.Feature == requiredSectorFeature)
+                        if (sector != null && sector.Feature == requiredSectorFeature)
                         {
                             hasFeature = true;
                             break;

@@ -103,12 +103,8 @@ namespace GameDevTV.RTS.UI.Containers
             if (GenerationManager.Instance != null)
             {
                 var gm = GenerationManager.Instance;
-                string milestoneGoal = TerraformingGoalColors.GoalKeyForMilestone(gm.CurrentMilestoneType);
-                string goalHex = TerraformingGoalColors.ToHex(TerraformingGoalColors.ForGoal(milestoneGoal));
-                string primaryGoal = gm.CurrentMilestoneDescription;
-                int climateIdx = primaryGoal.IndexOf(" (Temp", System.StringComparison.Ordinal);
-                if (climateIdx > 0) primaryGoal = primaryGoal.Substring(0, climateIdx);
-                sb.AppendLine($"{TerraformingGoalColors.Colorize("Goal:", milestoneGoal)} <color={goalHex}>{primaryGoal}</color>");
+                sb.AppendLine("<color=#8FE7FF><b>Terraform the planet</b></color>");
+                sb.AppendLine("<color=#C8D0D8>Clear all three climate lines to win.</color>");
 
                 if (!gm.IsExpansionPhase)
                 {
@@ -128,11 +124,11 @@ namespace GameDevTV.RTS.UI.Containers
                         water, gm.BaselineWater, gm.GetRoundWaterTarget(),
                         "{0:F0}% / {1:F0}% ({2})");
 
-                    float progress = gm.CalculateCurrentSectorProgress(out string bottleneck);
+                    float progress = gm.CalculateCurrentSectorProgress(out _);
                     sb.AppendLine();
                     if (progress >= 1f || gm.IsBetweenRounds)
                     {
-                        sb.AppendLine("<color=#66F273><b>All sector goals met — advancing…</b></color>");
+                        sb.AppendLine("<color=#66F273><b>All climate goals met — you win!</b></color>");
                     }
                     else
                     {
@@ -143,18 +139,13 @@ namespace GameDevTV.RTS.UI.Containers
                         if (waiting.Count > 0)
                         {
                             sb.AppendLine(
-                                $"<color=#FFD080>Sector finishes when <b>all three</b> are green. Still need: {string.Join(", ", waiting)}</color>");
-                        }
-                        else if (!string.IsNullOrEmpty(bottleneck))
-                        {
-                            sb.AppendLine(
-                                $"<color=#FFD080>Still need primary goal: {bottleneck}</color>");
+                                $"<color=#FFD080>Still need: {string.Join(", ", waiting)}</color>");
                         }
                     }
 
-                    sb.AppendLine("<size=13><color=#C8D0D8>Each sector needs its own climate gains — prior sectors do not count.</color></size>");
+                    sb.AppendLine("<size=13><color=#C8D0D8>Every climate building on the planet counts.</color></size>");
                     sb.AppendLine("<size=13>" + TerraformingGoalColors.BuildLegendLine(
-                        milestoneGoal, "TEMPERATURE", "ATMOSPHERE", "WATER") + "</size>");
+                        "TEMPERATURE", "ATMOSPHERE", "WATER") + "</size>");
                 }
             }
             else

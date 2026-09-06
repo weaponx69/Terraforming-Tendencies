@@ -890,8 +890,8 @@ namespace GameDevTV.RTS.Units
 
         /// <summary>
         /// Config climate rates are per-second. Tick in real time while grid-powered so
-        /// atmosphere/temp/water progress while the player is busy (not only on idle turns),
-        /// and only from buildings in the active sector mini-game.
+        /// atmosphere/temp/water progress while the player is busy (not only on idle turns).
+        /// MVP: all powered completed climate buildings on the planet contribute.
         /// </summary>
         public void TickClimateGeneration(float dt)
         {
@@ -949,13 +949,6 @@ namespace GameDevTV.RTS.Units
                     TryRepairClusterPowerLink();
                 }
                 if (!IsOperating) return;
-            }
-
-            // Prefer pad ownership over nearest-center (edge pads were silently ignored).
-            if (SectorManager.Instance != null
-                && !SectorManager.Instance.DoesBuildingCountForActiveClimate(this))
-            {
-                return;
             }
 
             Owner climateOwner = Owner != Owner.Invalid ? Owner : Owner.Player1;
