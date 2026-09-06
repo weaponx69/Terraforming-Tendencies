@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 using System.Linq;
+using GameDevTV.RTS.Units;
 
 namespace GameDevTV.RTS.Environment
 {

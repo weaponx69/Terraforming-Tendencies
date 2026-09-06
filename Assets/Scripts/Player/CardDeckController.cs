@@ -167,6 +167,8 @@ namespace GameDevTV.RTS.Player
             FillHandInternal();
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
+            EnsureMvpClimateGoalsInHand();
+            TrimHandToSize();
 
             OnHandChanged?.Invoke();
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
@@ -345,8 +347,35 @@ namespace GameDevTV.RTS.Player
             // Only re-seat if a pad is actually available (otherwise CanApply is still false).
             if (!found.CanApply()) return;
 
+            if (hand.Count >= handSize)
+            {
+                MakeHandRoomForHandoffCard(found);
+            }
+            if (hand.Count >= handSize) return;
+
             hand.Add(found);
+            TrimHandToSize();
             Debug.Log($"[CardDeckController] Restored bootstrap card '{found.cardName}' after planet gen.");
+        }
+
+        /// <summary>Never allow more than handSize cards in hand (MVP = 5).</summary>
+        private void TrimHandToSize()
+        {
+            while (hand.Count > handSize)
+            {
+                int dropIdx = hand.Count - 1;
+                // Prefer dropping from the end if it's support; otherwise still trim.
+                for (int i = hand.Count - 1; i >= 0; i--)
+                {
+                    if (IsMiningDroneCard(hand[i]) || IsSolarUnlockCard(hand[i])) continue;
+                    if (TerraformingGoalColors.GetSectorGoalForCard(hand[i]) != null) continue;
+                    dropIdx = i;
+                    break;
+                }
+
+                discardPile.Add(hand[dropIdx]);
+                hand.RemoveAt(dropIdx);
+            }
         }
 
 
@@ -479,6 +508,7 @@ namespace GameDevTV.RTS.Player
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
+            TrimHandToSize();
             if (before.Length != hand.Count || !before.SequenceEqual(hand))
             {
                 OnHandChanged?.Invoke();
@@ -498,6 +528,7 @@ namespace GameDevTV.RTS.Player
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
+            TrimHandToSize();
             OnHandChanged?.Invoke();
         }
 

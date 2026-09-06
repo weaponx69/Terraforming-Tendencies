@@ -32,7 +32,6 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private float bottomMargin = 16f;
         [Tooltip("Distance from the left edge of the screen to the left edge of the hand.")]
         [SerializeField] private float leftMargin = 16f;
-        [Tooltip("Visible hand capacity — keep in sync with CardDeckController.handSize.")]
         [SerializeField] private int visibleHandSlots = 5;
 
         private bool isBuilt = false;
@@ -72,6 +71,7 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             HideChromeBackground();
+            visibleHandSlots = 5;
             ApplyPlayingCardLayout();
 
             if (actionButtons == null || actionButtons.Length == 0)
@@ -276,17 +276,15 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
-            // Gather unlocked building commands from GlobalCommander as fallback
-            var globalCmdr = Object.FindAnyObjectByType<GlobalCommander>();
-            BaseCommand[] globalCommands = globalCmdr?.AvailableCommands;
-
-            int maxButtons = Mathf.Min(actionButtons.Length, Mathf.Max(1, visibleHandSlots));
+            // Hard cap: only the 5-card hand is shown — never GlobalCommander fallback extras.
+            int maxButtons = Mathf.Min(actionButtons.Length, Mathf.Max(1, visibleHandSlots), 5);
+            int cardsToShow = Mathf.Min(hand.Count, maxButtons);
 
             for (int i = 0; i < actionButtons.Length; i++)
             {
                 if (actionButtons[i] == null) continue;
 
-                if (i < maxButtons && i < hand.Count && hand[i] != null)
+                if (i < cardsToShow && hand[i] != null)
                 {
                     var card = hand[i];
                     int cardIndex = i; // Capture for closure
@@ -339,63 +337,7 @@ namespace GameDevTV.RTS.UI.Containers
                 }
                 else
                 {
-                    // No card in this hand slot — populate with a GlobalCommander
-                    // unlocked building command that isn't already shown by a hand card.
                     actionButtons[i].Disable();
-                }
-            }
-
-            // ── Fallback: fill any empty slots with unlocked building commands ──
-            if (globalCommands != null)
-            {
-                // Collect building names already shown by hand cards (UnlockBuildingCardSO)
-                var alreadyShown = new HashSet<string>();
-                // Track which button indices are already populated
-                var filledSlots = new HashSet<int>();
-                for (int h = 0; h < hand.Count && h < maxButtons; h++)
-                {
-                    filledSlots.Add(h);
-                    if (hand[h] is UnlockBuildingCardSO uc && uc.buildingToUnlock != null)
-                        alreadyShown.Add(uc.buildingToUnlock.Name);
-                }
-
-                // Find an empty button for each GlobalCommander building that can actually be built
-                foreach (var cmd in globalCommands)
-                {
-                    if (cmd is BuildBuildingCommand bbc && bbc.Building != null
-                        && !alreadyShown.Contains(bbc.Building.Name)
-                        && ReservedSiteBuildUtility.CanBuildAtReservedSite(
-                            bbc.Building, owner, out _, requireUnlocked: true))
-                    {
-                        // Find the first button slot that is NOT already filled
-                        int slot = 0;
-                        while (slot < actionButtons.Length && filledSlots.Contains(slot))
-                        {
-                            slot++;
-                        }
-                        if (slot >= actionButtons.Length) break;
-
-                        var fbBbc = ScriptableObject.CreateInstance<BuildBuildingCommand>();
-                        fbBbc.Name = cmd.Name;
-                        fbBbc.Icon = cmd.Icon;
-                        fbBbc.Slot = slot;
-                        fbBbc.Building = bbc.Building;
-                        fbBbc.GhostPrefab = bbc.GhostPrefab ?? bbc.Building?.Prefab;
-
-                        string fallbackGoal = UnlockBuildingCardSO.ClassifyBuildingGoal(bbc.Building);
-                        if (!TerraformingGoalColors.IsSectorCompletionGoal(fallbackGoal))
-                        {
-                            fallbackGoal = null;
-                        }
-
-                        actionButtons[slot].EnableFor(fbBbc, null, () =>
-                        {
-                            BeginBuildingSelection(bbc.Building, cardIndex: -1);
-                        }, fallbackGoal);
-
-                        filledSlots.Add(slot);
-                        alreadyShown.Add(bbc.Building.Name);
-                    }
                 }
             }
 
