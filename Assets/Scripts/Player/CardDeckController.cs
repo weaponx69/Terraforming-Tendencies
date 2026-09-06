@@ -676,7 +676,9 @@ namespace GameDevTV.RTS.Player
                 {
                     var mgr = ExplorationManager.Instance;
                     string reason = $"Cannot play '{played.cardName}' right now.";
-                    if (mgr != null && scouting.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    if (!played.CanAffordMaterials())
+                        reason = $"Need {played.GetMaterialsPlayCost()} Materials to play {played.cardName}.";
+                    else if (mgr != null && scouting.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
                     {
                         if (!mgr.CanAffordExploration())
                             reason = $"Need {mgr.ExploreEnergyCost:0.#} Energy to play Orbital Scan.";
@@ -687,6 +689,11 @@ namespace GameDevTV.RTS.Player
                     }
                     ExplorationManager.NotifyExplorationFailed(reason);
                 }
+                else if (!played.CanAffordMaterials())
+                {
+                    ExplorationManager.NotifyExplorationFailed(
+                        $"Need {played.GetMaterialsPlayCost()} Materials to play {played.cardName}.");
+                }
                 else
                 {
                     Debug.LogWarning($"[CardDeckController] Card '{played.cardName}' cannot be played right now.");
@@ -695,6 +702,16 @@ namespace GameDevTV.RTS.Player
             }
 
             Debug.Log($"[CardDeckController] Playing card: '{played.cardName}' (index {handIndex})");
+
+            // Building cards spend materials at pad placement (ReservedSiteBuildUtility).
+            // Non-building cards spend here before Apply().
+            bool buildingCard = played is UnlockBuildingCardSO;
+            if (!buildingCard && !played.TrySpendMaterials())
+            {
+                ExplorationManager.NotifyExplorationFailed(
+                    $"Need {played.GetMaterialsPlayCost()} Materials to play {played.cardName}.");
+                return;
+            }
 
             // Register card's hazards if it has any
             if (played.HazardEventPrefabs != null)

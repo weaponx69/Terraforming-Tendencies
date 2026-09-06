@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Carbon Dioxide Import Laser
   cardDescription: Attracts cometary ice to enrich atmosphere. REQUIRES Atmosphere >= 0.10 atm.
+  materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: 94c1926e7b17af5299817655186c434b, type: 2}
   minTemperature: -9999.0
   maxTemperature: 9999.0

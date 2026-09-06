@@ -13,8 +13,31 @@ namespace GameDevTV.RTS.Player
             public override bool CanApply()
             {
                 if (buildingToUnlock == null) return false;
+                if (!CanAffordMaterials()) return false;
                 return ReservedSiteBuildUtility.CanBuildAtReservedSite(
                     buildingToUnlock, Owner.Player1, out _, requireUnlocked: false);
+            }
+
+            public override int GetMaterialsPlayCost()
+            {
+                int fromBuilding = ReservedSiteBuildUtility.GetMaterialsCost(buildingToUnlock);
+                int fromCard = MaterialsCost;
+                int priced = Mathf.Max(fromBuilding, fromCard);
+                if (priced > 0) return priced;
+                return DefaultCostForGoal(GetCardGoal());
+            }
+
+            private static int DefaultCostForGoal(string goal)
+            {
+                return goal switch
+                {
+                    "COMMAND POST" => 400,
+                    "POWER" => 100,
+                    "ATMOSPHERE" or "TEMPERATURE" or "WATER" or "OXYGEN" => 150,
+                    "POPULATION" => 150,
+                    "MATERIALS" => 200,
+                    _ => 150
+                };
             }
 
             public override bool IsGateMet()

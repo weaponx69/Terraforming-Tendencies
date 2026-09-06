@@ -16,20 +16,24 @@ namespace GameDevTV.RTS.Player
 
             public override bool CanApply()
             {
-                return IsGateMet();
+                if (!IsGateMet()) return false;
+                return CanAffordMaterials();
             }
-    
-            public override string GetCardGoal()
+
+            public override int GetMaterialsPlayCost()
             {
-                if (unitPrefab != null)
+                if (MaterialsCost > 0) return MaterialsCost;
+                var unit = unitPrefab != null ? unitPrefab.GetComponent<AbstractUnit>() : null;
+                if (unit?.UnitSO?.Cost != null)
                 {
-                    string name = unitPrefab.name.ToLower();
-                    if (name.Contains("repair")) return "MAINTENANCE";
-                    if (name.Contains("mining")) return "MINING";
+                    int fromUnit = Mathf.FloorToInt(
+                        unit.UnitSO.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
+                        + unit.UnitSO.Cost.Gas * Supplies.GasToMaterialsRateStatic);
+                    if (fromUnit > 0) return fromUnit;
                 }
-                return "UNIT SUPPORT";
+                return 100;
             }
-    
+
             public override void Apply()
             {
                 if (unitPrefab == null) return;
@@ -70,7 +74,7 @@ namespace GameDevTV.RTS.Player
                     worker.BeginAutoGather(spawnBase);
                 }
 
-                Debug.Log($"[Blueprint] Spawned free unit: {unitPrefab.name} at {spawnPos}");
+                Debug.Log($"[Blueprint] Spawned unit: {unitPrefab.name} at {spawnPos}");
             }
 
             private static BaseBuilding FindPlayerCommandPost()

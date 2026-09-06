@@ -480,7 +480,7 @@ namespace GameDevTV.RTS.Utilities
 
         private static bool HasEnoughMaterials(BuildingSO building, Owner owner)
         {
-            if (building == null || building.Cost == null) return true;
+            if (building == null) return false;
             if (Supplies.Materials == null || !Supplies.Materials.TryGetValue(owner, out int materials))
             {
                 return false;
@@ -492,10 +492,7 @@ namespace GameDevTV.RTS.Utilities
 
         private static bool ConsumeMaterials(BuildingSO building, Owner owner)
         {
-            if (building == null || building.Cost == null)
-            {
-                return true;
-            }
+            if (building == null) return false;
 
             _ = Supplies.Materials;
 
@@ -507,8 +504,9 @@ namespace GameDevTV.RTS.Utilities
             int materialsCost = GetMaterialsCost(building);
             if (materialsCost <= 0)
             {
-                Debug.LogWarning($"[ReservedSiteBuild] {building.Name} has zero materials cost configured.");
-                return true;
+                // Never treat a real building as free to place.
+                materialsCost = Mathf.Max(150, building.Cost != null ? building.Cost.Minerals : 150);
+                Debug.LogWarning($"[ReservedSiteBuild] {building.Name} resolved to 0 cost — charging {materialsCost} Materials.");
             }
 
             if (materialsCost > materials)
@@ -525,10 +523,36 @@ namespace GameDevTV.RTS.Utilities
 
         public static int GetMaterialsCost(BuildingSO building)
         {
-            if (building?.Cost == null) return 0;
-            return Mathf.FloorToInt(
-                building.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic +
-                building.Cost.Gas * Supplies.GasToMaterialsRateStatic);
+            if (building == null) return 0;
+
+            float mineralRate = Supplies.MineralsToMaterialsRateStatic;
+            float gasRate = Supplies.GasToMaterialsRateStatic;
+            // Uninitialized / zero rates would make every card show Free.
+            if (mineralRate <= 0.0001f) mineralRate = 1f;
+            if (gasRate <= 0.0001f) gasRate = 1f;
+
+            if (building.Cost != null)
+            {
+                int configured = Mathf.FloorToInt(
+                    building.Cost.Minerals * mineralRate +
+                    building.Cost.Gas * gasRate);
+                // Prefer raw minerals when conversion somehow collapses to 0.
+                if (configured <= 0 && building.Cost.Minerals > 0)
+                    configured = building.Cost.Minerals;
+                if (configured > 0) return configured;
+            }
+
+            // Themed BuildingSOs often shipped with Cost=null — keep play priced.
+            string goal = UnlockBuildingCardSO.ClassifyBuildingGoal(building);
+            return goal switch
+            {
+                "COMMAND POST" => 400,
+                "POWER" => 100,
+                "ATMOSPHERE" or "TEMPERATURE" or "WATER" or "OXYGEN" => 150,
+                "POPULATION" => 150,
+                "MATERIALS" => 200,
+                _ => 150
+            };
         }
     }
 }

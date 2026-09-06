@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Subglacial Water Extractor
   cardDescription: Drills deep into subglacial water deposits to pump biomass media.
+  materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: b5b6b9395538c09a5accaace20185d21, type: 2}
   minTemperature: -9999.0
   maxTemperature: 9999.0

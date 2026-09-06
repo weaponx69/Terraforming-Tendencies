@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Atmospheric Condenser
   cardDescription: Extracts gases from thin air. REQUIRES Atmosphere >= 0.05 atm.
+  materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: abf00ff14274daa1ab878024f72473ed, type: 2}
   minTemperature: -9999.0
   maxTemperature: 9999.0

@@ -31,6 +31,7 @@ namespace GameDevTV.RTS.Player
             public override bool CanApply()
             {
                 if (!IsGateMet()) return false;
+                if (!CanAffordMaterials()) return false;
 
                 if (scoutingType == ScoutingType.EmergencyCaches || scoutingType == ScoutingType.PipelineBoost)
                 {
@@ -48,6 +49,19 @@ namespace GameDevTV.RTS.Player
 
                 if (!explorationMgr.HasFrontierNode(out _, out _)) return false;
                 return explorationMgr.CanAffordExploration();
+            }
+
+            public override int GetMaterialsPlayCost()
+            {
+                if (MaterialsCost > 0) return MaterialsCost;
+                return scoutingType switch
+                {
+                    ScoutingType.OrbitalScan => 50,
+                    ScoutingType.SurveyDrone => 75,
+                    ScoutingType.PipelineBoost => 50,
+                    ScoutingType.EmergencyCaches => 0, // grants materials — keep free
+                    _ => 50
+                };
             }
 
             public override void Apply()

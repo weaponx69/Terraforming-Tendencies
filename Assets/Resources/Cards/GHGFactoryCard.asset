@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: GHG Factory
   cardDescription: Vaporizes chemicals to heat the planet. Generates heavy greenhouse gases.
+  materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: ebc99338ffaca3fe2b9cdad4908d1646, type: 2}
   minTemperature: -9999.0
   maxTemperature: 9999.0

@@ -12,6 +12,7 @@ namespace GameDevTV.RTS.Commands
     public class PlayCardCommand : BaseCommand
     {
         public int HandIndex { get; set; }
+        public int MaterialsCost { get; set; }
 
         public override bool RequiresClickToActivate => false;
 

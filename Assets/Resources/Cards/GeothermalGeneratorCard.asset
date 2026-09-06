@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Geothermal Generator
   cardDescription: Converts thermal vents into clean energy. REQUIRES Temperature >= -10C.
+  materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: f663cd9f6694c3ae5bdea520ebfd10b1, type: 2}
   minTemperature: -10.0
   maxTemperature: 9999.0

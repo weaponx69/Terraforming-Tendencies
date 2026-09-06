@@ -14,4 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Mining Drone
   cardDescription: Fabricate and deploy an additional fully functioning Mining Drone immediately at your command center.
+  materialsCost: 100
   unitPrefab: {fileID: 1076983579694789324, guid: 4d0c2e8c3bd76b64097b86828a286bc6, type: 3}

@@ -161,9 +161,9 @@ namespace GameDevTV.RTS.UI.Containers
                 Transform icon = slot.transform.Find("Icon");
                 if (icon is RectTransform iconRt)
                 {
-                    // Leave room for title + cost band at the bottom and goal badge at top.
+                    // Leave room for cost chip (top) and title (bottom).
                     iconRt.anchorMin = new Vector2(0.08f, 0.28f);
-                    iconRt.anchorMax = new Vector2(0.92f, 0.88f);
+                    iconRt.anchorMax = new Vector2(0.92f, 0.70f);
                     iconRt.offsetMin = Vector2.zero;
                     iconRt.offsetMax = Vector2.zero;
                 }
@@ -336,10 +336,11 @@ namespace GameDevTV.RTS.UI.Containers
                         buildCmd.Icon = unlockCard.buildingToUnlock.Icon;
                         buildCmd.Slot = i;
 
+                        int playCost = unlockCard.GetMaterialsPlayCost();
                         actionButtons[i].EnableFor(buildCmd, null, () =>
                         {
                             PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
-                        }, sectorGoal);
+                        }, sectorGoal, playCost);
                     }
                     else
                     {
@@ -360,13 +361,14 @@ namespace GameDevTV.RTS.UI.Containers
                         
                         playCmd.Slot = i;
                         playCmd.HandIndex = cardIndex;
+                        playCmd.MaterialsCost = card.GetMaterialsPlayCost();
 
                         actionButtons[i].EnableFor(playCmd, null, () =>
                         {
                             // The actual play happens in PlayCardCommand.Handle()
                             // The onClick just needs to route through PlayerInput
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
-                        }, sectorGoal);
+                        }, sectorGoal, playCmd.MaterialsCost);
                     }
                 }
                 else

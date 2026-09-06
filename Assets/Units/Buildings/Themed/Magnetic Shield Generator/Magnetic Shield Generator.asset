@@ -16,7 +16,7 @@ MonoBehaviour:
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 10
   <Icon>k__BackingField: {fileID: 21300000, guid: 02b2044a687f963d3a9d7b3aa1d97063, type: 3}
-  <Cost>k__BackingField: {fileID: 0}
+  <Cost>k__BackingField: {fileID: 11400000, guid: 9d5813cc9271469a8c2e42013a6c5a21, type: 2}
   <TechTree>k__BackingField: {fileID: 0}
   <unlockRequirements>k__BackingField: []
   health: 100

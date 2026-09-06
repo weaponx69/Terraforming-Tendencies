@@ -54,7 +54,7 @@ namespace GameDevTV.RTS.UI.Components
 
         public void EnableFor(BaseCommand command, IEnumerable<AbstractCommandable> selectedUnits, UnityAction onClick)
         {
-            EnableFor(command, selectedUnits, onClick, null);
+            EnableFor(command, selectedUnits, onClick, null, -1);
         }
 
         public void EnableFor(
@@ -63,13 +63,24 @@ namespace GameDevTV.RTS.UI.Components
             UnityAction onClick,
             string cardGoal)
         {
+            EnableFor(command, selectedUnits, onClick, cardGoal, -1);
+        }
+
+        public void EnableFor(
+            BaseCommand command,
+            IEnumerable<AbstractCommandable> selectedUnits,
+            UnityAction onClick,
+            string cardGoal,
+            int materialsCostOverride)
+        {
             if (button == null) return;
 
             button.onClick.RemoveAllListeners();
             SetIcon(command.Icon);
             EnsureCardTextLayout();
             SetLabel(command.Name);
-            SetCost(ResolveMaterialsCost(command));
+            int cost = materialsCostOverride >= 0 ? materialsCostOverride : ResolveMaterialsCost(command);
+            SetCost(cost);
             button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
             button.onClick.AddListener(onClick);
             isActive = true;
@@ -188,21 +199,28 @@ namespace GameDevTV.RTS.UI.Components
                 costLabel = costGO.GetComponent<TextMeshProUGUI>();
             }
 
-            costLabel.fontSize = 13f;
+            // Top-left cost chip — always above the icon, hard to miss.
+            costLabel.fontSize = 16f;
             costLabel.fontStyle = FontStyles.Bold;
-            costLabel.alignment = TextAlignmentOptions.Bottom;
+            costLabel.alignment = TextAlignmentOptions.TopLeft;
             costLabel.color = new Color(1f, 0.92f, 0.45f, 1f);
             costLabel.richText = true;
             costLabel.raycastTarget = false;
-            costLabel.margin = new Vector4(6f, 0f, 6f, 4f);
-            if (label.font != null) costLabel.font = label.font;
+            costLabel.margin = new Vector4(8f, 6f, 4f, 2f);
+            if (label != null && label.font != null) costLabel.font = label.font;
 
             RectTransform costRt = costLabel.rectTransform;
-            costRt.anchorMin = new Vector2(0.06f, 0.02f);
-            costRt.anchorMax = new Vector2(0.94f, 0.14f);
+            costRt.anchorMin = new Vector2(0.04f, 0.72f);
+            costRt.anchorMax = new Vector2(0.55f, 0.98f);
             costRt.offsetMin = Vector2.zero;
             costRt.offsetMax = Vector2.zero;
-            costRt.pivot = new Vector2(0.5f, 0f);
+            costRt.pivot = new Vector2(0f, 1f);
+            costLabel.transform.SetAsLastSibling();
+
+            var costOutline = costLabel.GetComponent<UnityEngine.UI.Outline>();
+            if (costOutline == null) costOutline = costLabel.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            costOutline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+            costOutline.effectDistance = new Vector2(1.5f, -1.5f);
         }
 
         private void SetLabel(string text)
@@ -227,22 +245,23 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
-            costLabel.gameObject.SetActive(true);
+            // Never leave paid cards looking blank/"Free" due to a 0 read — floor to 1 for display.
             if (materialsCost == 0)
             {
+                costLabel.gameObject.SetActive(true);
                 costLabel.text = "Free";
                 costLabel.color = new Color(0.65f, 0.95f, 0.7f, 1f);
+                return;
             }
-            else
-            {
-                bool canAfford = Supplies.Materials != null
-                    && Supplies.Materials.TryGetValue(Owner.Player1, out int have)
-                    && have >= materialsCost;
-                costLabel.text = $"{materialsCost} Mat";
-                costLabel.color = canAfford
-                    ? new Color(1f, 0.92f, 0.45f, 1f)
-                    : new Color(1f, 0.45f, 0.4f, 1f);
-            }
+
+            costLabel.gameObject.SetActive(true);
+            bool canAfford = Supplies.Materials != null
+                && Supplies.Materials.TryGetValue(Owner.Player1, out int have)
+                && have >= materialsCost;
+            costLabel.text = $"{materialsCost} Mat";
+            costLabel.color = canAfford
+                ? new Color(1f, 0.92f, 0.45f, 1f)
+                : new Color(1f, 0.45f, 0.4f, 1f);
         }
 
         private static int ResolveMaterialsCost(BaseCommand command)
@@ -257,6 +276,11 @@ namespace GameDevTV.RTS.UI.Components
                 return Mathf.FloorToInt(
                     unitCommand.Unit.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
                     + unitCommand.Unit.Cost.Gas * Supplies.GasToMaterialsRateStatic);
+            }
+
+            if (command is PlayCardCommand playCard)
+            {
+                return Mathf.Max(0, playCard.MaterialsCost);
             }
 
             return 0;
