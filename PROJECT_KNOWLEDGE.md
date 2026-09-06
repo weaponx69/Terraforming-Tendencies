@@ -71,7 +71,9 @@ Enough copies that the player can slowly finish without RNG softlock:
 * Draft overlays, scouting-as-progression, AI opponents  
 * Extra primaries (Oxygen / Power / Population) on the win path  
 
-> If code and this doc conflict on *intent*, follow **§0**. For *what currently runs*, see **§1**.
+> If code and this doc conflict on *intent*, follow **§0** for the hamster win loop and **§1A** for the next visual slice. For *what currently runs*, see **§1** / **§2**.
+
+**Next slice after hamster playtest:** **§1A Visual Climate Stages MVP**.
 
 ---
 
@@ -87,17 +89,82 @@ Enough copies that the player can slowly finish without RNG softlock:
 | Win = Temp+Atmos+Water only | **Done** | One round → victory (no primary gate) |
 | Baselines / deltas | **Done (Tier 1)** | +15°C / +0.25 atm / +5% |
 | Objectives copy | **Done** | Planet terraform / three lines / win |
-| Adjacency combos | **Post-MVP** | Only after 10–15 min place→win feels good |
+| 5-card hand hard cap | **Done** | No GlobalCommander extra slots |
+| Hamster playtest (place→win) | **Done enough** | Fantasy gap = barren world doesn’t *look* alive |
+| **Visual climate stages** | **Next** | See **§1A** — authoritative next slice |
+| Adjacency combos | **Later** | After planet looks terraformed |
 | Live bot / CLI win check | **Legacy** | Retarget to MVP victory when needed |
 
-**Ordered build list (do in order):**
+**Ordered build list:**
 
-1. ~~**Whole-board climate**~~ **Done**  
-2. ~~**MVP win gate**~~ **Done** (one round → `TriggerVictory`)  
-3. ~~**Deck reliability**~~ **Done** (MVP kit unlocked; climate gates relaxed for Temp/Atmos/Water)  
-4. ~~**Objectives / HUD**~~ **Done**  
-5. **Playtest** — can a player finish without cheats in ~15 min?  
-6. **Only then:** combos, tiers 2/3, guilds, colonization-as-flavor.
+1. ~~Hamster card/climate win loop~~ **Done**  
+2. **Visual climate stages (§1A)** — ground / sky-fog / sparse flora  
+3. Colonist life reacting to stages (after visuals)  
+4. Placement popcorn / combo juice (after fantasy reads)
+
+---
+
+## 1A. Visual Climate Stages MVP (Authoritative — Next Slice)
+
+**One-sentence goal:** As Temp / Atmos / Water climb toward the hamster win, the **planet visibly shifts** barren → living so the run feels like making another Earth — not just three green meters.
+
+**Does not change:** win gate, card hand, pads, deck. Visuals only.
+
+### Progress driver
+
+Compute one whole-planet **Terraform Look** `0→1` from the same MVP deltas used for win:
+
+* Temp progress = round delta / +15°C  
+* Atmos progress = round delta / +0.25 atm  
+* Water progress = round delta / +5%  
+
+`lookProgress = min(temp, atmos, water)` (same bottleneck as win). Subscribe to `Supplies.OnTemperatureChanged` / `OnAtmosphereChanged` / `OnWaterChanged` (and refresh on generation start / baselines).
+
+### Stages (exactly 4)
+
+| Stage | `lookProgress` | Player-visible look |
+|---|---|---|
+| **0 Barren** | &lt; 0.33 | Red-brown ground, cold harsh sky/fog, **no** flora |
+| **1 Thaw** | 0.33–0.66 | Ground warms toward dusty soil; sky/fog softer |
+| **2 Wet** | 0.66–0.999 | Cooler green-brown tint; **sparse** grass near Water / life-support |
+| **3 Living** | ≥ 0.999 (win) | Greener ground; denser grass/plants in range; clearer sky |
+
+Planet-wide stages only — do **not** split per climate channel or per sector in this slice.
+
+### Visual channels (exactly 3)
+
+1. **Ground tint** — lerp planet mesh `_BaseColor` / `_Color` (PlanetGenerator already stamps a fixed martian color; make it dynamic from stage colors).  
+2. **Sky / fog** — lerp `RenderSettings.fogColor` + ambient (reuse existing sky material only if already wired and cheap).  
+3. **Sparse flora** — gate `VegetationManager` spawn: stage 0 = off, 2 = trickle, 3 = normal. Prefer existing plant/grass prefabs; no new biomes.
+
+Suggested owner script: `ClimateVisualStages` (or similar) auto-spawned / scene singleton that applies lerps each climate change (smooth over ~1–2s).
+
+### Out of this slice (do not build yet)
+
+* Lakes / ocean meshes  
+* Rain / dust / weather particles  
+* Per-building adjacency VFX / combo pops  
+* Colonist happiness / population fantasy  
+* New shaders beyond tint + fog  
+* Changing win rules or card kit  
+
+### Success check
+
+One full place→win run: player can **see** barren → thaw → wet → living without reading the HUD.
+
+### Build order for §1A
+
+1. `ClimateVisualStages` — progress + stage enum from Supplies / GenerationManager baselines  
+2. Ground color lerp on planet meshes  
+3. Fog / ambient sky lerp  
+4. Vegetation spawn gated by stage  
+
+### Hooks already in repo
+
+* `Supplies.OnTemperatureChanged` / `OnAtmosphereChanged` / `OnWaterChanged`  
+* `GenerationManager` baselines + round deltas  
+* `PlanetGenerator` ground `_BaseColor` assignment (~martian brown)  
+* `VegetationManager` + `GrowingVegetation` (currently life-support oriented; gate by stage)
 
 ---
 
@@ -197,14 +264,16 @@ Enough copies that the player can slowly finish without RNG softlock:
 
 ---
 
-## 9. Post-MVP Backlog (After Hamster Loop Works)
+## 9. Backlog (After Visual Climate Stages)
 
-1. Adjacency combo multipliers + pop UX  
-2. Weather / terrain tiles (cloud, ice, vent) as amplifiers  
-3. Harder milestone tiers / action clock  
-4. Guild-like run identity  
-5. Colonization as optional better land, not a softlock  
-6. Retarget `./tools/sector-win-cli.sh` → planet milestone bot  
+1. ~~Visual climate stages (§1A)~~ — **in progress / next**  
+2. Colonists react to stages (survive → thrive)  
+3. Placement popcorn (+Temp / +Atmos float text)  
+4. Adjacency combo multipliers  
+5. Weather / terrain amplifier tiles  
+6. Harder milestone tiers / action clock  
+7. Guild-like run identity  
+8. Retarget `./tools/sector-win-cli.sh` → planet milestone bot  
 
 ---
 
@@ -221,10 +290,10 @@ unity command eval "return UnityEditor.EditorApplication.isPlaying;" --json
 
 ---
 
-## 11. Related Systems (Ignore for MVP)
+## 11. Related Systems (Ignore Until §1A Is Done)
 
-Curved world, colonists/tubes, deep unit tech trees, combat, AI expansion, vegetation biomass-as-economy — leave alone unless they block the hamster loop.
+Curved world, colonists/tubes as required systems, deep unit tech trees, combat, AI expansion — leave alone unless they block visuals or the hamster loop. `VegetationManager` may be lightly gated by climate stage; do not rebuild flora economy for this slice.
 
 ---
 
-*Last rewritten: 2026-09-06 — Hamster MVP playable: whole-board climate, one-round Temp/Atmos/Water victory.*
+*Last rewritten: 2026-09-06 — Visual climate stages (§1A) is the next authoritative slice after the playable hamster win loop.*
