@@ -181,6 +181,12 @@ namespace GameDevTV.RTS.Utilities
             }
 
             Vector3 targetPos = SnapToNavMesh(site.Position);
+            site.Position = targetPos;
+            if (site.MarkerGO != null)
+            {
+                site.MarkerGO.transform.position = targetPos;
+            }
+
             bool instant = waiveCost || IsFirstPlayerCommandPost(building, owner);
 
             Worker worker = null;
@@ -207,6 +213,9 @@ namespace GameDevTV.RTS.Utilities
                 reason = $"Failed to spawn {building.Name}.";
                 return false;
             }
+
+            // Re-ground after spawn — prefab pivots / child meshes can look airborne.
+            GroundBuilding(built);
 
             built.enabled = true;
             built.Owner = owner;
@@ -239,13 +248,15 @@ namespace GameDevTV.RTS.Utilities
 
                 ConnectToClusterSolar(built, site);
                 PowerGridManager.RecalculateGrids();
+                GroundBuilding(built);
             }
             else
             {
                 Material ghostMat = building.PlacementMaterial;
                 built.InitializeAsGhost(ghostMat, owner);
+                GroundBuilding(built);
                 worker.ResumeBuilding(built);
-                Debug.Log($"[ReservedSiteBuild] {worker.name} assigned to build {building.Name} at {targetPos}");
+                Debug.Log($"[ReservedSiteBuild] {worker.name} assigned to build {building.Name} at {built.transform.position}");
             }
 
             if (!BuildingSiteRegistry.IsCommandBuilding(building) && !BuildingSiteRegistry.IsSolarBuilding(building))
@@ -436,6 +447,14 @@ namespace GameDevTV.RTS.Utilities
             return new CommandContext(owner, commandable, hit, 0);
         }
 
+        /// <summary>Pin a building's root to terrain under its XZ (fixes air-spawned themed pads).</summary>
+        public static void GroundBuilding(BaseBuilding building)
+        {
+            if (building == null) return;
+            Vector3 grounded = SnapToNavMesh(building.transform.position);
+            building.transform.position = grounded;
+        }
+
         private static Vector3 SnapToNavMesh(Vector3 approximate)
         {
             Vector3 grounded = SnapToGround(approximate);
@@ -445,12 +464,12 @@ namespace GameDevTV.RTS.Utilities
                 agentTypeID = 0,
                 areaMask = UnityEngine.AI.NavMesh.AllAreas
             };
-            if (UnityEngine.AI.NavMesh.SamplePosition(grounded, out UnityEngine.AI.NavMeshHit navHit, 8f, filter))
+            if (UnityEngine.AI.NavMesh.SamplePosition(grounded, out UnityEngine.AI.NavMeshHit navHit, 12f, filter))
             {
                 // Prefer NavMesh XZ, but never adopt an elevated/air sample — that leaves
-                // buildings (esp. Oxygen Processor) hovering above the terrain.
+                // buildings (esp. GHG / Oxygen Processor) hovering above the terrain.
                 Vector3 navPos = navHit.position;
-                if (Mathf.Abs(navPos.y - grounded.y) <= 1.25f)
+                if (navPos.y <= grounded.y + 1.25f)
                     return new Vector3(navPos.x, grounded.y, navPos.z);
             }
 
@@ -459,23 +478,52 @@ namespace GameDevTV.RTS.Utilities
 
         private static Vector3 SnapToGround(Vector3 approximate)
         {
-            Vector3 origin = approximate + Vector3.up * 80f;
-            int mask = LayerMask.GetMask("Default", "Terrain");
-            if (mask == 0) mask = Physics.DefaultRaycastLayers;
+            int terrainMask = LayerMask.GetMask("Terrain");
+            int groundMask = LayerMask.GetMask("Default", "Terrain");
+            if (groundMask == 0) groundMask = Physics.DefaultRaycastLayers;
 
-            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 200f, mask, QueryTriggerInteraction.Ignore))
+            Vector3[] origins =
             {
-                return hit.point;
+                new Vector3(approximate.x, approximate.y + 120f, approximate.z),
+                new Vector3(approximate.x, 200f, approximate.z),
+            };
+
+            foreach (Vector3 origin in origins)
+            {
+                if (terrainMask != 0
+                    && Physics.Raycast(origin, Vector3.down, out RaycastHit terrainHit, 400f, terrainMask,
+                        QueryTriggerInteraction.Ignore))
+                {
+                    return terrainHit.point;
+                }
+
+                if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 400f, groundMask,
+                        QueryTriggerInteraction.Ignore))
+                {
+                    if (IsIgnorableGroundHit(hit)) continue;
+                    return hit.point;
+                }
             }
 
-            // Fallback: unrestricted raycast, but reject hits that are clearly elevated meshes.
-            if (Physics.Raycast(origin, Vector3.down, out hit, 200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            // Last resort: any non-trigger collider that is not a building/pad ghost.
+            if (Physics.Raycast(new Vector3(approximate.x, 200f, approximate.z), Vector3.down,
+                    out RaycastHit anyHit, 400f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                && !IsIgnorableGroundHit(anyHit))
             {
-                if (hit.point.y <= approximate.y + 2f)
-                    return hit.point;
+                return anyHit.point;
             }
 
             return new Vector3(approximate.x, approximate.y, approximate.z);
+        }
+
+        private static bool IsIgnorableGroundHit(RaycastHit hit)
+        {
+            if (hit.collider == null) return true;
+            if (hit.collider.isTrigger) return true;
+            if (hit.collider.GetComponentInParent<BaseBuilding>() != null) return true;
+            if (hit.collider.GetComponentInParent<BuildingSiteMarker>() != null) return true;
+            if (hit.collider.GetComponentInParent<AbstractUnit>() != null) return true;
+            return false;
         }
 
         private static bool HasEnoughMaterials(BuildingSO building, Owner owner)

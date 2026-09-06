@@ -818,7 +818,12 @@ namespace GameDevTV.RTS.Environment
                     if (Physics.Raycast(pos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f, mask,
                             QueryTriggerInteraction.Ignore))
                     {
-                        pos = hit.point;
+                        // Skip hits on buildings / pad ghosts so clusters don't stack on air meshes.
+                        if (hit.collider.GetComponentInParent<BaseBuilding>() == null
+                            && hit.collider.GetComponentInParent<BuildingSiteMarker>() == null)
+                        {
+                            pos = hit.point;
+                        }
                     }
 
                     UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter

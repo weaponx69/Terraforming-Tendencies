@@ -4,6 +4,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using UnityEngine.AI;
 using GameDevTV.RTS.VisualScriptingStubs;
@@ -35,10 +36,10 @@ namespace GameDevTV.RTS.Units
         public EnergyPipelineManager CurrentPipeline { get; private set; }
         private Coroutine runningCoroutine;
 
-        [Header("Mining Drone Proximity Repair")]
-        [SerializeField] private float proximityRepairRadius = 14f;
+        [Header("Drone Proximity Repair")]
+        [SerializeField] private float proximityRepairRadius = 16f;
         [SerializeField] private float proximityRepairInterval = 0.5f;
-        [SerializeField] private int proximityRepairHeal = 10;
+        [SerializeField] private int proximityRepairHeal = 12;
         private float proximityRepairTimer;
 
         private void Awake()
@@ -53,15 +54,13 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
-        /// Mining drones passively repair damaged friendly buildings while nearby
-        /// (including during gather trips) so decay does not wipe pads they work beside.
+        /// All worker drones passively repair damaged friendly buildings while nearby
+        /// (including during gather/idle trips) so decay does not wipe pads they pass.
         /// </summary>
         private void TickProximityRepair()
         {
-            if (worker == null || worker.UnitSO == null) return;
-            if (!worker.UnitSO.Name.Contains("Mining", System.StringComparison.OrdinalIgnoreCase)) return;
+            if (worker == null) return;
             if (CurrentState == State.Repairing || CurrentState == State.MovingToRepair) return;
-            if (CurrentState == State.Building || CurrentState == State.MovingToBuild) return;
 
             proximityRepairTimer += Time.deltaTime;
             if (proximityRepairTimer < proximityRepairInterval) return;
@@ -437,8 +436,16 @@ namespace GameDevTV.RTS.Units
             // ── Complete construction ─────────────────────────────────
             if (building != null)
             {
+                // Rise animation moves the mesh renderer; restore it under the root,
+                // then pin the whole building to terrain so themed pads never float.
+                if (buildingRenderer != null && buildingRenderer.transform != building.transform)
+                {
+                    buildingRenderer.transform.localPosition = Vector3.zero;
+                }
+
                 building.enabled = true;
                 building.CompleteConstruction();
+                ReservedSiteBuildUtility.GroundBuilding(building);
             }
 
             CurrentState = State.Idle;
