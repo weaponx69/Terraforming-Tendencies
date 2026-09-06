@@ -91,7 +91,7 @@ Enough copies that the player can slowly finish without RNG softlock:
 | Objectives copy | **Done** | Planet terraform / three lines / win |
 | 5-card hand hard cap | **Done** | No GlobalCommander extra slots |
 | Hamster playtest (place→win) | **Done enough** | Fantasy gap = barren world doesn’t *look* alive |
-| **Visual climate stages** | **In progress** | Step 1 done (controller + ground tint). Next: fog/sky, then flora |
+| **Visual climate stages** | **In progress** | Ground tint done; flora = Atmosphere. Next: fog/sky |
 | Adjacency combos | **Later** | After planet looks terraformed |
 | Live bot / CLI win check | **Legacy** | Retarget to MVP victory when needed |
 
@@ -135,7 +135,7 @@ Planet-wide stages only — do **not** split per climate channel or per sector i
 
 1. **Ground tint** — lerp planet mesh `_BaseColor` / `_Color` (PlanetGenerator already stamps a fixed martian color; make it dynamic from stage colors).  
 2. **Sky / fog** — lerp `RenderSettings.fogColor` + ambient (reuse existing sky material only if already wired and cheap).  
-3. **Sparse flora** — gate `VegetationManager` spawn: stage 0 = off, 2 = trickle, 3 = normal. Prefer existing plant/grass prefabs; no new biomes.
+3. **Sparse flora** — `VegetationManager` spawn scales with **Atmosphere** progress (0 = off/trickle, full at Atmos win delta). Prefer existing plant/grass prefabs; no new biomes.
 
 Suggested owner script: `ClimateVisualStages` (or similar) auto-spawned / scene singleton that applies lerps each climate change (smooth over ~1–2s).
 
@@ -156,7 +156,7 @@ One full place→win run: player can **see** barren → thaw → wet → living 
 
 1. ~~`ClimateVisualStages` + ground tint~~ **Done** (progress/stage enum; terrain gradient + `_BaseColor` lerp)  
 2. Fog / ambient sky lerp  
-3. Vegetation spawn gated by stage  
+3. ~~Vegetation spawn gated by stage~~ **Done** (`VegetationManager` scales with **Atmosphere** progress toward +0.25 atm — **not** Oxygen)  
 
 **Test:** raise climate (play tiles or cheats) and watch ground shift red-brown → dusty → green-brown → green. Console logs `[ClimateVisualStages] Stage=...`.
 

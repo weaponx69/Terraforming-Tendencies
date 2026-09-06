@@ -282,21 +282,16 @@ namespace GameDevTV.RTS.Environment
         {
             while (true)
             {
-                Owner owner = GameOverManager.MonitoredOwner;
-                float oxygen = 0f;
-                if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(owner, out float val))
-                {
-                    oxygen = val;
-                }
-
-                if (oxygen <= 0)
+                // Flora density tracks Atmosphere toward the MVP +0.25 atm delta (not Oxygen).
+                GetAtmosphereFloraGate(out bool allowSpawn, out float densityFactor, out float intervalScale);
+                if (!allowSpawn)
                 {
                     yield return new WaitForSeconds(spawnInterval);
                     continue;
                 }
 
-                float currentInterval = spawnInterval / Mathf.Clamp(oxygen, 0.1f, 2f);
-                yield return new WaitForSeconds(Mathf.Clamp(currentInterval, 0.5f, spawnInterval));
+                float currentInterval = spawnInterval * intervalScale;
+                yield return new WaitForSeconds(Mathf.Clamp(currentInterval, 0.5f, spawnInterval * 2f));
 
                 foreach (var node in cachedNodes)
                 {
@@ -304,9 +299,8 @@ namespace GameDevTV.RTS.Environment
                     if (node.TryGetComponent<BaseBuilding>(out var b) && !b.IsOperating) continue;
                     EnsureNodeData(node);
 
-                    float oxFactor = Mathf.Clamp01(oxygen / 40f);
-                    int currentMaxPlants = Mathf.RoundToInt(maxPlantsPerZone * oxFactor);
-                    int currentMaxGrass = Mathf.RoundToInt(maxGrassPerZone * oxFactor);
+                    int currentMaxPlants = Mathf.RoundToInt(maxPlantsPerZone * densityFactor);
+                    int currentMaxGrass = Mathf.RoundToInt(maxGrassPerZone * densityFactor);
 
                     for (int i = 0; i < spawnAttemptsPerInterval; i++)
                     {
@@ -318,6 +312,42 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Spawn rate/density scales with Atmosphere progress toward the MVP round delta.
+        /// </summary>
+        private static void GetAtmosphereFloraGate(out bool allowSpawn, out float densityFactor, out float intervalScale)
+        {
+            allowSpawn = false;
+            densityFactor = 0f;
+            intervalScale = 1f;
+
+            Owner owner = GameOverManager.MonitoredOwner;
+            float atmos = 0.01f;
+            if (Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(owner, out float val))
+                atmos = val;
+
+            float baseline = 0.01f;
+            float requiredDelta = GenerationManager.SectorAtmosphereDelta;
+            if (GenerationManager.Instance != null)
+                baseline = GenerationManager.Instance.BaselineAtmosphere;
+
+            if (requiredDelta <= 0.0001f)
+            {
+                allowSpawn = true;
+                densityFactor = 1f;
+                intervalScale = 0.55f;
+                return;
+            }
+
+            float progress = Mathf.Clamp01((atmos - baseline) / requiredDelta);
+            if (progress <= 0.001f) return;
+
+            allowSpawn = true;
+            // Trickle early, full density at the Atmos win line.
+            densityFactor = Mathf.Lerp(0.12f, 1f, progress);
+            intervalScale = Mathf.Lerp(1.5f, 0.55f, progress);
         }
 
         private void EnsureNodeData(LifeSupportNode node)
@@ -373,9 +403,6 @@ namespace GameDevTV.RTS.Environment
         private IEnumerator FillAllZonesRoutine()
         {
             UpdateNodeCache();
-            float oxygen = 100f; 
-            Owner owner = GameOverManager.MonitoredOwner;
-            if (Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(owner, out float val)) oxygen = val;
 
             int spawnCountThisFrame = 0;
             foreach (var node in cachedNodes)
