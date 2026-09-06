@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
-using System;
 using System.Linq;
 using GameDevTV.RTS.Units;
 
@@ -1490,7 +1489,8 @@ namespace GameDevTV.RTS.Environment
                     Material mat = renderer.material; // instance so we don't mutate a shared asset
                     if (mat == null) return;
 
-                    if (mat.mainTexture is Texture2D oldTex && oldTex != null && oldTex.name.StartsWith("ClimateGroundGrad", StringComparison.Ordinal))
+                    if (mat.mainTexture is Texture2D oldTex && oldTex != null
+                        && oldTex.name.StartsWith("ClimateGroundGrad", System.StringComparison.Ordinal))
                     {
                         Destroy(oldTex);
                     }

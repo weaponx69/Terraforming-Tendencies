@@ -129,12 +129,10 @@ namespace GameDevTV.RTS.Environment
                 targetLookProgress,
                 lerpSpeed * Time.unscaledDeltaTime);
 
-            // Rebuild the 256px gradient at most ~10 Hz while lerping (force always applies).
-            if (force
-                || Mathf.Abs(displayedLookProgress - lastAppliedProgress) >= 0.02f
-                || !appliedOnce)
+            // Rebuild the 256px gradient at most ~10 Hz while lerping.
+            if (Mathf.Abs(displayedLookProgress - lastAppliedProgress) >= 0.02f || !appliedOnce)
             {
-                ApplyGroundForProgress(displayedLookProgress, force: force);
+                ApplyGroundForProgress(displayedLookProgress, force: false);
             }
         }
 
