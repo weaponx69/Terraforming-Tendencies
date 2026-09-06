@@ -217,6 +217,9 @@ namespace GameDevTV.RTS.UI
                 ClearUiImage(bottomBar.Find("Minimap Container/Background"));
                 ClearUiImage(bottomBar.Find("Menu Container"));
 
+                // Debug/layout: make Center Container bounds obvious over the world.
+                EnsureOpaqueBoxAround(FindChildRecursive(bottomBar, "Center Container"));
+
                 // Leave the lower-left corner for the card hand — shove selection info right.
                 ShiftBuildingSelectedPanelRight(bottomBar);
             }
@@ -260,6 +263,44 @@ namespace GameDevTV.RTS.UI
             image.color = c;
             image.raycastTarget = false;
             image.enabled = false;
+        }
+
+        /// <summary>
+        /// Puts a solid plate behind <paramref name="target"/> so its RectTransform
+        /// is easy to see while tuning layout. Does not block clicks.
+        /// </summary>
+        private static void EnsureOpaqueBoxAround(Transform target)
+        {
+            if (target == null) return;
+
+            const string boxName = "Center Container Debug Box";
+            Transform existing = target.Find(boxName);
+            Image box;
+            if (existing == null)
+            {
+                var go = new GameObject(boxName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                go.transform.SetParent(target, false);
+                go.transform.SetAsFirstSibling();
+                box = go.GetComponent<Image>();
+            }
+            else
+            {
+                box = existing.GetComponent<Image>();
+                if (box == null) box = existing.gameObject.AddComponent<Image>();
+            }
+
+            var rt = box.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = Vector2.zero;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            box.color = new Color(0.05f, 0.08f, 0.12f, 1f);
+            box.raycastTarget = false;
+            box.enabled = true;
         }
 
         private void CopyRectTransform(RectTransform source, RectTransform target)
