@@ -57,12 +57,12 @@ namespace GameDevTV.RTS.Environment
 
         public static bool HasAvailableSite(BuildingSO building, Owner owner)
         {
-            return GetEligibleSites(building, owner, visibleToPlayerOnly: true).Count > 0;
+            return GetEligibleSites(building, owner, visibleToPlayerOnly: false).Count > 0;
         }
 
         public static BuildingSiteSlot GetAvailableSite(BuildingSO building, Owner owner)
         {
-            var eligible = GetEligibleSites(building, owner, visibleToPlayerOnly: true);
+            var eligible = GetEligibleSites(building, owner, visibleToPlayerOnly: false);
             if (eligible.Count == 0) return null;
 
             Vector3 reference = GetReferencePosition(owner);
@@ -83,12 +83,13 @@ namespace GameDevTV.RTS.Environment
 
             foreach (var sector in SectorManager.Instance.Sectors)
             {
-                if (sector == null || sector.IsLocked || !sector.IsExplored) continue;
-                if (sector.BuildingSites == null) continue;
+                // Whole-planet pads: sector lock no longer gates eligibility.
+                if (sector == null || sector.BuildingSites == null) continue;
 
                 foreach (var site in sector.BuildingSites)
                 {
                     if (site == null) continue;
+                    // Card selection passes visibleToPlayerOnly:false so every open pad on the map is offered.
                     if (visibleToPlayerOnly && !IsSiteVisibleToPlayer(site)) continue;
                     if (site.OccupyingBuilding != null && !BuildingSiteSlot.IsValidOccupant(site.OccupyingBuilding))
                     {
@@ -128,18 +129,13 @@ namespace GameDevTV.RTS.Environment
 
         public static bool IsSiteVisibleToPlayer(BuildingSiteSlot site)
         {
-            if (site?.Sector == null)
+            if (site == null)
             {
                 return true;
             }
 
-            if (site.Sector.IsLocked || !site.Sector.IsExplored)
-            {
-                return false;
-            }
-
-            // Hex fog is the display gate — do not show pads in unrevealed shroud.
-            // Starting-area pads appear after HexGridManager.RevealStartingArea + RefreshAllMarkers.
+            // Sector lock retired — idle pad ghosts still respect hex fog so the shroud stays meaningful.
+            // Card picking uses GetEligibleSites(..., visibleToPlayerOnly: false) for the whole planet.
             if (HexGridManager.Instance != null)
             {
                 return HexGridManager.IsWorldPositionRevealed(site.Position);

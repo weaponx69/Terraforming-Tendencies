@@ -209,23 +209,24 @@ namespace GameDevTV.RTS.Environment
                         int featureIndex = 1 + ((Sectors.Count - 1) % 4);
                         feature = (SectorFeature)featureIndex;
                     }
-                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = !isFirst, IsExplored = isFirst, Feature = feature });
+                    // Sector lockdown retired (whole-board terraforming): pads/builds available planet-wide.
+                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = false, IsExplored = true, Feature = feature });
             }
             
             if (Sectors.Count > 0)
             {
                 BeginTerraformingOn(Sectors[0]);
 
-                // Force-discover Minerals and Gas in Sector 0 so the player can bootstrap.
-                // All other sectors require discovery cards to reveal resource types.
+                // Force-discover Minerals and Gas types so the player can bootstrap.
+                // Individual deposit nodes still need hex reveal / exploration to appear.
                 DiscoverySystem.RevealResourceType("Minerals");
                 DiscoverySystem.RevealResourceType("Gas");
 
-                DiscoverResourcesInUnlockedSectors();
+                DiscoverStartingSectorResources();
                 UpdateSectorBorders();
                 OnSectorUnlocked?.Invoke();
             }
-            Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector 0 is unlocked.");
+            Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector lockdown disabled (whole planet open).");
         }
 
         public void ReinitializeSectors()
@@ -236,20 +237,26 @@ namespace GameDevTV.RTS.Environment
             InitializeSectors();
         }
 
-        public void DiscoverResourcesInUnlockedSectors()
+        /// <summary>Bootstrap resource nodes near Sector 0 only — do not mass-reveal the whole planet.</summary>
+        public void DiscoverStartingSectorResources()
         {
+            if (Sectors == null || Sectors.Count == 0) return;
+            var start = Sectors[0];
             var hiddenResources = UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include);
             foreach (var hr in hiddenResources)
             {
                 if (hr == null || hr.IsDiscovered) continue;
 
                 var nearestSector = GetNearestSector(hr.transform.position);
-                if (nearestSector != null && !nearestSector.IsLocked)
+                if (nearestSector == start)
                 {
                     hr.Discover();
                 }
             }
         }
+
+        /// <summary>Obsolete name — redirects to starting-sector discovery (sector lock retired).</summary>
+        public void DiscoverResourcesInUnlockedSectors() => DiscoverStartingSectorResources();
 
         private bool hasDoneStartingDiscovery = false;
 
@@ -265,7 +272,7 @@ namespace GameDevTV.RTS.Environment
             {
                 hasDoneStartingDiscovery = true;
                 DiscoverResourcesInUnlockedSectors();
-                Debug.Log("[SectorManager] Completed deferred starting resource discovery for unlocked sectors!");
+                Debug.Log("[SectorManager] Completed deferred starting resource discovery (Sector 0).");
             }
         }
 

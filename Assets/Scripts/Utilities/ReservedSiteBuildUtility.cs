@@ -78,11 +78,11 @@ namespace GameDevTV.RTS.Utilities
                 }
                 else if (BuildingSiteRegistry.IsCommandBuilding(building))
                 {
-                    reason = "No available Command Post site in an unlocked sector.";
+                    reason = "No available Command Post site on the planet.";
                 }
                 else if (BuildingSiteRegistry.IsSolarBuilding(building))
                 {
-                    reason = "No open solar array sites in unlocked sectors.";
+                    reason = "No open solar array sites on the planet.";
                 }
                 else
                 {

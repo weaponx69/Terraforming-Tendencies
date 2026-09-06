@@ -40,7 +40,8 @@ namespace GameDevTV.RTS.Environment
             markersPending = true;
 
             eligibleSites.Clear();
-            eligibleSites.AddRange(BuildingSiteRegistry.GetEligibleSites(building, owner));
+            // Whole planet: ignore fog / former sector locks while picking a pad for a card.
+            eligibleSites.AddRange(BuildingSiteRegistry.GetEligibleSites(building, owner, visibleToPlayerOnly: false));
 
             // Ensure every eligible pad has an active marker before we highlight / click.
             BuildingSiteRegistry.RefreshAllMarkers();
@@ -48,7 +49,7 @@ namespace GameDevTV.RTS.Environment
             if (eligibleSites.Count == 0)
             {
                 string reason = BuildingSiteRegistry.IsSolarBuilding(building)
-                    ? "No open solar array sites. Unlock a new sector or wait for a cluster to free up."
+                    ? "No open solar array sites left on the planet."
                     : "No powered building sites. Build a Solar Panel at a cluster first, then pick that cluster.";
                 NotifyBuildFeedback(reason);
                 callback?.Invoke(false, reason);

@@ -86,12 +86,6 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            if (isSelectable && Site.Sector != null && (Site.Sector.IsLocked || !Site.Sector.IsExplored))
-            {
-                gameObject.SetActive(false);
-                return;
-            }
-
             if (Site.IsOccupied)
             {
                 gameObject.SetActive(false);

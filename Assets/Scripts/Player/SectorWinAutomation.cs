@@ -156,7 +156,7 @@ namespace GameDevTV.RTS.Player
                 return sb.ToString();
             }
 
-            int unlockedBefore = SectorManager.Instance?.GetUnlockedSectorCount() ?? 0;
+            int occupiedBefore = CountOccupiedSectors();
             var colonUi = SectorColonizationSummaryUI.EnsureInstance();
             colonUi.ShowAfterGenerationSummary();
             sb.AppendLine($"Colonization UI after show: visible={colonUi.IsVisible} previewWillColonize={gm.PreviewColonizationBeforeAdvance().WillColonize}");
@@ -168,7 +168,7 @@ namespace GameDevTV.RTS.Player
             }
 
             colonUi.InvokePrimaryAction();
-            sb.AppendLine($"After deploy: Gen={gm.CurrentGeneration} Unlocked={SectorManager.Instance?.GetUnlockedSectorCount()} " +
+            sb.AppendLine($"After deploy: Gen={gm.CurrentGeneration} Occupied={CountOccupiedSectors()} " +
                           $"ColonizationSucceeded={gm.LastColonizationResult.Succeeded} verificationVisible={colonUi.IsVisible}");
 
             if (colonUi.IsVisible)
@@ -177,10 +177,10 @@ namespace GameDevTV.RTS.Player
                 sb.AppendLine($"After verification dismiss: verificationVisible={colonUi.IsVisible} timeScale={Time.timeScale}");
             }
 
-            int unlockedAfter = SectorManager.Instance?.GetUnlockedSectorCount() ?? 0;
-            if (unlockedAfter <= unlockedBefore)
+            int occupiedAfter = CountOccupiedSectors();
+            if (!gm.LastColonizationResult.Succeeded && occupiedAfter <= occupiedBefore)
             {
-                sb.AppendLine("RESULT: FAIL (unlocked sector count did not increase)");
+                sb.AppendLine("RESULT: FAIL (colonization did not claim a new sector)");
                 return sb.ToString();
             }
 
@@ -249,12 +249,10 @@ namespace GameDevTV.RTS.Player
                 return sb.ToString();
             }
 
-            int unlockedBefore = SectorManager.Instance != null
-                ? SectorManager.Instance.GetUnlockedSectorCount()
-                : 0;
+            int occupiedBefore = CountOccupiedSectors();
 
             gm.StartNextGeneration();
-            sb.AppendLine($"Started next → Gen={gm.CurrentGeneration} Expansion={gm.IsExpansionPhase} Unlocked={SectorManager.Instance?.GetUnlockedSectorCount()}");
+            sb.AppendLine($"Started next → Gen={gm.CurrentGeneration} Expansion={gm.IsExpansionPhase} Occupied={CountOccupiedSectors()}");
 
             if (gm.IsExpansionPhase)
             {
@@ -262,13 +260,11 @@ namespace GameDevTV.RTS.Player
                 return sb.ToString();
             }
 
-            int unlockedAfter = SectorManager.Instance != null
-                ? SectorManager.Instance.GetUnlockedSectorCount()
-                : 0;
-            sb.AppendLine($"Unlocked sectors: {unlockedBefore} → {unlockedAfter}");
-            if (unlockedAfter <= unlockedBefore)
+            int occupiedAfter = CountOccupiedSectors();
+            sb.AppendLine($"Occupied sectors: {occupiedBefore} → {occupiedAfter} ColonizationSucceeded={gm.LastColonizationResult.Succeeded}");
+            if (!gm.LastColonizationResult.Succeeded && occupiedAfter <= occupiedBefore)
             {
-                sb.AppendLine("RESULT: FAIL (unlocked sector count did not increase after advancing)");
+                sb.AppendLine("RESULT: FAIL (colonization did not claim a new sector after advancing)");
                 return sb.ToString();
             }
 
@@ -343,12 +339,23 @@ namespace GameDevTV.RTS.Player
             if (SectorManager.Instance?.Sectors == null) return;
             foreach (var sector in SectorManager.Instance.Sectors)
             {
-                if (sector == null || sector.IsLocked || !sector.IsExplored) continue;
+                if (sector == null) continue;
                 CountPadsInSector(sector, out int s, out int p, out int pw);
                 solarOpen += s;
                 pairedOpen += p;
                 pairedPoweredOpen += pw;
             }
+        }
+
+        private static int CountOccupiedSectors()
+        {
+            int count = 0;
+            if (SectorManager.Instance?.Sectors == null) return 0;
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector != null && sector.IsOccupied) count++;
+            }
+            return count;
         }
 
         private static void CountPadsInSector(SectorManager.Sector sector, out int solarOpen, out int pairedOpen, out int pairedPoweredOpen)
@@ -535,8 +542,7 @@ namespace GameDevTV.RTS.Player
             int pairedPoweredOpen = 0;
             foreach (var sector in SectorManager.Instance.Sectors)
             {
-                if (sector == null || sector.IsLocked || !sector.IsExplored) continue;
-                if (sector.BuildingClusters == null) continue;
+                if (sector == null || sector.BuildingClusters == null) continue;
                 foreach (var cluster in sector.BuildingClusters)
                 {
                     if (cluster == null) continue;

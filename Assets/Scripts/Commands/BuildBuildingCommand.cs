@@ -62,13 +62,7 @@ namespace GameDevTV.RTS.Commands
                 targetPos = navHit.position;
             }
 
-            // Prevent building in locked sectors
-            var sector = GameDevTV.RTS.Environment.SectorManager.Instance?.GetNearestSector(targetPos);
-            if (sector != null && sector.IsLocked)
-            {
-                return false;
-            }
-
+            // Sector lockdown retired — placement uses pad eligibility / restrictions only.
             return HasEnoughSupplies(context) && AllRestrictionsPass(targetPos, context.Owner);
         }
 

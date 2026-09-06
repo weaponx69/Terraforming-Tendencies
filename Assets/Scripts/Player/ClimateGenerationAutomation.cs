@@ -407,7 +407,7 @@ namespace GameDevTV.RTS.Player
             {
                 foreach (var s in SectorManager.Instance.Sectors)
                 {
-                    if (s == null || s.IsLocked || !s.IsExplored) continue;
+                    if (s == null) continue;
                     cluster = FindOpenCluster(s);
                     if (cluster != null)
                     {
@@ -420,7 +420,7 @@ namespace GameDevTV.RTS.Player
 
             if (cluster?.SolarSlot == null || cluster.BuildingSlot == null)
             {
-                reason = "No open solar+building cluster in an unlocked sector.";
+                reason = "No open solar+building cluster on the planet.";
                 return false;
             }
 

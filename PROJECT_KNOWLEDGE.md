@@ -59,12 +59,12 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 |---|---|---|
 | Climate contribution | Focus sector via `TerraformingSector` / `GetClimateFocusSector()`; historically ActiveSector-only | All completed climate buildings always count |
 | Round win | Per-sector generation: primary + Temp/Atmos/Water deltas from baselines | Planet milestones / tiers; whole board |
-| Sector unlock | Auto-colonize closest sector on gen advance; Orbital Scan / Survey optional | Optional expansion for land / combos |
+| Sector unlock | **Lock retired** — all sectors open; pads planet-wide on card pick | Optional expansion for land / combos |
 | Caps | Floored to round / next-gen cumulative targets | Still need headroom past milestone lines so HUD keeps moving |
 | Cards / hand | FIFO 5-card hand, reserved pads, materials costs | Keep; add adjacency combo feedback |
 | Adjacency combos | Not yet a first-class system | Core dopamine layer to build |
 
-**Migration priority:** (1) remove exclusive climate gating → whole-board ticks, (2) redefine milestones as planet tiers, (3) add adjacency combo multipliers + UI pops, (4) demote sectors to fog/biome/expansion.
+**Migration priority:** (1) ~~remove exclusive climate gating~~ / remove sector build lock — **sector lock retired**; (2) whole-board climate ticks; (3) redefine milestones as planet tiers; (4) add adjacency combo multipliers + UI pops.
 
 ---
 
@@ -114,18 +114,17 @@ Themed buildings tick Temp / Atmos / Water from `BuildingConfigSO` (and card pro
 
 ---
 
-## 3. Sectors — Transitional Role
+## 3. Sectors — Map Regions (Lock Retired)
 
-**Target:** sectors = biomes, deposits, fog frontiers, optional colonization for better combo land.
+**Sector lockdown is retired.** At planet init every sector starts `IsLocked = false` and `IsExplored = true`. Building cards offer **eligible pads across the entire planet** (`GetEligibleSites(..., visibleToPlayerOnly: false)`). Movement and free-placement no longer reject “locked” sectors.
 
-**Still in code today:**
-* Map divided into sectors; locked sectors block build/move.
-* Round completion can auto-colonize closest sector needing a Command Post.
-* Exploration cards (Orbital Scan, Survey Drone, Pipeline Boost) unlock early.
-* Guaranteed mineral/gas per sector from planet gen.
-* Legacy climate focus sector APIs — **do not extend**; migrate off.
+**Still true:**
+* Sectors remain map regions (centers, features, pad lists, borders).
+* Hex fog still hides idle world content; card pad-picking ignores fog so you can jump to distant pads.
+* Resource node discovery stays bootstrap-limited to Sector 0 (`DiscoverStartingSectorResources`) — exploring hexes reveals deposits elsewhere.
+* Optional colonization (Command Post claim) can still expand occupied footprint; it is not required to unlock build rights.
 
-When touching `SectorManager`, `GenerationManager`, or climate tick paths: prefer whole-board contribution and planet milestones over deepening exclusive-sector logic.
+**Do not reintroduce** `IsLocked` gates on pad eligibility, card `CanApply`, or unit movement.
 
 ---
 
@@ -260,4 +259,4 @@ Scene note: GameObject often named `PlanetManager`; script is `PlanetGenerator`.
 
 ---
 
-*Last rewritten: 2026-09-06 — Combolands-style whole-board terraforming milestones as design authority; exclusive-sector climate marked legacy.*
+*Last rewritten: 2026-09-06 — Combolands-style whole-board terraforming milestones as design authority; sector lockdown retired (pads planet-wide).*

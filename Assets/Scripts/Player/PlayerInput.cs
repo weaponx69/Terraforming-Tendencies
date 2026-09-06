@@ -661,12 +661,6 @@ namespace GameDevTV.RTS.Player
 
                 bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hitPos.Value);
 
-                var sector = SectorManager.Instance?.GetNearestSector(hitPos.Value);
-                if (sector != null && sector.IsLocked)
-                {
-                    allRestrictionsPass = false;
-                }
-
                 if (ghostRenderer != null && ghostRenderer.material != null)
                 {
                     ghostRenderer.material.SetColor(TINT, allRestrictionsPass ? availableToPlaceTintColor : errorTintColor);
@@ -886,13 +880,6 @@ namespace GameDevTV.RTS.Player
             }
 
             Debug.Log($"[PlayerInput] Right-click hit {hit.collider?.name} at {hit.point} with {selectedUnits.Count} selected.");
-
-            var sector = SectorManager.Instance?.GetNearestSector(hit.point);
-            if (sector != null && sector.IsLocked)
-            {
-                Debug.Log("[PlayerInput] Cannot interact with locked sectors.");
-                return;
-            }
 
             List<AbstractUnit> abstractUnits = new(selectedUnits.Count);
             foreach (ISelectable selectable in selectedUnits)
