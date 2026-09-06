@@ -83,6 +83,7 @@ Player building cards primarily play onto **pre-placed pads** (`ReservedSiteBuil
 * **Kinds:** `CommandPost`, `Solar`, `PairedBuilding`, `Mine`. Deprecated: `Infrastructure`.
 * **Cluster rule:** one solar pad + one consumer pad; consumer requires that cluster’s solar occupied, then auto-wires to it. **Solar never auto-wires to the Command Post.**
 * **Builds need an idle drone** (HUD: “A drone is needed.”). Exceptions: waived-cost auto-colonize CP, first Command Post orbital drop.
+* **Pad browse (Q/E):** While a building card is selecting a site, **Q** / **E** cycle the camera across planet-wide eligible pads (sorted west→east). Click places on the focused/clicked pad; Esc cancels. Outside site-picking, Q/E still page Command Posts.
 * Site-marker preview ghosts must never occupy pads or raise `BuildingSpawnEvent`. See historical pad/ghost rules under **§11** if debugging visuals.
 
 ### 2.3 Climate buildings & rates

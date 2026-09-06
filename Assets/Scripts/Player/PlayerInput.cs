@@ -501,12 +501,24 @@ namespace GameDevTV.RTS.Player
 
         private void HandleBasePaging()
         {
+            if (Keyboard.current == null) return;
+
             if (Keyboard.current.qKey.wasPressedThisFrame)
             {
+                if (BuildingSiteSelectionController.IsSelecting)
+                {
+                    BuildingSiteSelectionController.CycleFocus(-1);
+                    return;
+                }
                 PageBases(-1);
             }
             else if (Keyboard.current.eKey.wasPressedThisFrame)
             {
+                if (BuildingSiteSelectionController.IsSelecting)
+                {
+                    BuildingSiteSelectionController.CycleFocus(1);
+                    return;
+                }
                 PageBases(1);
             }
         }

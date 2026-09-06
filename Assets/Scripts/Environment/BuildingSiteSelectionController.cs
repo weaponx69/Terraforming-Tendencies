@@ -9,18 +9,22 @@ using UnityEngine;
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// Lets the player pick which solar cluster to build in after playing a building card.
+    /// Lets the player pick which reserved pad to build on after playing a building card.
+    /// Q / E cycle camera focus across planet-wide eligible pads.
     /// </summary>
     public static class BuildingSiteSelectionController
     {
         public static bool IsSelecting => pendingBuilding != null;
         public static int AcceptClicksAfterFrame => acceptClicksAfterFrame;
+        public static BuildingSiteSlot FocusedSite =>
+            focusedIndex >= 0 && focusedIndex < eligibleSites.Count ? eligibleSites[focusedIndex] : null;
 
         private static BuildingSO pendingBuilding;
         private static Owner pendingOwner;
         private static int pendingCardIndex = -1;
         private static int acceptClicksAfterFrame = -1;
         private static bool markersPending;
+        private static int focusedIndex = -1;
         private static readonly List<BuildingSiteSlot> eligibleSites = new();
         private static Action<bool, string> onComplete;
 
@@ -38,10 +42,12 @@ namespace GameDevTV.RTS.Environment
             onComplete = callback;
             acceptClicksAfterFrame = Time.frameCount;
             markersPending = true;
+            focusedIndex = -1;
 
             eligibleSites.Clear();
             // Whole planet: ignore fog / former sector locks while picking a pad for a card.
             eligibleSites.AddRange(BuildingSiteRegistry.GetEligibleSites(building, owner, visibleToPlayerOnly: false));
+            SortSitesForCycling(eligibleSites);
 
             // Ensure every eligible pad has an active marker before we highlight / click.
             BuildingSiteRegistry.RefreshAllMarkers();
@@ -57,7 +63,8 @@ namespace GameDevTV.RTS.Environment
                 return;
             }
 
-            FocusCameraOnEligibleSites();
+            focusedIndex = FindNearestSiteIndex(PlayerInput.GetCameraFocusPosition());
+            FocusCameraOnFocusedSite();
 
             // Single candidate: build immediately after framing the pad.
             if (eligibleSites.Count == 1)
@@ -67,7 +74,20 @@ namespace GameDevTV.RTS.Environment
             }
 
             // Instructional only — do not use the red failure banner.
-            Debug.Log($"[BuildingSiteSelection] Choose a site for {building.Name} ({eligibleSites.Count} option(s)). Esc to cancel.");
+            Debug.Log($"[BuildingSiteSelection] Choose a site for {building.Name} ({eligibleSites.Count} option(s)). Q/E cycle pads, click to place, Esc cancel.");
+        }
+
+        /// <summary>Cycle eligible pads planet-wide. Negative = previous (Q), positive = next (E).</summary>
+        public static void CycleFocus(int direction)
+        {
+            if (!IsSelecting || eligibleSites.Count == 0 || direction == 0) return;
+
+            if (focusedIndex < 0) focusedIndex = 0;
+            focusedIndex = (focusedIndex + direction) % eligibleSites.Count;
+            if (focusedIndex < 0) focusedIndex += eligibleSites.Count;
+
+            FocusCameraOnFocusedSite();
+            RefreshFocusHighlights();
         }
 
         public static void ActivatePendingMarkersIfNeeded()
@@ -84,6 +104,7 @@ namespace GameDevTV.RTS.Environment
             }
 
             markersPending = false;
+            RefreshFocusHighlights();
         }
 
         public static bool TryHandleClick(RaycastHit hit)
@@ -97,6 +118,7 @@ namespace GameDevTV.RTS.Environment
                 return false;
             }
 
+            focusedIndex = eligibleSites.IndexOf(site);
             TryCommitSite(site);
             return true;
         }
@@ -105,7 +127,7 @@ namespace GameDevTV.RTS.Environment
         public static void NotifyMissedClick()
         {
             if (!IsSelecting || pendingBuilding == null) return;
-            Debug.Log($"[BuildingSiteSelection] Click a highlighted pad to build {pendingBuilding.Name}. Esc to cancel.");
+            Debug.Log($"[BuildingSiteSelection] Q/E to browse pads, click to build {pendingBuilding.Name}. Esc to cancel.");
         }
 
         public static void Cancel()
@@ -122,6 +144,7 @@ namespace GameDevTV.RTS.Environment
             markersPending = false;
             acceptClicksAfterFrame = -1;
             pendingCardIndex = -1;
+            focusedIndex = -1;
             ClearPending();
             BuildingSiteRegistry.RefreshAllMarkers();
         }
@@ -153,17 +176,27 @@ namespace GameDevTV.RTS.Environment
             callback?.Invoke(built, reason);
         }
 
-        private static void FocusCameraOnEligibleSites()
+        private static void SortSitesForCycling(List<BuildingSiteSlot> sites)
         {
-            if (eligibleSites.Count == 0) return;
-
-            Vector3 cameraPos = PlayerInput.GetCameraFocusPosition();
-            cameraPos.y = 0f;
-
-            BuildingSiteSlot nearest = null;
-            float bestDist = float.MaxValue;
-            foreach (var site in eligibleSites)
+            sites.Sort((a, b) =>
             {
+                if (a == null && b == null) return 0;
+                if (a == null) return 1;
+                if (b == null) return -1;
+                int cmp = a.Position.x.CompareTo(b.Position.x);
+                if (cmp != 0) return cmp;
+                return a.Position.z.CompareTo(b.Position.z);
+            });
+        }
+
+        private static int FindNearestSiteIndex(Vector3 cameraPos)
+        {
+            cameraPos.y = 0f;
+            int best = 0;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < eligibleSites.Count; i++)
+            {
+                var site = eligibleSites[i];
                 if (site == null) continue;
                 Vector3 flat = site.Position;
                 flat.y = 0f;
@@ -171,13 +204,29 @@ namespace GameDevTV.RTS.Environment
                 if (dist < bestDist)
                 {
                     bestDist = dist;
-                    nearest = site;
+                    best = i;
                 }
             }
+            return best;
+        }
 
-            if (nearest != null)
+        private static void FocusCameraOnFocusedSite()
+        {
+            var site = FocusedSite;
+            if (site == null) return;
+            PlayerInput.FocusCameraOnWorldPosition(site.Position);
+        }
+
+        private static void RefreshFocusHighlights()
+        {
+            for (int i = 0; i < eligibleSites.Count; i++)
             {
-                PlayerInput.FocusCameraOnWorldPosition(nearest.Position);
+                var site = eligibleSites[i];
+                if (site?.MarkerGO == null) continue;
+                var marker = site.MarkerGO.GetComponent<BuildingSiteMarker>();
+                if (marker == null) continue;
+                // All eligible pads stay clickable; only the focused pad gets the bright highlight.
+                marker.SetHighlight(i == focusedIndex);
             }
         }
 
@@ -211,13 +260,14 @@ namespace GameDevTV.RTS.Environment
             }
 
             var building = hit.collider.GetComponentInParent<BaseBuilding>();
-            if (building == null) return null;
-
-            foreach (var site in eligibleSites)
+            if (building != null)
             {
-                if (site?.Cluster?.SolarBuilding == building && site.Kind == BuildingSiteKind.PairedBuilding)
+                foreach (var site in eligibleSites)
                 {
-                    return site;
+                    if (site?.Cluster?.SolarBuilding == building && site.Kind == BuildingSiteKind.PairedBuilding)
+                    {
+                        return site;
+                    }
                 }
             }
 
@@ -229,10 +279,9 @@ namespace GameDevTV.RTS.Environment
             foreach (var site in eligibleSites)
             {
                 if (site == null) continue;
-                float d = (site.Position - point).sqrMagnitude;
-                // Ignore Y for pad snaps.
-                Vector3 flat = site.Position; flat.y = point.y;
-                d = (flat - point).sqrMagnitude;
+                Vector3 flat = site.Position;
+                flat.y = point.y;
+                float d = (flat - point).sqrMagnitude;
                 if (d < best)
                 {
                     best = d;
