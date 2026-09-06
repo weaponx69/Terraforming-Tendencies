@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+using System;
 using System.Linq;
 using GameDevTV.RTS.Units;
 
@@ -1470,14 +1471,53 @@ namespace GameDevTV.RTS.Environment
 
                 private Texture2D GenerateHeightGradient()
                 {
+                    // Muted Mars Palette — used at barren stage / cold start.
+                    Color colorLow = new Color(0.55f, 0.25f, 0.15f);
+                    Color colorMid = new Color(0.65f, 0.35f, 0.20f);
+                    Color colorHigh = new Color(0.75f, 0.45f, 0.25f);
+                    return GenerateHeightGradient(colorLow, colorMid, colorHigh);
+                }
+
+                /// <summary>
+                /// Rebuild the terrain height-band texture and optional albedo tint.
+                /// Used by <see cref="ClimateVisualStages"/> for barren→living ground look.
+                /// </summary>
+                public void ApplyClimateGroundPalette(Color colorLow, Color colorMid, Color colorHigh, Color baseTint)
+                {
+                    MeshRenderer renderer = GetComponent<MeshRenderer>();
+                    if (renderer == null) return;
+
+                    Material mat = renderer.material; // instance so we don't mutate a shared asset
+                    if (mat == null) return;
+
+                    if (mat.mainTexture is Texture2D oldTex && oldTex != null && oldTex.name.StartsWith("ClimateGroundGrad", StringComparison.Ordinal))
+                    {
+                        Destroy(oldTex);
+                    }
+
+                    Texture2D gradient = GenerateHeightGradient(colorLow, colorMid, colorHigh);
+                    gradient.name = "ClimateGroundGrad";
+                    mat.mainTexture = gradient;
+                    if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", baseTint);
+                    else if (mat.HasProperty("_Color")) mat.SetColor("_Color", baseTint);
+
+                    // Terrain wrap ghosts share the generator's material path — retarget them.
+                    foreach (Transform child in transform)
+                    {
+                        if (child == null || !child.name.StartsWith("Terrain Ghost", System.StringComparison.Ordinal))
+                            continue;
+                        if (child.TryGetComponent(out MeshRenderer ghostRenderer))
+                            ghostRenderer.sharedMaterial = mat;
+                    }
+
+                    renderer.sharedMaterial = mat;
+                }
+
+                private Texture2D GenerateHeightGradient(Color colorLow, Color colorMid, Color colorHigh)
+                {
                 Texture2D tex = new Texture2D(1, 256);
                 tex.wrapMode = TextureWrapMode.Clamp;
                 tex.filterMode = FilterMode.Bilinear; // Smooth blending
-            
-                // Muted Mars Palette: Subtle contrast limited to a few specific tones
-                Color colorLow = new Color(0.55f, 0.25f, 0.15f);   // Deep plains
-                Color colorMid = new Color(0.65f, 0.35f, 0.20f);   // Slopes
-                Color colorHigh = new Color(0.75f, 0.45f, 0.25f);  // Peaks
 
                 for (int i = 0; i < 256; i++)
                 {

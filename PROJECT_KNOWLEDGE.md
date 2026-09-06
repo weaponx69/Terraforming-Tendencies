@@ -91,7 +91,7 @@ Enough copies that the player can slowly finish without RNG softlock:
 | Objectives copy | **Done** | Planet terraform / three lines / win |
 | 5-card hand hard cap | **Done** | No GlobalCommander extra slots |
 | Hamster playtest (place→win) | **Done enough** | Fantasy gap = barren world doesn’t *look* alive |
-| **Visual climate stages** | **Next** | See **§1A** — authoritative next slice |
+| **Visual climate stages** | **In progress** | Step 1 done (controller + ground tint). Next: fog/sky, then flora |
 | Adjacency combos | **Later** | After planet looks terraformed |
 | Live bot / CLI win check | **Legacy** | Retarget to MVP victory when needed |
 
@@ -154,10 +154,11 @@ One full place→win run: player can **see** barren → thaw → wet → living 
 
 ### Build order for §1A
 
-1. `ClimateVisualStages` — progress + stage enum from Supplies / GenerationManager baselines  
-2. Ground color lerp on planet meshes  
-3. Fog / ambient sky lerp  
-4. Vegetation spawn gated by stage  
+1. ~~`ClimateVisualStages` + ground tint~~ **Done** (progress/stage enum; terrain gradient + `_BaseColor` lerp)  
+2. Fog / ambient sky lerp  
+3. Vegetation spawn gated by stage  
+
+**Test:** raise climate (play tiles or cheats) and watch ground shift red-brown → dusty → green-brown → green. Console logs `[ClimateVisualStages] Stage=...`.
 
 ### Hooks already in repo
 
