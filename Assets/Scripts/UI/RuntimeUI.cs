@@ -229,8 +229,8 @@ namespace GameDevTV.RTS.UI
         }
 
         /// <summary>
-        /// Card hand docks bottom-left. Push "Building Selected Container" into the right
-        /// half of the Bottom Bar so the middle status strip is not under the cards.
+        /// Card hand docks bottom-left. Pin "Building Selected Container" to the far right
+        /// of the Bottom Bar (short panel) so it never sits under the card hand.
         /// </summary>
         private void ShiftBuildingSelectedPanelRight(Transform bottomBar)
         {
@@ -240,13 +240,14 @@ namespace GameDevTV.RTS.UI
                 selected = FindChildRecursive(bottomBar, "Building Selected Container");
             if (selected is not RectTransform rt) return;
 
-            // Right 55% of the bottom bar band.
-            rt.anchorMin = new Vector2(0.45f, 0f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = Vector2.zero;
-            rt.offsetMin = new Vector2(8f, 4f);
-            rt.offsetMax = new Vector2(-8f, -4f);
+            // Far-right dock, short panel (~280px wide).
+            rt.anchorMin = new Vector2(1f, 0.12f);
+            rt.anchorMax = new Vector2(1f, 0.78f);
+            rt.pivot = new Vector2(1f, 0.5f);
+            rt.sizeDelta = new Vector2(280f, 0f);
+            rt.anchoredPosition = new Vector2(-12f, 0f);
+            rt.offsetMin = new Vector2(rt.offsetMin.x, 0f);
+            rt.offsetMax = new Vector2(rt.offsetMax.x, 0f);
         }
 
         private static void ClearUiImage(Transform target)
