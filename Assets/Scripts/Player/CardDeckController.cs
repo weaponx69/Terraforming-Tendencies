@@ -482,8 +482,10 @@ namespace GameDevTV.RTS.Player
 
             played.Apply();
 
-            ColonyActManager.Instance?.GrantCardScore(played);
+            // Week first, then deferred instant-build score (and non-building card score).
             ColonyActManager.Instance?.SpendWeek();
+            BaseBuilding.FlushAllDeferredColonyActScores();
+            ColonyActManager.Instance?.GrantCardScore(played);
 
             GameFlowManager.Instance?.PlayerActed();
 
@@ -839,8 +841,9 @@ namespace GameDevTV.RTS.Player
             // Apply the card's effect
             played.Apply();
 
-            ColonyActManager.Instance?.GrantCardScore(played);
+            // Week first so Act-clear from GrantCardScore cannot leave the week on the next Act.
             ColonyActManager.Instance?.SpendWeek();
+            ColonyActManager.Instance?.GrantCardScore(played);
 
             // Notify GameFlowManager that an action was taken
             if (GameFlowManager.Instance != null)

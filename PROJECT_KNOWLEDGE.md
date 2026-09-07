@@ -54,7 +54,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Other | default | 5 | — |
 
 ### Habitability & look
-* Cumulative Habitability from climate-tagged tiles drives [`ClimateVisualStages`](Assets/Scripts/Environment/ClimateVisualStages.cs) (Barren→Living) and flora spawn density.
+* Cumulative Habitability from climate-tagged tiles drives [`ClimateVisualStages`](Assets/Scripts/Environment/ClimateVisualStages.cs) (Barren→Living): **ground tint**, **fog color/density**, and **ambient sky**, plus flora spawn density via [`VegetationManager`](Assets/Scripts/Environment/VegetationManager.cs).
 * Not driven by Supplies climate deltas for win/look.
 
 ### Board / sectors
@@ -71,13 +71,13 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Colony Acts + week clock | **Done** | Tune targets / weeks in playtest |
 | Score on building complete | **Done** | Adjacency multipliers later |
 | Objectives HUD (Act/Score/Weeks) | **Done** | Polish |
-| Habitability → ground tint / flora | **Done** | Fog/sky lerp still open |
+| Habitability → ground / fog / sky / flora | **Done** | Tune palette in playtest |
 | Adjacency combos | **Later** | After Acts feel good |
 | Sector unlock progression | **Retired** | Do not restore for win |
 
 **Ordered build list:**
 1. ~~Colony Acts runtime + docs~~ **Done**
-2. Fog / ambient sky from Habitability
+2. ~~Fog / ambient sky from Habitability~~ **Done**
 3. Simple adjacency score bonuses
 4. Placement popcorn (+Score float text)
 
@@ -92,6 +92,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Generations | `MaxGenerations = 1` legacy shell | Acts replace multi-gen |
 | Sector lock | All open | Keep |
 | Cards | Unlock buildings + BaseScore table | Add adjacency later |
+| Week / score order | Spend week on play; tile score on complete (instant builds defer score until after week) | Last-week drone builds may still finish before fail |
 
 ---
 
@@ -122,11 +123,10 @@ Goal colors still tint Heat/Air/Water tiles. FIFO deck rules still apply. Prefab
 
 ## 9. Backlog
 
-1. Fog / sky from Habitability  
-2. Adjacency score  
-3. Placement +Score VFX  
-4. Soft-fail / extra weeks (Combolands-like)  
-5. Retarget CLI bots to Colony Score Acts  
+1. Adjacency score  
+2. Placement +Score VFX  
+3. Soft-fail / extra weeks (Combolands-like)  
+4. Retarget CLI bots to Colony Score Acts  
 
 ---
 
@@ -140,4 +140,4 @@ See [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md). Unit
 
 Colonists/tubes, guilds, combat — leave until Acts feel like Combolands.
 
-*Last rewritten: 2026-09-06 — Combolands Colony Acts replace climate MVP win.*
+*Last updated: 2026-09-07 — Habitability fog/sky; Act week/score edge-case fixes.*

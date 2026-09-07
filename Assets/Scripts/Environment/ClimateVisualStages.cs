@@ -6,8 +6,8 @@ using UnityEngine;
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// Visual climate stages — ground tint from Colony Habitability (climate-tagged tiles),
-    /// not from Supplies Temp/Atmos/Water win deltas.
+    /// Visual climate stages — ground tint, fog, and ambient sky from Colony Habitability
+    /// (climate-tagged tiles), not from Supplies Temp/Atmos/Water win deltas.
     /// </summary>
     public class ClimateVisualStages : MonoBehaviour
     {
@@ -32,6 +32,11 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private float wetAt = 0.66f;
         [SerializeField] private float livingAt = 0.999f;
 
+        [Header("Atmosphere (fog / ambient)")]
+        [SerializeField] private bool driveFogAndAmbient = true;
+        [SerializeField] private float barrenFogDensity = 0.028f;
+        [SerializeField] private float livingFogDensity = 0.008f;
+
         // Gradient low / mid / high + albedo tint multiplier per stage.
         private static readonly Color BarrenLow = new Color(0.55f, 0.25f, 0.15f);
         private static readonly Color BarrenMid = new Color(0.65f, 0.35f, 0.20f);
@@ -52,6 +57,16 @@ namespace GameDevTV.RTS.Environment
         private static readonly Color LivingMid = new Color(0.28f, 0.55f, 0.22f);
         private static readonly Color LivingHigh = new Color(0.35f, 0.65f, 0.28f);
         private static readonly Color LivingTint = new Color(0.75f, 1.00f, 0.75f);
+
+        // Fog + ambient sky per stage (dusty red → clear blue-green).
+        private static readonly Color BarrenFog = new Color(0.62f, 0.38f, 0.28f);
+        private static readonly Color BarrenAmbient = new Color(0.45f, 0.32f, 0.28f);
+        private static readonly Color ThawFog = new Color(0.55f, 0.42f, 0.35f);
+        private static readonly Color ThawAmbient = new Color(0.52f, 0.45f, 0.40f);
+        private static readonly Color WetFog = new Color(0.42f, 0.48f, 0.40f);
+        private static readonly Color WetAmbient = new Color(0.48f, 0.55f, 0.50f);
+        private static readonly Color LivingFog = new Color(0.55f, 0.68f, 0.72f);
+        private static readonly Color LivingAmbient = new Color(0.55f, 0.70f, 0.78f);
 
         private float targetLookProgress;
         private float displayedLookProgress = -1f;
@@ -182,6 +197,8 @@ namespace GameDevTV.RTS.Environment
                 PlanetGenerator.Instance.ApplyClimateGroundPalette(low, mid, high, tint);
             }
 
+            ApplyAtmosphereForProgress(progress, stage, next, blend);
+
             lastAppliedProgress = progress;
 
             if (stage != currentStage || !appliedOnce)
@@ -194,6 +211,50 @@ namespace GameDevTV.RTS.Environment
             else
             {
                 appliedOnce = true;
+            }
+        }
+
+        private void ApplyAtmosphereForProgress(float progress, Stage stage, Stage next, float blend)
+        {
+            if (!driveFogAndAmbient) return;
+
+            GetStageAtmosphere(stage, out Color fogA, out Color ambientA);
+            GetStageAtmosphere(next, out Color fogB, out Color ambientB);
+
+            Color fog = Color.Lerp(fogA, fogB, blend);
+            Color ambient = Color.Lerp(ambientA, ambientB, blend);
+            float density = Mathf.Lerp(barrenFogDensity, livingFogDensity, Mathf.Clamp01(progress));
+
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = fog;
+            RenderSettings.fogDensity = density;
+
+            // Flat ambient (typical scene AmbientMode) — sky / ambientLight carry the tint.
+            RenderSettings.ambientSkyColor = ambient;
+            if (RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Trilight
+                || RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Flat)
+            {
+                RenderSettings.ambientLight = ambient;
+            }
+        }
+
+        private static void GetStageAtmosphere(Stage stage, out Color fog, out Color ambient)
+        {
+            switch (stage)
+            {
+                case Stage.Thaw:
+                    fog = ThawFog; ambient = ThawAmbient;
+                    break;
+                case Stage.Wet:
+                    fog = WetFog; ambient = WetAmbient;
+                    break;
+                case Stage.Living:
+                    fog = LivingFog; ambient = LivingAmbient;
+                    break;
+                default:
+                    fog = BarrenFog; ambient = BarrenAmbient;
+                    break;
             }
         }
 

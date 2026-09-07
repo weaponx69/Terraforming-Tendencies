@@ -277,6 +277,11 @@ namespace GameDevTV.RTS.Units
         {
             base.OnDisable();
             ActiveBuildings.Remove(this);
+            if (pendingColonyActScore)
+            {
+                pendingColonyActScore = false;
+                PendingColonyActScoreBuildings.Remove(this);
+            }
 
             // Unregister from BuildingUpkeepManager
             if (GameDevTV.RTS.Player.BuildingUpkeepManager.Instance != null)
@@ -404,6 +409,56 @@ namespace GameDevTV.RTS.Units
         }
 
         private bool hasCompletedConstruction = false;
+        /// <summary>
+        /// Instant card builds complete before <see cref="CardDeckController.ConsumeCardAfterBuild"/>
+        /// spends the week — defer Act score so the week counts against the Act that was played.
+        /// </summary>
+        private bool deferColonyActScore;
+        private bool pendingColonyActScore;
+        private static readonly List<BaseBuilding> PendingColonyActScoreBuildings = new();
+
+        /// <summary>Defer Colony Act score until <see cref="FlushDeferredColonyActScore"/> (instant card builds).</summary>
+        public void DeferColonyActScoreOnce()
+        {
+            deferColonyActScore = true;
+        }
+
+        /// <summary>Grant deferred Act score after the card week is spent.</summary>
+        public void FlushDeferredColonyActScore()
+        {
+            if (!pendingColonyActScore) return;
+            pendingColonyActScore = false;
+            PendingColonyActScoreBuildings.Remove(this);
+            if (Owner == Owner.Player1)
+                ColonyActManager.Instance?.GrantTileScore(ResolvedBuildingSO);
+        }
+
+        /// <summary>Flush all buildings that completed instantly before their card week was spent.</summary>
+        public static void FlushAllDeferredColonyActScores()
+        {
+            for (int i = PendingColonyActScoreBuildings.Count - 1; i >= 0; i--)
+            {
+                var building = PendingColonyActScoreBuildings[i];
+                if (building == null)
+                {
+                    PendingColonyActScoreBuildings.RemoveAt(i);
+                    continue;
+                }
+
+                building.FlushDeferredColonyActScore();
+            }
+        }
+
+        public static bool HasPendingDeferredColonyActScores()
+        {
+            for (int i = PendingColonyActScoreBuildings.Count - 1; i >= 0; i--)
+            {
+                if (PendingColonyActScoreBuildings[i] == null)
+                    PendingColonyActScoreBuildings.RemoveAt(i);
+            }
+
+            return PendingColonyActScoreBuildings.Count > 0;
+        }
 
         public void CompleteConstruction()
         {
@@ -422,7 +477,19 @@ namespace GameDevTV.RTS.Units
 
             // Combolands: finished tile grants Colony Score (+ Habitability for climate tags).
             if (Owner == Owner.Player1)
-                ColonyActManager.Instance?.GrantTileScore(BuildingSO);
+            {
+                if (deferColonyActScore)
+                {
+                    deferColonyActScore = false;
+                    pendingColonyActScore = true;
+                    if (!PendingColonyActScoreBuildings.Contains(this))
+                        PendingColonyActScoreBuildings.Add(this);
+                }
+                else
+                {
+                    ColonyActManager.Instance?.GrantTileScore(ResolvedBuildingSO);
+                }
+            }
 
             // Drone builds finish after the reserved-site spawn frame; re-wire cluster solar now.
             GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.EnsureClusterPowerForBuilding(this);
@@ -1185,6 +1252,9 @@ namespace GameDevTV.RTS.Units
             // the drone's later CompleteConstruction actually runs.
             hasCompletedConstruction = false;
             hasRaisedSpawnEvent = false;
+            deferColonyActScore = false;
+            pendingColonyActScore = false;
+            PendingColonyActScoreBuildings.Remove(this);
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Paused, 0, 0);
             CurrentHealth = 0;
             Heal(300);

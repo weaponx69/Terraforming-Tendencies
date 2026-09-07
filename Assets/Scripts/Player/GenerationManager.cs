@@ -447,9 +447,10 @@ namespace GameDevTV.RTS.Player
         /// <summary>True when Colony Acts have finished the run (final Act cleared).</summary>
         public bool IsCurrentSectorRoundComplete()
         {
-            if (IsBetweenRounds || IsExpansionPhase) return false;
             var acts = ColonyActManager.Instance;
-            return acts != null && acts.IsRunEnded
+            if (acts == null) return false;
+            // Do not gate on IsBetweenRounds — NotifyColonyActVictory sets that before TriggerVictory.
+            return acts.IsRunEnded
                 && acts.CurrentAct >= acts.TotalActs
                 && acts.ColonyScore >= acts.TargetScore;
         }

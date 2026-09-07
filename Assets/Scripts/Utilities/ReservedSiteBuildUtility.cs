@@ -232,6 +232,12 @@ namespace GameDevTV.RTS.Utilities
 
             if (instant)
             {
+                // Card-driven instant completes run before ConsumeCardAfterBuild spends the week.
+                // Defer Act score so SpendWeek applies to the Act that was played (not the next).
+                // waiveCost auto-colonize is not a card week — score immediately.
+                if (!waiveCost)
+                    built.DeferColonyActScoreOnce();
+
                 built.CompleteConstruction();
                 EnsurePowerNodeReady(built);
 

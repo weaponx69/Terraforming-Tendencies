@@ -107,6 +107,12 @@ namespace GameDevTV.RTS.Player
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
         }
 
+        private void Update()
+        {
+            // Drone builds may finish (or be cancelled) after weeks hit 0 — resolve then.
+            TryResolveWeekExhaustion();
+        }
+
         /// <summary>Spend one week when a hand card is committed (played / placed).</summary>
         public void SpendWeek()
         {
@@ -116,17 +122,7 @@ namespace GameDevTV.RTS.Player
             weeksRemaining--;
             Debug.Log($"[ColonyActManager] Week spent — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
             OnActStateChanged?.Invoke();
-
-            if (colonyScore >= TargetScore)
-            {
-                ClearCurrentAct();
-                return;
-            }
-
-            if (weeksRemaining <= 0)
-            {
-                FailCurrentAct();
-            }
+            TryResolveWeekExhaustion();
         }
 
         /// <summary>Grant score when a building finishes (or a non-build card resolves).</summary>
@@ -141,9 +137,7 @@ namespace GameDevTV.RTS.Player
             Debug.Log($"[ColonyActManager] +{score} score ({tag}) → {colonyScore}/{TargetScore}; hab={habitability:F0}");
             OnActStateChanged?.Invoke();
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
-
-            if (colonyScore >= TargetScore)
-                ClearCurrentAct();
+            TryResolveWeekExhaustion();
         }
 
         public void GrantCardScore(BlueprintCardSO card)
@@ -158,8 +152,43 @@ namespace GameDevTV.RTS.Player
             if (!started || runEnded || IsBetweenActs) return;
             colonyScore += 2;
             OnActStateChanged?.Invoke();
+            TryResolveWeekExhaustion();
+        }
+
+        /// <summary>
+        /// Clear Act when score is met; fail only when weeks are exhausted and no Player1
+        /// tile is still under construction (last-week placements may still score).
+        /// </summary>
+        private void TryResolveWeekExhaustion()
+        {
+            if (!started || runEnded || IsBetweenActs) return;
+
             if (colonyScore >= TargetScore)
+            {
                 ClearCurrentAct();
+                return;
+            }
+
+            if (weeksRemaining <= 0 && !HasPendingPlayerConstructionScores())
+                FailCurrentAct();
+        }
+
+        /// <summary>True while a Player1 pad build can still grant Colony Score.</summary>
+        private static bool HasPendingPlayerConstructionScores()
+        {
+            if (BaseBuilding.HasPendingDeferredColonyActScores())
+                return true;
+
+            foreach (var building in BaseBuilding.ActiveBuildings)
+            {
+                if (building == null || building.Owner != Owner.Player1) continue;
+                var state = building.Progress.State;
+                if (state == BuildingProgress.BuildingState.Building
+                    || state == BuildingProgress.BuildingState.Paused)
+                    return true;
+            }
+
+            return false;
         }
 
         private void ClearCurrentAct()
