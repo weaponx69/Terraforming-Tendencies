@@ -482,6 +482,9 @@ namespace GameDevTV.RTS.Player
 
             played.Apply();
 
+            ColonyActManager.Instance?.GrantCardScore(played);
+            ColonyActManager.Instance?.SpendWeek();
+
             GameFlowManager.Instance?.PlayerActed();
 
             hand.RemoveAt(handIndex);
@@ -835,6 +838,9 @@ namespace GameDevTV.RTS.Player
 
             // Apply the card's effect
             played.Apply();
+
+            ColonyActManager.Instance?.GrantCardScore(played);
+            ColonyActManager.Instance?.SpendWeek();
 
             // Notify GameFlowManager that an action was taken
             if (GameFlowManager.Instance != null)

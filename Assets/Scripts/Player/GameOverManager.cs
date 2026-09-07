@@ -135,13 +135,7 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // 1. Authoritative Win Check — MVP: Temp + Atmos + Water cleared once.
-            if (GenerationManager.Instance != null
-                && GenerationManager.Instance.IsCurrentSectorRoundComplete())
-            {
-                TriggerVictory();
-                return;
-            }
+            // Win is owned by ColonyActManager (final Act clear → TriggerVictory).
 
             // Hard biomass check removed because GenerationManager liquidates biomass to 0 at the end of every round.
 
@@ -248,7 +242,7 @@ namespace GameDevTV.RTS.Player
                 }
                 else if (GenerationManager.Instance != null)
                 {
-                    Debug.Log("[GameOverManager] Climate goals incomplete — map depletion ends the colony.");
+                    Debug.Log("[GameOverManager] Colony Act score incomplete — map depletion ends the colony.");
                     TriggerGameOver(GameOverReason.Resources);
                 }
                 else
@@ -362,7 +356,7 @@ namespace GameDevTV.RTS.Player
         {
             if (gameOverTriggered) return;
             gameOverTriggered = true;
-            Debug.Log("[GameOverManager] Victory triggered! MVP climate goals (Temp + Atmos + Water) met.");
+            Debug.Log("[GameOverManager] Victory triggered! Colony Acts complete.");
             Time.timeScale = 0f;
             CancelInvoke(nameof(CheckNoRecovery));
             StopAllCoroutines();

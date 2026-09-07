@@ -2,8 +2,6 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Units;
-using GameDevTV.RTS.UI;
 
 namespace GameDevTV.RTS.UI.Containers
 {
@@ -98,89 +96,16 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (bodyText == null) return;
 
-            var sb = new System.Text.StringBuilder();
+            if (headerText != null)
+                headerText.text = "COLONY ACTS";
 
-            if (GenerationManager.Instance != null)
+            if (ColonyActManager.Instance != null)
             {
-                var gm = GenerationManager.Instance;
-                sb.AppendLine("<color=#8FE7FF><b>Terraform the planet</b></color>");
-                sb.AppendLine("<color=#C8D0D8>Clear all three climate lines to win.</color>");
-
-                if (!gm.IsExpansionPhase)
-                {
-                    float temp = Supplies.Temperature.TryGetValue(Owner.Player1, out float tVal) ? tVal : -60f;
-                    float atmos = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float aVal) ? aVal : 0.01f;
-                    float water = Supplies.Water.TryGetValue(Owner.Player1, out float wVal) ? wVal : 0f;
-
-                    bool tempMet = AppendClimateLine(sb, "TEMPERATURE",
-                        temp, gm.BaselineTemperature, gm.GetRoundTemperatureTarget(),
-                        "{0:F1}°C / {1:F1}°C ({2})");
-
-                    bool atmosMet = AppendClimateLine(sb, "ATMOSPHERE",
-                        atmos, gm.BaselineAtmosphere, gm.GetRoundAtmosphereTarget(),
-                        "{0:F2} atm / {1:F2} atm ({2})");
-
-                    bool waterMet = AppendClimateLine(sb, "WATER",
-                        water, gm.BaselineWater, gm.GetRoundWaterTarget(),
-                        "{0:F0}% / {1:F0}% ({2})");
-
-                    float progress = gm.CalculateCurrentSectorProgress(out _);
-                    sb.AppendLine();
-                    if (progress >= 1f || gm.IsBetweenRounds)
-                    {
-                        sb.AppendLine("<color=#66F273><b>All climate goals met — you win!</b></color>");
-                    }
-                    else
-                    {
-                        var waiting = new System.Collections.Generic.List<string>(3);
-                        if (!tempMet) waiting.Add("Temp");
-                        if (!atmosMet) waiting.Add("Atmos");
-                        if (!waterMet) waiting.Add("Water");
-                        if (waiting.Count > 0)
-                        {
-                            sb.AppendLine(
-                                $"<color=#FFD080>Still need: {string.Join(", ", waiting)}</color>");
-                        }
-                    }
-
-                    sb.AppendLine("<size=13><color=#C8D0D8>Every climate building on the planet counts.</color></size>");
-                    sb.AppendLine("<size=13>" + TerraformingGoalColors.BuildLegendLine(
-                        "TEMPERATURE", "ATMOSPHERE", "WATER") + "</size>");
-                }
-            }
-            else
-            {
-                sb.AppendLine($"{TerraformingGoalColors.Colorize("Goal:", "COMMAND POST")} Secure sector and expand.");
+                bodyText.SetText(ColonyActManager.Instance.BuildObjectivesText());
+                return;
             }
 
-            bodyText.SetText(sb.ToString());
-        }
-
-        /// <returns>True when this climate line is met (shown green / DONE).</returns>
-        private static bool AppendClimateLine(
-            System.Text.StringBuilder sb,
-            string goalKey,
-            float current,
-            float baseline,
-            float roundTarget,
-            string valueFormat)
-        {
-            bool met = !GenerationManager.IsUnmetSectorGoal(goalKey);
-            Color valueColor = met ? TerraformingGoalColors.MetValue : TerraformingGoalColors.UnmetValue;
-            float remaining = Mathf.Max(0f, roundTarget - current);
-            string status = met
-                ? "DONE ✓"
-                : goalKey == "TEMPERATURE"
-                    ? $"need +{remaining:F0} more"
-                    : goalKey == "ATMOSPHERE"
-                        ? $"need +{remaining:F2} more"
-                        : $"need +{remaining:F0} more";
-            string valueText = string.Format(valueFormat, current, roundTarget, status);
-            string label = TerraformingGoalColors.DisplayName(goalKey);
-            sb.AppendLine(
-                $"  • {TerraformingGoalColors.Colorize(label + ":", goalKey)} " +
-                $"{TerraformingGoalColors.Colorize(valueText, valueColor)}");
-            return met;
+            bodyText.SetText("<color=#C8D0D8>Colony Act manager starting…</color>");
         }
     }
 }

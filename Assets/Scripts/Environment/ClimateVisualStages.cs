@@ -6,8 +6,8 @@ using UnityEngine;
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// §1A Visual Climate Stages — step 1: look progress + ground tint.
-    /// Barren → Thaw → Wet → Living as Temp/Atmos/Water climb toward the MVP win deltas.
+    /// Visual climate stages — ground tint from Colony Habitability (climate-tagged tiles),
+    /// not from Supplies Temp/Atmos/Water win deltas.
     /// </summary>
     public class ClimateVisualStages : MonoBehaviour
     {
@@ -84,20 +84,16 @@ namespace GameDevTV.RTS.Environment
 
         private void OnEnable()
         {
-            Supplies.OnTemperatureChanged += HandleClimateChanged;
-            Supplies.OnAtmosphereChanged += HandleClimateChanged;
-            Supplies.OnWaterChanged += HandleClimateChanged;
             GenerationManager.OnGenerationStarted += HandleGenerationStarted;
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
+            ColonyActManager.OnActStateChanged += HandleActStateChanged;
         }
 
         private void OnDisable()
         {
-            Supplies.OnTemperatureChanged -= HandleClimateChanged;
-            Supplies.OnAtmosphereChanged -= HandleClimateChanged;
-            Supplies.OnWaterChanged -= HandleClimateChanged;
             GenerationManager.OnGenerationStarted -= HandleGenerationStarted;
             PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
+            ColonyActManager.OnActStateChanged -= HandleActStateChanged;
         }
 
         private void OnDestroy()
@@ -136,11 +132,7 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
-        private void HandleClimateChanged(Owner owner, float _)
-        {
-            if (owner != Owner.Player1) return;
-            RecalculateTarget();
-        }
+        private void HandleActStateChanged() => RecalculateTarget();
 
         private void HandleGenerationStarted(int current, int max) => RecalculateTarget();
 
@@ -151,43 +143,16 @@ namespace GameDevTV.RTS.Environment
             ApplyGroundForProgress(displayedLookProgress, force: true);
         }
 
-        /// <summary>Recompute look progress from current Supplies vs generation baselines.</summary>
+        /// <summary>Called when Habitability changes from ColonyActManager tile grants.</summary>
+        public void NotifyHabitabilityChanged() => RecalculateTarget();
+
+        /// <summary>Look progress from cumulative Habitability (climate-tagged tiles).</summary>
         public void RecalculateTarget()
         {
-            float temp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t)
-                ? t : -60f;
-            float atmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a)
-                ? a : 0.01f;
-            float water = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float w)
-                ? w : 0f;
-
-            float baselineTemp = -60f;
-            float baselineAtmos = 0.01f;
-            float baselineWater = 0f;
-            float deltaTemp = GenerationManager.SectorTemperatureDelta;
-            float deltaAtmos = GenerationManager.SectorAtmosphereDelta;
-            float deltaWater = GenerationManager.SectorWaterDelta;
-
-            if (GenerationManager.Instance != null)
-            {
-                baselineTemp = GenerationManager.Instance.BaselineTemperature;
-                baselineAtmos = GenerationManager.Instance.BaselineAtmosphere;
-                baselineWater = GenerationManager.Instance.BaselineWater;
-            }
-
-            float tempProgress = DeltaProgress(temp, baselineTemp, deltaTemp);
-            float atmosProgress = DeltaProgress(atmos, baselineAtmos, deltaAtmos);
-            float waterProgress = DeltaProgress(water, baselineWater, deltaWater);
-
-            targetLookProgress = Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress));
-        }
-
-        private static float DeltaProgress(float current, float baseline, float requiredDelta)
-        {
-            if (requiredDelta <= 0.0001f) return 1f;
-            float gained = current - baseline;
-            if (gained + 0.0005f >= requiredDelta) return 1f;
-            return Mathf.Clamp01(gained / requiredDelta);
+            if (ColonyActManager.Instance != null)
+                targetLookProgress = ColonyActManager.Instance.HabitabilityProgress;
+            else
+                targetLookProgress = 0f;
         }
 
         public Stage StageForProgress(float progress)

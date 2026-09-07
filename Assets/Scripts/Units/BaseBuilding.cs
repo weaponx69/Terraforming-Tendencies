@@ -420,6 +420,10 @@ namespace GameDevTV.RTS.Units
             enabled = true;
             Supplies.BeginColonyIntegrityIfNeeded(this);
 
+            // Combolands: finished tile grants Colony Score (+ Habitability for climate tags).
+            if (Owner == Owner.Player1)
+                ColonyActManager.Instance?.GrantTileScore(BuildingSO);
+
             // Drone builds finish after the reserved-site spawn frame; re-wire cluster solar now.
             GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.EnsureClusterPowerForBuilding(this);
 

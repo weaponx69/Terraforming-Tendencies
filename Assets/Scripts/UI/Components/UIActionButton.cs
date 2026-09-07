@@ -95,6 +95,18 @@ namespace GameDevTV.RTS.UI.Components
             }
             ApplyGoalAccent(cardGoal);
 
+            if (command is BuildBuildingCommand buildCmd && buildCmd.Building != null)
+            {
+                ColonyActManager.GetTileValues(buildCmd.Building, out int score, out _, out _);
+                EnsureGoalBadge();
+                if (goalBadge != null)
+                {
+                    goalBadge.gameObject.SetActive(true);
+                    goalBadge.SetText($"+{score}");
+                    goalBadge.color = new Color(1f, 0.92f, 0.45f, 1f);
+                }
+            }
+
             if (tooltip != null)
             {
                 try
@@ -397,7 +409,16 @@ namespace GameDevTV.RTS.UI.Components
         {
             string tooltipText = command.Name + "\n";
 
-            if (!string.IsNullOrEmpty(cardGoal) && TerraformingGoalColors.IsSectorCompletionGoal(cardGoal))
+            BuildingSO building = null;
+            if (command is BuildBuildingCommand bbc) building = bbc.Building;
+
+            if (building != null)
+            {
+                ColonyActManager.GetTileValues(building, out int score, out float hab, out string tag);
+                tooltipText = $"<b>+{score} Score</b>  [{tag}]\n{command.Name}\n";
+                if (hab > 0f) tooltipText += $"Habitability +{hab:F0}\n";
+            }
+            else if (!string.IsNullOrEmpty(cardGoal) && TerraformingGoalColors.IsSectorCompletionGoal(cardGoal))
             {
                 tooltipText =
                     $"{TerraformingGoalColors.Colorize(TerraformingGoalColors.ShortLabel(cardGoal), cardGoal)}\n" +

@@ -282,8 +282,8 @@ namespace GameDevTV.RTS.Environment
         {
             while (true)
             {
-                // Flora density tracks Atmosphere toward the MVP +0.25 atm delta (not Oxygen).
-                GetAtmosphereFloraGate(out bool allowSpawn, out float densityFactor, out float intervalScale);
+                // Flora density tracks Habitability from climate-tagged tiles (not Oxygen / Atmos supplies).
+                GetHabitabilityFloraGate(out bool allowSpawn, out float densityFactor, out float intervalScale);
                 if (!allowSpawn)
                 {
                     yield return new WaitForSeconds(spawnInterval);
@@ -315,37 +315,21 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Spawn rate/density scales with Atmosphere progress toward the MVP round delta.
+        /// Spawn rate/density scales with Habitability from ColonyActManager (climate-tagged tiles).
         /// </summary>
-        private static void GetAtmosphereFloraGate(out bool allowSpawn, out float densityFactor, out float intervalScale)
+        private static void GetHabitabilityFloraGate(out bool allowSpawn, out float densityFactor, out float intervalScale)
         {
             allowSpawn = false;
             densityFactor = 0f;
             intervalScale = 1f;
 
-            Owner owner = GameOverManager.MonitoredOwner;
-            float atmos = 0.01f;
-            if (Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(owner, out float val))
-                atmos = val;
+            float progress = ColonyActManager.Instance != null
+                ? ColonyActManager.Instance.HabitabilityProgress
+                : 0f;
 
-            float baseline = 0.01f;
-            float requiredDelta = GenerationManager.SectorAtmosphereDelta;
-            if (GenerationManager.Instance != null)
-                baseline = GenerationManager.Instance.BaselineAtmosphere;
-
-            if (requiredDelta <= 0.0001f)
-            {
-                allowSpawn = true;
-                densityFactor = 1f;
-                intervalScale = 0.55f;
-                return;
-            }
-
-            float progress = Mathf.Clamp01((atmos - baseline) / requiredDelta);
-            if (progress <= 0.001f) return;
+            if (progress <= 0.05f) return;
 
             allowSpawn = true;
-            // Trickle early, full density at the Atmos win line.
             densityFactor = Mathf.Lerp(0.12f, 1f, progress);
             intervalScale = Mathf.Lerp(1.5f, 0.55f, progress);
         }

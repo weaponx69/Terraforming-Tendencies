@@ -94,7 +94,9 @@ namespace GameDevTV.RTS.Player
             get
             {
                 // MVP: one round — clear Temp / Atmos / Water on the whole planet.
-                return $"Terraform the planet (+{SectorTemperatureDelta:F0}°C Temp, +{SectorAtmosphereDelta:F2} atm, +{SectorWaterDelta:F0}% Water)";
+                return ColonyActManager.Instance != null
+                    ? $"Act {ColonyActManager.Instance.CurrentAct}: {ColonyActManager.Instance.CurrentActName} — Colony Score {ColonyActManager.Instance.ColonyScore}/{ColonyActManager.Instance.TargetScore}"
+                    : $"Grow the colony (place tiles for Colony Score)";
             }
         }
 
@@ -174,7 +176,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            // Absolute hamster MVP: one round — Temp + Atmos + Water, then win.
+            // Absolute Combolands run: ColonyActManager owns Acts. Keep one generation slot for legacy UI.
             MaxGenerations = 1;
             CurrentGeneration = 1;
             IsBetweenRounds = false;
@@ -380,27 +382,30 @@ namespace GameDevTV.RTS.Player
 
             if (progress >= 0.999f)
             {
-                // MVP: clearing Temp+Atmos+Water wins the game (one round).
-                TriggerMvpVictory();
+                // Climate deltas are no longer the win meter — ColonyActManager owns Acts.
+                // Keep progress event for any legacy HUD that still reads generation % .
             }
         }
 
-        /// <summary>Pause and fire victory when the hamster MVP climate goals are met.</summary>
-        private void TriggerMvpVictory()
+        /// <summary>Called by <see cref="ColonyActManager"/> when the final Act clears.</summary>
+        public void NotifyColonyActVictory()
         {
             if (IsBetweenRounds) return;
             IsBetweenRounds = true;
             OnGenerationProgressChanged?.Invoke(1f);
             Time.timeScale = 0f;
-            Debug.Log("[GenerationManager] MVP climate goals met — victory.");
+            Debug.Log("[GenerationManager] Colony Acts complete — victory.");
             if (GameOverManager.Instance != null)
-            {
                 GameOverManager.Instance.TriggerVictory();
-            }
             else
-            {
                 Debug.LogError("[GenerationManager] GameOverManager missing — cannot show victory UI.");
-            }
+        }
+
+        /// <summary>Pause and fire victory when the hamster MVP climate goals are met.</summary>
+        [System.Obsolete("Climate MVP victory retired — use ColonyActManager.")]
+        private void TriggerMvpVictory()
+        {
+            NotifyColonyActVictory();
         }
 
         /// <summary>
@@ -439,11 +444,14 @@ namespace GameDevTV.RTS.Player
             return progress;
         }
 
-        /// <summary>True when Temp, Atmos, and Water deltas for the MVP round are met.</summary>
+        /// <summary>True when Colony Acts have finished the run (final Act cleared).</summary>
         public bool IsCurrentSectorRoundComplete()
         {
             if (IsBetweenRounds || IsExpansionPhase) return false;
-            return CalculateCurrentSectorProgress(out _) >= 0.999f;
+            var acts = ColonyActManager.Instance;
+            return acts != null && acts.IsRunEnded
+                && acts.CurrentAct >= acts.TotalActs
+                && acts.ColonyScore >= acts.TargetScore;
         }
 
         public void CheatCompleteGeneration()
