@@ -137,10 +137,15 @@ namespace GameDevTV.RTS.UI
         private void HandleVictory()
         {
             if (headlineText != null)
-                headlineText.SetText("MISSION SUCCESSFUL");
+                headlineText.SetText("YOU WIN");
 
             if (reasonText != null)
-                reasonText.SetText("The planet is now human habitable.\nSectors occupied and terraforming complete.");
+            {
+                string detail = !string.IsNullOrEmpty(GameOverManager.LastOutcomeDetail)
+                    ? GameOverManager.LastOutcomeDetail
+                    : "All Colony Acts cleared — score and climate goals met before weeks ran out.";
+                reasonText.SetText(detail);
+            }
 
             ShowGameOverUI();
         }
@@ -149,25 +154,36 @@ namespace GameDevTV.RTS.UI
         {
             Debug.Log($"[GameOverUI] HandleGameOver called with reason: {reason}");
             if (headlineText != null)
-                headlineText.SetText("MISSION FAILED");
+                headlineText.SetText("YOU LOSE");
 
             if (reasonText != null)
             {
-                switch (reason)
+                if (!string.IsNullOrEmpty(GameOverManager.LastOutcomeDetail)
+                    && reason == GameOverManager.GameOverReason.ColonyActFailed)
                 {
-                    case GameOverManager.GameOverReason.LifeSupport:
-                        reasonText.SetText("Life support has collapsed.\nThe colony can no longer sustain itself.");
-                        break;
-                    case GameOverManager.GameOverReason.MachineryFailure:
-                        reasonText.SetText("Critical machinery has failed.\nExpansion and terraforming are no longer possible.");
-                        break;
-                    case GameOverManager.GameOverReason.HousingShortage:
-                        reasonText.SetText("Housing capacity exceeded!\nNew colonists arrived with nowhere to stay. The colony has rebelled.");
-                        break;
-                    case GameOverManager.GameOverReason.Resources:
-                    default:
-                        reasonText.SetText("The planet's resources are gone.\nTerraforming has ceased.");
-                        break;
+                    reasonText.SetText(GameOverManager.LastOutcomeDetail);
+                }
+                else
+                {
+                    switch (reason)
+                    {
+                        case GameOverManager.GameOverReason.ColonyActFailed:
+                            reasonText.SetText("Weeks ran out before this Act’s score and climate goals were met.\nPlace tiles for Colony Score and Temp/Atmos/Water.");
+                            break;
+                        case GameOverManager.GameOverReason.LifeSupport:
+                            reasonText.SetText("Life support has collapsed.\nThe colony can no longer sustain itself.");
+                            break;
+                        case GameOverManager.GameOverReason.MachineryFailure:
+                            reasonText.SetText("Critical machinery has failed.\nExpansion and terraforming are no longer possible.");
+                            break;
+                        case GameOverManager.GameOverReason.HousingShortage:
+                            reasonText.SetText("Housing capacity exceeded!\nNew colonists arrived with nowhere to stay. The colony has rebelled.");
+                            break;
+                        case GameOverManager.GameOverReason.Resources:
+                        default:
+                            reasonText.SetText("The planet's resources are gone.\nTerraforming has ceased.");
+                            break;
+                    }
                 }
             }
 

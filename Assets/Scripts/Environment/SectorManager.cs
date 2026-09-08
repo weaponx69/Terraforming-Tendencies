@@ -92,12 +92,12 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// MVP: every powered completed climate building on the planet counts.
-        /// Sector focus no longer gates contribution.
+        /// Climate ticks only from the current Act’s focus sector — you must place
+        /// Heat / Air / Water infrastructure in each region to clear that Act.
         /// </summary>
         public bool DoesBuildingCountForActiveClimate(BaseBuilding building)
         {
-            return building != null;
+            return IsBuildingInActiveSector(building);
         }
 
         private float secW;

@@ -24,6 +24,9 @@ namespace GameDevTV.RTS.Commands
         [Inspectable]
         [field: SerializeField] public BuildingSO Building { get; set; }
 
+        /// <summary>When ≥ 0, this placement came from a hand card — consume that card on success.</summary>
+        public int HandIndex { get; set; } = -1;
+
         /// <summary>
         /// Returns true if this building is a command-type building (Command Center, Command Post, etc.)
         /// that should auto-place without requiring a worker selection.
@@ -56,13 +59,26 @@ namespace GameDevTV.RTS.Commands
             
             // Check horizontal distance
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
+            if (HandIndex >= 0)
+                targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
+
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
             {
-                targetPos = navHit.position;
+                if (HandIndex >= 0)
+                    targetPos = new Vector3(targetPos.x, navHit.position.y, targetPos.z);
+                else
+                    targetPos = navHit.position;
             }
 
-            // Sector lockdown retired — placement uses pad eligibility / restrictions only.
+            // Card plays: power is the only hard placement gate.
+            if (HandIndex >= 0)
+            {
+                if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                    return false;
+                return AllRestrictionsPass(targetPos, context.Owner, requireWorker: false);
+            }
+
             return HasEnoughSupplies(context) && AllRestrictionsPass(targetPos, context.Owner);
         }
 
@@ -72,10 +88,20 @@ namespace GameDevTV.RTS.Commands
 
             // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
+
+            // Card tiles snap to the Combolands square grid (join edges with neighbors).
+            if (HandIndex >= 0)
+            {
+                targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
+            }
+
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
             {
-                targetPos = navHit.position;
+                if (HandIndex >= 0)
+                    targetPos = new Vector3(targetPos.x, navHit.position.y, targetPos.z);
+                else
+                    targetPos = navHit.position;
             }
 
             // Check if this is the player's very first Command Post
@@ -107,13 +133,43 @@ namespace GameDevTV.RTS.Commands
                 }
             }
 
+            // Hand card plays: power gate only — self-construct with rise animation (no drone).
+            if (HandIndex >= 0)
+            {
+                if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                {
+                    ExplorationManager.NotifyExplorationFailed("Not enough power to place this card.");
+                    return;
+                }
+
+                if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
+                {
+                    ExplorationManager.NotifyExplorationFailed("Can't place here.");
+                    return;
+                }
+
+                GameObject cardInstance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
+                if (cardInstance.TryGetComponent(out BaseBuilding cardBuilding))
+                {
+                    cardBuilding.BeginSelfConstruction(context.Owner, Building, Building.PlacementMaterial);
+                    BlueprintDraftManager.LockBuilding(Building.Name);
+                    if (CardDeckController.Instance != null)
+                    {
+                        CardDeckController.Instance.ConsumeCardAfterBuild(HandIndex);
+                        HandIndex = -1;
+                    }
+                }
+
+                return;
+            }
+
             if (isFirstCommandPost)
             {
                 builder = null;
             }
             else
             {
-                // If the unit issuing the command isn't a builder (e.g. Command Center or Global Commander), find the nearest idle drone
+                // Prefer a drone when one is free; otherwise self-construct.
                 if (builder == null)
                 {
                     float closestDist = float.MaxValue;
@@ -136,21 +192,27 @@ namespace GameDevTV.RTS.Commands
 
             if (builder == null)
             {
-                isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
-                if (!isCommandPost || !isFirstCommandPost)
+                // No drone: still place with construction animation.
+                if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
                 {
-                    ExplorationManager.NotifyExplorationFailed("A drone is needed.");
-                    Debug.LogWarning($"[BuildBuildingCommand] No drone available to build {Building?.Name}.");
+                    ExplorationManager.NotifyExplorationFailed("Can't place here.");
                     return;
                 }
 
-                // Instant orbital drop for the very first Command Post only (no drones yet).
+                if (!HasEnoughSupplies(context) && !isFirstCommandPost)
+                {
+                    ExplorationManager.NotifyExplorationFailed("Not enough materials.");
+                    return;
+                }
+
                 GameObject instance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                 if (instance.TryGetComponent(out BaseBuilding newBuilding))
                 {
-                    newBuilding.enabled = true;
-                    newBuilding.Owner = context.Owner;
-                    newBuilding.CompleteConstruction();
+                    newBuilding.BeginSelfConstruction(context.Owner, Building, Building.PlacementMaterial);
+                    BlueprintDraftManager.LockBuilding(Building.Name);
+                    if (CardDeckController.Instance != null)
+                        CardDeckController.Instance.DrawCard();
+                    GameFlowManager.Instance?.PlayerActed();
                 }
 
                 return;
@@ -327,8 +389,8 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null) return false;
 
-            // Check if the tech tree is unlocked.
-            if (!BlueprintDraftManager.IsBuildingUnlocked(Building)) return true;
+            // Check if the tech tree is unlocked (card plays bypass — unlock happens on consume).
+            if (HandIndex < 0 && !BlueprintDraftManager.IsBuildingUnlocked(Building)) return true;
 
             // Check if the player has completed a round for Command Center.
             // Exception: allow building when no Command Post exists yet (player starts with nothing)
@@ -396,6 +458,9 @@ namespace GameDevTV.RTS.Commands
 
         private bool HasEnoughSupplies(CommandContext context)
         {
+            // Card plays are power-gated only (see CanHandle / HandIndex path).
+            if (HandIndex >= 0) return true;
+
             if (Building == null || Building.Cost == null) return true;
 
             // Materials replaces minerals/gas. Compute materials-equivalent cost.

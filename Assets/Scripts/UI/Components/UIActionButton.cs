@@ -4,6 +4,7 @@ using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Utilities;
 using TMPro;
@@ -257,23 +258,10 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
-            // Never leave paid cards looking blank/"Free" due to a 0 read — floor to 1 for display.
-            if (materialsCost == 0)
-            {
-                costLabel.gameObject.SetActive(true);
-                costLabel.text = "Free";
-                costLabel.color = new Color(0.65f, 0.95f, 0.7f, 1f);
-                return;
-            }
-
+            // Card plays cost 1 week; power is the placement gate (shown in tooltip).
             costLabel.gameObject.SetActive(true);
-            bool canAfford = Supplies.Materials != null
-                && Supplies.Materials.TryGetValue(Owner.Player1, out int have)
-                && have >= materialsCost;
-            costLabel.text = $"{materialsCost} Mat";
-            costLabel.color = canAfford
-                ? new Color(1f, 0.92f, 0.45f, 1f)
-                : new Color(1f, 0.45f, 0.4f, 1f);
+            costLabel.text = "1 Week";
+            costLabel.color = new Color(0.75f, 0.9f, 1f, 1f);
         }
 
         private static int ResolveMaterialsCost(BaseCommand command)
@@ -416,6 +404,13 @@ namespace GameDevTV.RTS.UI.Components
             {
                 ColonyActManager.GetTileValues(building, out int score, out float hab, out string tag);
                 tooltipText = $"<b>+{score} Score</b>  [{tag}]\n{command.Name}\n";
+                tooltipText += "Costs <b>1 Week</b> when played.\n";
+                float upkeep = PowerGridManager.GetBuildingPowerUpkeep(building);
+                if (upkeep > 0f)
+                    tooltipText += $"Needs <b>{upkeep:0.#} Power</b> upkeep to place.\n";
+                else
+                    tooltipText += "No power upkeep (places freely).\n";
+                tooltipText += "Stack near other tiles for adjacency bonus.\n";
                 if (hab > 0f) tooltipText += $"Habitability +{hab:F0}\n";
             }
             else if (!string.IsNullOrEmpty(cardGoal) && TerraformingGoalColors.IsSectorCompletionGoal(cardGoal))

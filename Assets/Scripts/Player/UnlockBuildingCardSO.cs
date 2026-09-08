@@ -42,10 +42,10 @@ namespace GameDevTV.RTS.Player
 
             public override bool IsGateMet()
             {
-                // Materials only — site availability is CanApply. Keeps bootstrap cards
-                // (Command Post / Solar) drawable before PlanetGenerator places pads.
+                // Combolands: hand shows the card even if materials are short.
+                // Affordability is checked when the player commits the play.
                 if (buildingToUnlock == null || buildingToUnlock.Prefab == null) return false;
-                return ReservedSiteBuildUtility.CanAffordBuilding(buildingToUnlock, Owner.Player1);
+                return true;
             }
     
             public override string GetCardGoal()

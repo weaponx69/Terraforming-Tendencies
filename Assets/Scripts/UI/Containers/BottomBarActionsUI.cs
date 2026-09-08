@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
     /// Persistent bottom-left action bar that shows the player's card hand.
-    /// Building cards open site selection so the player picks which solar cluster to use.
+    /// Building cards enter free ground placement (click anywhere) — Combolands-style.
     /// </summary>
     public class BottomBarActionsUI : MonoBehaviour
     {
@@ -348,40 +348,45 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (building == null) return;
 
-            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(
-                    building, owner, out string reason, requireUnlocked: false))
+            // Card placement gate: power only.
+            if (!PowerGridManager.CanPlayBuildingForPower(building, owner))
             {
-                ExplorationManager.NotifyExplorationFailed(reason);
-                CardDeckController.Instance?.DiscardUnplayableFromHand();
+                float gen = PowerGridManager.GetBoardPowerGeneration(owner);
+                float need = PowerGridManager.GetBuildingPowerUpkeep(building);
+                ExplorationManager.NotifyExplorationFailed(
+                    $"Not enough power for {building.Name} (needs {need:0.#} upkeep, generating {gen:0.#}). Build more Solar first.");
                 return;
             }
 
-            if (BuildingSiteRegistry.IsCommandBuilding(building))
-            {
-                if (!ReservedSiteBuildUtility.TryBuildAtReservedSite(building, owner, out reason))
-                {
-                    ExplorationManager.NotifyExplorationFailed(reason);
-                    return;
-                }
+            // Free placement: click anywhere on the ground (Combolands-style).
+            var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
+            buildCmd.Name = building.Name;
+            buildCmd.Building = building;
+            buildCmd.Icon = building.Icon;
+            buildCmd.HandIndex = cardIndex;
+            buildCmd.GhostPrefab = FindGhostPrefabForBuilding(building);
 
-                CardDeckController.Instance.ConsumeCardAfterBuild(cardIndex);
-                return;
-            }
-
-            BeginBuildingSelection(building, cardIndex);
+            Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(buildCmd));
         }
 
         private void BeginBuildingSelection(BuildingSO building, int cardIndex = -1)
         {
+            // Kept for non-card / legacy callers; card plays use free ground placement.
             if (building == null) return;
 
-            // Cards defer PlayCard until a site is chosen, so the building is not unlocked yet.
             bool requireUnlocked = cardIndex < 0;
 
             if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(building, owner, out string reason, requireUnlocked))
             {
                 ExplorationManager.NotifyExplorationFailed(reason);
-                CardDeckController.Instance?.DiscardUnplayableFromHand();
+                return;
+            }
+
+            if (!ReservedSiteBuildUtility.CanAffordBuilding(building, owner))
+            {
+                int cost = ReservedSiteBuildUtility.GetMaterialsCost(building);
+                ExplorationManager.NotifyExplorationFailed(
+                    $"Need {cost} Materials to play {building.Name} (also costs 1 week).");
                 return;
             }
 

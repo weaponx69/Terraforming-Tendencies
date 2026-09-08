@@ -33,6 +33,10 @@ namespace GameDevTV.RTS.Player
         private Color availableToPlaceTintColor = new (0.2f, 0.65f, 1, 2);
         [SerializeField] [ColorUsage(showAlpha: true, hdr: true)]
         private Color availableToPlaceFresnelColor = new(4, 1.7f, 0, 2);
+        [SerializeField] [ColorUsage(showAlpha: true, hdr: true)]
+        private Color joinedTileTintColor = new (0.15f, 1.1f, 0.35f, 2);
+        [SerializeField] [ColorUsage(showAlpha: true, hdr: true)]
+        private Color joinedTileFresnelColor = new (0.4f, 4f, 1.2f, 2);
 
         private Vector2 startingMousePosition;
 
@@ -40,6 +44,19 @@ namespace GameDevTV.RTS.Player
         private List<ISelectable> commandTargetUnits = new(12);
         private GameObject ghostInstance;
         private Renderer ghostRenderer;
+        private GameObject tileFootprint;
+        private readonly List<LineRenderer> joinLines = new();
+        private readonly List<BaseBuilding> joinNeighbors = new();
+        private Vector2Int? tileGhostStickyCell;
+        private int lastJoinCount = -1;
+        private bool lastGhostRestrictionsPass = true;
+        private int restrictionAgreeFrames;
+        private bool displayedRestrictionsPass = true;
+        private Material tileFootprintMaterial;
+        private static readonly int TINT = Shader.PropertyToID("_Tint");
+        private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
+        private static readonly RaycastHit[] ghostRayHits = new RaycastHit[24];
+        private const int RestrictionHysteresisFrames = 4;
         private bool wasMouseDownOnUI;
         private CinemachineFollow cinemachineFollow;
         private float zoomStartTime;
@@ -57,9 +74,6 @@ namespace GameDevTV.RTS.Player
         private GlobalCommander globalCommander;
         private GameDevTV.RTS.Environment.HexGridManager.HexTile currentHex;
         private GameDevTV.RTS.Environment.HexGridManager.HexTile hoveredHex;
-
-        private static readonly int TINT = Shader.PropertyToID("_Tint");
-        private static readonly int FRESNEL = Shader.PropertyToID("_FresnelColor");
 
         public static PlayerInput Instance { get; private set; }
 
@@ -368,6 +382,7 @@ namespace GameDevTV.RTS.Player
 
         private void HandleActionSelected(CommandSelectedEvent evt)
         {
+            ClearGhostVisuals();
             activeCommand = evt.Command;
             commandTargetUnits = new List<ISelectable>(selectedUnits);
 
@@ -453,14 +468,29 @@ namespace GameDevTV.RTS.Player
                             ? bbc2.Building.PlacementMaterial
                             : null;
                         bb.InitializeAsGhost(ghostMat, Owner.Player1);
+                        // Must leave ActiveBuildings — otherwise the ghost occupies its own
+                        // tile cell and snap thrash-loops between neighbors every frame.
+                        bb.enabled = false;
                     }
 
                     ghostRenderer = ghostInstance.GetComponentInChildren<Renderer>();
+                    if (ghostRenderer != null && ghostRenderer.material != null)
+                    {
+                        ghostRenderer.material.SetColor(TINT, availableToPlaceTintColor);
+                        ghostRenderer.material.SetColor(FRESNEL, availableToPlaceFresnelColor);
+                    }
                     
                     // We only want the visuals for the ghost, so strip any colliders/navmesh obstacles
                     // to prevent it from interfering with the game while dragging!
                     foreach (var col in ghostInstance.GetComponentsInChildren<Collider>()) Destroy(col);
                     foreach (var nav in ghostInstance.GetComponentsInChildren<UnityEngine.AI.NavMeshObstacle>()) Destroy(nav);
+
+                    // Kill leftover animation / VFX scripts that can strobe translucent mats.
+                    foreach (var mb in ghostInstance.GetComponentsInChildren<MonoBehaviour>(true))
+                    {
+                        if (mb == null || mb is Transform) continue;
+                        mb.enabled = false;
+                    }
                 }
             }
         }
@@ -635,52 +665,242 @@ namespace GameDevTV.RTS.Player
 
             if (Keyboard.current.escapeKey.wasReleasedThisFrame)
             {
-                Destroy(ghostInstance);
-                ghostInstance = null;
+                ClearGhostVisuals();
                 activeCommand = null;
                 return;
             }
 
-            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
-            Vector3? hitPos = null;
+            bool cardTilePlace = activeCommand is BuildBuildingCommand cardBbc && cardBbc.HandIndex >= 0;
+            Vector3? hitPos = cardTilePlace
+                ? RaycastGroundForTileGhost()
+                : RaycastGhostPoint();
 
-            if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, floorLayers))
+            if (!hitPos.HasValue)
             {
-                hitPos = hit.point;
-            }
-            // Fallback: if floorLayers is missing or misconfigured, try hitting ANYTHING
-            else if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
-            {
-                hitPos = hit.point;
+                // Keep last ghost pose — don't thrash visuals when the ray misses a frame.
+                return;
             }
 
-            if (hitPos.HasValue)
-            {
-                // Snap to sector if it's a command center
-                if (activeCommand is BuildBuildingCommand bbc && bbc.Building != null && bbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    hitPos = bbc.SnapToNearestSector(hitPos.Value);
-                }
+            int joinCount = 0;
 
-                // Snap to NavMesh to ensure the ghost isn't floating on top of large rock colliders
-                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
-                if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
-                {
+            if (activeCommand is BuildBuildingCommand bbc && bbc.Building != null
+                && bbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            {
+                hitPos = bbc.SnapToNearestSector(hitPos.Value);
+            }
+
+            if (cardTilePlace)
+            {
+                hitPos = ColonyTileGrid.SnapForPlacement(
+                    hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
+            }
+
+            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
+            {
+                agentTypeID = 0,
+                areaMask = UnityEngine.AI.NavMesh.AllAreas
+            };
+            if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+            {
+                if (cardTilePlace)
+                    hitPos = new Vector3(hitPos.Value.x, navHit.position.y, hitPos.Value.z);
+                else
                     hitPos = navHit.position;
-                }
+            }
 
-                ghostInstance.transform.position = hitPos.Value;
+            Vector3 snapTarget = hitPos.Value;
+            // Hard snap to the cell — lerp made occupancy thrash look like a strobing animation.
+            ghostInstance.transform.position = snapTarget;
+            UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
-                bool allRestrictionsPass = activeCommand.AllRestrictionsPass(hitPos.Value);
+            bool allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
+            if (cardTilePlace && activeCommand is BuildBuildingCommand powerBbc
+                && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
+            {
+                allRestrictionsPass = false;
+            }
 
-                if (ghostRenderer != null && ghostRenderer.material != null)
+            // Hysteresis so NavMesh / overlap edge cases don't strobe red/blue every frame.
+            if (allRestrictionsPass == displayedRestrictionsPass)
+            {
+                restrictionAgreeFrames = RestrictionHysteresisFrames;
+            }
+            else
+            {
+                restrictionAgreeFrames++;
+                if (restrictionAgreeFrames >= RestrictionHysteresisFrames)
                 {
-                    ghostRenderer.material.SetColor(TINT, allRestrictionsPass ? availableToPlaceTintColor : errorTintColor);
-                    ghostRenderer.material.SetColor(FRESNEL,
-                        allRestrictionsPass ? availableToPlaceFresnelColor : errorFresnelColor
-                    );
+                    displayedRestrictionsPass = allRestrictionsPass;
+                    restrictionAgreeFrames = 0;
                 }
             }
+
+            if (ghostRenderer != null && ghostRenderer.material != null
+                && (displayedRestrictionsPass != lastGhostRestrictionsPass || !cardTilePlace))
+            {
+                // Join feedback stays on the footprint / lines — not the mesh tint —
+                // so the translucent fresnel shader does not strobe green.
+                Color tint = displayedRestrictionsPass ? availableToPlaceTintColor : errorTintColor;
+                Color fresnel = displayedRestrictionsPass ? availableToPlaceFresnelColor : errorFresnelColor;
+                ghostRenderer.material.SetColor(TINT, tint);
+                ghostRenderer.material.SetColor(FRESNEL, fresnel);
+                lastGhostRestrictionsPass = displayedRestrictionsPass;
+            }
+
+            if (cardTilePlace && joinCount > 0)
+                UpdateJoinLines(snapTarget, snapTarget);
+            else
+                ClearJoinLines();
+        }
+
+        private Vector3? RaycastGhostPoint()
+        {
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, floorLayers))
+                return hit.point;
+            if (Physics.Raycast(cameraRay, out hit, float.MaxValue))
+                return hit.point;
+            return null;
+        }
+
+        /// <summary>
+        /// Ground pick that ignores buildings so hovering near existing tiles does not thrash the snap cell.
+        /// </summary>
+        private Vector3? RaycastGroundForTileGhost()
+        {
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+
+            if (Physics.Raycast(cameraRay, out RaycastHit floorHit, float.MaxValue, floorLayers))
+                return floorHit.point;
+
+            int count = Physics.RaycastNonAlloc(cameraRay, ghostRayHits, float.MaxValue);
+            float bestDist = float.MaxValue;
+            Vector3? best = null;
+            for (int i = 0; i < count; i++)
+            {
+                var h = ghostRayHits[i];
+                if (h.collider == null) continue;
+                if (ShouldIgnoreSelectionHit(h.collider)) continue;
+                if (h.collider.GetComponentInParent<BaseBuilding>() != null) continue;
+                if (h.distance < bestDist)
+                {
+                    bestDist = h.distance;
+                    best = h.point;
+                }
+            }
+
+            if (best.HasValue) return best;
+
+            // Stable fallback: horizontal plane at last ghost height / camera focus.
+            float y = ghostInstance != null ? ghostInstance.transform.position.y : GetCameraFocusPosition().y;
+            var plane = new Plane(Vector3.up, new Vector3(0f, y, 0f));
+            if (plane.Raycast(cameraRay, out float enter))
+                return cameraRay.GetPoint(enter);
+
+            return null;
+        }
+
+        private void UpdateTileFootprint(Vector3 center, bool show, int joinCount)
+        {
+            if (!show)
+            {
+                if (tileFootprint != null) tileFootprint.SetActive(false);
+                return;
+            }
+
+            if (tileFootprint == null)
+            {
+                tileFootprint = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                tileFootprint.name = "ColonyTileFootprint";
+                Object.Destroy(tileFootprint.GetComponent<Collider>());
+                var mr = tileFootprint.GetComponent<MeshRenderer>();
+                var shader = Shader.Find("Universal Render Pipeline/Unlit")
+                    ?? Shader.Find("Unlit/Color")
+                    ?? Shader.Find("Sprites/Default");
+                tileFootprintMaterial = new Material(shader);
+                mr.material = tileFootprintMaterial;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                mr.receiveShadows = false;
+            }
+
+            tileFootprint.SetActive(true);
+            float s = ColonyTileGrid.TileSize * 0.92f;
+            tileFootprint.transform.position = center + Vector3.up * 0.12f;
+            tileFootprint.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            tileFootprint.transform.localScale = new Vector3(s, s, 1f);
+
+            if (joinCount != lastJoinCount && tileFootprintMaterial != null)
+            {
+                Color c = joinCount > 0
+                    ? new Color(0.15f, 1f, 0.4f, 0.55f)
+                    : new Color(0.25f, 0.75f, 1f, 0.4f);
+                if (tileFootprintMaterial.HasProperty("_BaseColor")) tileFootprintMaterial.SetColor("_BaseColor", c);
+                else if (tileFootprintMaterial.HasProperty("_Color")) tileFootprintMaterial.SetColor("_Color", c);
+                else tileFootprintMaterial.color = c;
+                lastJoinCount = joinCount;
+            }
+        }
+
+        private void UpdateJoinLines(Vector3 snapPos, Vector3 ghostVisualPos)
+        {
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
+                ColonyTileGrid.WorldToCell(snapPos), Owner.Player1, joinNeighbors);
+
+            while (joinLines.Count < joinNeighbors.Count)
+            {
+                var go = new GameObject("TileJoinLine");
+                var lr = go.AddComponent<LineRenderer>();
+                lr.positionCount = 2;
+                lr.startWidth = 0.35f;
+                lr.endWidth = 0.35f;
+                lr.material = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color"));
+                lr.startColor = new Color(0.3f, 1f, 0.5f, 0.9f);
+                lr.endColor = new Color(0.3f, 1f, 0.5f, 0.9f);
+                lr.useWorldSpace = true;
+                joinLines.Add(lr);
+            }
+
+            for (int i = 0; i < joinLines.Count; i++)
+            {
+                if (i < joinNeighbors.Count && joinNeighbors[i] != null)
+                {
+                    joinLines[i].gameObject.SetActive(true);
+                    Vector3 a = ghostVisualPos + Vector3.up * 1.5f;
+                    Vector3 b = joinNeighbors[i].transform.position + Vector3.up * 1.5f;
+                    joinLines[i].SetPosition(0, a);
+                    joinLines[i].SetPosition(1, b);
+                }
+                else
+                {
+                    joinLines[i].gameObject.SetActive(false);
+                }
+            }
+        }
+
+        private void ClearJoinLines()
+        {
+            for (int i = 0; i < joinLines.Count; i++)
+            {
+                if (joinLines[i] != null)
+                    joinLines[i].gameObject.SetActive(false);
+            }
+        }
+
+        private void ClearGhostVisuals()
+        {
+            if (ghostInstance != null)
+            {
+                Destroy(ghostInstance);
+                ghostInstance = null;
+            }
+            ghostRenderer = null;
+            if (tileFootprint != null) tileFootprint.SetActive(false);
+            ClearJoinLines();
+            tileGhostStickyCell = null;
+            lastJoinCount = -1;
+            restrictionAgreeFrames = 0;
+            displayedRestrictionsPass = true;
+            lastGhostRestrictionsPass = true;
         }
 
         private void HandleDragSelect()
@@ -1046,11 +1266,32 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            if (ghostInstance != null)
+            // Commit the cell the ghost/footprint was showing — not a fresh noisy ray hit.
+            if (activeCommand is BuildBuildingCommand placeBbc && placeBbc.HandIndex >= 0)
             {
-                Destroy(ghostInstance);
-                ghostInstance = null;
+                Vector3 placePoint;
+                if (tileGhostStickyCell.HasValue)
+                {
+                    placePoint = ColonyTileGrid.CellToWorld(tileGhostStickyCell.Value, hit.point.y);
+                }
+                else
+                {
+                    placePoint = RaycastGroundForTileGhost() ?? hit.point;
+                    placePoint = ColonyTileGrid.SnapForPlacement(placePoint, Owner.Player1, out _);
+                }
+
+                UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
+                {
+                    agentTypeID = 0,
+                    areaMask = UnityEngine.AI.NavMesh.AllAreas
+                };
+                if (UnityEngine.AI.NavMesh.SamplePosition(placePoint, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+                    placePoint = new Vector3(placePoint.x, navHit.position.y, placePoint.z);
+
+                hit.point = placePoint;
             }
+
+            ClearGhostVisuals();
 
             // Snap camera to the build site for building commands
             if (activeCommand is BuildBuildingCommand && hit.point != Vector3.zero)

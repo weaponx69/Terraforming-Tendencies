@@ -27,8 +27,8 @@ namespace GameDevTV.RTS.UI.Containers
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(380f, 280f);
-            rect.anchoredPosition = new Vector2(-20f, -150f);
+            rect.sizeDelta = new Vector2(440f, 400f);
+            rect.anchoredPosition = new Vector2(-20f, -140f);
 
             background = gameObject.GetComponent<Image>();
             if (background == null) background = gameObject.AddComponent<Image>();
@@ -78,7 +78,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             bodyText = bodyGO.AddComponent<TextMeshProUGUI>();
             if (projectFont != null) bodyText.font = projectFont;
-            bodyText.fontSize = 15f;
+            bodyText.fontSize = 14f;
             bodyText.alignment = TextAlignmentOptions.TopLeft;
             bodyText.textWrappingMode = TextWrappingModes.Normal;
             bodyText.lineSpacing = 1.2f;

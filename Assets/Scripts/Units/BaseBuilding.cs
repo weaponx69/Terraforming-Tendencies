@@ -376,8 +376,10 @@ namespace GameDevTV.RTS.Units
                     MainRenderer.material = primaryMaterial;
                 }
                 
-                // If the building is already completed (e.g. spawned by AI), ensure it has health and completed progress
-                if (unitBuildingThis == null)
+                // If already done (e.g. AI spawn) finish setup. Do NOT auto-complete
+                // while State==Building with no drone — that is self-construction.
+                if (unitBuildingThis == null
+                    && Progress.State != BuildingProgress.BuildingState.Building)
                 {
                     CompleteConstruction();
                 }
@@ -430,7 +432,7 @@ namespace GameDevTV.RTS.Units
             pendingColonyActScore = false;
             PendingColonyActScoreBuildings.Remove(this);
             if (Owner == Owner.Player1)
-                ColonyActManager.Instance?.GrantTileScore(ResolvedBuildingSO);
+                ColonyActManager.Instance?.GrantTileScore(this);
         }
 
         /// <summary>Flush all buildings that completed instantly before their card week was spent.</summary>
@@ -487,7 +489,7 @@ namespace GameDevTV.RTS.Units
                 }
                 else
                 {
-                    ColonyActManager.Instance?.GrantTileScore(ResolvedBuildingSO);
+                    ColonyActManager.Instance?.GrantTileScore(this);
                 }
             }
 
@@ -1334,19 +1336,21 @@ namespace GameDevTV.RTS.Units
         {
             InitializeIfNeeded();
             unitBuildingThis = buildingBuilder;
-            Owner = unitBuildingThis.Owner;
+            if (unitBuildingThis != null)
+                Owner = unitBuildingThis.Owner;
             if (MainRenderer != null)
             {
                 // Use the visual override material if present (e.g. dull grey for smokestack).
                 Material buildMat = TryGetComponent<SmokestackVisuals>(out var sv2)
                     ? sv2.GhostMaterial
-                    : BuildingSO.PlacementMaterial;
+                    : (ResolvedBuildingSO != null ? ResolvedBuildingSO.PlacementMaterial : BuildingSO.PlacementMaterial);
                 MainRenderer.material = buildMat;
             }
 
+            float buildTime = Mathf.Max(0.35f, (ResolvedBuildingSO != null ? ResolvedBuildingSO.BuildTime : BuildingSO.BuildTime));
             Progress = new BuildingProgress(
                 BuildingProgress.BuildingState.Building,
-                Time.time - BuildingSO.BuildTime * Progress.Completion,
+                Time.time - buildTime * Progress.Completion,
                 Progress.Completion
             );
 
@@ -1368,6 +1372,85 @@ namespace GameDevTV.RTS.Units
 
             Bus<UnitDeathEvent>.OnEvent[Owner] -= HandleUnitDeath;
             Bus<UnitDeathEvent>.OnEvent[Owner] += HandleUnitDeath;
+        }
+
+        private Coroutine selfBuildCoroutine;
+
+        /// <summary>
+        /// Combolands card / free place: ghost → rise animation → complete, no drone required.
+        /// </summary>
+        public void BeginSelfConstruction(Owner owner, BuildingSO definition = null, Material ghostMaterial = null)
+        {
+            if (definition != null)
+                BindBuildingDefinition(definition);
+
+            Owner = owner;
+            enabled = true;
+            hasCompletedConstruction = false;
+
+            Material mat = ghostMaterial != null
+                ? ghostMaterial
+                : (ResolvedBuildingSO != null ? ResolvedBuildingSO.PlacementMaterial : null);
+            InitializeAsGhost(mat, owner);
+            StartBuilding(null);
+
+            if (selfBuildCoroutine != null)
+                StopCoroutine(selfBuildCoroutine);
+            selfBuildCoroutine = StartCoroutine(SelfBuildLoop());
+        }
+
+        private IEnumerator SelfBuildLoop()
+        {
+            BuildingSO def = ResolvedBuildingSO;
+            float buildTime = Mathf.Max(0.35f, def != null ? def.BuildTime : 3f);
+            if (def?.BuildingConfig != null)
+                buildTime *= Mathf.Max(0.1f, def.BuildingConfig.BuildTimeMultiplier);
+
+            Renderer buildingRenderer = MainRenderer;
+            Vector3 endPosition = transform.position;
+            Vector3 startPosition = endPosition;
+            if (buildingRenderer != null)
+            {
+                startPosition = endPosition - Vector3.up * buildingRenderer.bounds.size.y;
+                buildingRenderer.transform.position = startPosition;
+            }
+
+            float elapsed = 0f;
+            float targetHealth = 0f;
+            float maxHealth = def != null ? def.Health : MaxHealth;
+
+            while (elapsed < buildTime)
+            {
+                elapsed += Time.deltaTime;
+                float normalized = elapsed / buildTime;
+
+                targetHealth += Time.deltaTime * (maxHealth / buildTime);
+                if (targetHealth >= 1f)
+                {
+                    int healAmount = Mathf.FloorToInt(targetHealth);
+                    Heal(healAmount);
+                    targetHealth -= healAmount;
+                }
+
+                if (buildingRenderer != null)
+                    buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalized);
+
+                // Keep Progress.Completion moving for any UI that reads it.
+                Progress = new BuildingProgress(
+                    BuildingProgress.BuildingState.Building,
+                    Time.time - buildTime * normalized,
+                    Mathf.Clamp01(normalized));
+
+                yield return null;
+            }
+
+            if (buildingRenderer != null && buildingRenderer.transform != transform)
+                buildingRenderer.transform.localPosition = Vector3.zero;
+
+            enabled = true;
+            CompleteConstruction();
+            ReservedSiteBuildUtility.GroundBuilding(this);
+            selfBuildCoroutine = null;
         }
 
         private void HandleUnitDeath(UnitDeathEvent evt)

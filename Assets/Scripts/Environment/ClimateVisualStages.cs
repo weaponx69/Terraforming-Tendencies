@@ -34,8 +34,12 @@ namespace GameDevTV.RTS.Environment
 
         [Header("Atmosphere (fog / ambient)")]
         [SerializeField] private bool driveFogAndAmbient = true;
-        [SerializeField] private float barrenFogDensity = 0.028f;
-        [SerializeField] private float livingFogDensity = 0.008f;
+        [Tooltip("Exponential fog reads as a thick haze when zoomed out — keep these very low.")]
+        [SerializeField] private float barrenFogDensity = 0.0035f;
+        [SerializeField] private float livingFogDensity = 0.0012f;
+        [SerializeField] private bool useLinearFog = true;
+        [SerializeField] private float linearFogStart = 220f;
+        [SerializeField] private float linearFogEnd = 1100f;
 
         // Gradient low / mid / high + albedo tint multiplier per stage.
         private static readonly Color BarrenLow = new Color(0.55f, 0.25f, 0.15f);
@@ -226,9 +230,19 @@ namespace GameDevTV.RTS.Environment
             float density = Mathf.Lerp(barrenFogDensity, livingFogDensity, Mathf.Clamp01(progress));
 
             RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = fog;
-            RenderSettings.fogDensity = density;
+            if (useLinearFog)
+            {
+                // Linear fog stays readable when zoomed out; Exp² turned into a dust wall.
+                RenderSettings.fogMode = FogMode.Linear;
+                RenderSettings.fogStartDistance = linearFogStart;
+                RenderSettings.fogEndDistance = Mathf.Lerp(linearFogEnd * 0.85f, linearFogEnd, Mathf.Clamp01(progress));
+            }
+            else
+            {
+                RenderSettings.fogMode = FogMode.ExponentialSquared;
+                RenderSettings.fogDensity = density;
+            }
 
             // Flat ambient (typical scene AmbientMode) — sky / ambientLight carry the tint.
             RenderSettings.ambientSkyColor = ambient;

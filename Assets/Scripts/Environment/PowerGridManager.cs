@@ -159,5 +159,87 @@ namespace GameDevTV.RTS.Environment
             bool isCp = node.Building.ResolvedBuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
             return isCp ? 2 : 1;
         }
+
+        /// <summary>Total PowerGeneration from completed Player buildings.</summary>
+        public static float GetBoardPowerGeneration(Owner owner)
+        {
+            float gen = 0f;
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b.Owner != owner) continue;
+                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                var cfg = b.ResolvedBuildingSO?.BuildingConfig;
+                if (cfg == null) continue;
+                if (cfg.PowerGeneration > 0f)
+                    gen += cfg.PowerGeneration * BlueprintDraftManager.PowerGenMultiplier;
+            }
+            return gen;
+        }
+
+        /// <summary>Total PowerUpkeep from completed Player buildings.</summary>
+        public static float GetBoardPowerUpkeep(Owner owner)
+        {
+            float upkeep = 0f;
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b.Owner != owner) continue;
+                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                var cfg = b.ResolvedBuildingSO?.BuildingConfig;
+                if (cfg != null && cfg.PowerUpkeep > 0f)
+                    upkeep += cfg.PowerUpkeep;
+            }
+            return upkeep;
+        }
+
+        public static float GetBuildingPowerUpkeep(BuildingSO building)
+        {
+            if (building?.BuildingConfig == null) return 0f;
+            return Mathf.Max(0f, building.BuildingConfig.PowerUpkeep);
+        }
+
+        public static float GetBuildingPowerGeneration(BuildingSO building)
+        {
+            if (building?.BuildingConfig == null) return 0f;
+            float gen = building.BuildingConfig.PowerGeneration;
+            return gen > 0f ? gen * BlueprintDraftManager.PowerGenMultiplier : 0f;
+        }
+
+        /// <summary>
+        /// Hand may not hold consumer cards whose combined PowerUpkeep exceeds board generation.
+        /// Generators (and zero-upkeep tiles) are always allowed.
+        /// </summary>
+        public static bool CanSeatCardInHandForPower(BlueprintCardSO card, System.Collections.Generic.IList<BlueprintCardSO> hand, Owner owner)
+        {
+            if (card == null) return false;
+            float cardUpkeep = GetCardPowerUpkeep(card);
+            if (cardUpkeep <= 0.0001f) return true;
+
+            float gen = GetBoardPowerGeneration(owner);
+            float handUpkeep = 0f;
+            if (hand != null)
+            {
+                for (int i = 0; i < hand.Count; i++)
+                    handUpkeep += GetCardPowerUpkeep(hand[i]);
+            }
+
+            return handUpkeep + cardUpkeep <= gen + 0.001f;
+        }
+
+        /// <summary>True if placing this consumer still fits under board generation.</summary>
+        public static bool CanPlayBuildingForPower(BuildingSO building, Owner owner)
+        {
+            float upkeep = GetBuildingPowerUpkeep(building);
+            if (upkeep <= 0.0001f) return true;
+            float gen = GetBoardPowerGeneration(owner);
+            float boardUpkeep = GetBoardPowerUpkeep(owner);
+            return boardUpkeep + upkeep <= gen + 0.001f;
+        }
+
+        public static float GetCardPowerUpkeep(BlueprintCardSO card)
+        {
+            if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
+                return GetBuildingPowerUpkeep(unlock.buildingToUnlock);
+            return 0f;
+        }
     }
 }

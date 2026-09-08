@@ -4,86 +4,39 @@ using GameDevTV.RTS.Units;
 namespace GameDevTV.RTS.Player
 {
     public class TerraformingCardSO : UnlockBuildingCardSO
+    {
+        [Header("Climate Gates")]
+        public float minTemperature = float.MinValue;
+        public float maxTemperature = float.MaxValue;
+        public float minOxygen = float.MinValue;
+        public float maxOxygen = float.MaxValue;
+        public float minAtmosphere = float.MinValue;
+        public float maxAtmosphere = float.MaxValue;
+        public float minWater = float.MinValue;
+        public float maxWater = float.MaxValue;
+        public GameDevTV.RTS.Environment.SectorManager.SectorFeature requiredSectorFeature =
+            GameDevTV.RTS.Environment.SectorManager.SectorFeature.None;
+
+        public override bool IsGateMet()
         {
-            [Header("Climate Gates")]
-            public float minTemperature = float.MinValue;
-            public float maxTemperature = float.MaxValue;
-            public float minOxygen = float.MinValue;
-            public float maxOxygen = float.MaxValue;
-            public float minAtmosphere = float.MinValue;
-            public float maxAtmosphere = float.MaxValue;
-            public float minWater = float.MinValue;
-            public float maxWater = float.MaxValue;
-            public GameDevTV.RTS.Environment.SectorManager.SectorFeature requiredSectorFeature = GameDevTV.RTS.Environment.SectorManager.SectorFeature.None;
-    
-            public override bool IsGateMet()
+            // Combolands: climate soft-gates do not block drawing or selecting the card.
+            // Materials / pads are checked when the player commits the play.
+            if (buildingToUnlock == null || buildingToUnlock.Prefab == null) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Climate / sector-feature gates — ignored for free hand play (always true).
+        /// </summary>
+        public bool PassesClimateRequirements() => true;
+
+        public override void Apply()
+        {
+            base.Apply();
+            if (buildingToUnlock != null)
             {
-                if (!base.IsGateMet()) return false;
-                return PassesClimateRequirements();
-            }
-
-            /// <summary>
-            /// Climate / sector-feature gates. MVP climate tools (Temp / Atmos / Water) ignore
-            /// minimum climate and sector-feature requirements so the hamster deck never softlocks.
-            /// </summary>
-            public bool PassesClimateRequirements()
-            {
-                string goal = GetCardGoal();
-                bool mvpClimateTool = goal == "TEMPERATURE" || goal == "ATMOSPHERE" || goal == "WATER";
-                bool relaxMinGates = mvpClimateTool || GenerationManager.IsUnmetSectorGoal(goal);
-
-                float currentTemp = Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
-                if (!PassesClimateBound(currentTemp, minTemperature, maxTemperature, relaxMinGates))
-                    return false;
-
-                float currentOxygen = Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
-                if (!PassesClimateBound(currentOxygen, minOxygen, maxOxygen, relaxMinGates))
-                    return false;
-
-                float currentAtmosphere = Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a) ? a : 0.01f;
-                if (!PassesClimateBound(currentAtmosphere, minAtmosphere, maxAtmosphere, relaxMinGates))
-                    return false;
-
-                float currentWater = Supplies.Water.TryGetValue(Owner.Player1, out float w) ? w : 0f;
-                if (!PassesClimateBound(currentWater, minWater, maxWater, relaxMinGates))
-                    return false;
-
-                // MVP climate buildings never require a sector feature.
-                if (mvpClimateTool) return true;
-
-                if (requiredSectorFeature != GameDevTV.RTS.Environment.SectorManager.SectorFeature.None
-                    && !relaxMinGates)
-                {
-                    if (GameDevTV.RTS.Environment.SectorManager.Instance == null) return false;
-                    bool hasFeature = false;
-                    foreach (var sector in GameDevTV.RTS.Environment.SectorManager.Instance.Sectors)
-                    {
-                        if (sector != null && sector.Feature == requiredSectorFeature)
-                        {
-                            hasFeature = true;
-                            break;
-                        }
-                    }
-                    if (!hasFeature) return false;
-                }
-
-                return true;
-            }
-
-            private static bool PassesClimateBound(float current, float min, float max, bool skipMin)
-            {
-                if (!skipMin && current < min) return false;
-                if (current > max) return false;
-                return true;
-            }
-    
-            public override void Apply()
-            {
-                base.Apply();
-                if (buildingToUnlock != null)
-                {
-                    BlueprintDraftManager.RegisterBuildingSO(buildingToUnlock);
-                }
+                BlueprintDraftManager.RegisterBuildingSO(buildingToUnlock);
             }
         }
+    }
 }

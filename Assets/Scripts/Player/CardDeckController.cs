@@ -538,58 +538,15 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// MVP: while Temp / Atmos / Water are unmet, keep at least one tool for each in hand
-        /// so FIFO spam cannot bury Water for minutes.
+        /// Legacy climate force-seat — disabled for Combolands free hand selection.
         /// </summary>
         private void EnsureMvpClimateGoalsInHand()
         {
-            EnsureUnmetSectorGoalCardInHand("TEMPERATURE");
-            EnsureUnmetSectorGoalCardInHand("ATMOSPHERE");
-            EnsureUnmetSectorGoalCardInHand("WATER");
         }
 
-        /// <summary>
-        /// Builds require a worker drone. Keep a Mining Drone card in hand whenever one
-        /// exists in the deck (make room by dropping a non-critical support card if needed).
-        /// </summary>
+        /// <summary>Legacy force-seat — disabled so the player freely picks any hand card.</summary>
         private void EnsureMiningDroneInHand()
         {
-            if (hand.Any(IsMiningDroneCard)) return;
-
-            BlueprintCardSO found = FindCardInPiles(IsMiningDroneCard);
-            if (found == null)
-            {
-                found = EnsureStarterCard<SpawnUnitCardSO>("Cards/MiningDroneCard");
-                drawPile.Remove(found);
-            }
-
-            if (found == null) return;
-
-            if (hand.Count >= handSize)
-            {
-                int dropIdx = hand.FindIndex(c =>
-                    c != null
-                    && !IsMiningDroneCard(c)
-                    && !IsSolarUnlockCard(c)
-                    && TerraformingGoalColors.GetSectorGoalForCard(c) == null);
-                if (dropIdx < 0)
-                {
-                    dropIdx = hand.FindIndex(c =>
-                        c is UnlockBuildingCardSO unlock
-                        && !IsSolarUnlockCard(c)
-                        && NeedsSolarPoweredPad(unlock));
-                }
-
-                if (dropIdx < 0) return;
-
-                discardPile.Add(hand[dropIdx]);
-                hand.RemoveAt(dropIdx);
-            }
-
-            if (hand.Count >= handSize) return;
-
-            hand.Add(found);
-            Debug.Log($"[CardDeckController] Seated Mining Drone card in hand.");
         }
 
         private static bool IsMiningDroneCard(BlueprintCardSO card)
@@ -599,53 +556,9 @@ namespace GameDevTV.RTS.Player
                 && spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>
-        /// Climate/paired buildings (water, atmosphere, etc.) sit in hand while unmet even
-        /// before their cluster has solar. That used to fill the hand and bury Solar in
-        /// discard so the player could never power the pad. Whenever an open solar site
-        /// exists, force Solar Panel back into the hand (make room if needed).
-        /// </summary>
+        /// <summary>Legacy force-seat — disabled for Combolands free hand selection.</summary>
         private void EnsureSolarPrereqInHand()
         {
-            if (IsSolarUnlockCardInHand()) return;
-
-            BuildingSO solarSO = BlueprintDraftManager.GetBuildingSOByName("Solar Panel");
-            if (solarSO == null) return;
-            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(solarSO, Owner.Player1, out _, requireUnlocked: false))
-                return;
-
-            // Prefer injecting when a paired/climate unlock is already waiting on solar,
-            // or whenever open solar pads exist and Solar is simply missing from hand.
-            bool blockedPairedWaiting = hand.OfType<UnlockBuildingCardSO>().Any(NeedsSolarPoweredPad);
-            if (!blockedPairedWaiting && hand.Count >= handSize)
-            {
-                // Hand full of playable cards — still try to seat Solar by swapping a
-                // pad-blocked unlock if one exists; otherwise leave hand alone.
-                return;
-            }
-
-            if (hand.Count >= handSize)
-            {
-                int dropIdx = hand.FindIndex(c =>
-                    c is UnlockBuildingCardSO unlock
-                    && !IsSolarUnlockCard(c)
-                    && NeedsSolarPoweredPad(unlock));
-                if (dropIdx < 0)
-                {
-                    dropIdx = hand.FindIndex(c =>
-                        c is UnlockBuildingCardSO unlock
-                        && !IsSolarUnlockCard(c)
-                        && !unlock.CanApply());
-                }
-
-                if (dropIdx < 0) return;
-
-                discardPile.Add(hand[dropIdx]);
-                hand.RemoveAt(dropIdx);
-                Debug.Log($"[CardDeckController] Made room for Solar Panel (hand was full of pad-blocked unlocks).");
-            }
-
-            EnsureBootstrapUnlockInHand("Solar");
         }
 
         private static bool IsSolarUnlockCard(BlueprintCardSO card)
@@ -701,20 +614,12 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Move any hand cards that are no longer playable to discard.
-        /// Call <see cref="RefreshHand"/> after builds, sector unlocks, and supply changes.
+        /// Combolands: never auto-purge the hand — player keeps every drawn card and
+        /// picks which to play. Soft gates (pads / materials) are checked on click only.
         /// </summary>
         public void DiscardUnplayableFromHand()
         {
-            for (int i = hand.Count - 1; i >= 0; i--)
-            {
-                var card = hand[i];
-                if (ShouldKeepInHand(card)) continue;
-
-                hand.RemoveAt(i);
-                if (card != null) discardPile.Add(card);
-                Debug.Log($"[CardDeckController] Discarded unplayable card '{card?.cardName}' from hand.");
-            }
+            // Intentionally empty.
         }
 
         private static bool IsPlayableNow(BlueprintCardSO card)
@@ -722,38 +627,16 @@ namespace GameDevTV.RTS.Player
             return card != null && card.IsGateMet() && card.CanApply();
         }
 
-        /// <summary>
-        /// Cards eligible to enter the hand: playable now, or building unlocks waiting for a pad.
-        /// </summary>
+        /// <summary>Any valid card can enter the hand — player chooses when to play it.</summary>
         private static bool IsDrawableNow(BlueprintCardSO card) => ShouldKeepInHand(card);
 
-        /// <summary>
-        /// Keep cards that are playable now, plus building unlocks waiting on a pad or
-        /// materials when they advance an unmet sector terraforming goal.
-        /// Mining Drone stays seated even before a Command Post exists (needed for builds).
-        /// </summary>
+        /// <summary>Keep every real card; only drop broken/null entries.</summary>
         private static bool ShouldKeepInHand(BlueprintCardSO card)
         {
             if (card == null) return false;
-
-            // Construction requires drones — never purge the Mining Drone starter from hand.
-            if (IsMiningDroneCard(card)) return true;
-
-            string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
-            if (!string.IsNullOrEmpty(sectorGoal)
-                && GenerationManager.IsUnmetSectorGoal(sectorGoal)
-                && card is UnlockBuildingCardSO unlock)
-            {
-                if (unlock.buildingToUnlock == null || unlock.buildingToUnlock.Prefab == null)
-                    return false;
-                if (card is TerraformingCardSO terra && !terra.PassesClimateRequirements())
-                    return false;
-                return true;
-            }
-
-            if (!card.IsGateMet()) return false;
-            if (card.CanApply()) return true;
-            return card is UnlockBuildingCardSO;
+            if (card is UnlockBuildingCardSO unlock)
+                return unlock.buildingToUnlock != null && unlock.buildingToUnlock.Prefab != null;
+            return true;
         }
 
         /// <summary>

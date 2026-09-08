@@ -34,10 +34,13 @@ namespace GameDevTV.RTS.Player
         #pragma warning restore 0414
 
         // ── Public event ───────────────────────────────────────────────────────────
-        public enum GameOverReason { LifeSupport, Resources, MachineryFailure, HousingShortage }
+        public enum GameOverReason { LifeSupport, Resources, MachineryFailure, HousingShortage, ColonyActFailed }
 
         public static event System.Action<GameOverReason> OnGameOver;
         public static event System.Action OnVictory;
+
+        /// <summary>Optional detail line shown on the game-over / victory overlay.</summary>
+        public static string LastOutcomeDetail { get; set; } = string.Empty;
 
         public static Owner MonitoredOwner { get; private set; } = Owner.Player1;
 
@@ -234,6 +237,13 @@ namespace GameDevTV.RTS.Player
             if (!recoveryPossible)
             {
                 Debug.Log($"[GameOverManager] Map Depleted. Nodes Exist: {supplyNodesExist}, Drones Exist: {miningUnitsExist}, Biomass: {materials}");
+
+                // Combolands Colony Acts: materials / mining are not a win or lose path.
+                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                {
+                    Debug.Log("[GameOverManager] Ignoring map depletion — Colony Acts are the run spine.");
+                    return;
+                }
 
                 if (GenerationManager.Instance != null
                     && GenerationManager.Instance.IsCurrentSectorRoundComplete())

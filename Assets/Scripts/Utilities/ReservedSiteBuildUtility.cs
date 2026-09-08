@@ -55,6 +55,9 @@ namespace GameDevTV.RTS.Utilities
             return building != null && building.Prefab != null && HasEnoughMaterials(building, owner);
         }
 
+        /// <summary>Charge Materials for a card/building play. Returns false if unaffordable.</summary>
+        public static bool TrySpendMaterials(BuildingSO building, Owner owner) => ConsumeMaterials(building, owner);
+
         public static bool CanBuildAtReservedSite(BuildingSO building, Owner owner, out string reason, bool requireUnlocked = true)
         {
             reason = null;
