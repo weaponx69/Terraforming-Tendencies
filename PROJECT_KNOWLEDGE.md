@@ -40,7 +40,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Card play gated by Materials | **Retired** (cards) |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
 | Auto-discard “unplayable” hand cards | **Retired** |
-| Force-seat Solar / climate / Mining Drone into hand | **Retired** |
+| Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar **is** always seated (power gate); climate/drone force-seat stays retired |
 | Climate soft-gates blocking card draw/select | **Retired** |
 | Oxygen / Power / Pop as win primaries | **Retired** |
 | Fixed 4 Acts independent of map size | **Retired** — Act count = sector count |
@@ -71,16 +71,18 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 ## 0.3 Loop (how a play works)
 
-1. **Hand (5 cards)** — player picks any seated card. Playing **uses it up** (removed from hand, building on board, draw a replacement). Cards are **not** silently purged for being unaffordable / ungated.
+1. **Hand (up to 10 cards, scrollable)** — Solar is **always** seated. Playing uses a card up; draw fills remaining slots. Cards keep a fixed playing-card size; hover the hand and use the **mouse wheel** (or trackpad horizontal scroll) to scroll the strip left/right when more than ~5 cards are held.
 2. **Week** — commit spends **1 week** on the Act clock (`SpendWeek` on consume).
 3. **Placement gate = power only**
    * If `PowerUpkeep > 0` and board generation cannot cover **board upkeep + this tile**, placement is blocked.
    * Generators / zero-upkeep tiles always place (power-wise).
    * No Materials / drone / pad requirement on **card** plays.
-4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell + lerp; no far magnet). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes.
-5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags).
+4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes.
+5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags). Completing a building also **queues its old RTS production options as hand cards** for the next fill (no build menu on the structure).
 6. **Climate** — powered climate buildings in the **current focus sector** tick Temp / Atmos / Water. Other sectors do not help this Act.
 7. Clear Act when **score AND climate** are both met before weeks run out → next sector (or win).
+
+**Build source:** cards / tiles only. Selecting a building does **not** open an RTS build/train panel.
 
 ---
 
@@ -149,7 +151,8 @@ Non-building cards grant a small flat score on play (no adjacency).
 | Piece | Status | Notes |
 |-------|--------|-------|
 | Colony Acts + week clock | **Done** | **1 Act per sector**; climate gated to focus sector |
-| Free hand pick + consume on play | **Done** | No auto-discard / force-seat |
+| Free hand pick + consume on play | **Done** | Solar always seated; hand up to 10 + scroll |
+| Card-only builds (no RTS build menus) | **Done** | Building production → next-hand offers |
 | Free ground placement | **Done** | Click-to-place cards |
 | Power-only place gate | **Done** | |
 | Base score + adjacency (tile-edge) | **Done** | Ortho grid + §0.5 bonuses / soft cap |
@@ -174,7 +177,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 | Win / lose Acts | `ColonyActManager` |
 | Legacy `GenerationManager` | `MaxGenerations = 1` shell; victory via `NotifyColonyActVictory` — **not** climate progress |
 | `DoesBuildingCountForActiveClimate` | True only for buildings in the **current Act focus sector** |
-| Card UI | Lower-left hand; cost chip shows **1 Week**; tooltip shows score / power need / adjacency hint |
+| Card UI | Lower-left hand (~5-card viewport + `RectMask2D`); wheel scrolls horizontally; cost chip shows **1 Week** |
 | Instant card place | Completes immediately; week spent on consume; score deferred until after week when needed |
 
 ---

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
@@ -10,32 +8,37 @@ using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
-    /// Persistent bottom-left action bar that shows the player's card hand.
-    /// Building cards enter free ground placement (click anywhere) — Combolands-style.
+    /// Bottom-left card hand. Cards keep a fixed playing-card size.
+    /// When there are more cards than fit (~5), the strip scrolls horizontally
+    /// with the mouse wheel (and trackpad horizontal scroll).
     /// </summary>
     public class BottomBarActionsUI : MonoBehaviour
     {
         [Header("Button Wiring")]
-        [Tooltip("Drag pre-placed UIActionButton children here (same pattern as ActionsUI).")]
         [SerializeField] private UIActionButton[] actionButtons;
 
         [Header("Card Layout")]
-        [Tooltip("Playing-card style size for a 5-card hand (width x height).")]
         [SerializeField] private Vector2 cardSize = new Vector2(158f, 220f);
         [SerializeField] private float cardSpacing = 14f;
-        [Tooltip("Distance from the bottom edge of the screen to the bottom of the hand.")]
         [SerializeField] private float bottomMargin = 16f;
-        [Tooltip("Distance from the left edge of the screen to the left edge of the hand.")]
         [SerializeField] private float leftMargin = 16f;
-        [SerializeField] private int visibleHandSlots = 5;
+        [SerializeField] private int visibleCardCount = 5;
+        // Input System wheel deltas are often ~±120 per notch; ~1.5 → one card per tick.
+        [SerializeField] private float scrollSpeed = 1.5f;
 
-        private bool isBuilt = false;
+        private bool isBuilt;
         private Owner owner = Owner.Player1;
+        private float scrollOffset;
+        private float contentWidth;
+        private float viewportWidth;
+        private RectTransform cardsRt;
+        private RectTransform containerRt;
 
         private void OnEnable()
         {
@@ -63,85 +66,141 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void Awake()
         {
-            // Ensure this GameObject has a RectTransform (not plain Transform) for Canvas layout
-            if (GetComponent<RectTransform>() == null)
+            cardsRt = transform as RectTransform;
+            if (cardsRt == null)
             {
-                Debug.LogError("[BottomBarActionsUI] This GameObject must have a RectTransform, not a plain Transform. UI elements under a Canvas require RectTransform.", this);
+                Debug.LogError("[BottomBarActionsUI] Needs a RectTransform.", this);
                 return;
             }
 
-            HideChromeBackground();
-            visibleHandSlots = 5;
-            ApplyPlayingCardLayout();
+            if (actionButtons == null || actionButtons.Length == 0)
+                actionButtons = GetComponentsInChildren<UIActionButton>(true);
 
             if (actionButtons == null || actionButtons.Length == 0)
             {
-                Debug.LogError("[BottomBarActionsUI] No action buttons wired in Inspector! Drag UIActionButton children into the 'Action Buttons' array.", this);
+                Debug.LogError("[BottomBarActionsUI] No action buttons found.", this);
                 return;
             }
+
+            UndoBrokenScrollHierarchy();
+            HideChromeBackground();
+            // Always use a wheel-friendly speed (serialized prefab values can stick at old 80).
+            scrollSpeed = 1.5f;
+            ApplyPlayingCardLayout();
 
             isBuilt = true;
             gameObject.SetActive(true);
             RefreshBar();
-            Debug.Log($"[BottomBarActionsUI] Initialized with {actionButtons.Length} wired action buttons. Showing up to {visibleHandSlots} hand cards.");
+            Debug.Log($"[BottomBarActionsUI] Hand visible ({actionButtons.Length} slots).");
         }
 
+        private void Start() => RefreshBar();
+
         /// <summary>
-        /// Resize hand slots to a taller playing-card aspect and dock them in the
-        /// lower-left corner (selection info is shifted right by RuntimeUI).
+        /// Previous broken ScrollRect pass reparented buttons under HandContent.
+        /// Put them back as direct children of this bar.
         /// </summary>
+        private void UndoBrokenScrollHierarchy()
+        {
+            // Destroy leftover ScrollRect — we scroll by offsetting the content strip.
+            var sr = GetComponent<ScrollRect>();
+            if (sr != null) Destroy(sr);
+
+            Transform leftoverVp = transform.Find("HandViewport");
+            if (leftoverVp != null)
+            {
+                // Rescue any buttons nested under the viewport/content.
+                foreach (var btn in leftoverVp.GetComponentsInChildren<UIActionButton>(true))
+                {
+                    if (btn != null) btn.transform.SetParent(transform, false);
+                }
+                Destroy(leftoverVp.gameObject);
+            }
+
+            // Also rescue buttons that may sit under a sibling HandContent.
+            foreach (var btn in GetComponentsInChildren<UIActionButton>(true))
+            {
+                if (btn != null && btn.transform.parent != transform)
+                    btn.transform.SetParent(transform, false);
+            }
+
+            // Refresh wired array from current children order if needed.
+            if (actionButtons == null || actionButtons.Length == 0
+                || actionButtons[0] == null || actionButtons[0].transform.parent != transform)
+            {
+                actionButtons = GetComponentsInChildren<UIActionButton>(true);
+            }
+        }
+
         private void ApplyPlayingCardLayout()
         {
             float width = Mathf.Max(48f, cardSize.x);
             float height = Mathf.Max(width * 1.25f, cardSize.y);
 
-            // Cards live on this object; chrome/container may be the parent.
-            var cardsRt = transform as RectTransform;
-            var containerRt = transform.parent as RectTransform;
+            containerRt = transform.parent as RectTransform;
             if (containerRt == null) containerRt = cardsRt;
-            if (containerRt == null) return;
 
-            // True bottom-left corner — do not float mid-screen above the old Bottom Bar band.
+            // Dock container bottom-left with a fixed viewport size (scroll if more cards).
+            int padL = 8, padR = 8, padT = 6, padB = 6;
+            viewportWidth = visibleCardCount * width
+                + Mathf.Max(0, visibleCardCount - 1) * cardSpacing
+                + padL + padR;
+            float viewportHeight = height + padT + padB;
+
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
             containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, viewportWidth);
+            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
             containerRt.SetAsLastSibling();
+            containerRt.localScale = Vector3.one;
 
-            if (cardsRt != null && cardsRt != containerRt)
-            {
-                cardsRt.anchorMin = Vector2.zero;
-                cardsRt.anchorMax = Vector2.one;
-                cardsRt.offsetMin = Vector2.zero;
-                cardsRt.offsetMax = Vector2.zero;
-            }
+            // Mask so off-screen cards are clipped.
+            if (containerRt.GetComponent<RectMask2D>() == null)
+                containerRt.gameObject.AddComponent<RectMask2D>();
+            var dockImg = containerRt.GetComponent<Image>();
+            if (dockImg == null) dockImg = containerRt.gameObject.AddComponent<Image>();
+            dockImg.color = new Color(0f, 0f, 0f, 0.001f);
+            dockImg.raycastTarget = true; // needed so scroll wheel hits the hand
+            dockImg.enabled = true;
 
-            // Layout group must be on the parent of the card buttons.
+            // This bar fills the dock; we slide it horizontally for scrolling.
+            cardsRt.anchorMin = new Vector2(0f, 0f);
+            cardsRt.anchorMax = new Vector2(0f, 1f);
+            cardsRt.pivot = new Vector2(0f, 0.5f);
+            cardsRt.offsetMin = new Vector2(0f, 0f);
+            cardsRt.offsetMax = new Vector2(0f, 0f);
+            cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
+            cardsRt.anchoredPosition = Vector2.zero;
+            cardsRt.localScale = Vector3.one;
+
             var hlg = GetComponent<HorizontalLayoutGroup>();
             if (hlg == null) hlg = gameObject.AddComponent<HorizontalLayoutGroup>();
+            hlg.enabled = true;
             hlg.spacing = cardSpacing;
             hlg.childAlignment = TextAnchor.MiddleLeft;
             hlg.childControlWidth = false;
             hlg.childControlHeight = false;
             hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
-            hlg.padding = new RectOffset(8, 8, 6, 6);
+            hlg.padding = new RectOffset(padL, padR, padT, padB);
 
-            // Disable a parent HLG that only wraps this bar — it fights sizing.
-            if (containerRt != cardsRt)
-            {
-                var parentHlg = containerRt.GetComponent<HorizontalLayoutGroup>();
-                if (parentHlg != null) parentHlg.enabled = false;
-            }
-
-            if (actionButtons == null) return;
+            var parentHlg = containerRt.GetComponent<HorizontalLayoutGroup>();
+            if (parentHlg != null && containerRt != cardsRt) parentHlg.enabled = false;
 
             foreach (var slot in actionButtons)
             {
                 if (slot == null) continue;
                 var rt = slot.transform as RectTransform;
                 if (rt == null) continue;
+                if (rt.parent != transform) rt.SetParent(transform, false);
+                rt.localScale = Vector3.one;
+                rt.anchorMin = new Vector2(0f, 0.5f);
+                rt.anchorMax = new Vector2(0f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
                 rt.sizeDelta = new Vector2(width, height);
+                rt.gameObject.SetActive(true);
 
                 var le = slot.GetComponent<LayoutElement>();
                 if (le == null) le = slot.gameObject.AddComponent<LayoutElement>();
@@ -151,12 +210,11 @@ namespace GameDevTV.RTS.UI.Containers
                 le.minHeight = height;
                 le.flexibleWidth = 0f;
                 le.flexibleHeight = 0f;
-                // Empty slots are collapsed in FitLayoutToActiveCards after RefreshBar.
+                le.ignoreLayout = false;
 
                 Transform icon = slot.transform.Find("Icon");
                 if (icon is RectTransform iconRt)
                 {
-                    // Leave room for cost chip (top) and title (bottom).
                     iconRt.anchorMin = new Vector2(0.08f, 0.28f);
                     iconRt.anchorMax = new Vector2(0.92f, 0.70f);
                     iconRt.offsetMin = Vector2.zero;
@@ -167,16 +225,9 @@ namespace GameDevTV.RTS.UI.Containers
             FitLayoutToActiveCards();
         }
 
-        /// <summary>
-        /// Collapse disabled slots out of the horizontal layout and size the dock
-        /// to the active hand only (left-aligned).
-        /// </summary>
         private void FitLayoutToActiveCards()
         {
-            var cardsRt = transform as RectTransform;
-            var containerRt = transform.parent as RectTransform;
-            if (containerRt == null) containerRt = cardsRt;
-            if (containerRt == null || actionButtons == null) return;
+            if (containerRt == null || cardsRt == null || actionButtons == null) return;
 
             float width = Mathf.Max(48f, cardSize.x);
             float height = Mathf.Max(width * 1.25f, cardSize.y);
@@ -203,38 +254,50 @@ namespace GameDevTV.RTS.UI.Containers
                 le.minHeight = height;
             }
 
-            float contentWidth = activeSlots <= 0
+            contentWidth = activeSlots <= 0
                 ? leftPad + rightPad
                 : activeSlots * width
                   + Mathf.Max(0, activeSlots - 1) * cardSpacing
                   + leftPad + rightPad;
-            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
-            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height + topPad + bottomPad);
 
+            viewportWidth = Mathf.Min(
+                contentWidth,
+                visibleCardCount * width
+                + Mathf.Max(0, visibleCardCount - 1) * cardSpacing
+                + leftPad + rightPad);
+
+            float viewportHeight = height + topPad + bottomPad;
+            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, viewportWidth);
+            containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
             containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
 
-            LayoutRebuilder.ForceRebuildLayoutImmediate(containerRt);
+            cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
+            cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
+            ClampScroll();
+            ApplyScrollOffset();
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(cardsRt);
         }
 
-        /// <summary>
-        /// Hide panel backgrounds so only card / action buttons remain visible.
-        /// </summary>
+        private void ClampScroll()
+        {
+            float minOffset = Mathf.Min(0f, viewportWidth - contentWidth);
+            scrollOffset = Mathf.Clamp(scrollOffset, minOffset, 0f);
+        }
+
+        private void ApplyScrollOffset()
+        {
+            if (cardsRt == null) return;
+            cardsRt.anchoredPosition = new Vector2(scrollOffset, 0f);
+        }
+
         private void HideChromeBackground()
         {
+            // Do NOT clear the container dock Image — it must receive scroll/raycasts.
             ClearBackgroundImage(GetComponent<Image>());
-            Transform t = transform;
-            for (int i = 0; i < 4 && t != null; i++)
-            {
-                ClearBackgroundImage(t.GetComponent<Image>());
-                if (t.name == "Bottom Action Bar Container" || t.name == "Bottom Bar")
-                {
-                    ClearBackgroundImage(t.GetComponent<Image>());
-                }
-                t = t.parent;
-            }
         }
 
         private static void ClearBackgroundImage(Image image)
@@ -251,11 +314,39 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (!Application.isPlaying) return;
             if (BuildingSiteSelectionController.IsSelecting) return;
-            // Periodic refresh every ~0.5s to catch newly completed buildings
+
+            HandleMouseWheelScroll();
+
             if (Time.frameCount % 30 == 0)
-            {
                 RefreshBar();
-            }
+        }
+
+        private void HandleMouseWheelScroll()
+        {
+            if (Mouse.current == null || containerRt == null) return;
+            if (contentWidth <= viewportWidth + 0.5f) return;
+
+            Vector2 scroll = Mouse.current.scroll.ReadValue();
+            // Vertical wheel scrolls the hand left/right; also accept horizontal axis.
+            float delta = scroll.y + scroll.x;
+            if (Mathf.Abs(delta) < 0.01f) return;
+
+            if (!IsPointerOverHand()) return;
+
+            scrollOffset += delta * scrollSpeed;
+            ClampScroll();
+            ApplyScrollOffset();
+        }
+
+        private bool IsPointerOverHand()
+        {
+            if (containerRt == null || Mouse.current == null) return false;
+            Vector2 screen = Mouse.current.position.ReadValue();
+            Camera eventCam = null;
+            var canvas = containerRt.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                eventCam = canvas.worldCamera;
+            return RectTransformUtility.RectangleContainsScreenPoint(containerRt, screen, eventCam);
         }
 
         private void HandleRefresh(UnitSelectedEvent evt) { RefreshBar(); }
@@ -265,9 +356,6 @@ namespace GameDevTV.RTS.UI.Containers
         private void HandleRefresh(BuildingSpawnEvent evt) { RefreshBar(); }
         private void HandleRefresh(UpgradeResearchedEvent evt) { RefreshBar(); }
 
-        /// <summary>
-        /// Refresh the bottom bar to show the player's current hand (up to 5 cards).
-        /// </summary>
         public void RefreshBar()
         {
             if (!isBuilt || actionButtons == null) return;
@@ -276,9 +364,7 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
-            // Hard cap: only the 5-card hand is shown — never GlobalCommander fallback extras.
-            int maxButtons = Mathf.Min(actionButtons.Length, Mathf.Max(1, visibleHandSlots), 5);
-            int cardsToShow = Mathf.Min(hand.Count, maxButtons);
+            int cardsToShow = Mathf.Min(hand.Count, actionButtons.Length);
 
             for (int i = 0; i < actionButtons.Length; i++)
             {
@@ -287,9 +373,7 @@ namespace GameDevTV.RTS.UI.Containers
                 if (i < cardsToShow && hand[i] != null)
                 {
                     var card = hand[i];
-                    int cardIndex = i; // Capture for closure
-
-                    // Create a BuildBuildingCommand for building cards so placement works
+                    int cardIndex = i;
                     string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
 
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
@@ -299,38 +383,31 @@ namespace GameDevTV.RTS.UI.Containers
                         buildCmd.Building = unlockCard.buildingToUnlock;
                         buildCmd.Icon = unlockCard.buildingToUnlock.Icon;
                         buildCmd.Slot = i;
+                        buildCmd.HandIndex = cardIndex;
+                        buildCmd.GhostPrefab = FindGhostPrefabForBuilding(unlockCard.buildingToUnlock);
 
-                        int playCost = unlockCard.GetMaterialsPlayCost();
                         actionButtons[i].EnableFor(buildCmd, null, () =>
                         {
                             PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
-                        }, sectorGoal, playCost);
+                        }, sectorGoal, unlockCard.GetMaterialsPlayCost());
                     }
                     else
                     {
-                        // Non-building cards: use PlayCardCommand which applies the card immediately
                         var playCmd = ScriptableObject.CreateInstance<PlayCardCommand>();
                         playCmd.Name = card.cardName;
-                        
                         Sprite cardIcon = card.icon;
                         if (cardIcon == null && card is SpawnUnitCardSO spawnCard && spawnCard.unitPrefab != null)
                         {
                             var unit = spawnCard.unitPrefab.GetComponent<AbstractUnit>();
-                            if (unit != null)
-                            {
-                                cardIcon = unit.Icon;
-                            }
+                            if (unit != null) cardIcon = unit.Icon;
                         }
                         playCmd.Icon = cardIcon;
-                        
                         playCmd.Slot = i;
                         playCmd.HandIndex = cardIndex;
                         playCmd.MaterialsCost = card.GetMaterialsPlayCost();
 
                         actionButtons[i].EnableFor(playCmd, null, () =>
                         {
-                            // The actual play happens in PlayCardCommand.Handle()
-                            // The onClick just needs to route through PlayerInput
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
                         }, sectorGoal, playCmd.MaterialsCost);
                     }
@@ -348,7 +425,6 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (building == null) return;
 
-            // Card placement gate: power only.
             if (!PowerGridManager.CanPlayBuildingForPower(building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
@@ -358,69 +434,25 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            // Free placement: click anywhere on the ground (Combolands-style).
             var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
             buildCmd.Name = building.Name;
             buildCmd.Building = building;
             buildCmd.Icon = building.Icon;
             buildCmd.HandIndex = cardIndex;
             buildCmd.GhostPrefab = FindGhostPrefabForBuilding(building);
-
             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(buildCmd));
         }
 
-        private void BeginBuildingSelection(BuildingSO building, int cardIndex = -1)
-        {
-            // Kept for non-card / legacy callers; card plays use free ground placement.
-            if (building == null) return;
-
-            bool requireUnlocked = cardIndex < 0;
-
-            if (!ReservedSiteBuildUtility.CanBuildAtReservedSite(building, owner, out string reason, requireUnlocked))
-            {
-                ExplorationManager.NotifyExplorationFailed(reason);
-                return;
-            }
-
-            if (!ReservedSiteBuildUtility.CanAffordBuilding(building, owner))
-            {
-                int cost = ReservedSiteBuildUtility.GetMaterialsCost(building);
-                ExplorationManager.NotifyExplorationFailed(
-                    $"Need {cost} Materials to play {building.Name} (also costs 1 week).");
-                return;
-            }
-
-            BuildingSiteSelectionController.Begin(building, owner, cardIndex, (ok, selectReason) =>
-            {
-                if (ok)
-                {
-                    FindAnyObjectByType<RuntimeUI>(FindObjectsInactive.Include)?.HideWarningBanner();
-                    return;
-                }
-
-                if (!string.IsNullOrEmpty(selectReason))
-                {
-                    ExplorationManager.NotifyExplorationFailed(selectReason);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Find the GhostPrefab from the template BuildBuildingCommand asset for this building.
-        /// </summary>
         private GameObject FindGhostPrefabForBuilding(BuildingSO buildingSO)
         {
-            if (buildingSO == null || string.IsNullOrEmpty(buildingSO.Name)) return null;
-
+            if (buildingSO == null) return null;
             var allCommands = Resources.FindObjectsOfTypeAll<BuildBuildingCommand>();
             foreach (var cmd in allCommands)
             {
                 if (cmd != null && cmd.Building != null && cmd.Building.Name == buildingSO.Name && cmd.GhostPrefab != null)
-                {
                     return cmd.GhostPrefab;
-                }
             }
-            return null;
+            return buildingSO.Prefab;
         }
     }
 }

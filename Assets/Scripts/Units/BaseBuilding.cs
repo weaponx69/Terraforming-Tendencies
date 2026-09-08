@@ -553,6 +553,10 @@ namespace GameDevTV.RTS.Units
             // Activate any procedural visual effects (e.g. SmokestackVisuals).
             GetComponent<SmokestackVisuals>()?.ActivateSmoke();
 
+            // Combolands: former RTS build menu options become hand cards next week.
+            if (Owner == Owner.Player1)
+                CardDeckController.Instance?.QueueProductionFromBuilding(this);
+
             // Add the dynamic Connect Power command if it doesn't already have one
             bool hasConnectCommand = false;
             BaseCommand[] existingCommands = AvailableCommands ?? System.Array.Empty<BaseCommand>();
@@ -1693,6 +1697,10 @@ namespace GameDevTV.RTS.Units
         {
             get
             {
+                // Combolands: buildings do not offer RTS build/train menus — everything is cards.
+                if (Owner == Owner.Player1)
+                    return System.Array.Empty<BaseCommand>();
+
                 BaseCommand[] baseCmds = base.AvailableCommands;
 
                 // Add ExitBuildingCommand if MartianColonist is inside this building
@@ -1713,6 +1721,12 @@ namespace GameDevTV.RTS.Units
 
                 return baseCmds;
             }
+        }
+
+        /// <summary>Native prefab commands used to seed hand cards when this building completes.</summary>
+        public BaseCommand[] GetNativeCommandsForCardOffers()
+        {
+            return _availableCommands;
         }
 
         private BaseCommand[] GetAugmentedCommands(BaseCommand[] cmds)

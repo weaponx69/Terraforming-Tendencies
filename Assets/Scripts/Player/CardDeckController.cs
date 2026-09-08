@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.EventBus;
@@ -26,11 +27,13 @@ namespace GameDevTV.RTS.Player
         [Header("Deck Configuration")]
         [SerializeField] private List<BlueprintCardSO> masterDeck = new();
         public List<BlueprintCardSO> MasterDeck => masterDeck;
-        [SerializeField] private int handSize = 5;
+        [SerializeField] private int handSize = 10;
 
         private List<BlueprintCardSO> drawPile = new();
         private List<BlueprintCardSO> discardPile = new();
         private List<BlueprintCardSO> hand = new();
+        /// <summary>Old RTS building production — offered into hand after the next week spend.</summary>
+        private readonly Queue<BlueprintCardSO> pendingProductionOffers = new();
 
         /// <summary>The player's current hand of cards (max handSize).</summary>
         public IReadOnlyList<BlueprintCardSO> Hand => hand;
@@ -55,8 +58,8 @@ namespace GameDevTV.RTS.Player
         private void Awake()
         {
             Instance = this;
-            // Keep the hand readable: five larger cards (overrides older serialized 10).
-            handSize = 5;
+            // Scrollable hand — keep up to 10 cards (Solar always reserved).
+            handSize = 10;
         }
 
         private void OnEnable()
@@ -358,21 +361,19 @@ namespace GameDevTV.RTS.Player
             Debug.Log($"[CardDeckController] Restored bootstrap card '{found.cardName}' after planet gen.");
         }
 
-        /// <summary>Never allow more than handSize cards in hand (MVP = 5).</summary>
+        /// <summary>Never allow more than handSize cards — never drop the last Solar.</summary>
         private void TrimHandToSize()
         {
             while (hand.Count > handSize)
             {
-                int dropIdx = hand.Count - 1;
-                // Prefer dropping from the end if it's support; otherwise still trim.
+                int dropIdx = -1;
                 for (int i = hand.Count - 1; i >= 0; i--)
                 {
-                    if (IsMiningDroneCard(hand[i]) || IsSolarUnlockCard(hand[i])) continue;
-                    if (TerraformingGoalColors.GetSectorGoalForCard(hand[i]) != null) continue;
+                    if (IsSolarUnlockCard(hand[i]) || IsMiningDroneCard(hand[i])) continue;
                     dropIdx = i;
                     break;
                 }
-
+                if (dropIdx < 0) break;
                 discardPile.Add(hand[dropIdx]);
                 hand.RemoveAt(dropIdx);
             }
@@ -509,6 +510,7 @@ namespace GameDevTV.RTS.Player
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
+            InjectPendingProductionOffers();
             FillHandInternal();
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
@@ -529,6 +531,7 @@ namespace GameDevTV.RTS.Player
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
+            InjectPendingProductionOffers();
             FillHandInternal();
             EnsureSolarPrereqInHand();
             EnsureMiningDroneInHand();
@@ -556,9 +559,143 @@ namespace GameDevTV.RTS.Player
                 && spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>Legacy force-seat — disabled for Combolands free hand selection.</summary>
+        /// <summary>Always keep a Solar Panel card seated — power is the placement gate.</summary>
         private void EnsureSolarPrereqInHand()
         {
+            if (IsSolarUnlockCardInHand()) return;
+            EnsureBootstrapUnlockInHand("Solar");
+            // If deck is empty of Solar, clone from master so the player never soft-locks.
+            if (!IsSolarUnlockCardInHand())
+            {
+                BlueprintCardSO solarTemplate = masterDeck.FirstOrDefault(IsSolarUnlockCard)
+                    ?? drawPile.FirstOrDefault(IsSolarUnlockCard)
+                    ?? discardPile.FirstOrDefault(IsSolarUnlockCard);
+                if (solarTemplate != null)
+                {
+                    BlueprintCardSO clone = UnityEngine.Object.Instantiate(solarTemplate);
+                    clone.name = $"{solarTemplate.name} (Power Reserve)";
+                    if (hand.Count >= handSize)
+                        MakeHandRoomForHandoffCard(clone);
+                    if (hand.Count < handSize)
+                        hand.Add(clone);
+                }
+            }
+        }
+
+        /// <summary>
+        /// When a building completes, queue whatever it used to build from its RTS command
+        /// list as hand cards for the next draw (after a week is spent).
+        /// </summary>
+        public void QueueProductionFromBuilding(BaseBuilding building)
+        {
+            if (building == null || building.Owner != Owner.Player1) return;
+            var cmds = building.GetNativeCommandsForCardOffers();
+            if (cmds == null || cmds.Length == 0) return;
+            QueueCommandsAsCards(cmds);
+        }
+
+        private void QueueCommandsAsCards(BaseCommand[] cmds)
+        {
+            if (cmds == null) return;
+            foreach (var cmd in cmds)
+            {
+                if (cmd == null) continue;
+                if (cmd is GameDevTV.RTS.Commands.OverrideCommandsCommand ov && ov.Commands != null)
+                {
+                    QueueCommandsAsCards(ov.Commands);
+                    continue;
+                }
+
+                if (cmd is GameDevTV.RTS.Commands.BuildBuildingCommand bbc && bbc.Building != null)
+                {
+                    BlueprintCardSO card = FindOrCloneUnlockCardForBuilding(bbc.Building);
+                    if (card != null) EnqueueProductionOffer(card);
+                }
+                else if (cmd is GameDevTV.RTS.Commands.BuildUnitCommand buc && buc.Unit != null)
+                {
+                    BlueprintCardSO card = FindOrCloneSpawnCardForUnit(buc.Unit);
+                    if (card != null) EnqueueProductionOffer(card);
+                }
+            }
+        }
+
+        private void EnqueueProductionOffer(BlueprintCardSO card)
+        {
+            if (card == null) return;
+            // Avoid flooding duplicates already pending / in hand.
+            if (hand.Contains(card)) return;
+            foreach (var pending in pendingProductionOffers)
+            {
+                if (pending == card) return;
+                if (pending != null && card != null
+                    && pending.cardName == card.cardName) return;
+            }
+            pendingProductionOffers.Enqueue(card);
+            Debug.Log($"[CardDeckController] Queued production offer '{card.cardName}' for next hand fill.");
+        }
+
+        private void InjectPendingProductionOffers()
+        {
+            while (pendingProductionOffers.Count > 0 && hand.Count < handSize)
+            {
+                BlueprintCardSO offer = pendingProductionOffers.Dequeue();
+                if (offer == null) continue;
+                if (hand.Contains(offer)) continue;
+                // Prefer inserting near the front so the player sees new unlocks.
+                hand.Insert(0, offer);
+                drawPile.Remove(offer);
+                discardPile.Remove(offer);
+            }
+        }
+
+        private BlueprintCardSO FindOrCloneUnlockCardForBuilding(BuildingSO building)
+        {
+            if (building == null) return null;
+            bool Match(BlueprintCardSO c) =>
+                c is UnlockBuildingCardSO u
+                && u.buildingToUnlock != null
+                && u.buildingToUnlock.Name == building.Name;
+
+            BlueprintCardSO found = hand.FirstOrDefault(Match)
+                ?? drawPile.FirstOrDefault(Match)
+                ?? discardPile.FirstOrDefault(Match)
+                ?? masterDeck.FirstOrDefault(Match);
+            if (found != null)
+            {
+                if (hand.Contains(found)) return null; // already available
+                return found;
+            }
+
+            // Runtime unlock card so production is still playable as a tile.
+            var created = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+            created.cardName = building.Name;
+            created.buildingToUnlock = building;
+            created.icon = building.Icon;
+            created.name = $"Unlock_{building.Name}_FromBuilding";
+            return created;
+        }
+
+        private BlueprintCardSO FindOrCloneSpawnCardForUnit(AbstractUnitSO unit)
+        {
+            if (unit == null) return null;
+            bool Match(BlueprintCardSO c) =>
+                c is SpawnUnitCardSO s
+                && s.cardName != null
+                && unit.Name != null
+                && s.cardName.IndexOf(unit.Name, StringComparison.OrdinalIgnoreCase) >= 0;
+
+            BlueprintCardSO found = drawPile.FirstOrDefault(Match)
+                ?? discardPile.FirstOrDefault(Match)
+                ?? masterDeck.FirstOrDefault(Match);
+            if (found != null) return found;
+
+            var created = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
+            created.cardName = unit.Name;
+            created.icon = unit.Icon;
+            created.name = $"Spawn_{unit.Name}_FromBuilding";
+            if (unit.Prefab != null)
+                created.unitPrefab = unit.Prefab;
+            return created;
         }
 
         private static bool IsSolarUnlockCard(BlueprintCardSO card)
@@ -923,7 +1060,7 @@ namespace GameDevTV.RTS.Player
                 && BuildingSiteRegistry.IsSolarBuilding(u.buildingToUnlock));
             if (solarTemplate != null)
             {
-                for (int i = 0; i < 2; i++)
+                for (int i = 0; i < 6; i++)
                 {
                     BlueprintCardSO extraSolar = UnityEngine.Object.Instantiate(solarTemplate);
                     extraSolar.name = $"{solarTemplate.name} (Infra Copy {i + 1})";

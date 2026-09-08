@@ -386,8 +386,13 @@ namespace GameDevTV.RTS.Player
             activeCommand = evt.Command;
             commandTargetUnits = new List<ISelectable>(selectedUnits);
 
-            // Auto-place logic for Command Posts: automatically build in the nearest unoccupied sector
-            if (activeCommand is BuildBuildingCommand commandPostBbc && commandPostBbc.Building != null && commandPostBbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            // Legacy: Command Post select used to pan to the nearest empty sector center.
+            // That pulled the first CP far from a Solar the player had just placed.
+            // Card plays (HandIndex >= 0) keep the camera where the player is looking.
+            if (activeCommand is BuildBuildingCommand commandPostBbc
+                && commandPostBbc.HandIndex < 0
+                && commandPostBbc.Building != null
+                && commandPostBbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
                 var sectorManager = SectorManager.Instance;
                 if (sectorManager != null)
@@ -417,23 +422,12 @@ namespace GameDevTV.RTS.Player
                             .OrderBy(s => Vector3.Distance(refPos, s.Center))
                             .FirstOrDefault();
 
-                        // Maybe I also want to check if there is a command post here too
-                        if (nearestUnoccupied != null)
+                        if (nearestUnoccupied != null && cameraTarget != null)
                         {
-                            // Move camera to the auto-placement site so the player can see the construction begin
-                            if (cameraTarget != null)
-                            {
-                                Vector3 targetCameraPos = nearestUnoccupied.Center;
-                                targetCameraPos.y = cameraTarget.position.y; // Maintain current camera height/zoom
-                                cameraTarget.position = targetCameraPos;
-                                hasCameraBeenFocused = true;
-                            }
-
-                            RaycastHit simulatedHit = new RaycastHit();
-                            simulatedHit.point = nearestUnoccupied.Center;
-                            
-                            // ActivateAction(simulatedHit);
-                            // return;
+                            Vector3 targetCameraPos = nearestUnoccupied.Center;
+                            targetCameraPos.y = cameraTarget.position.y;
+                            cameraTarget.position = targetCameraPos;
+                            hasCameraBeenFocused = true;
                         }
                     }
                 }

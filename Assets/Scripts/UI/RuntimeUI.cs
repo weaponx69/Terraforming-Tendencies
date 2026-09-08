@@ -1128,7 +1128,8 @@ namespace GameDevTV.RTS.UI
         {
             if (selectedUnits.Count == 1 && selectedUnits.First() is Worker)
             {
-                actionsUI.EnableFor(selectedUnits);
+                // Card hand only — no RTS worker build menu.
+                TryDisable(actionsUI);
             }
         }
 
@@ -1167,8 +1168,9 @@ namespace GameDevTV.RTS.UI
             if (selectedUnits.Count > 0)
             {
                 TryDisable(globalCommanderUI);
-                actionsUI.EnableFor(selectedUnits);
-                actionsUI.gameObject.SetActive(true);
+                // Combolands: all builds come from the card hand — hide RTS action menus.
+                TryDisable(actionsUI);
+                if (actionsUI != null) actionsUI.gameObject.SetActive(false);
 
                 if (selectedUnits.Count == 1)
                 {
@@ -1188,8 +1190,8 @@ namespace GameDevTV.RTS.UI
                 
                 if (globalCommander != null)
                 {
-                    actionsUI.EnableFor(new HashSet<AbstractCommandable> { globalCommander });
-                    actionsUI.gameObject.SetActive(true);
+                    TryDisable(actionsUI);
+                    if (actionsUI != null) actionsUI.gameObject.SetActive(false);
                     
                     if (globalCommanderUI != null)
                     {
@@ -1274,7 +1276,7 @@ namespace GameDevTV.RTS.UI
 
         private void HandleSupplyChange(SupplyEvent evt)
         {
-            actionsUI.EnableFor(selectedUnits);
+            bottomBarActionsUI?.RefreshBar();
         }
 
         private void SetIcon(Sprite icon)
