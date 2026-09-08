@@ -139,7 +139,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 ## 0.7 Board, power, sectors
 
 * **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (12 m cells). **Acts** advance sector-by-sector.
-* **Power:** only hard **placement** gate for cards (`PowerGridManager.CanPlayBuildingForPower`). Hand may hold cards the player cannot place yet.
+* **Power:** only hard **placement** gate for cards (`PowerGridManager.CanPlayBuildingForPower`). Hand may hold cards the player cannot place yet. **Adjacent tiles auto-link** on the power graph when construction completes (`BaseBuilding.AutoConnectAdjacentPowerNodes`) — no manual Connect Power.
 * **Sectors:** map-gen count drives **Act count**. Each Act focuses terraforming on one sector (`SectorManager.BeginTerraformingOn`). No old unlock/pad lockdown.
 * Reserved pads / drones may still exist in the scene for legacy systems; **card plays ignore them**.
 * Non-card builds (legacy drone path) do **not** force the tile grid.
@@ -177,7 +177,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 | Win / lose Acts | `ColonyActManager` |
 | Legacy `GenerationManager` | `MaxGenerations = 1` shell; victory via `NotifyColonyActVictory` — **not** climate progress |
 | `DoesBuildingCountForActiveClimate` | True only for buildings in the **current Act focus sector** |
-| Card UI | Lower-left hand (~5-card viewport + `RectMask2D`); wheel scrolls horizontally; cost chip shows **1 Week** |
+| Card UI | Lower-left hand (~5-card viewport + `RectMask2D`); hover lights the dock; wheel scrolls horizontally; cost chip shows **1 Week** |
 | Instant card place | Completes immediately; week spent on consume; score deferred until after week when needed |
 
 ---

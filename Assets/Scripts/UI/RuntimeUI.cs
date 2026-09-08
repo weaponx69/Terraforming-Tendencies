@@ -213,9 +213,18 @@ namespace GameDevTV.RTS.UI
                 Transform border = bottomBar.Find("Border");
                 if (border != null) border.gameObject.SetActive(false);
 
-                ClearUiImage(bottomBar.Find("Actions Container/Background"));
                 ClearUiImage(bottomBar.Find("Minimap Container/Background"));
                 ClearUiImage(bottomBar.Find("Menu Container"));
+
+                // Remove retired RTS action menu (builds are card-hand only).
+                Transform actionsContainer = bottomBar.Find("Actions Container");
+                if (actionsContainer == null)
+                    actionsContainer = FindChildRecursive(bottomBar, "Actions Container");
+                if (actionsContainer != null)
+                {
+                    actionsUI = null;
+                    Destroy(actionsContainer.gameObject);
+                }
 
                 // Debug/layout: make Center Container bounds obvious over the world.
                 EnsureOpaqueBoxAround(FindChildRecursive(bottomBar, "Center Container"));
@@ -224,11 +233,7 @@ namespace GameDevTV.RTS.UI
                 ShiftBuildingSelectedPanelRight(bottomBar);
             }
 
-            Transform cardContainer = FindChildRecursive(transform, "Bottom Action Bar Container");
-            if (cardContainer != null)
-            {
-                ClearUiImage(cardContainer);
-            }
+            // Card hand dock owns its own hover glow — do not clear its Image.
         }
 
         /// <summary>

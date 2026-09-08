@@ -41,6 +41,9 @@ namespace GameDevTV.RTS.UI.Containers
         private float viewportWidth;
         private RectTransform cardsRt;
         private RectTransform containerRt;
+        private Image dockImage;
+        private Color dockIdleColor = new Color(0.04f, 0.07f, 0.12f, 0.40f);
+        private Color dockHoverColor = new Color(0.20f, 0.55f, 0.85f, 0.62f);
         private static readonly List<RaycastResult> UiRaycastHits = new List<RaycastResult>(16);
         private static BottomBarActionsUI instance;
 
@@ -171,11 +174,11 @@ namespace GameDevTV.RTS.UI.Containers
             // Mask so off-screen cards are clipped.
             if (containerRt.GetComponent<RectMask2D>() == null)
                 containerRt.gameObject.AddComponent<RectMask2D>();
-            var dockImg = containerRt.GetComponent<Image>();
-            if (dockImg == null) dockImg = containerRt.gameObject.AddComponent<Image>();
-            dockImg.color = new Color(0f, 0f, 0f, 0.001f);
-            dockImg.raycastTarget = true; // needed so scroll wheel hits the hand
-            dockImg.enabled = true;
+            dockImage = containerRt.GetComponent<Image>();
+            if (dockImage == null) dockImage = containerRt.gameObject.AddComponent<Image>();
+            dockImage.color = dockIdleColor;
+            dockImage.raycastTarget = true; // needed so scroll wheel / hover hit the hand
+            dockImage.enabled = true;
 
             // This bar fills the dock; we slide it horizontally for scrolling.
             cardsRt.anchorMin = new Vector2(0f, 0f);
@@ -325,12 +328,22 @@ namespace GameDevTV.RTS.UI.Containers
         private void Update()
         {
             if (!Application.isPlaying) return;
+
+            UpdateDockHoverGlow();
+
             if (BuildingSiteSelectionController.IsSelecting) return;
 
             HandleMouseWheelScroll();
 
             if (Time.frameCount % 30 == 0)
                 RefreshBar();
+        }
+
+        private void UpdateDockHoverGlow()
+        {
+            if (dockImage == null) return;
+            Color target = IsPointerOverHand() ? dockHoverColor : dockIdleColor;
+            dockImage.color = Color.Lerp(dockImage.color, target, Time.unscaledDeltaTime * 12f);
         }
 
         private void HandleMouseWheelScroll()

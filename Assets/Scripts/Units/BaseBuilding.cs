@@ -383,6 +383,12 @@ namespace GameDevTV.RTS.Units
                 {
                     CompleteConstruction();
                 }
+                else if (hasCompletedConstruction
+                    || Progress.State == BuildingProgress.BuildingState.Completed)
+                {
+                    // Already completed earlier this frame (reserved-site) — still wire neighbors.
+                    AutoConnectAdjacentPowerNodes();
+                }
                 
                 RaiseSpawnEvent();
             }
@@ -557,33 +563,9 @@ namespace GameDevTV.RTS.Units
             if (Owner == Owner.Player1)
                 CardDeckController.Instance?.QueueProductionFromBuilding(this);
 
-            // Add the dynamic Connect Power command if it doesn't already have one
-            bool hasConnectCommand = false;
-            BaseCommand[] existingCommands = AvailableCommands ?? System.Array.Empty<BaseCommand>();
-            foreach (var cmd in existingCommands)
-            {
-                if (cmd is GameDevTV.RTS.Commands.ConnectPowerCommand)
-                {
-                    hasConnectCommand = true;
-                    break;
-                }
-            }
+            // Orthogonal tile neighbors share power automatically (no manual Connect Power).
+            AutoConnectAdjacentPowerNodes();
 
-            if (!hasConnectCommand)
-            {
-                var connectCommand = ScriptableObject.CreateInstance<GameDevTV.RTS.Commands.ConnectPowerCommand>();
-                var nameField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Name>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                if (nameField != null) nameField.SetValue(connectCommand, "Connect Power");
-
-                var iconField = typeof(GameDevTV.RTS.Commands.BaseCommand).GetField("<Icon>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                if (iconField != null) iconField.SetValue(connectCommand, UnityEngine.Resources.Load<UnityEngine.Sprite>("PlugIcon"));
-
-                var commandList = new System.Collections.Generic.List<GameDevTV.RTS.Commands.BaseCommand>(existingCommands);
-                connectCommand.Slot = FindFreeSlot(commandList);
-                commandList.Add(connectCommand);
-                AvailableCommands = commandList.ToArray();
-            }
-            
             // This is where available commandables are named.
             if (BuildingSO != null)
             {
@@ -733,6 +715,35 @@ namespace GameDevTV.RTS.Units
             }
 
             RaiseSpawnEvent();
+        }
+
+        /// <summary>
+        /// Wire this building into the power graph of every completed orthogonal
+        /// tile neighbor. Replaces manual Connect Power for the Combolands grid.
+        /// </summary>
+        private void AutoConnectAdjacentPowerNodes()
+        {
+            if (!TryGetComponent(out PowerNode myNode)) return;
+
+            Vector2Int cell = ColonyTileGrid.WorldToCell(transform.position);
+            var neighbors = new List<BaseBuilding>(4);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(cell, Owner, neighbors);
+
+            int linked = 0;
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                BaseBuilding other = neighbors[i];
+                if (other == null || other == this) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                if (!other.TryGetComponent(out PowerNode otherNode)) continue;
+                if (myNode.ConnectedNodes.Contains(otherNode)) continue;
+
+                myNode.ConnectTo(otherNode);
+                linked++;
+            }
+
+            if (linked > 0)
+                Debug.Log($"[Power] {name} auto-linked to {linked} adjacent building(s).");
         }
 
         private IEnumerator ConnectPowerGeneratorToCommandPost()
