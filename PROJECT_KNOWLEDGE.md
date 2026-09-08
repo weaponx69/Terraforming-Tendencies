@@ -26,6 +26,8 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Power place-gate | [`PowerGridManager`](Assets/Scripts/Environment/PowerGridManager.cs) (`CanPlayBuildingForPower`) |
 | Look / fog / flora | [`ClimateVisualStages`](Assets/Scripts/Environment/ClimateVisualStages.cs), [`VegetationManager`](Assets/Scripts/Environment/VegetationManager.cs) |
 | Objectives HUD | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) |
+| Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
+| Tile snap / place SFX | [`AudioManager`](Assets/Scripts/Audio/AudioManager.cs) (`PlayTileSnapSound` / `PlayPlaceClickSound`) |
 
 ---
 

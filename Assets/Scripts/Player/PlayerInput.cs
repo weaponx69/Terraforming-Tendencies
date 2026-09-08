@@ -686,8 +686,17 @@ namespace GameDevTV.RTS.Player
 
             if (cardTilePlace)
             {
+                Vector2Int? previousSticky = tileGhostStickyCell;
                 hitPos = ColonyTileGrid.SnapForPlacement(
                     hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
+
+                // Soft tick when the ghost settles on a new cell that joins a neighbor.
+                if (joinCount > 0
+                    && tileGhostStickyCell.HasValue
+                    && (!previousSticky.HasValue || previousSticky.Value != tileGhostStickyCell.Value))
+                {
+                    AudioManager.Instance.PlayTileSnapSound();
+                }
             }
 
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
@@ -1262,7 +1271,8 @@ namespace GameDevTV.RTS.Player
             }
 
             // Commit the cell the ghost/footprint was showing — not a fresh noisy ray hit.
-            if (activeCommand is BuildBuildingCommand placeBbc && placeBbc.HandIndex >= 0)
+            bool cardTilePlace = activeCommand is BuildBuildingCommand placeBbc && placeBbc.HandIndex >= 0;
+            if (cardTilePlace)
             {
                 Vector3 placePoint;
                 if (tileGhostStickyCell.HasValue)
@@ -1327,18 +1337,23 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            bool handled = false;
             for (int i = 0; i < abstractCommandables.Count; i++)
             {
                 CommandContext context = new(abstractCommandables[i], hit, i);
                 if (activeCommand.CanHandle(context))
                 {
                     activeCommand.Handle(context);
+                    handled = true;
                     if (activeCommand.IsSingleUnitCommand)
                     {
                         break;
                     }
                 }
             }
+
+            if (handled && cardTilePlace)
+                AudioManager.Instance.PlayPlaceClickSound();
 
 
             if (activeCommand != null && !activeCommand.StaysActive)

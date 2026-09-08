@@ -28,6 +28,8 @@ namespace GameDevTV.RTS.Audio
         private AudioSource musicSource;
         private AudioSource soundEffectSource;
         private AudioClip hexHoverClip;
+        private AudioClip tileSnapClip;
+        private AudioClip placeClickClip;
         private Coroutine fadeCoroutine;
         private float targetVolume = 0.5f; // Set a default pleasant background volume
 
@@ -65,6 +67,8 @@ namespace GameDevTV.RTS.Audio
             soundEffectSource.spatialBlend = 0f;
             soundEffectSource.volume = 0.35f;
             hexHoverClip = CreateHexHoverClip();
+            tileSnapClip = CreateTileSnapClip();
+            placeClickClip = CreatePlaceClickClip();
 
             AudioClip bgm = Resources.Load<AudioClip>("Audio/Music/AtmosphericSoundtrack");
             if (bgm != null)
@@ -132,10 +136,25 @@ namespace GameDevTV.RTS.Audio
 
         public void PlayHexHoverSound()
         {
-            if (soundEffectSource != null && hexHoverClip != null)
-            {
-                soundEffectSource.PlayOneShot(hexHoverClip);
-            }
+            PlaySfx(hexHoverClip);
+        }
+
+        /// <summary>Soft tick when the tile ghost snaps next to an existing building.</summary>
+        public void PlayTileSnapSound()
+        {
+            PlaySfx(tileSnapClip, 0.85f);
+        }
+
+        /// <summary>Click when the player confirms a card tile placement.</summary>
+        public void PlayPlaceClickSound()
+        {
+            PlaySfx(placeClickClip, 1f);
+        }
+
+        private void PlaySfx(AudioClip clip, float volumeScale = 1f)
+        {
+            if (soundEffectSource != null && clip != null)
+                soundEffectSource.PlayOneShot(clip, volumeScale);
         }
 
         private static AudioClip CreateHexHoverClip()
@@ -154,6 +173,49 @@ namespace GameDevTV.RTS.Audio
             }
 
             AudioClip clip = AudioClip.Create("HexHover", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private static AudioClip CreateTileSnapClip()
+        {
+            const int sampleRate = 44100;
+            const float duration = 0.06f;
+            int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float time = i / (float)sampleRate;
+                float envelope = Mathf.Exp(-time * 42f);
+                // Soft wooden/plastic tick — lower than hex hover.
+                samples[i] = (Mathf.Sin(2f * Mathf.PI * 520f * time) +
+                    0.4f * Mathf.Sin(2f * Mathf.PI * 780f * time)) * envelope * 0.22f;
+            }
+
+            AudioClip clip = AudioClip.Create("TileSnap", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private static AudioClip CreatePlaceClickClip()
+        {
+            const int sampleRate = 44100;
+            const float duration = 0.09f;
+            int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float time = i / (float)sampleRate;
+                float clickEnv = Mathf.Exp(-time * 55f);
+                float bodyEnv = Mathf.Exp(-time * 18f);
+                float click = Mathf.Sin(2f * Mathf.PI * 1400f * time) * clickEnv;
+                float body = Mathf.Sin(2f * Mathf.PI * 220f * time) * bodyEnv * 0.55f;
+                samples[i] = (click + body) * 0.28f;
+            }
+
+            AudioClip clip = AudioClip.Create("PlaceClick", sampleCount, 1, sampleRate, false);
             clip.SetData(samples, 0);
             return clip;
         }

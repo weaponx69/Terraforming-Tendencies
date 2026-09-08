@@ -333,6 +333,17 @@ namespace GameDevTV.RTS.UI
 #endif
             }
 
+            Transform weeksPanelT = FindChildRecursive(transform, "Weeks Left Panel");
+            if (weeksPanelT == null)
+            {
+                GameObject weeksPanel = new GameObject("Weeks Left Panel");
+                weeksPanel.transform.SetParent(transform, false);
+                weeksPanel.AddComponent<GameDevTV.RTS.UI.Containers.WeeksLeftUI>();
+#if UNITY_EDITOR
+                if (!Application.isPlaying) UnityEditor.Undo.RegisterCreatedObjectUndo(weeksPanel, "Create Weeks Left Panel");
+#endif
+            }
+
             // Wire the bottom bar action panel: use Inspector reference first,
             // then search children as fallback, then create as last resort
             StripLegacyBottomBarChrome();
