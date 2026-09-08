@@ -7,7 +7,9 @@ using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -39,9 +41,16 @@ namespace GameDevTV.RTS.UI.Containers
         private float viewportWidth;
         private RectTransform cardsRt;
         private RectTransform containerRt;
+        private static readonly List<RaycastResult> UiRaycastHits = new List<RaycastResult>(16);
+        private static BottomBarActionsUI instance;
+
+        /// <summary>True while the pointer is over the hand strip (camera zoom should yield the wheel).</summary>
+        public static bool IsPointerOverHandStrip =>
+            instance != null && instance.isBuilt && instance.IsPointerOverHand();
 
         private void OnEnable()
         {
+            instance = this;
             if (!Application.isPlaying) return;
             Bus<UnitSelectedEvent>.OnEvent[owner] += HandleRefresh;
             Bus<UnitDeselectedEvent>.OnEvent[owner] += HandleRefresh;
@@ -54,6 +63,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void OnDisable()
         {
+            if (instance == this) instance = null;
             if (!Application.isPlaying) return;
             Bus<UnitSelectedEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<UnitDeselectedEvent>.OnEvent[owner] -= HandleRefresh;
@@ -62,10 +72,12 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingSpawnEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] -= HandleRefresh;
             CardDeckController.OnHandChanged -= RefreshBar;
+            if (instance == this) instance = null;
         }
 
         private void Awake()
         {
+            instance = this;
             cardsRt = transform as RectTransform;
             if (cardsRt == null)
             {
@@ -325,13 +337,12 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (Mouse.current == null || containerRt == null) return;
             if (contentWidth <= viewportWidth + 0.5f) return;
+            if (!IsPointerOverHand()) return;
 
             Vector2 scroll = Mouse.current.scroll.ReadValue();
             // Vertical wheel scrolls the hand left/right; also accept horizontal axis.
             float delta = scroll.y + scroll.x;
             if (Mathf.Abs(delta) < 0.01f) return;
-
-            if (!IsPointerOverHand()) return;
 
             scrollOffset += delta * scrollSpeed;
             ClampScroll();
@@ -341,12 +352,30 @@ namespace GameDevTV.RTS.UI.Containers
         private bool IsPointerOverHand()
         {
             if (containerRt == null || Mouse.current == null) return false;
+
             Vector2 screen = Mouse.current.position.ReadValue();
+
+            // Prefer UI raycasts so hovering any card button counts (rect math alone
+            // can miss depending on canvas scaler / Game view letterboxing).
+            if (EventSystem.current != null)
+            {
+                var ped = new PointerEventData(EventSystem.current) { position = screen };
+                UiRaycastHits.Clear();
+                EventSystem.current.RaycastAll(ped, UiRaycastHits);
+                for (int i = 0; i < UiRaycastHits.Count; i++)
+                {
+                    Transform hit = UiRaycastHits[i].gameObject.transform;
+                    if (hit == containerRt || hit.IsChildOf(containerRt) || hit == transform || hit.IsChildOf(transform))
+                        return true;
+                }
+            }
+
             Camera eventCam = null;
             var canvas = containerRt.GetComponentInParent<Canvas>();
             if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
                 eventCam = canvas.worldCamera;
-            return RectTransformUtility.RectangleContainsScreenPoint(containerRt, screen, eventCam);
+            return RectTransformUtility.RectangleContainsScreenPoint(containerRt, screen, eventCam)
+                || (cardsRt != null && RectTransformUtility.RectangleContainsScreenPoint(cardsRt, screen, eventCam));
         }
 
         private void HandleRefresh(UnitSelectedEvent evt) { RefreshBar(); }

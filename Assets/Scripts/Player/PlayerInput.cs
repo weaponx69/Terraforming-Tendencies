@@ -11,6 +11,7 @@ using UnityEngine.InputSystem;
 using System.Linq;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.LowLevel;
+using GameDevTV.RTS.UI.Containers;
 
 namespace GameDevTV.RTS.Player
 {
@@ -1423,9 +1424,12 @@ namespace GameDevTV.RTS.Player
         {
             if (cinemachineFollow == null) return;
 
+            // Hand strip owns the wheel while hovered — don't zoom the camera.
+            bool handOwnsWheel = BottomBarActionsUI.IsPointerOverHandStrip;
+
             // Mouse scroll zoom
             float scroll = Mouse.current.scroll.y.ReadValue();
-            if (Mathf.Abs(scroll) > 0.01f)
+            if (!handOwnsWheel && Mathf.Abs(scroll) > 0.01f)
             {
                 // Normalize scroll to get consistent zoom speeds across all operating systems and mice
                 float scrollSign = Mathf.Sign(scroll);
