@@ -23,7 +23,6 @@ namespace GameDevTV.RTS.Commands
         {
             return context.Commandable is BaseBuilding building
                 && building.Owner == context.Owner
-                && building is not GlobalCommander
                 && building.Progress.State != BuildingProgress.BuildingState.Destroyed;
         }
 

@@ -1172,7 +1172,6 @@ namespace GameDevTV.RTS.Units
         /// </summary>
         public bool TryDemolish(bool refund = true)
         {
-            if (this is GlobalCommander) return false;
             if (Owner != Owner.Player1) return false;
             if (Progress.State == BuildingProgress.BuildingState.Destroyed) return false;
 
@@ -1210,7 +1209,6 @@ namespace GameDevTV.RTS.Units
 
         private void EnsureBuildingHealthBar()
         {
-            if (this is GlobalCommander) return;
             if (GetComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>() != null) return;
             gameObject.AddComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>();
         }

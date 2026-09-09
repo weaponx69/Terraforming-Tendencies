@@ -537,7 +537,6 @@ namespace GameDevTV.RTS.Player
             for (int i = 0; i < selectedUnits.Count; i++)
             {
                 if (selectedUnits[i] is not BaseBuilding building) continue;
-                if (building is GlobalCommander) continue;
                 if (building.Owner != Owner.Player1) continue;
                 building.TryDemolish(refund: true);
                 return;
@@ -1114,8 +1113,7 @@ namespace GameDevTV.RTS.Player
 
                     BaseBuilding clickedBuilding = vetoHit.collider.GetComponentInParent<BaseBuilding>();
                     if (clickedBuilding != null
-                        && clickedBuilding.Owner == Owner.Player1
-                        && clickedBuilding is not GlobalCommander)
+                        && clickedBuilding.Owner == Owner.Player1)
                     {
                         // Select the building so Delete still works, then open context menu.
                         if (!selectedUnits.Contains(clickedBuilding))

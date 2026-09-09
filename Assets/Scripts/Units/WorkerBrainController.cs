@@ -76,7 +76,6 @@ namespace GameDevTV.RTS.Units
                 if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
                 if (!BuildingSiteSlot.IsValidOccupant(building)) continue;
                 if (building.CurrentHealth >= building.MaxHealth) continue;
-                if (building is GlobalCommander) continue;
                 if (building.GetComponent<DecayStarter>() != null) continue;
 
                 if ((building.transform.position - origin).sqrMagnitude > radiusSqr) continue;

@@ -72,7 +72,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void Show(BaseBuilding building, Vector2 screenPosition)
         {
-            if (building == null || building is GlobalCommander) return;
+            if (building == null) return;
             if (building.Owner != Owner.Player1) return;
 
             EnsureBuilt();
