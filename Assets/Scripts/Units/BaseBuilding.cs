@@ -744,7 +744,7 @@ namespace GameDevTV.RTS.Units
             }
 
             // Reach a generator even if not ortho-adjacent (Manhattan ≤ 2).
-            linked += ConnectToNearestPowerGenerator(myNode, maxManhattan: 2);
+                linked += ConnectToNearestPowerGenerator(myNode, maxManhattan: 4);
 
             if (linked > 0)
                 Debug.Log($"[Power] {name} auto-linked ({linked} connection(s)).");
@@ -1033,6 +1033,13 @@ namespace GameDevTV.RTS.Units
             if (!gameObject.activeInHierarchy) return;
             if (Progress.State != BuildingProgress.BuildingState.Completed) return;
 
+            // Colony Acts: only the focus sector's climate buildings push the meters.
+            if (SectorManager.Instance != null
+                && !SectorManager.Instance.DoesBuildingCountForActiveClimate(this))
+            {
+                return;
+            }
+
             BuildingSO def = ResolvedBuildingSO;
             if (def?.BuildingConfig == null) return;
 
@@ -1050,14 +1057,14 @@ namespace GameDevTV.RTS.Units
                         || n.Contains("Carbon Dioxide Import", System.StringComparison.OrdinalIgnoreCase)
                         || n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase)))
                 {
-                    atmosRate = 0.05f;
+                    atmosRate = 0.012f;
                 }
                 if (tempRate <= 0f
                     && (n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase)
                         || n.Contains("Geothermal", System.StringComparison.OrdinalIgnoreCase)
                         || n.Contains("Methanogenic", System.StringComparison.OrdinalIgnoreCase)))
                 {
-                    tempRate = 0.5f;
+                    tempRate = 0.2f;
                 }
                 if (waterRate <= 0f
                     && (n.Contains("Aquifer", System.StringComparison.OrdinalIgnoreCase)
@@ -1065,9 +1072,14 @@ namespace GameDevTV.RTS.Units
                         || (n.Contains("Water", System.StringComparison.OrdinalIgnoreCase)
                             && !n.Contains("Processor", System.StringComparison.OrdinalIgnoreCase))))
                 {
-                    waterRate = 0.5f;
+                    waterRate = 0.1f;
                 }
             }
+
+            // Soft caps so a single tile cannot clear an Act channel in seconds.
+            tempRate = Mathf.Min(tempRate, 0.3f);
+            atmosRate = Mathf.Min(atmosRate, 0.015f);
+            waterRate = Mathf.Min(waterRate, 0.12f);
 
             if (tempRate <= 0f && atmosRate <= 0f && waterRate <= 0f)
             {

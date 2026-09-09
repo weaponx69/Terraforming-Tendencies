@@ -13,8 +13,17 @@ namespace GameDevTV.RTS.Environment
         public static bool IsSolarBuilding(BuildingSO building)
         {
             if (building == null || string.IsNullOrEmpty(building.Name)) return false;
-            string name = building.Name.ToLowerInvariant();
-            return name.Contains("solar");
+            // Exact Solar Panel only — "Solar Greenhouse" is habitat, not a generator.
+            return building.Name.IndexOf("Solar Panel", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>True when the building produces grid power (Solar, Geothermal, Magnetic Shield, …).</summary>
+        public static bool IsPowerGeneratorBuilding(BuildingSO building)
+        {
+            if (building == null) return false;
+            if (IsSolarBuilding(building)) return true;
+            var cfg = building.BuildingConfig;
+            return cfg != null && cfg.PowerGeneration > 0f;
         }
 
         public static bool IsMineBuilding(BuildingSO building)

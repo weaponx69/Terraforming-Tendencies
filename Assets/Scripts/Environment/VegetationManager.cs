@@ -32,8 +32,8 @@ namespace GameDevTV.RTS.Environment
         public LayerMask groundLayer;
 
         [Header("Oxygen & Cost Balance")]
-        public float oxygenPerGrass = 0.0005f;
-        public float oxygenPerPlant = 0.001f;
+        public float oxygenPerGrass = 0.00005f;
+        public float oxygenPerPlant = 0.0001f;
         public float biomassCostPerGrass = 0.02f;
         public float biomassCostPerPlant = 0.1f;
         [Range(0f, 1f)]

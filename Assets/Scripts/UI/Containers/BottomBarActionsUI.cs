@@ -406,6 +406,8 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
+            EnsureHandSlotCount(hand.Count);
+
             int cardsToShow = Mathf.Min(hand.Count, actionButtons.Length);
 
             for (int i = 0; i < actionButtons.Length; i++)
@@ -461,6 +463,33 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             FitLayoutToActiveCards();
+        }
+
+        /// <summary>
+        /// Clone UIActionButton slots so a large scrollable hand is never truncated by
+        /// the original 9–12 prefab buttons.
+        /// </summary>
+        private void EnsureHandSlotCount(int needed)
+        {
+            if (actionButtons == null || actionButtons.Length == 0) return;
+            int target = Mathf.Max(needed, actionButtons.Length);
+            // Cap runaway clones; handSize is 24.
+            target = Mathf.Min(target, 32);
+            if (actionButtons.Length >= target) return;
+
+            var template = actionButtons[0];
+            if (template == null) return;
+
+            var list = new List<UIActionButton>(actionButtons);
+            while (list.Count < target)
+            {
+                var clone = Instantiate(template, transform);
+                clone.name = list.Count.ToString();
+                clone.gameObject.SetActive(true);
+                list.Add(clone);
+            }
+            actionButtons = list.ToArray();
+            ApplyPlayingCardLayout();
         }
 
         private void PlayBuildingCard(int cardIndex, BuildingSO building)

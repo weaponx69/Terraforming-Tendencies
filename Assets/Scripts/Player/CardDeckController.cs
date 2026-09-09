@@ -27,7 +27,7 @@ namespace GameDevTV.RTS.Player
         [Header("Deck Configuration")]
         [SerializeField] private List<BlueprintCardSO> masterDeck = new();
         public List<BlueprintCardSO> MasterDeck => masterDeck;
-        [SerializeField] private int handSize = 10;
+        [SerializeField] private int handSize = 24;
 
         private List<BlueprintCardSO> drawPile = new();
         private List<BlueprintCardSO> discardPile = new();
@@ -58,8 +58,8 @@ namespace GameDevTV.RTS.Player
         private void Awake()
         {
             Instance = this;
-            // Scrollable hand — keep up to 10 cards (Solar always reserved).
-            handSize = 10;
+            // Scrollable hand — large hand since the strip scrolls horizontally.
+            handSize = 24;
         }
 
         private void OnEnable()
@@ -166,9 +166,9 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            EnsureSolarPrereqInHand();
+            EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             FillHandInternal();
-            EnsureSolarPrereqInHand();
+            EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
             TrimHandToSize();
@@ -508,12 +508,12 @@ namespace GameDevTV.RTS.Player
         {
             var before = hand.ToArray();
             DiscardUnplayableFromHand();
-            EnsureSolarPrereqInHand();
+            EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
             InjectPendingProductionOffers();
             FillHandInternal();
-            EnsureSolarPrereqInHand();
+            EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
             TrimHandToSize();
@@ -529,12 +529,12 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void FillHand()
         {
-            EnsureSolarPrereqInHand();
+            EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
             InjectPendingProductionOffers();
             FillHandInternal();
-            EnsureSolarPrereqInHand();
+            EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
             TrimHandToSize();
@@ -560,26 +560,32 @@ namespace GameDevTV.RTS.Player
                 && spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>Always keep a Solar Panel card seated — power is the placement gate.</summary>
+        /// <summary>
+        /// Always keep at least one power-generator card seated (Solar Panel, Geothermal,
+        /// Magnetic Shield, etc.) so the player cannot soft-lock on the power place-gate.
+        /// </summary>
         private void EnsureSolarPrereqInHand()
         {
-            if (IsSolarUnlockCardInHand()) return;
+            if (IsPowerGeneratorUnlockCardInHand()) return;
             EnsureBootstrapUnlockInHand("Solar");
-            // If deck is empty of Solar, clone from master so the player never soft-locks.
-            if (!IsSolarUnlockCardInHand())
+            if (IsPowerGeneratorUnlockCardInHand()) return;
+            EnsureBootstrapUnlockInHand("Geothermal");
+            if (IsPowerGeneratorUnlockCardInHand()) return;
+
+            // Clone from deck so the player never soft-locks.
+            BlueprintCardSO powerTemplate = masterDeck.FirstOrDefault(IsPowerGeneratorUnlockCard)
+                ?? drawPile.FirstOrDefault(IsPowerGeneratorUnlockCard)
+                ?? discardPile.FirstOrDefault(IsPowerGeneratorUnlockCard)
+                ?? masterDeck.FirstOrDefault(IsSolarUnlockCard)
+                ?? drawPile.FirstOrDefault(IsSolarUnlockCard);
+            if (powerTemplate != null)
             {
-                BlueprintCardSO solarTemplate = masterDeck.FirstOrDefault(IsSolarUnlockCard)
-                    ?? drawPile.FirstOrDefault(IsSolarUnlockCard)
-                    ?? discardPile.FirstOrDefault(IsSolarUnlockCard);
-                if (solarTemplate != null)
-                {
-                    BlueprintCardSO clone = UnityEngine.Object.Instantiate(solarTemplate);
-                    clone.name = $"{solarTemplate.name} (Power Reserve)";
-                    if (hand.Count >= handSize)
-                        MakeHandRoomForHandoffCard(clone);
-                    if (hand.Count < handSize)
-                        hand.Add(clone);
-                }
+                BlueprintCardSO clone = UnityEngine.Object.Instantiate(powerTemplate);
+                clone.name = $"{powerTemplate.name} (Power Reserve)";
+                if (hand.Count >= handSize)
+                    MakeHandRoomForHandoffCard(clone);
+                if (hand.Count < handSize)
+                    hand.Add(clone);
             }
         }
 
@@ -706,7 +712,15 @@ namespace GameDevTV.RTS.Player
                 && BuildingSiteRegistry.IsSolarBuilding(unlock.buildingToUnlock);
         }
 
+        private static bool IsPowerGeneratorUnlockCard(BlueprintCardSO card)
+        {
+            return card is UnlockBuildingCardSO unlock
+                && unlock.buildingToUnlock != null
+                && BuildingSiteRegistry.IsPowerGeneratorBuilding(unlock.buildingToUnlock);
+        }
+
         private bool IsSolarUnlockCardInHand() => hand.Any(IsSolarUnlockCard);
+        private bool IsPowerGeneratorUnlockCardInHand() => hand.Any(IsPowerGeneratorUnlockCard);
 
         /// <summary>
         /// True for unlock cards that place on a solar-powered cluster pad and cannot
@@ -1053,20 +1067,39 @@ namespace GameDevTV.RTS.Player
                 extras++;
             }
 
-            // Extra Solar Panel copies: infrastructure prerequisite for every paired
-            // climate building. Sector-win doubling alone is not enough while POWER is
-            // not the active milestone (Solar sits behind climate unlocks in FIFO).
+            // Extra power infrastructure copies (Solar + Geothermal) so the place-gate
+            // stays reachable while climate cards dominate the FIFO front.
             BlueprintCardSO solarTemplate = masterDeck.FirstOrDefault(c =>
                 c is UnlockBuildingCardSO u
                 && u.buildingToUnlock != null
                 && BuildingSiteRegistry.IsSolarBuilding(u.buildingToUnlock));
             if (solarTemplate != null)
             {
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < 10; i++)
                 {
                     BlueprintCardSO extraSolar = UnityEngine.Object.Instantiate(solarTemplate);
                     extraSolar.name = $"{solarTemplate.name} (Infra Copy {i + 1})";
                     drawPile.Add(extraSolar);
+                    extras += 1;
+                }
+            }
+
+            BlueprintCardSO geoTemplate = masterDeck.FirstOrDefault(c =>
+                c is UnlockBuildingCardSO u
+                && u.buildingToUnlock != null
+                && u.buildingToUnlock.Name != null
+                && u.buildingToUnlock.Name.Contains("Geothermal", StringComparison.OrdinalIgnoreCase));
+            if (geoTemplate == null)
+                geoTemplate = Resources.Load<UnlockBuildingCardSO>("Cards/GeothermalGeneratorCard");
+            if (geoTemplate != null)
+            {
+                if (!masterDeck.Contains(geoTemplate) && !drawPile.Contains(geoTemplate))
+                    drawPile.Add(geoTemplate);
+                for (int i = 0; i < 4; i++)
+                {
+                    BlueprintCardSO extraGeo = UnityEngine.Object.Instantiate(geoTemplate);
+                    extraGeo.name = $"{geoTemplate.name} (Power Copy {i + 1})";
+                    drawPile.Add(extraGeo);
                     extras += 1;
                 }
             }

@@ -64,7 +64,9 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 * **Most successful card plays = 1 week.** Exceptions (free): **Solar** and **scouting/discovery** cards — they do not burn the Act clock.
 * **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from that Act’s baselines (+15°C / +0.25 atm / +5%).
-* **Climate ticks** from powered Heat/Air/Water buildings (auto-link to nearby Solar within 2 tiles). Unpowered consumers do nothing.
+* **Climate ticks** from powered Heat/Air/Water buildings in the **current focus sector** only (auto-link to nearby generators within 4 tiles). Unpowered consumers do nothing.
+* **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
+* **Hand size 24** (scrollable); draw pile is not limited to 5.
 * **Mine tiles** require a **discovered** matching deposit, and must be placed **near** that deposit.
 * On clear: camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
@@ -74,7 +76,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 ## 0.3 Loop (how a play works)
 
-1. **Hand (up to 10 cards, scrollable)** — Solar is **always** seated. Playing uses a card up; draw fills remaining slots. Cards keep a fixed playing-card size; hover the hand and use the **mouse wheel** (or trackpad horizontal scroll) to scroll the strip left/right when more than ~5 cards are held.
+1. **Hand (up to 24 cards, scrollable)** — at least one **power generator** is always seated (Solar Panel, Geothermal, Magnetic Shield, …). Playing uses a card up; draw fills remaining slots. Cards keep a fixed playing-card size; hover the hand and use the **mouse wheel** to scroll when more than ~5 cards are held. The draw pile is **not** capped at 5 — extras of Solar/Geothermal keep power available.
 2. **Week** — most commits spend **1 week** (`SpendWeek` on consume). Solar and scouting/discovery are free.
 3. **Placement gates**
    * Power: if `PowerUpkeep > 0` and board generation cannot cover **board upkeep + this tile**, placement is blocked.
@@ -83,8 +85,10 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
    * No Materials / drone / pad requirement on **card** plays.
 4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes. Ghost snap + place play short SFX.
 5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags). Completing a building also **queues its old RTS production options as hand cards** for the next fill (no build menu on the structure).
-6. **Climate** — powered climate buildings tick Temp / Atmos / Water. Place them within ~2 tiles of Solar (auto power link). Unpowered = no climate change.
+6. **Climate** — powered Heat/Air/Water buildings in the **current Act focus sector** tick Temp / Atmos / Water (rates tuned so one tile takes ~1–2 minutes to clear a channel, not seconds). Auto power-link reaches generators within **4** tiles. Unpowered = no climate. Prior-sector buildings stop pushing meters.
 7. Clear Act when **score AND climate** are both met before weeks run out → next sector (or win).
+
+**Power note (vs Combolands):** Combolands has no power grid — adjacency is for score. Here, consumers need watts; place them on the same auto-linked cluster as Solar/Geothermal (within a few tiles is enough; they do not have to share an edge with Solar if another powered neighbor bridges).
 
 **Build source:** cards / tiles only. Selecting a building does **not** open an RTS build/train panel.
 

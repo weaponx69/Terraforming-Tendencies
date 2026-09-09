@@ -20,7 +20,7 @@ MonoBehaviour:
   oxygenUpkeep: 0
   biomassGeneration: 0
   powerGeneration: 0
-  temperatureGeneration: 0.3
+  temperatureGeneration: 0.15
   atmosphereGeneration: 0
   waterGeneration: 0
   housingCapacity: 0

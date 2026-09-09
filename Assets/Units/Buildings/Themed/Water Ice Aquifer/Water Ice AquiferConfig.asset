@@ -22,5 +22,5 @@ MonoBehaviour:
   powerGeneration: 0
   temperatureGeneration: 0
   atmosphereGeneration: 0
-  waterGeneration: 0.5
+  waterGeneration: 0.1
   housingCapacity: 0

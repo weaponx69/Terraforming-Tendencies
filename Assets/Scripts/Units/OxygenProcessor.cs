@@ -24,9 +24,8 @@ namespace GameDevTV.RTS.Units
             if (Owner != Owner.Invalid && IsOperating)
             {
                 bool shouldGenerateOxygen = BuildingSO != null && (
-                    BuildingSO.Name.Contains("Oxygen Processor") || 
-                    BuildingSO.Name.Contains("Algae Spreader") || 
-                    BuildingSO.Name.Contains("Atmospheric Condenser") ||
+                    BuildingSO.Name.Contains("Oxygen Processor") ||
+                    BuildingSO.Name.Contains("Algae Spreader") ||
                     BuildingSO.Name.Contains("Greenery Dome")
                 );
 
