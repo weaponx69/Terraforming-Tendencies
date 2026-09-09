@@ -148,35 +148,57 @@ namespace GameDevTV.RTS.Commands
                 }
             }
 
-            // Hand card plays: power gate only — self-construct with rise animation (no drone).
-            if (HandIndex >= 0)
-            {
-                if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                // Hand card plays: power gate only — self-construct with rise animation (no drone).
+                if (HandIndex >= 0)
                 {
-                    ExplorationManager.NotifyExplorationFailed("Not enough power to place this card.");
-                    return;
-                }
-
-                if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
-                {
-                    ExplorationManager.NotifyExplorationFailed("Can't place here.");
-                    return;
-                }
-
-                GameObject cardInstance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
-                if (cardInstance.TryGetComponent(out BaseBuilding cardBuilding))
-                {
-                    cardBuilding.BeginSelfConstruction(context.Owner, Building, Building.PlacementMaterial);
-                    BlueprintDraftManager.LockBuilding(Building.Name);
-                    if (CardDeckController.Instance != null)
+                    if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
-                        CardDeckController.Instance.ConsumeCardAfterBuild(HandIndex);
-                        HandIndex = -1;
+                        ExplorationManager.NotifyExplorationFailed("Not enough power to place this card.");
+                        return;
                     }
-                }
 
-                return;
-            }
+                    if (BuildingSiteRegistry.IsMineBuilding(Building))
+                    {
+                        if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
+                        {
+                            DiscoverySystem.TryGetMineResourceType(Building, out string type);
+                            ExplorationManager.NotifyExplorationFailed(
+                                $"Discover a {type ?? "resource"} deposit before placing this mine.");
+                            return;
+                        }
+                        if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
+                        {
+                            if (DiscoverySystem.TryGetAutoMinePlacement(Building, out Vector3 autoPos, out _))
+                                targetPos = autoPos;
+                            else
+                            {
+                                ExplorationManager.NotifyExplorationFailed(
+                                    "Place this mine on a discovered deposit of the matching resource.");
+                                return;
+                            }
+                        }
+                    }
+
+                    if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
+                    {
+                        ExplorationManager.NotifyExplorationFailed("Can't place here.");
+                        return;
+                    }
+
+                    GameObject cardInstance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
+                    if (cardInstance.TryGetComponent(out BaseBuilding cardBuilding))
+                    {
+                        cardBuilding.BeginSelfConstruction(context.Owner, Building, Building.PlacementMaterial);
+                        BlueprintDraftManager.LockBuilding(Building.Name);
+                        if (CardDeckController.Instance != null)
+                        {
+                            CardDeckController.Instance.ConsumeCardAfterBuild(HandIndex);
+                            HandIndex = -1;
+                        }
+                    }
+
+                    return;
+                }
 
             if (isFirstCommandPost)
             {

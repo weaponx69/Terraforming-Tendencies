@@ -67,9 +67,9 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from that Act’s baselines (+15°C / +0.25 atm / +5%). These are **gains per sector**, not absolute planet floors (HUD shows `+gain / +need`).
 * **Climate ticks** from powered Heat/Air/Water buildings in the **current focus sector** only (auto-link to nearby generators within 4 tiles). Unpowered consumers do nothing.
 * **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
-* **Climate cards:** no force-seat. Heat↔Air / Air↔Water / Water↔Heat **adjacency combos** queue the missing third channel as a hand offer (once per Act per channel). Draw pile gets a few extra Heat/Air copies so combos can start.
-* **Hand size 24** (scrollable); draw pile is not limited to 5.
-* **Mine tiles** require a **discovered** matching deposit, and must be placed **on that deposit’s tile** (not nearby free ground).
+* **Climate cards:** no force-seat. Draw pile gets modest climate extras (+3 Aquifer, +2 Subglacial, +3 Heat/Air). Heat+Air in the focus sector still queues a Water offer once per Act.
+* **Hand size 24** (scrollable); deck excludes combat clutter (**Barracks**, Infantry School). Spaceport and Deploy Engineer stay.
+* **Mine tiles** only enter the hand after a matching deposit is **discovered**; clicking the card **auto-builds on that deposit’s tile**.
 * On clear: camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
 * Final sector Act clear → victory.
@@ -130,7 +130,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 | Same tag | +4 |
 | Power next to a consumer (upkeep &gt; 0) | +5 |
 | Anchor next to anything | +3 |
-| Climate pair Heat↔Air, Air↔Water, Water↔Heat | +4 **and** queues missing third climate card into hand (once/Act) |
+| Climate pair Heat↔Air, Air↔Water, Water↔Heat | +4 **and** queues missing third climate card (also when both partners exist in focus sector) |
 | Life next to Water or Anchor | +4 |
 
 * HUD / tooltip should explain stacking; placement popcorn (`+Score`) is backlog.

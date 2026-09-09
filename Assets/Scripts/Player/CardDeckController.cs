@@ -397,6 +397,9 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void RebuildDeck()
         {
+            // Drop RTS combat / non-colony clutter that may still be in the master list.
+            masterDeck.RemoveAll(IsExcludedFromColonyDeck);
+
             InitializeDrawPile();
 
             // 1. Clear the hand
@@ -531,6 +534,8 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void FillHand()
         {
+            StripUndiscoveredMineCardsFromHand();
+            StripExcludedColonyCardsFromHand();
             EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
@@ -540,6 +545,7 @@ namespace GameDevTV.RTS.Player
             EnsureMiningDroneInHand();
             EnsureMvpClimateGoalsInHand();
             TrimHandToSize();
+            ColonyActManager.Instance?.TryRefreshClimateComboFromPresence();
             OnHandChanged?.Invoke();
         }
 
@@ -714,6 +720,7 @@ namespace GameDevTV.RTS.Player
         private void EnqueueProductionOffer(BlueprintCardSO card)
         {
             if (card == null) return;
+            if (IsExcludedFromColonyDeck(card)) return;
             // Avoid flooding duplicates already pending / in hand.
             if (hand.Contains(card)) return;
             foreach (var pending in pendingProductionOffers)
@@ -867,13 +874,72 @@ namespace GameDevTV.RTS.Player
         /// <summary>Any valid card can enter the hand — player chooses when to play it.</summary>
         private static bool IsDrawableNow(BlueprintCardSO card) => ShouldKeepInHand(card);
 
-        /// <summary>Keep every real card; only drop broken/null entries.</summary>
+        /// <summary>
+        /// Colony Acts deck: drop RTS combat clutter that doesn't serve
+        /// score + climate tile play (Barracks, Infantry School). Spaceport and
+        /// Deploy Engineer stay in the deck.
+        /// </summary>
+        public static bool IsExcludedFromColonyDeck(BlueprintCardSO card)
+        {
+            if (card == null) return true;
+
+            string name = card.cardName ?? card.name ?? string.Empty;
+            if (NameLooksLikeMilitaryClutter(name)) return true;
+
+            if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
+            {
+                string buildingName = unlock.buildingToUnlock.Name ?? string.Empty;
+                if (NameLooksLikeMilitaryClutter(buildingName)) return true;
+            }
+
+            return false;
+        }
+
+        private static bool NameLooksLikeMilitaryClutter(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.IndexOf("Barracks", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Infantry", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>Keep real cards; mines only enter the hand after a matching deposit is discovered.</summary>
         private static bool ShouldKeepInHand(BlueprintCardSO card)
         {
             if (card == null) return false;
+            if (IsExcludedFromColonyDeck(card)) return false;
             if (card is UnlockBuildingCardSO unlock)
-                return unlock.buildingToUnlock != null && unlock.buildingToUnlock.Prefab != null;
+            {
+                if (unlock.buildingToUnlock == null || unlock.buildingToUnlock.Prefab == null)
+                    return false;
+                if (BuildingSiteRegistry.IsMineBuilding(unlock.buildingToUnlock)
+                    && !DiscoverySystem.HasDiscoveredMineDeposit(unlock.buildingToUnlock))
+                    return false;
+                return true;
+            }
             return true;
+        }
+
+        private void StripUndiscoveredMineCardsFromHand()
+        {
+            for (int i = hand.Count - 1; i >= 0; i--)
+            {
+                if (hand[i] is not UnlockBuildingCardSO unlock) continue;
+                if (unlock.buildingToUnlock == null) continue;
+                if (!BuildingSiteRegistry.IsMineBuilding(unlock.buildingToUnlock)) continue;
+                if (DiscoverySystem.HasDiscoveredMineDeposit(unlock.buildingToUnlock)) continue;
+                discardPile.Add(hand[i]);
+                hand.RemoveAt(i);
+            }
+        }
+
+        private void StripExcludedColonyCardsFromHand()
+        {
+            for (int i = hand.Count - 1; i >= 0; i--)
+            {
+                if (!IsExcludedFromColonyDeck(hand[i])) continue;
+                discardPile.Add(hand[i]);
+                hand.RemoveAt(i);
+            }
         }
 
         /// <summary>
@@ -1135,7 +1201,7 @@ namespace GameDevTV.RTS.Player
 
             foreach (var card in masterDeck)
             {
-                if (card == null) continue;
+                if (card == null || IsExcludedFromColonyDeck(card)) continue;
                 drawPile.Add(card);
             }
 
@@ -1143,7 +1209,7 @@ namespace GameDevTV.RTS.Player
             int extras = 0;
             foreach (var card in masterDeck)
             {
-                if (card == null) continue;
+                if (card == null || IsExcludedFromColonyDeck(card)) continue;
                 if (TerraformingGoalColors.GetSectorGoalForCard(card) == null) continue;
 
                 BlueprintCardSO copy = UnityEngine.Object.Instantiate(card);
@@ -1176,7 +1242,7 @@ namespace GameDevTV.RTS.Player
                 && u.buildingToUnlock.Name.Contains("Geothermal", StringComparison.OrdinalIgnoreCase));
             if (geoTemplate == null)
                 geoTemplate = Resources.Load<UnlockBuildingCardSO>("Cards/GeothermalGeneratorCard");
-            if (geoTemplate != null)
+            if (geoTemplate != null && !IsExcludedFromColonyDeck(geoTemplate))
             {
                 if (!masterDeck.Contains(geoTemplate) && !drawPile.Contains(geoTemplate))
                     drawPile.Add(geoTemplate);
@@ -1189,9 +1255,11 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            // Small Heat / Air extras so climate-trio combos can start without force-seating Water.
-            extras += AddClimateChannelExtras("TEMPERATURE", "GHG Factory", 2);
-            extras += AddClimateChannelExtras("ATMOSPHERE", "Atmospheric Condenser", 2);
+            // Heat / Air extras to start climate play; modest Water extras (not a flood).
+            extras += AddClimateChannelExtras("TEMPERATURE", "GHG Factory", 3);
+            extras += AddClimateChannelExtras("ATMOSPHERE", "Atmospheric Condenser", 3);
+            extras += AddClimateChannelExtras("WATER", "Water Ice Aquifer", 3);
+            extras += AddClimateChannelExtras("WATER", "Subglacial Water Extractor", 2);
 
             Debug.Log($"[CardDeckController] Draw pile ready: {drawPile.Count} cards " +
                       $"({masterDeck.Count} base + {extras} sector-win/infra duplicates).");

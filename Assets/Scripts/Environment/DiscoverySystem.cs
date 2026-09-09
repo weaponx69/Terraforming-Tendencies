@@ -200,5 +200,57 @@ namespace GameDevTV.RTS.Environment
             snapped = ColonyTileGrid.CellToWorld(cell, cursorWorld.y);
             return true;
         }
+
+        /// <summary>
+        /// First free matching discovered deposit tile for auto-build (focus sector preferred).
+        /// </summary>
+        public static bool TryGetAutoMinePlacement(BuildingSO building, out Vector3 worldPos, out string failReason)
+        {
+            worldPos = Vector3.zero;
+            failReason = null;
+            if (!TryGetMineResourceType(building, out string type))
+            {
+                failReason = "Not a mine.";
+                return false;
+            }
+            if (!HasDiscoveredMineDeposit(building))
+            {
+                failReason = $"No discovered {type} deposit yet.";
+                return false;
+            }
+
+            var occupied = ColonyTileGrid.GetOccupiedCells(Owner.Player1);
+            HiddenResource focusBest = null;
+            HiddenResource anyBest = null;
+            var focus = SectorManager.Instance != null ? SectorManager.Instance.GetClimateFocusSector() : null;
+
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var cell = ColonyTileGrid.WorldToCell(hr.transform.position);
+                if (occupied.Contains(cell)) continue;
+
+                anyBest ??= hr;
+                if (focus != null && SectorManager.Instance != null
+                    && SectorManager.Instance.GetNearestSector(hr.transform.position) == focus)
+                {
+                    focusBest = hr;
+                    break;
+                }
+            }
+
+            var chosen = focusBest != null ? focusBest : anyBest;
+            if (chosen == null)
+            {
+                failReason = $"All discovered {type} deposits already have a mine.";
+                return false;
+            }
+
+            var placeCell = ColonyTileGrid.WorldToCell(chosen.transform.position);
+            worldPos = ColonyTileGrid.CellToWorld(placeCell, chosen.transform.position.y);
+            return true;
+        }
     }
 }

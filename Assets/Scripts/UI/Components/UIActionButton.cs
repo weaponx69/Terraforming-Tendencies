@@ -98,12 +98,15 @@ namespace GameDevTV.RTS.UI.Components
 
             if (command is BuildBuildingCommand buildCmd && buildCmd.Building != null)
             {
-                ColonyActManager.GetTileValues(buildCmd.Building, out int score, out _, out _);
+                ColonyActManager.GetTileValues(buildCmd.Building, out int score, out _, out string tag);
                 EnsureGoalBadge();
                 if (goalBadge != null)
                 {
                     goalBadge.gameObject.SetActive(true);
-                    goalBadge.SetText($"+{score}");
+                    if (tag == "Heat" || tag == "Air")
+                        goalBadge.SetText($"+{score}\n→Water");
+                    else
+                        goalBadge.SetText($"+{score}");
                     goalBadge.color = new Color(1f, 0.92f, 0.45f, 1f);
                 }
             }
@@ -412,6 +415,15 @@ namespace GameDevTV.RTS.UI.Components
                     tooltipText += "No power upkeep (places freely).\n";
                 tooltipText += "Stack near other tiles for adjacency bonus.\n";
                 if (hab > 0f) tooltipText += $"Habitability +{hab:F0}\n";
+
+                if (tag == "Heat")
+                    tooltipText += "<b>Combo:</b> With an Air tile in this sector → unlocks <b>Water</b> card.\n";
+                else if (tag == "Air")
+                    tooltipText += "<b>Combo:</b> With a Heat tile in this sector → unlocks <b>Water</b> card.\n";
+                else if (tag == "Water")
+                    tooltipText += "<b>Combo:</b> Pairs with Heat/Air to unlock the missing climate card.\n";
+                else if (BuildingSiteRegistry.IsMineBuilding(building))
+                    tooltipText += "Builds automatically on a matching discovered deposit.\n";
             }
             else if (!string.IsNullOrEmpty(cardGoal) && TerraformingGoalColors.IsSectorCompletionGoal(cardGoal))
             {

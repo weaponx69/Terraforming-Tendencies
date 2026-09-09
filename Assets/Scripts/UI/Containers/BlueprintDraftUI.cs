@@ -152,8 +152,13 @@ namespace GameDevTV.RTS.UI.Containers
             if (CardDeckController.Instance != null)
             {
                 CardDeckController.Instance.MasterDeck.Clear();
-                CardDeckController.Instance.MasterDeck.AddRange(runtimePool);
-                Debug.Log($"[BlueprintDraftUI] Populated CardDeckController with {runtimePool.Count} cards. Rebuilding hand...");
+                foreach (var card in runtimePool)
+                {
+                    if (card == null) continue;
+                    if (CardDeckController.IsExcludedFromColonyDeck(card)) continue;
+                    CardDeckController.Instance.MasterDeck.Add(card);
+                }
+                Debug.Log($"[BlueprintDraftUI] Populated CardDeckController with {CardDeckController.Instance.MasterDeck.Count} colony cards (filtered from {runtimePool.Count}). Rebuilding hand...");
                 CardDeckController.Instance.RebuildDeck();
             }
         }

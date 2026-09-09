@@ -505,6 +505,7 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
+            // Mines: auto-build on a matching discovered deposit — no free-ground ghost.
             if (BuildingSiteRegistry.IsMineBuilding(building))
             {
                 if (!DiscoverySystem.HasDiscoveredMineDeposit(building))
@@ -514,6 +515,31 @@ namespace GameDevTV.RTS.UI.Containers
                         $"No discovered {type ?? "resource"} deposit yet. Explore / discover mines before placing {building.Name}.");
                     return;
                 }
+
+                if (!DiscoverySystem.TryGetAutoMinePlacement(building, out Vector3 minePos, out string failReason))
+                {
+                    ExplorationManager.NotifyExplorationFailed(
+                        failReason ?? $"No free {building.Name} deposit tile.");
+                    return;
+                }
+
+                var autoCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
+                autoCmd.Name = building.Name;
+                autoCmd.Building = building;
+                autoCmd.Icon = building.Icon;
+                autoCmd.HandIndex = cardIndex;
+                autoCmd.GhostPrefab = FindGhostPrefabForBuilding(building);
+
+                GlobalCommander commander = Object.FindAnyObjectByType<GlobalCommander>(FindObjectsInactive.Exclude);
+                if (commander == null)
+                {
+                    ExplorationManager.NotifyExplorationFailed("Cannot place mine — Global Commander missing.");
+                    return;
+                }
+
+                var hit = new RaycastHit { point = minePos };
+                autoCmd.Handle(new CommandContext(commander, hit));
+                return;
             }
 
             var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();

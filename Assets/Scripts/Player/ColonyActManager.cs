@@ -299,8 +299,16 @@ namespace GameDevTV.RTS.Player
 
             weeksRemaining--;
             Debug.Log($"[ColonyActManager] Week spent — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
+            TryOfferClimateComboCards(null, null);
             OnActStateChanged?.Invoke();
             TryResolveWeekExhaustion();
+        }
+
+        /// <summary>Re-check Heat/Air/Water presence combos (e.g. after hand fill).</summary>
+        public void TryRefreshClimateComboFromPresence()
+        {
+            if (!started || runEnded || IsBetweenActs) return;
+            TryOfferClimateComboCards(null, null);
         }
 
         /// <summary>Grant score when a building finishes (base + adjacency stacking).</summary>
@@ -340,35 +348,47 @@ namespace GameDevTV.RTS.Player
 
         /// <summary>
         /// Heat↔Air↔Water edge pairs queue the missing third channel as a hand offer (once per Act).
+        /// Also offers when both partner tags already exist in the focus sector (not only adjacent).
         /// </summary>
         private void TryOfferClimateComboCards(BaseBuilding placed, string tag)
         {
-            if (placed == null || string.IsNullOrEmpty(tag)) return;
-            if (tag != "Heat" && tag != "Air" && tag != "Water") return;
-            if (CardDeckController.Instance == null) return;
+            if (placed == null || CardDeckController.Instance == null) return;
 
-            var neighbors = new System.Collections.Generic.List<BaseBuilding>(4);
-            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
-                ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
-
-            foreach (var other in neighbors)
+            if (!string.IsNullOrEmpty(tag) && (tag == "Heat" || tag == "Air" || tag == "Water"))
             {
-                if (other == null || other == placed) continue;
-                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
-                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
-                string third = ThirdClimateTag(tag, otherTag);
-                if (string.IsNullOrEmpty(third)) continue;
+                var neighbors = new System.Collections.Generic.List<BaseBuilding>(4);
+                ColonyTileGrid.CollectOrthogonalNeighborBuildings(
+                    ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
 
-                string goalKey = ClimateTagToGoalKey(third);
-                if (string.IsNullOrEmpty(goalKey)) continue;
-
-                string offeredName = CardDeckController.Instance.QueueClimateComboOffer(goalKey);
-                if (string.IsNullOrEmpty(offeredName)) continue;
-
-                ShowStatusBanner(
-                    $"<color=#8FE7FF><b>COMBO</b></color> {tag}+{otherTag} → <color=#7CFF9A>{offeredName}</color> offered",
-                    5f);
+                foreach (var other in neighbors)
+                {
+                    if (other == null || other == placed) continue;
+                    if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                    GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                    string third = ThirdClimateTag(tag, otherTag);
+                    TryQueueClimateThird(third, tag, otherTag);
+                }
             }
+
+            // Presence unlock: both partners in this sector → offer the missing third.
+            GetFocusSectorClimatePresence(out bool hasHeat, out bool hasAir, out bool hasWater);
+            if (hasHeat && hasAir) TryQueueClimateThird("Water", "Heat", "Air");
+            if (hasAir && hasWater) TryQueueClimateThird("Heat", "Air", "Water");
+            if (hasWater && hasHeat) TryQueueClimateThird("Air", "Water", "Heat");
+        }
+
+        private void TryQueueClimateThird(string thirdTag, string a, string b)
+        {
+            if (string.IsNullOrEmpty(thirdTag) || CardDeckController.Instance == null) return;
+            string goalKey = ClimateTagToGoalKey(thirdTag);
+            if (string.IsNullOrEmpty(goalKey)) return;
+
+            string offeredName = CardDeckController.Instance.QueueClimateComboOffer(goalKey);
+            if (string.IsNullOrEmpty(offeredName)) return;
+
+            ShowStatusBanner(
+                $"<color=#8FE7FF><b>COMBO</b></color> {a}+{b} → <color=#7CFF9A>{offeredName}</color> offered",
+                5f);
         }
 
         /// <summary>
@@ -690,17 +710,32 @@ namespace GameDevTV.RTS.Player
             string climateMark = IsClimateMet ? "✓" : "○";
             string climateColor = IsClimateMet ? "#7CFF9A" : "#FFE08A";
             sb.AppendLine($"<color={climateColor}>{climateMark} CLIMATE GAINS  {climate:P0}</color>");
-            sb.AppendLine(
-                $"  <color=#A8B0B8>Temp <color=#C8D0D8>+{tempGain:F1}</color> / +{GenerationManager.SectorTemperatureDelta:F0}°C" +
-                $" · Atmos <color=#C8D0D8>+{atmosGain:F2}</color> / +{GenerationManager.SectorAtmosphereDelta:F2}" +
-                $" · Water <color=#C8D0D8>+{waterGain:F1}</color> / +{GenerationManager.SectorWaterDelta:F0}%</color>");
+            // Fixed-width monospace so digits don't shove the rest of the line around.
+            sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Temp  {FormatGain(tempGain, 1)} / +{GenerationManager.SectorTemperatureDelta:F0}.0 °C</mspace></color>");
+            sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Atmos {FormatGain(atmosGain, 2)} / +{GenerationManager.SectorAtmosphereDelta:F2} atm</mspace></color>");
+            sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Water {FormatGain(waterGain, 1)} / +{GenerationManager.SectorWaterDelta:F0}.0 %</mspace></color>");
             sb.AppendLine($"  <color=#A8B0B8>Each sector must GAIN these deltas (not absolute planet floors).</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";
             string w = hasWater ? "<color=#7CFF9A>Water✓</color>" : "<color=#FF8A8A>Water○</color>";
             sb.AppendLine($"  <color=#A8B0B8>In this sector:</color> {h}  {a}  {w}");
-            sb.AppendLine($"  <color=#A8B0B8>Combo: Heat+Air → Water card · Air+Water → Heat · Water+Heat → Air</color>");
+
+            if (!hasWater)
+            {
+                if (hasHeat && hasAir)
+                    sb.AppendLine("  <color=#8FE7FF>Water unlock: Heat+Air in this sector → Water Ice Aquifer card</color>");
+                else if (!hasHeat && !hasAir)
+                    sb.AppendLine("  <color=#FFE08A>Need Heat (GHG) and Air (Condenser) tiles — together they unlock Water</color>");
+                else if (!hasHeat)
+                    sb.AppendLine("  <color=#FFE08A>Need a Heat tile (GHG Factory) — with Air it unlocks Water</color>");
+                else
+                    sb.AppendLine("  <color=#FFE08A>Need an Air tile (Atmospheric Condenser) — with Heat it unlocks Water</color>");
+            }
+            else
+            {
+                sb.AppendLine("  <color=#A8B0B8>Trio combo: Heat+Air→Water · Air+Water→Heat · Water+Heat→Air</color>");
+            }
 
             string weekColor = weeksRemaining <= 2 ? "#FF8A8A" : (weeksRemaining <= 4 ? "#FFE08A" : "#C8D0D8");
             sb.AppendLine($"<color={weekColor}>WEEKS LEFT  {weeksRemaining}</color>");
@@ -714,6 +749,17 @@ namespace GameDevTV.RTS.Player
             float t = Mathf.Clamp01(value / (float)max);
             int filled = Mathf.RoundToInt(t * width);
             return new string('█', filled) + new string('░', width - filled);
+        }
+
+        /// <summary>Fixed-width signed gain so HUD lines don't jitter as values change.</summary>
+        private static string FormatGain(float gain, int decimals)
+        {
+            string body = decimals <= 0
+                ? Mathf.Abs(gain).ToString("F0")
+                : Mathf.Abs(gain).ToString($"F{decimals}");
+            // Pad so "+12.3" and "+0.0" occupy similar width inside <mspace>.
+            string signed = (gain < -0.0005f ? "-" : "+") + body;
+            return signed.PadLeft(6 + decimals);
         }
     }
 }

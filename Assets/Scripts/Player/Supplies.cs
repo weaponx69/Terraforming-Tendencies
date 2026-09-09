@@ -465,6 +465,26 @@ namespace GameDevTV.RTS.Player
             maxWater = Mathf.Max(maxWater, GenerationManager.SectorWaterDelta);
             maxTemperature = Mathf.Max(maxTemperature, -60f + GenerationManager.SectorTemperatureDelta);
 
+            // Colony Acts: each Act needs another +delta from rising baselines.
+            // Absolute caps like 1.0 atm soft-lock later Acts — keep headroom above current.
+            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+            {
+                if (_atmosphere != null && _atmosphere.TryGetValue(Owner.Player1, out float curA))
+                    maxAtmosphere = Mathf.Max(maxAtmosphere, curA + GenerationManager.SectorAtmosphereDelta + 0.05f);
+                else
+                    maxAtmosphere = Mathf.Max(maxAtmosphere, 2.5f);
+
+                if (_water != null && _water.TryGetValue(Owner.Player1, out float curW))
+                    maxWater = Mathf.Max(maxWater, curW + GenerationManager.SectorWaterDelta + 1f);
+                else
+                    maxWater = Mathf.Max(maxWater, 100f);
+
+                if (_temperature != null && _temperature.TryGetValue(Owner.Player1, out float curT))
+                    maxTemperature = Mathf.Max(maxTemperature, curT + GenerationManager.SectorTemperatureDelta + 5f);
+                else
+                    maxTemperature = Mathf.Max(maxTemperature, 100f);
+            }
+
             var gm = GenerationManager.Instance;
             if (gm != null && !gm.IsExpansionPhase)
             {

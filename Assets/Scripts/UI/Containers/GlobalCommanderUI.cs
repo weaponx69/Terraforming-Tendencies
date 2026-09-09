@@ -163,9 +163,9 @@ namespace GameDevTV.RTS.UI.Containers
                         string atmosColor = atmosGain + 0.0005f >= needA ? "#55FF55" : "#FF5555";
                         string waterColor = waterGain + 0.0005f >= needW ? "#55FF55" : "#FF5555";
 
-                        sb.AppendLine($"  <color=#CCCCCC>• Temp gain:</color> <color={tempColor}>+{tempGain:F1} / +{needT:F0}°C</color>");
-                        sb.AppendLine($"  <color=#CCCCCC>• Atmos gain:</color> <color={atmosColor}>+{atmosGain:F2} / +{needA:F2}</color>");
-                        sb.AppendLine($"  <color=#CCCCCC>• Water gain:</color> <color={waterColor}>+{waterGain:F1} / +{needW:F0}%</color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Temp gain:</color> <color={tempColor}><mspace=0.5em>{FormatStableGain(tempGain, 1)} / +{needT:F0}.0°C</mspace></color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Atmos gain:</color> <color={atmosColor}><mspace=0.5em>{FormatStableGain(atmosGain, 2)} / +{needA:F2}</mspace></color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Water gain:</color> <color={waterColor}><mspace=0.5em>{FormatStableGain(waterGain, 1)} / +{needW:F0}.0%</mspace></color>");
                     }
                     else
                     {
@@ -250,6 +250,15 @@ namespace GameDevTV.RTS.UI.Containers
             {
                 allowanceSlider.onValueChanged.RemoveListener(HandleSliderValueChanged);
             }
+        }
+
+        private static string FormatStableGain(float gain, int decimals)
+        {
+            string body = decimals <= 0
+                ? Mathf.Abs(gain).ToString("F0")
+                : Mathf.Abs(gain).ToString($"F{decimals}");
+            string signed = (gain < -0.0005f ? "-" : "+") + body;
+            return signed.PadLeft(6 + decimals);
         }
     }
 }
