@@ -162,7 +162,7 @@ namespace GameDevTV.RTS.Player
             {
                 // Progressive score; scales gently so large maps are longer, not absurdly hard per Act.
                 int score = 40 + i * 35;
-                int weeks = i == 0 ? 8 : (i >= n - 1 ? 10 : 8);
+                int weeks = i == 0 ? 16 : (i >= n - 1 ? 16 : 14);
                 string name = BuildActName(i, n);
                 acts.Add(new ActDef
                 {

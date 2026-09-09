@@ -476,6 +476,17 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
+            if (BuildingSiteRegistry.IsMineBuilding(building))
+            {
+                if (!DiscoverySystem.HasDiscoveredMineDeposit(building))
+                {
+                    DiscoverySystem.TryGetMineResourceType(building, out string type);
+                    ExplorationManager.NotifyExplorationFailed(
+                        $"No discovered {type ?? "resource"} deposit yet. Explore / discover mines before placing {building.Name}.");
+                    return;
+                }
+            }
+
             var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
             buildCmd.Name = building.Name;
             buildCmd.Building = building;

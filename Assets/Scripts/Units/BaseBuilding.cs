@@ -718,8 +718,9 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
-        /// Wire this building into the power graph of every completed orthogonal
-        /// tile neighbor. Replaces manual Connect Power for the Combolands grid.
+        /// Wire this building into the power graph of nearby completed buildings.
+        /// Ortho neighbors first, then nearest generator within 2 cells so climate
+        /// consumers can reach Solar without being stranded on the Command Post grid.
         /// </summary>
         private void AutoConnectAdjacentPowerNodes()
         {
@@ -742,8 +743,53 @@ namespace GameDevTV.RTS.Units
                 linked++;
             }
 
+            // Reach a generator even if not ortho-adjacent (Manhattan ≤ 2).
+            linked += ConnectToNearestPowerGenerator(myNode, maxManhattan: 2);
+
             if (linked > 0)
-                Debug.Log($"[Power] {name} auto-linked to {linked} adjacent building(s).");
+                Debug.Log($"[Power] {name} auto-linked ({linked} connection(s)).");
+        }
+
+        /// <summary>
+        /// Connect to the nearest completed building that generates power within
+        /// <paramref name="maxManhattan"/> tile steps. Skips Command Posts so Solar
+        /// clusters are not drained by CP upkeep.
+        /// </summary>
+        private int ConnectToNearestPowerGenerator(PowerNode myNode, int maxManhattan)
+        {
+            if (myNode == null) return 0;
+
+            Vector2Int myCell = ColonyTileGrid.WorldToCell(transform.position);
+            BaseBuilding best = null;
+            int bestDist = int.MaxValue;
+
+            foreach (var b in ActiveBuildings)
+            {
+                if (b == null || b == this || b.Owner != Owner) continue;
+                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                var def = b.ResolvedBuildingSO;
+                if (def?.BuildingConfig == null || def.BuildingConfig.PowerGeneration <= 0f) continue;
+                if (def.Name != null && def.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!b.TryGetComponent(out PowerNode otherNode)) continue;
+                if (myNode.ConnectedNodes.Contains(otherNode)) continue;
+
+                Vector2Int otherCell = ColonyTileGrid.WorldToCell(b.transform.position);
+                int dist = Mathf.Abs(myCell.x - otherCell.x) + Mathf.Abs(myCell.y - otherCell.y);
+                if (dist <= 0 || dist > maxManhattan) continue;
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    best = b;
+                }
+            }
+
+            if (best != null && best.TryGetComponent(out PowerNode genNode))
+            {
+                myNode.ConnectTo(genNode);
+                return 1;
+            }
+            return 0;
         }
 
         private IEnumerator ConnectPowerGeneratorToCommandPost()
@@ -1065,6 +1111,8 @@ namespace GameDevTV.RTS.Units
             if (Time.time < nextClusterPowerRetryTime) return;
             nextClusterPowerRetryTime = Time.time + 1f;
             GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.EnsureClusterPowerForBuilding(this);
+            // Free-placed climate tiles: keep retrying neighbor / nearby-solar links.
+            AutoConnectAdjacentPowerNodes();
         }
 
         private void Update()

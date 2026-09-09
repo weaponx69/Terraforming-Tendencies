@@ -690,12 +690,11 @@ namespace GameDevTV.RTS.Player
                 hitPos = ColonyTileGrid.SnapForPlacement(
                     hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
 
-                // Soft tick when the ghost settles on a new cell that joins a neighbor.
-                if (joinCount > 0
-                    && tileGhostStickyCell.HasValue
+                // Tick when the ghost settles on a new grid cell (louder when joining a neighbor).
+                if (tileGhostStickyCell.HasValue
                     && (!previousSticky.HasValue || previousSticky.Value != tileGhostStickyCell.Value))
                 {
-                    AudioManager.Instance.PlayTileSnapSound();
+                    AudioManager.Instance.PlayTileSnapSound(joining: joinCount > 0);
                 }
             }
 
@@ -1354,6 +1353,22 @@ namespace GameDevTV.RTS.Player
 
             if (handled && cardTilePlace)
                 AudioManager.Instance.PlayPlaceClickSound();
+            else if (!handled && cardTilePlace
+                && activeCommand is BuildBuildingCommand failedMine
+                && BuildingSiteRegistry.IsMineBuilding(failedMine.Building))
+            {
+                if (!DiscoverySystem.HasDiscoveredMineDeposit(failedMine.Building))
+                {
+                    DiscoverySystem.TryGetMineResourceType(failedMine.Building, out string type);
+                    ExplorationManager.NotifyExplorationFailed(
+                        $"Discover a {type ?? "resource"} deposit before placing this mine.");
+                }
+                else if (!DiscoverySystem.HasDiscoveredMineDepositNear(failedMine.Building, hit.point))
+                {
+                    ExplorationManager.NotifyExplorationFailed(
+                        "Place this mine next to a discovered deposit of the matching resource.");
+                }
+            }
 
 
             if (activeCommand != null && !activeCommand.StaysActive)

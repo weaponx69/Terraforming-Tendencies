@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameDevTV.RTS.Units;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Environment
@@ -92,6 +93,65 @@ namespace GameDevTV.RTS.Environment
         {
             discoveredTypes.Clear();
             // No default types — Sector 0 force-discovery handles the starting resources
+        }
+
+        /// <summary>
+        /// Resource type a mine building needs (Basalt→Regolith, Deep-Core→Minerals, etc.).
+        /// Returns false for non-mine buildings.
+        /// </summary>
+        public static bool TryGetMineResourceType(BuildingSO building, out string resourceType)
+        {
+            resourceType = null;
+            if (!BuildingSiteRegistry.IsMineBuilding(building)) return false;
+
+            string name = building.Name.ToLowerInvariant();
+            if (name.Contains("gas")) resourceType = "Gas";
+            else if (name.Contains("iron")) resourceType = "Iron";
+            else if (name.Contains("regolith") || name.Contains("basalt") || name.Contains("strip"))
+                resourceType = "Regolith";
+            else if (name.Contains("laser") || name.Contains("deep"))
+                resourceType = "Minerals";
+            else
+                resourceType = "Minerals";
+            return true;
+        }
+
+        /// <summary>True if at least one deposit of the mine's resource type has been discovered.</summary>
+        public static bool HasDiscoveredMineDeposit(BuildingSO building)
+        {
+            if (!TryGetMineResourceType(building, out string type)) return true;
+            return HasDiscoveredDepositOfType(type);
+        }
+
+        public static bool HasDiscoveredDepositOfType(string resourceType)
+        {
+            if (string.IsNullOrEmpty(resourceType)) return false;
+            if (!IsTypeDiscovered(resourceType)) return false;
+
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!string.Equals(hr.ResourceTypeName, resourceType, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>True if a matching discovered deposit lies within <paramref name="radius"/> of worldPos.</summary>
+        public static bool HasDiscoveredMineDepositNear(BuildingSO building, Vector3 worldPos, float radius = 28f)
+        {
+            if (!TryGetMineResourceType(building, out string type)) return true;
+            float r2 = radius * radius;
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if ((hr.transform.position - worldPos).sqrMagnitude <= r2)
+                    return true;
+            }
+            return false;
         }
     }
 }

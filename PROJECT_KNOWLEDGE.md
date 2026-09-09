@@ -58,13 +58,14 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 | Act slot | Typical name | Score | Weeks |
 |----------|--------------|------:|------:|
-| First | Survive · Sector 1 | 40 | 8 |
-| Middle | Settle / Expand · Sector N | 40 + 35×(N−1) | 8 |
-| Last | Thrive · Sector N | … | 10 → **run victory** |
+| First | Survive · Sector 1 | 40 | 16 |
+| Middle | Settle / Expand · Sector N | 40 + 35×(N−1) | 14 |
+| Last | Thrive · Sector N | … | 16 → **run victory** |
 
-* **1 successful card play = 1 week.**
+* **Most successful card plays = 1 week.** Exceptions (free): **Solar** and **scouting/discovery** cards — they do not burn the Act clock.
 * **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from that Act’s baselines (+15°C / +0.25 atm / +5%).
-* **Climate ticks only from the current focus sector** — Heat / Air / Water buildings elsewhere do not advance this Act. You must plant climate infrastructure in each region.
+* **Climate ticks** from powered Heat/Air/Water buildings (auto-link to nearby Solar within 2 tiles). Unpowered consumers do nothing.
+* **Mine tiles** require a **discovered** matching deposit, and must be placed **near** that deposit.
 * On clear: camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
 * Final sector Act clear → victory.
@@ -74,14 +75,15 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 ## 0.3 Loop (how a play works)
 
 1. **Hand (up to 10 cards, scrollable)** — Solar is **always** seated. Playing uses a card up; draw fills remaining slots. Cards keep a fixed playing-card size; hover the hand and use the **mouse wheel** (or trackpad horizontal scroll) to scroll the strip left/right when more than ~5 cards are held.
-2. **Week** — commit spends **1 week** on the Act clock (`SpendWeek` on consume).
-3. **Placement gate = power only**
-   * If `PowerUpkeep > 0` and board generation cannot cover **board upkeep + this tile**, placement is blocked.
+2. **Week** — most commits spend **1 week** (`SpendWeek` on consume). Solar and scouting/discovery are free.
+3. **Placement gates**
+   * Power: if `PowerUpkeep > 0` and board generation cannot cover **board upkeep + this tile**, placement is blocked.
+   * Mines: require a discovered matching deposit and placement near it.
    * Generators / zero-upkeep tiles always place (power-wise).
    * No Materials / drone / pad requirement on **card** plays.
-4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes.
+4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes. Ghost snap + place play short SFX.
 5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags). Completing a building also **queues its old RTS production options as hand cards** for the next fill (no build menu on the structure).
-6. **Climate** — powered climate buildings in the **current focus sector** tick Temp / Atmos / Water. Other sectors do not help this Act.
+6. **Climate** — powered climate buildings tick Temp / Atmos / Water. Place them within ~2 tiles of Solar (auto power link). Unpowered = no climate change.
 7. Clear Act when **score AND climate** are both met before weeks run out → next sector (or win).
 
 **Build source:** cards / tiles only. Selecting a building does **not** open an RTS build/train panel.

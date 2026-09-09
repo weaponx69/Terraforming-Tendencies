@@ -71,11 +71,18 @@ namespace GameDevTV.RTS.Commands
                     targetPos = navHit.position;
             }
 
-            // Card plays: power is the only hard placement gate.
+            // Card plays: power gate + mine discovery (industry tiles need a found deposit).
             if (HandIndex >= 0)
             {
                 if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
+                if (BuildingSiteRegistry.IsMineBuilding(Building))
+                {
+                    if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
+                        return false;
+                    if (!DiscoverySystem.HasDiscoveredMineDepositNear(Building, targetPos))
+                        return false;
+                }
                 return AllRestrictionsPass(targetPos, context.Owner, requireWorker: false);
             }
 

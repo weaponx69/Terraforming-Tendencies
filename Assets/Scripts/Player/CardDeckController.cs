@@ -484,7 +484,8 @@ namespace GameDevTV.RTS.Player
             played.Apply();
 
             // Week first, then deferred instant-build score (and non-building card score).
-            ColonyActManager.Instance?.SpendWeek();
+            if (CardCostsWeek(played))
+                ColonyActManager.Instance?.SpendWeek();
             BaseBuilding.FlushAllDeferredColonyActScores();
             ColonyActManager.Instance?.GrantCardScore(played);
 
@@ -862,7 +863,8 @@ namespace GameDevTV.RTS.Player
             played.Apply();
 
             // Week first so Act-clear from GrantCardScore cannot leave the week on the next Act.
-            ColonyActManager.Instance?.SpendWeek();
+            if (CardCostsWeek(played))
+                ColonyActManager.Instance?.SpendWeek();
             ColonyActManager.Instance?.GrantCardScore(played);
 
             // Notify GameFlowManager that an action was taken
@@ -1094,6 +1096,36 @@ namespace GameDevTV.RTS.Player
             if (!masterDeck.Contains(card)) masterDeck.Add(card);
             if (!drawPile.Contains(card)) drawPile.Add(card);
             return card;
+        }
+
+        /// <summary>
+        /// Solar and scouting/discovery are free infrastructure — they do not burn Act weeks.
+        /// Climate, industry, and other tile plays still cost 1 week.
+        /// </summary>
+        private static bool CardCostsWeek(BlueprintCardSO card)
+        {
+            if (card == null) return true;
+            if (card is ScoutingCardSO) return false;
+
+            if (card is UnlockBuildingCardSO unlock
+                && unlock.buildingToUnlock != null
+                && BuildingSiteRegistry.IsSolarBuilding(unlock.buildingToUnlock))
+            {
+                return false;
+            }
+
+            string name = card.cardName ?? string.Empty;
+            if (name.IndexOf("solar", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
+            if (name.IndexOf("discover", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("scout", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("survey", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("orbital scan", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }
