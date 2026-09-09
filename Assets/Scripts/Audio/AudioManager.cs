@@ -31,8 +31,15 @@ namespace GameDevTV.RTS.Audio
         private AudioClip tileSnapClip;
         private AudioClip placeClickClip;
         private Coroutine fadeCoroutine;
-        private float targetVolume = 0.5f; // Set a default pleasant background volume
+        private float targetVolume = 0.5f; // Music master (0–1)
+        private float sfxVolume = 0.85f;   // SFX master (0–1)
         private bool setupComplete;
+
+        private const string PrefMusic = "tt_music_volume";
+        private const string PrefSfx = "tt_sfx_volume";
+
+        public float MusicVolume => targetVolume;
+        public float SfxVolume => sfxVolume;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void OnStartup()
@@ -57,6 +64,9 @@ namespace GameDevTV.RTS.Audio
 
         private void SetupAudio()
         {
+            targetVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PrefMusic, 0.5f));
+            sfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PrefSfx, 0.85f));
+
             if (musicSource == null)
             {
                 musicSource = gameObject.AddComponent<AudioSource>();
@@ -72,7 +82,7 @@ namespace GameDevTV.RTS.Audio
                 soundEffectSource.playOnAwake = false;
                 soundEffectSource.spatialBlend = 0f;
             }
-            soundEffectSource.volume = 0.85f;
+            soundEffectSource.volume = sfxVolume;
 
             EnsureSfxClips();
 
@@ -92,6 +102,40 @@ namespace GameDevTV.RTS.Audio
                 }
                 setupComplete = true;
             }
+            else
+            {
+                ApplyMusicVolumeImmediate(targetVolume);
+                if (soundEffectSource != null) soundEffectSource.volume = sfxVolume;
+            }
+        }
+
+        /// <summary>Master music volume 0–1 (persisted). Applies immediately.</summary>
+        public void SetMusicVolume(float volume01)
+        {
+            targetVolume = Mathf.Clamp01(volume01);
+            PlayerPrefs.SetFloat(PrefMusic, targetVolume);
+            PlayerPrefs.Save();
+            ApplyMusicVolumeImmediate(targetVolume);
+        }
+
+        /// <summary>Master SFX volume 0–1 (persisted).</summary>
+        public void SetSfxVolume(float volume01)
+        {
+            sfxVolume = Mathf.Clamp01(volume01);
+            PlayerPrefs.SetFloat(PrefSfx, sfxVolume);
+            PlayerPrefs.Save();
+            EnsureSfxReady();
+            if (soundEffectSource != null) soundEffectSource.volume = sfxVolume;
+        }
+
+        private void ApplyMusicVolumeImmediate(float volume)
+        {
+            if (fadeCoroutine != null)
+            {
+                StopCoroutine(fadeCoroutine);
+                fadeCoroutine = null;
+            }
+            if (musicSource != null) musicSource.volume = volume;
         }
 
         private void EnsureSfxClips()
@@ -114,11 +158,17 @@ namespace GameDevTV.RTS.Audio
         /// </summary>
         public void FadeTo(float volume, float duration)
         {
+            targetVolume = Mathf.Clamp01(volume);
             if (fadeCoroutine != null)
             {
                 StopCoroutine(fadeCoroutine);
             }
-            fadeCoroutine = StartCoroutine(FadeVolumeCoroutine(volume, duration));
+            if (duration <= 0.01f || musicSource == null)
+            {
+                ApplyMusicVolumeImmediate(targetVolume);
+                return;
+            }
+            fadeCoroutine = StartCoroutine(FadeVolumeCoroutine(targetVolume, duration));
         }
 
         private IEnumerator FadeVolumeCoroutine(float target, float duration)
@@ -128,7 +178,7 @@ namespace GameDevTV.RTS.Audio
 
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 musicSource.volume = Mathf.Lerp(startVolume, target, elapsed / duration);
                 yield return null;
             }
