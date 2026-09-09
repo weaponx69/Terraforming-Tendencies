@@ -34,6 +34,8 @@ namespace GameDevTV.RTS.Player
         private List<BlueprintCardSO> hand = new();
         /// <summary>Old RTS building production — offered into hand after the next week spend.</summary>
         private readonly Queue<BlueprintCardSO> pendingProductionOffers = new();
+        /// <summary>Climate combo offers already granted this Act (TEMPERATURE / ATMOSPHERE / WATER).</summary>
+        private readonly HashSet<string> climateComboOffersThisAct = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The player's current hand of cards (max handSize).</summary>
         public IReadOnlyList<BlueprintCardSO> Hand => hand;
@@ -601,6 +603,89 @@ namespace GameDevTV.RTS.Player
             QueueCommandsAsCards(cmds);
         }
 
+        /// <summary>Clear Act-scoped climate combo dedupe (call on BeginRun / Act clear).</summary>
+        public void NotifyActClimateComboReset()
+        {
+            climateComboOffersThisAct.Clear();
+        }
+
+        /// <summary>
+        /// Heat+Air / Air+Water / Water+Heat adjacency: queue the missing third climate card
+        /// into the hand once per Act per channel. Returns offered card name, or null if skipped.
+        /// </summary>
+        public string QueueClimateComboOffer(string goalKey)
+        {
+            if (string.IsNullOrEmpty(goalKey)) return null;
+
+            string goal = goalKey.Trim().ToUpperInvariant();
+            if (goal != "TEMPERATURE" && goal != "ATMOSPHERE" && goal != "WATER") return null;
+
+            if (climateComboOffersThisAct.Contains(goal)) return null;
+
+            if (hand.Any(c =>
+                    string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)))
+            {
+                climateComboOffersThisAct.Add(goal);
+                return null;
+            }
+
+            BlueprintCardSO template = FindPreferredClimateComboTemplate(goal);
+            if (template == null) return null;
+
+            BlueprintCardSO offer = UnityEngine.Object.Instantiate(template);
+            offer.name = $"{template.name} (Climate Combo)";
+            if (!string.IsNullOrEmpty(template.cardName))
+                offer.cardName = template.cardName;
+
+            climateComboOffersThisAct.Add(goal);
+            EnqueueProductionOffer(offer);
+            InjectPendingProductionOffers();
+            if (hand.Count < handSize)
+                FillHandInternal();
+            OnHandChanged?.Invoke();
+
+            Debug.Log($"[CardDeckController] Climate combo offered '{offer.cardName}' for {goal}.");
+            return string.IsNullOrEmpty(offer.cardName) ? offer.name : offer.cardName;
+        }
+
+        private BlueprintCardSO FindPreferredClimateComboTemplate(string goal)
+        {
+            string preferredName = goal switch
+            {
+                "TEMPERATURE" => "GHG Factory",
+                "ATMOSPHERE" => "Atmospheric Condenser",
+                "WATER" => "Water Ice Aquifer",
+                _ => null
+            };
+
+            BlueprintCardSO Prefer(string nameContains)
+            {
+                if (string.IsNullOrEmpty(nameContains)) return null;
+                bool MatchName(BlueprintCardSO c) =>
+                    c != null
+                    && c.cardName != null
+                    && c.cardName.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0
+                    && string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase);
+
+                return masterDeck.FirstOrDefault(MatchName)
+                    ?? drawPile.FirstOrDefault(MatchName)
+                    ?? discardPile.FirstOrDefault(MatchName)
+                    ?? Resources.LoadAll<UnlockBuildingCardSO>("Cards").FirstOrDefault(MatchName);
+            }
+
+            BlueprintCardSO preferred = Prefer(preferredName);
+            if (preferred != null) return preferred;
+
+            // Fallback: any card classified to this climate goal.
+            bool MatchGoal(BlueprintCardSO c) =>
+                c != null
+                && string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase);
+
+            return masterDeck.FirstOrDefault(MatchGoal)
+                ?? drawPile.FirstOrDefault(MatchGoal)
+                ?? discardPile.FirstOrDefault(MatchGoal);
+        }
+
         private void QueueCommandsAsCards(BaseCommand[] cmds)
         {
             if (cmds == null) return;
@@ -1104,8 +1189,39 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            // Small Heat / Air extras so climate-trio combos can start without force-seating Water.
+            extras += AddClimateChannelExtras("TEMPERATURE", "GHG Factory", 2);
+            extras += AddClimateChannelExtras("ATMOSPHERE", "Atmospheric Condenser", 2);
+
             Debug.Log($"[CardDeckController] Draw pile ready: {drawPile.Count} cards " +
                       $"({masterDeck.Count} base + {extras} sector-win/infra duplicates).");
+        }
+
+        private int AddClimateChannelExtras(string goal, string preferredCardName, int count)
+        {
+            if (count <= 0) return 0;
+            bool MatchPreferred(BlueprintCardSO c) =>
+                c != null
+                && c.cardName != null
+                && c.cardName.IndexOf(preferredCardName, StringComparison.OrdinalIgnoreCase) >= 0
+                && string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase);
+            bool MatchGoal(BlueprintCardSO c) =>
+                c != null
+                && string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase);
+
+            BlueprintCardSO template = masterDeck.FirstOrDefault(MatchPreferred)
+                ?? masterDeck.FirstOrDefault(MatchGoal)
+                ?? drawPile.FirstOrDefault(MatchPreferred)
+                ?? drawPile.FirstOrDefault(MatchGoal);
+            if (template == null) return 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                BlueprintCardSO extra = UnityEngine.Object.Instantiate(template);
+                extra.name = $"{template.name} (Climate Copy {i + 1})";
+                drawPile.Add(extra);
+            }
+            return count;
         }
 
         /// <summary>Move discard queue onto draw queue, preserving FIFO order.</summary>

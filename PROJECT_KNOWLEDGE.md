@@ -43,7 +43,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Card play gated by Materials | **Retired** (cards) |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
 | Auto-discard “unplayable” hand cards | **Retired** |
-| Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar **is** always seated (power gate); climate/drone force-seat stays retired |
+| Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar **is** always seated (power gate); climate/drone force-seat stays retired — missing climate tiles surface via **adjacency combos** instead |
 | Climate soft-gates blocking card draw/select | **Retired** |
 | Oxygen / Power / Pop as win primaries | **Retired** |
 | Fixed 4 Acts independent of map size | **Retired** — Act count = sector count |
@@ -64,9 +64,10 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | Last | Thrive · Sector N | … | 16 → **run victory** |
 
 * **Most successful card plays = 1 week.** Exceptions (free): **Solar** and **scouting/discovery** cards — they do not burn the Act clock.
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from that Act’s baselines (+15°C / +0.25 atm / +5%).
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from that Act’s baselines (+15°C / +0.25 atm / +5%). These are **gains per sector**, not absolute planet floors (HUD shows `+gain / +need`).
 * **Climate ticks** from powered Heat/Air/Water buildings in the **current focus sector** only (auto-link to nearby generators within 4 tiles). Unpowered consumers do nothing.
 * **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
+* **Climate cards:** no force-seat. Heat↔Air / Air↔Water / Water↔Heat **adjacency combos** queue the missing third channel as a hand offer (once per Act per channel). Draw pile gets a few extra Heat/Air copies so combos can start.
 * **Hand size 24** (scrollable); draw pile is not limited to 5.
 * **Mine tiles** require a **discovered** matching deposit, and must be placed **near** that deposit.
 * On clear: camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
@@ -86,8 +87,8 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
    * No Materials / drone / pad requirement on **card** plays.
 4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes. Ghost snap + place play short SFX.
 5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags). Completing a building also **queues its old RTS production options as hand cards** for the next fill (no build menu on the structure).
-6. **Climate** — powered Heat/Air/Water buildings in the **current Act focus sector** tick Temp / Atmos / Water (rates tuned so one tile takes ~1–2 minutes to clear a channel, not seconds). Auto power-link reaches generators within **4** tiles. Unpowered = no climate. Prior-sector buildings stop pushing meters.
-7. Clear Act when **score AND climate** are both met before weeks run out → next sector (or win).
+6. **Climate** — powered Heat/Air/Water buildings in the **current Act focus sector** tick Temp / Atmos / Water (rates tuned so one tile takes ~1–2 minutes to clear a channel, not seconds). Auto power-link reaches generators within **4** tiles. Unpowered = no climate. Prior-sector buildings stop pushing meters. Act clear needs **gains** of +15°C / +0.25 atm / +5% from that Act’s baselines. Placing a Heat/Air/Water tile next to another climate-pair neighbor **offers the missing third** as a hand card (once per Act).
+7. Clear Act when **score AND climate gains** are both met before weeks run out → next sector (or win).
 
 **Power note (vs Combolands):** Combolands has no power grid — adjacency is for score. Here, consumers need watts; place them on the same auto-linked cluster as Solar/Geothermal (within a few tiles is enough; they do not have to share an edge with Solar if another powered neighbor bridges).
 
@@ -129,7 +130,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 | Same tag | +4 |
 | Power next to a consumer (upkeep &gt; 0) | +5 |
 | Anchor next to anything | +3 |
-| Climate pair Heat↔Air, Air↔Water, Water↔Heat | +4 |
+| Climate pair Heat↔Air, Air↔Water, Water↔Heat | +4 **and** queues missing third climate card into hand (once/Act) |
 | Life next to Water or Anchor | +4 |
 
 * HUD / tooltip should explain stacking; placement popcorn (`+Score`) is backlog.

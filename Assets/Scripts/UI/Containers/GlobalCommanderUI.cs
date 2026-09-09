@@ -152,21 +152,39 @@ namespace GameDevTV.RTS.UI.Containers
 
                 if (!gm.IsExpansionPhase)
                 {
-                    float currentTemp = GameDevTV.RTS.Player.Supplies.Temperature.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float tVal) ? tVal : -60f;
-                    float targetTemp = gm.GetTargetTemperature(gm.CurrentGeneration);
-                    string tempColor = currentTemp >= targetTemp ? "#55FF55" : "#FF5555";
+                    var acts = GameDevTV.RTS.Player.ColonyActManager.Instance;
+                    if (acts != null && acts.IsRunActive)
+                    {
+                        acts.GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
+                        float needT = GameDevTV.RTS.Player.GenerationManager.SectorTemperatureDelta;
+                        float needA = GameDevTV.RTS.Player.GenerationManager.SectorAtmosphereDelta;
+                        float needW = GameDevTV.RTS.Player.GenerationManager.SectorWaterDelta;
+                        string tempColor = tempGain + 0.0005f >= needT ? "#55FF55" : "#FF5555";
+                        string atmosColor = atmosGain + 0.0005f >= needA ? "#55FF55" : "#FF5555";
+                        string waterColor = waterGain + 0.0005f >= needW ? "#55FF55" : "#FF5555";
 
-                    float currentAtmos = GameDevTV.RTS.Player.Supplies.Atmosphere.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float aVal) ? aVal : 0.01f;
-                    float targetAtmos = gm.GetTargetAtmosphere(gm.CurrentGeneration);
-                    string atmosColor = currentAtmos >= targetAtmos ? "#55FF55" : "#FF5555";
+                        sb.AppendLine($"  <color=#CCCCCC>• Temp gain:</color> <color={tempColor}>+{tempGain:F1} / +{needT:F0}°C</color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Atmos gain:</color> <color={atmosColor}>+{atmosGain:F2} / +{needA:F2}</color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Water gain:</color> <color={waterColor}>+{waterGain:F1} / +{needW:F0}%</color>");
+                    }
+                    else
+                    {
+                        float currentTemp = GameDevTV.RTS.Player.Supplies.Temperature.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float tVal) ? tVal : -60f;
+                        float targetTemp = gm.GetTargetTemperature(gm.CurrentGeneration);
+                        string tempColor = currentTemp >= targetTemp ? "#55FF55" : "#FF5555";
 
-                    float currentWater = GameDevTV.RTS.Player.Supplies.Water.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float wVal) ? wVal : 0f;
-                    float targetWater = gm.GetTargetWater(gm.CurrentGeneration);
-                    string waterColor = currentWater >= targetWater ? "#55FF55" : "#FF5555";
+                        float currentAtmos = GameDevTV.RTS.Player.Supplies.Atmosphere.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float aVal) ? aVal : 0.01f;
+                        float targetAtmos = gm.GetTargetAtmosphere(gm.CurrentGeneration);
+                        string atmosColor = currentAtmos >= targetAtmos ? "#55FF55" : "#FF5555";
 
-                    sb.AppendLine($"  <color=#CCCCCC>• Temp:</color> <color={tempColor}>{currentTemp:F1}°C / {targetTemp:F1}°C</color>");
-                    sb.AppendLine($"  <color=#CCCCCC>• Atmos:</color> <color={atmosColor}>{currentAtmos:F2} atm / {targetAtmos:F2} atm</color>");
-                    sb.AppendLine($"  <color=#CCCCCC>• Water:</color> <color={waterColor}>{currentWater:F0}% / {targetWater:F0}%</color>");
+                        float currentWater = GameDevTV.RTS.Player.Supplies.Water.TryGetValue(GameDevTV.RTS.Units.Owner.Player1, out float wVal) ? wVal : 0f;
+                        float targetWater = gm.GetTargetWater(gm.CurrentGeneration);
+                        string waterColor = currentWater >= targetWater ? "#55FF55" : "#FF5555";
+
+                        sb.AppendLine($"  <color=#CCCCCC>• Temp:</color> <color={tempColor}>{currentTemp:F1}°C / {targetTemp:F1}°C</color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Atmos:</color> <color={atmosColor}>{currentAtmos:F2} atm / {targetAtmos:F2} atm</color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Water:</color> <color={waterColor}>{currentWater:F0}% / {targetWater:F0}%</color>");
+                    }
                 }
             }
             else

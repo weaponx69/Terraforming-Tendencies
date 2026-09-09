@@ -146,6 +146,7 @@ namespace GameDevTV.RTS.Player
             started = true;
             RecordClimateBaselines();
             ApplyFocusSector(FocusSectorIndex, announce: false);
+            CardDeckController.Instance?.NotifyActClimateComboReset();
             Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining}, climate from sector {FocusSectorIndex}");
             OnActStateChanged?.Invoke();
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
@@ -248,6 +249,16 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public float GetClimateProgress(out float tempProgress, out float atmosProgress, out float waterProgress)
         {
+            GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
+            tempProgress = DeltaProgressFromGain(tempGain, GenerationManager.SectorTemperatureDelta);
+            atmosProgress = DeltaProgressFromGain(atmosGain, GenerationManager.SectorAtmosphereDelta);
+            waterProgress = DeltaProgressFromGain(waterGain, GenerationManager.SectorWaterDelta);
+            return Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress));
+        }
+
+        /// <summary>Absolute gains this Act from baselines (Temp °C, Atmos atm, Water %).</summary>
+        public void GetClimateGains(out float tempGain, out float atmosGain, out float waterGain)
+        {
             float temp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t)
                 ? t : baselineTemperature;
             float atmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float a)
@@ -255,18 +266,23 @@ namespace GameDevTV.RTS.Player
             float water = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float w)
                 ? w : baselineWater;
 
-            tempProgress = DeltaProgress(temp, baselineTemperature, GenerationManager.SectorTemperatureDelta);
-            atmosProgress = DeltaProgress(atmos, baselineAtmosphere, GenerationManager.SectorAtmosphereDelta);
-            waterProgress = DeltaProgress(water, baselineWater, GenerationManager.SectorWaterDelta);
-            return Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress));
+            tempGain = temp - baselineTemperature;
+            atmosGain = atmos - baselineAtmosphere;
+            waterGain = water - baselineWater;
         }
 
-        private static float DeltaProgress(float current, float baseline, float requiredDelta)
+        private static float DeltaProgressFromGain(float gained, float requiredDelta)
         {
             if (requiredDelta <= 0.0001f) return 1f;
-            float gained = current - baseline;
             if (gained + 0.0005f >= requiredDelta) return 1f;
             return Mathf.Clamp01(gained / requiredDelta);
+        }
+
+        public void ShowStatusBanner(string richText, float seconds = 5f)
+        {
+            statusBanner = richText ?? string.Empty;
+            statusBannerUntil = Time.unscaledTime + Mathf.Max(0.5f, seconds);
+            OnActStateChanged?.Invoke();
         }
 
         private void Update()
@@ -303,7 +319,10 @@ namespace GameDevTV.RTS.Player
             int adjBonus = 0;
             int neighbors = 0;
             if (placed != null)
+            {
                 adjBonus = CalculateAdjacencyBonus(placed, tag, out neighbors);
+                TryOfferClimateComboCards(placed, tag);
+            }
 
             int total = score + adjBonus;
             if (total <= 0 && hab <= 0f) return;
@@ -317,6 +336,39 @@ namespace GameDevTV.RTS.Player
             OnActStateChanged?.Invoke();
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
             TryResolveWeekExhaustion();
+        }
+
+        /// <summary>
+        /// Heat↔Air↔Water edge pairs queue the missing third channel as a hand offer (once per Act).
+        /// </summary>
+        private void TryOfferClimateComboCards(BaseBuilding placed, string tag)
+        {
+            if (placed == null || string.IsNullOrEmpty(tag)) return;
+            if (tag != "Heat" && tag != "Air" && tag != "Water") return;
+            if (CardDeckController.Instance == null) return;
+
+            var neighbors = new System.Collections.Generic.List<BaseBuilding>(4);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
+                ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
+
+            foreach (var other in neighbors)
+            {
+                if (other == null || other == placed) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                string third = ThirdClimateTag(tag, otherTag);
+                if (string.IsNullOrEmpty(third)) continue;
+
+                string goalKey = ClimateTagToGoalKey(third);
+                if (string.IsNullOrEmpty(goalKey)) continue;
+
+                string offeredName = CardDeckController.Instance.QueueClimateComboOffer(goalKey);
+                if (string.IsNullOrEmpty(offeredName)) continue;
+
+                ShowStatusBanner(
+                    $"<color=#8FE7FF><b>COMBO</b></color> {tag}+{otherTag} → <color=#7CFF9A>{offeredName}</color> offered",
+                    5f);
+            }
         }
 
         /// <summary>
@@ -370,6 +422,30 @@ namespace GameDevTV.RTS.Player
             return (a == "Heat" && b == "Air") || (a == "Air" && b == "Heat")
                 || (a == "Air" && b == "Water") || (a == "Water" && b == "Air")
                 || (a == "Water" && b == "Heat") || (a == "Heat" && b == "Water");
+        }
+
+        /// <summary>Missing third of the Heat/Air/Water trio when a and b form a climate pair.</summary>
+        private static string ThirdClimateTag(string a, string b)
+        {
+            if (!IsClimatePair(a, b)) return null;
+            bool heat = a == "Heat" || b == "Heat";
+            bool air = a == "Air" || b == "Air";
+            bool water = a == "Water" || b == "Water";
+            if (heat && air && !water) return "Water";
+            if (air && water && !heat) return "Heat";
+            if (water && heat && !air) return "Air";
+            return null;
+        }
+
+        private static string ClimateTagToGoalKey(string tag)
+        {
+            return tag switch
+            {
+                "Heat" => "TEMPERATURE",
+                "Air" => "ATMOSPHERE",
+                "Water" => "WATER",
+                _ => null
+            };
         }
 
         public void GrantCardScore(BlueprintCardSO card)
@@ -455,6 +531,7 @@ namespace GameDevTV.RTS.Player
             RecordClimateBaselines();
             IsBetweenActs = false;
             ApplyFocusSector(FocusSectorIndex, announce: true);
+            CardDeckController.Instance?.NotifyActClimateComboReset();
             statusBanner = $"<color=#7CFF9A><b>SECTOR ACT CLEARED!</b></color>  Now: {CurrentActName}";
             statusBannerUntil = Time.unscaledTime + 6f;
 
@@ -562,7 +639,7 @@ namespace GameDevTV.RTS.Player
             if (runEnded)
                 return "<color=#FF8A8A><b>YOU LOSE</b></color>\nWeeks ran out before this sector’s score + climate goals.";
 
-            float climate = GetClimateProgress(out float tempP, out float atmosP, out float waterP);
+            float climate = GetClimateProgress(out _, out _, out _);
             GetFocusSectorClimatePresence(out bool hasHeat, out bool hasAir, out bool hasWater);
             var sb = new System.Text.StringBuilder();
 
@@ -609,16 +686,21 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color={scoreColor}>{scoreMark} SCORE  {colonyScore} / {TargetScore}</color>");
             sb.AppendLine($"  <color=#A8B0B8>{ProgressBar(colonyScore, TargetScore)}</color>");
 
+            GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
             string climateMark = IsClimateMet ? "✓" : "○";
             string climateColor = IsClimateMet ? "#7CFF9A" : "#FFE08A";
-            sb.AppendLine($"<color={climateColor}>{climateMark} CLIMATE  {climate:P0}</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Temp {tempP:P0} · Atmos {atmosP:P0} · Water {waterP:P0}</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Need +{GenerationManager.SectorTemperatureDelta:F0}°C / +{GenerationManager.SectorAtmosphereDelta:F2} atm / +{GenerationManager.SectorWaterDelta:F0}%</color>");
+            sb.AppendLine($"<color={climateColor}>{climateMark} CLIMATE GAINS  {climate:P0}</color>");
+            sb.AppendLine(
+                $"  <color=#A8B0B8>Temp <color=#C8D0D8>+{tempGain:F1}</color> / +{GenerationManager.SectorTemperatureDelta:F0}°C" +
+                $" · Atmos <color=#C8D0D8>+{atmosGain:F2}</color> / +{GenerationManager.SectorAtmosphereDelta:F2}" +
+                $" · Water <color=#C8D0D8>+{waterGain:F1}</color> / +{GenerationManager.SectorWaterDelta:F0}%</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Each sector must GAIN these deltas (not absolute planet floors).</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";
             string w = hasWater ? "<color=#7CFF9A>Water✓</color>" : "<color=#FF8A8A>Water○</color>";
             sb.AppendLine($"  <color=#A8B0B8>In this sector:</color> {h}  {a}  {w}");
+            sb.AppendLine($"  <color=#A8B0B8>Combo: Heat+Air → Water card · Air+Water → Heat · Water+Heat → Air</color>");
 
             string weekColor = weeksRemaining <= 2 ? "#FF8A8A" : (weeksRemaining <= 4 ? "#FFE08A" : "#C8D0D8");
             sb.AppendLine($"<color={weekColor}>WEEKS LEFT  {weeksRemaining}</color>");
