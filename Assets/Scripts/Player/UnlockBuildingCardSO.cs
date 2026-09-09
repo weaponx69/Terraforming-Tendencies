@@ -31,12 +31,12 @@ namespace GameDevTV.RTS.Player
             {
                 return goal switch
                 {
-                    "COMMAND POST" => 400,
-                    "POWER" => 100,
-                    "ATMOSPHERE" or "TEMPERATURE" or "WATER" or "OXYGEN" => 150,
-                    "POPULATION" => 150,
-                    "MATERIALS" => 200,
-                    _ => 150
+                    "COMMAND POST" => 80,
+                    "POWER" => 40,
+                    "ATMOSPHERE" or "TEMPERATURE" or "WATER" or "OXYGEN" => 60,
+                    "POPULATION" => 70,
+                    "MATERIALS" => 80,
+                    _ => 50
                 };
             }
 

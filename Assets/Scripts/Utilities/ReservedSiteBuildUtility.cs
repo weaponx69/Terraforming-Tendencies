@@ -588,28 +588,38 @@ namespace GameDevTV.RTS.Utilities
             if (mineralRate <= 0.0001f) mineralRate = 1f;
             if (gasRate <= 0.0001f) gasRate = 1f;
 
+            int configured = 0;
             if (building.Cost != null)
             {
-                int configured = Mathf.FloorToInt(
+                configured = Mathf.FloorToInt(
                     building.Cost.Minerals * mineralRate +
                     building.Cost.Gas * gasRate);
                 // Prefer raw minerals when conversion somehow collapses to 0.
                 if (configured <= 0 && building.Cost.Minerals > 0)
                     configured = building.Cost.Minerals;
-                if (configured > 0) return configured;
             }
 
-            // Themed BuildingSOs often shipped with Cost=null — keep play priced.
-            string goal = UnlockBuildingCardSO.ClassifyBuildingGoal(building);
-            return goal switch
+            if (configured <= 0)
             {
-                "COMMAND POST" => 400,
-                "POWER" => 100,
-                "ATMOSPHERE" or "TEMPERATURE" or "WATER" or "OXYGEN" => 150,
-                "POPULATION" => 150,
-                "MATERIALS" => 200,
-                _ => 150
-            };
+                // Themed BuildingSOs often shipped with Cost=null — keep play priced.
+                string goal = UnlockBuildingCardSO.ClassifyBuildingGoal(building);
+                configured = goal switch
+                {
+                    "COMMAND POST" => 80,
+                    "POWER" => 40,
+                    "ATMOSPHERE" or "TEMPERATURE" or "WATER" or "OXYGEN" => 60,
+                    "POPULATION" => 70,
+                    "MATERIALS" => 80,
+                    _ => 50
+                };
+            }
+
+            // Asset costs were tuned for the old RTS economy (100–400). Colony Acts
+            // uses a lean starting stock, so scale prices into a store-friendly range.
+            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                configured = Mathf.Max(25, Mathf.RoundToInt(configured * 0.35f));
+
+            return configured;
         }
     }
 }

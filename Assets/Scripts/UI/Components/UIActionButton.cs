@@ -261,9 +261,12 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
-            // Card plays cost 1 week; power is the placement gate (shown in tooltip).
+            // Card plays cost 1 week + Materials (store / roguelike).
             costLabel.gameObject.SetActive(true);
-            costLabel.text = "1 Week";
+            if (materialsCost > 0)
+                costLabel.text = $"1 Week\n{materialsCost} Mat";
+            else
+                costLabel.text = "1 Week";
             costLabel.color = new Color(0.75f, 0.9f, 1f, 1f);
         }
 
@@ -408,12 +411,16 @@ namespace GameDevTV.RTS.UI.Components
                 ColonyActManager.GetTileValues(building, out int score, out float hab, out string tag);
                 tooltipText = $"<b>+{score} Score</b>  [{tag}]\n{command.Name}\n";
                 tooltipText += "Costs <b>1 Week</b> when played.\n";
+                int matCost = ReservedSiteBuildUtility.GetMaterialsCost(building);
+                if (matCost > 0)
+                    tooltipText += $"Costs <b>{matCost} Materials</b> to place.\n";
                 float upkeep = PowerGridManager.GetBuildingPowerUpkeep(building);
                 if (upkeep > 0f)
                     tooltipText += $"Needs <b>{upkeep:0.#} Power</b> upkeep to place.\n";
                 else
                     tooltipText += "No power upkeep (places freely).\n";
                 tooltipText += "Stack near other tiles for adjacency bonus.\n";
+                tooltipText += "Right-click building → <b>Demolish</b> (Materials refund). Delete key also works.\n";
                 if (hab > 0f) tooltipText += $"Habitability +{hab:F0}\n";
 
                 if (tag == "Heat")

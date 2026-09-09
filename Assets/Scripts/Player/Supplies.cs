@@ -12,7 +12,7 @@ namespace GameDevTV.RTS.Player
     {
         [SerializeField] private float mineralsToMaterialsRate = 1f;
         [SerializeField] private float gasToMaterialsRate = 1f;
-        [SerializeField] private int startingMaterials = 1000;
+        [SerializeField] private int startingMaterials = 250;
         [SerializeField] private float startingOxygen = 0f;
 
         public static int StartingMaterials

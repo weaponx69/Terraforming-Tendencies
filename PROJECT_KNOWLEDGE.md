@@ -40,7 +40,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Hamster MVP one-round climate victory | **Retired** |
 | Sector unlock / colonization as progression | **Retired** (locks/pads) — **Acts now = sectors** |
 | Sector build lock / active-sector-only pads | **Retired** |
-| Card play gated by Materials | **Retired** (cards) |
+| Card play gated by Materials | **Active again** for Colony Acts card places (store economy); lean starting Materials |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
 | Auto-discard “unplayable” hand cards | **Retired** |
 | Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar **is** always seated (power gate); climate/drone force-seat stays retired — missing climate tiles surface via **adjacency combos** instead |
@@ -82,9 +82,11 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 2. **Week** — most commits spend **1 week** (`SpendWeek` on consume). Solar and scouting/discovery are free.
 3. **Placement gates**
    * Power: if `PowerUpkeep > 0` and board generation cannot cover **board upkeep + this tile**, placement is blocked.
+   * Materials: card buildings spend Materials on place (store / roguelike). Start ~250; Colony Acts prices are scaled (~35% of old RTS costs). Demolish refunds 50%.
    * Mines: require a discovered matching deposit and placement **on that deposit’s tile**.
    * Generators / zero-upkeep tiles always place (power-wise).
-   * No Materials / drone / pad requirement on **card** plays.
+   * **Demolish:** right-click a building → context menu (**Demolish** / **Repair**). Delete/Backspace also works. Refunds Materials (50% completed / 75% under construction).
+   * Health bars sit under every building so repair state is always visible.
 4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes. Ghost snap + place play short SFX.
 5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags). Completing a building also **queues its old RTS production options as hand cards** for the next fill (no build menu on the structure).
 6. **Climate** — powered Heat/Air/Water buildings in the **current Act focus sector** tick Temp / Atmos / Water (rates tuned so one tile takes ~1–2 minutes to clear a channel, not seconds). Auto power-link reaches generators within **4** tiles. Unpowered = no climate. Prior-sector buildings stop pushing meters. Act clear needs **gains** of +15°C / +0.25 atm / +5% from that Act’s baselines. Placing a Heat/Air/Water tile next to another climate-pair neighbor **offers the missing third** as a hand card (once per Act).

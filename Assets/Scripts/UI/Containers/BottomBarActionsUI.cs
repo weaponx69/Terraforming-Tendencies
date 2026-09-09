@@ -505,6 +505,15 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
+            int matCost = ReservedSiteBuildUtility.GetMaterialsCost(building);
+            int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
+            if (matCost > 0 && haveMats < matCost)
+            {
+                ExplorationManager.NotifyExplorationFailed(
+                    $"Need {matCost} Materials to place {building.Name} (have {haveMats}).");
+                return;
+            }
+
             // Mines: auto-build on a matching discovered deposit — no free-ground ghost.
             if (BuildingSiteRegistry.IsMineBuilding(building))
             {

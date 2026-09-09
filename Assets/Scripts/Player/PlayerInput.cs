@@ -11,6 +11,8 @@ using UnityEngine.InputSystem;
 using System.Linq;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.LowLevel;
+using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.Player;
 using GameDevTV.RTS.UI.Containers;
 
 namespace GameDevTV.RTS.Player
@@ -519,7 +521,27 @@ namespace GameDevTV.RTS.Player
             HandleRightClick();
             HandleDragSelect();
             HandleBasePaging();
+            HandleDemolishHotkey();
             HandleCheats();
+        }
+
+        /// <summary>Select a building, then Delete/Backspace to scrap it for Materials refund.</summary>
+        private void HandleDemolishHotkey()
+        {
+            if (Keyboard.current == null) return;
+            if (Time.timeScale <= 0.01f) return;
+            bool pressed = Keyboard.current.deleteKey.wasPressedThisFrame
+                || Keyboard.current.backspaceKey.wasPressedThisFrame;
+            if (!pressed) return;
+
+            for (int i = 0; i < selectedUnits.Count; i++)
+            {
+                if (selectedUnits[i] is not BaseBuilding building) continue;
+                if (building is GlobalCommander) continue;
+                if (building.Owner != Owner.Player1) continue;
+                building.TryDemolish(refund: true);
+                return;
+            }
         }
 
 
@@ -738,6 +760,14 @@ namespace GameDevTV.RTS.Player
                 && !DiscoverySystem.IsOnDiscoveredMineDeposit(mineGateBbc.Building, snapTarget))
             {
                 allRestrictionsPass = false;
+            }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand matBbc
+                && matBbc.Building != null)
+            {
+                int need = ReservedSiteBuildUtility.GetMaterialsCost(matBbc.Building);
+                int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
+                if (need > 0 && have < need)
+                    allRestrictionsPass = false;
             }
 
             // Hysteresis so NavMesh / overlap edge cases don't strobe red/blue every frame.
@@ -1082,35 +1112,23 @@ namespace GameDevTV.RTS.Player
                         return;
                     }
 
-                    if (vetoHit.collider.TryGetComponent<BaseBuilding>(out var building))
+                    BaseBuilding clickedBuilding = vetoHit.collider.GetComponentInParent<BaseBuilding>();
+                    if (clickedBuilding != null
+                        && clickedBuilding.Owner == Owner.Player1
+                        && clickedBuilding is not GlobalCommander)
                     {
-                        if (building.Progress.State != BuildingProgress.BuildingState.Completed)
+                        // Select the building so Delete still works, then open context menu.
+                        if (!selectedUnits.Contains(clickedBuilding))
                         {
-                            building.Die();
-                            return;
+                            DeselectAllUnits();
+                            clickedBuilding.Select();
                         }
-                        
-                        if (building.CurrentHealth < building.MaxHealth)
-                        {
-                            building.TryRepair();
-                            return;
-                        }
+                        BuildingContextMenuUI.Instance?.Show(
+                            clickedBuilding, Mouse.current.position.ReadValue());
+                        return;
                     }
-                    else if (vetoHit.collider.transform.parent != null && vetoHit.collider.transform.parent.TryGetComponent<BaseBuilding>(out var parentBuilding))
-                    {
-                        if (parentBuilding.Progress.State != BuildingProgress.BuildingState.Completed)
-                        {
-                            parentBuilding.Die();
-                            return;
-                        }
-                        
-                        if (parentBuilding.CurrentHealth < parentBuilding.MaxHealth)
-                        {
-                            parentBuilding.TryRepair();
-                            return;
-                        }
-                    }
-                    else if (vetoHit.collider.TryGetComponent<GameDevTV.RTS.Environment.ExplorableNode>(out var explorableNode))
+
+                    if (vetoHit.collider.TryGetComponent<GameDevTV.RTS.Environment.ExplorableNode>(out var explorableNode))
                     {
                         explorableNode.TryExplore();
                         return;

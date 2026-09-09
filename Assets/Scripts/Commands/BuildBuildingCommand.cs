@@ -2,6 +2,7 @@ using GameDevTV.RTS.Player;
 using GameDevTV.RTS.TechTree;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
 using System.Linq;
@@ -71,10 +72,12 @@ namespace GameDevTV.RTS.Commands
                     targetPos = navHit.position;
             }
 
-            // Card plays: power gate + mine discovery (industry tiles need the deposit tile).
+            // Card plays: power + Materials (store) + mine discovery.
             if (HandIndex >= 0)
             {
                 if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                    return false;
+                if (!HasEnoughMaterialsForCard(context.Owner))
                     return false;
                 if (BuildingSiteRegistry.IsMineBuilding(Building))
                 {
@@ -148,12 +151,20 @@ namespace GameDevTV.RTS.Commands
                 }
             }
 
-                // Hand card plays: power gate only — self-construct with rise animation (no drone).
                 if (HandIndex >= 0)
                 {
                     if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
                         ExplorationManager.NotifyExplorationFailed("Not enough power to place this card.");
+                        return;
+                    }
+
+                    if (!HasEnoughMaterialsForCard(context.Owner))
+                    {
+                        int need = ReservedSiteBuildUtility.GetMaterialsCost(Building);
+                        int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(context.Owner, out int m) ? m : 0;
+                        ExplorationManager.NotifyExplorationFailed(
+                            $"Need {need} Materials to place {Building.Name} (have {have}).");
                         return;
                     }
 
@@ -182,6 +193,13 @@ namespace GameDevTV.RTS.Commands
                     if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
                     {
                         ExplorationManager.NotifyExplorationFailed("Can't place here.");
+                        return;
+                    }
+
+                    if (!ReservedSiteBuildUtility.TrySpendMaterials(Building, context.Owner))
+                    {
+                        ExplorationManager.NotifyExplorationFailed(
+                            $"Need {ReservedSiteBuildUtility.GetMaterialsCost(Building)} Materials to place {Building.Name}.");
                         return;
                     }
 
@@ -495,18 +513,16 @@ namespace GameDevTV.RTS.Commands
 
         private bool HasEnoughSupplies(CommandContext context)
         {
-            // Card plays are power-gated only (see CanHandle / HandIndex path).
-            if (HandIndex >= 0) return true;
+            return HasEnoughMaterialsForCard(context.Owner);
+        }
 
-            if (Building == null || Building.Cost == null) return true;
-
-            // Materials replaces minerals/gas. Compute materials-equivalent cost.
-            int materialsCost = Mathf.FloorToInt(Building.Cost.Minerals * Supplies.MineralsToMaterialsRateStatic
-                + Building.Cost.Gas * Supplies.GasToMaterialsRateStatic);
-            
+        private bool HasEnoughMaterialsForCard(Owner owner)
+        {
+            if (Building == null) return true;
+            int materialsCost = ReservedSiteBuildUtility.GetMaterialsCost(Building);
+            if (materialsCost <= 0) return true;
             if (Supplies.Materials == null) return false;
-
-            return materialsCost <= Supplies.Materials[context.Owner];
+            return Supplies.Materials.TryGetValue(owner, out int have) && have >= materialsCost;
         }
     }
 }

@@ -244,6 +244,8 @@ namespace GameDevTV.RTS.Units
                 gameObject.AddComponent<GameDevTV.RTS.Environment.PowerNode>();
             }
 
+            EnsureBuildingHealthBar();
+
             isBuildingInitialized = true;
         }
 
@@ -481,6 +483,7 @@ namespace GameDevTV.RTS.Units
             unitBuildingThis = null;
             // Prefabs often ship with BaseBuilding disabled — climate / production need Update.
             enabled = true;
+            EnsureBuildingHealthBar();
             Supplies.BeginColonyIntegrityIfNeeded(this);
 
             // Combolands: finished tile grants Colony Score (+ Habitability for climate tags).
@@ -1162,6 +1165,54 @@ namespace GameDevTV.RTS.Units
             {
                 Debug.Log($"[BaseBuilding] Not enough materials to repair {gameObject.name}. Costs 2.");
             }
+        }
+
+        /// <summary>
+        /// Scrap this building for a partial Materials refund (store / roguelike economy).
+        /// </summary>
+        public bool TryDemolish(bool refund = true)
+        {
+            if (this is GlobalCommander) return false;
+            if (Owner != Owner.Player1) return false;
+            if (Progress.State == BuildingProgress.BuildingState.Destroyed) return false;
+
+            BuildingSO def = ResolvedBuildingSO;
+            int buildCost = GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.GetMaterialsCost(def);
+            int refundAmt = 0;
+            if (refund && buildCost > 0)
+            {
+                // Under construction: larger refund; completed: half back to the store.
+                float rate = Progress.State == BuildingProgress.BuildingState.Building ? 0.75f : 0.5f;
+                refundAmt = Mathf.Max(0, Mathf.RoundToInt(buildCost * rate));
+            }
+
+            string label = def != null && !string.IsNullOrEmpty(def.Name) ? def.Name : gameObject.name;
+            if (refundAmt > 0)
+            {
+                int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner, out int m) ? m : 0;
+                Supplies.UpdateMaterials(Owner, have + refundAmt);
+                ColonyActManager.Instance?.ShowStatusBanner(
+                    $"<color=#FFE08A><b>DEMOLISHED</b></color> {label}  <color=#7CFF9A>+{refundAmt} Materials</color>",
+                    4f);
+            }
+            else
+            {
+                ColonyActManager.Instance?.ShowStatusBanner(
+                    $"<color=#FFE08A><b>DEMOLISHED</b></color> {label}",
+                    3f);
+            }
+
+            Debug.Log($"[BaseBuilding] Demolished {label} (refund {refundAmt}).");
+            GameFlowManager.Instance?.PlayerActed();
+            Die();
+            return true;
+        }
+
+        private void EnsureBuildingHealthBar()
+        {
+            if (this is GlobalCommander) return;
+            if (GetComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>() != null) return;
+            gameObject.AddComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>();
         }
 
         private void AssignUniqueName()
