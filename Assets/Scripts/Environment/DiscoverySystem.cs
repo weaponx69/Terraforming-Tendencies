@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 
@@ -138,20 +139,66 @@ namespace GameDevTV.RTS.Environment
             return false;
         }
 
-        /// <summary>True if a matching discovered deposit lies within <paramref name="radius"/> of worldPos.</summary>
-        public static bool HasDiscoveredMineDepositNear(BuildingSO building, Vector3 worldPos, float radius = 28f)
+        /// <summary>
+        /// True when <paramref name="worldPos"/> sits on the same colony tile as a matching
+        /// discovered deposit (mines may only be built on the deposit spot).
+        /// </summary>
+        public static bool IsOnDiscoveredMineDeposit(BuildingSO building, Vector3 worldPos)
         {
             if (!TryGetMineResourceType(building, out string type)) return true;
-            float r2 = radius * radius;
+            var cell = ColonyTileGrid.WorldToCell(worldPos);
             foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {
                 if (hr == null || !hr.IsDiscovered) continue;
                 if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
                     continue;
-                if ((hr.transform.position - worldPos).sqrMagnitude <= r2)
+                if (ColonyTileGrid.WorldToCell(hr.transform.position) == cell)
                     return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Legacy name — same as <see cref="IsOnDiscoveredMineDeposit"/> (on-spot, not nearby).
+        /// </summary>
+        public static bool HasDiscoveredMineDepositNear(BuildingSO building, Vector3 worldPos, float radius = 28f)
+        {
+            return IsOnDiscoveredMineDeposit(building, worldPos);
+        }
+
+        /// <summary>
+        /// If the cursor is near a matching discovered deposit, snap to that deposit's tile.
+        /// Returns false when no deposit is in range (ghost stays on free grid snap).
+        /// </summary>
+        public static bool TrySnapToMineDeposit(
+            BuildingSO building,
+            Vector3 cursorWorld,
+            out Vector3 snapped,
+            out Vector2Int cell,
+            float maxDist = -1f)
+        {
+            snapped = cursorWorld;
+            cell = ColonyTileGrid.WorldToCell(cursorWorld);
+            if (!TryGetMineResourceType(building, out string type)) return false;
+
+            float max = maxDist > 0f ? maxDist : ColonyTileGrid.TileSize * 1.25f;
+            float bestDist = max;
+            HiddenResource best = null;
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                float d = Mathf.Sqrt(ColonyTileGrid.HorizontalDistSq(cursorWorld, hr.transform.position));
+                if (d > bestDist) continue;
+                bestDist = d;
+                best = hr;
+            }
+
+            if (best == null) return false;
+            cell = ColonyTileGrid.WorldToCell(best.transform.position);
+            snapped = ColonyTileGrid.CellToWorld(cell, cursorWorld.y);
+            return true;
         }
     }
 }

@@ -71,7 +71,7 @@ namespace GameDevTV.RTS.Commands
                     targetPos = navHit.position;
             }
 
-            // Card plays: power gate + mine discovery (industry tiles need a found deposit).
+            // Card plays: power gate + mine discovery (industry tiles need the deposit tile).
             if (HandIndex >= 0)
             {
                 if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
@@ -80,7 +80,10 @@ namespace GameDevTV.RTS.Commands
                 {
                     if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
                         return false;
-                    if (!DiscoverySystem.HasDiscoveredMineDepositNear(Building, targetPos))
+                    // Prefer snapping onto the deposit tile under/near the cursor before validating.
+                    if (DiscoverySystem.TrySnapToMineDeposit(Building, targetPos, out Vector3 mineSnap, out _))
+                        targetPos = mineSnap;
+                    if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
                 }
                 return AllRestrictionsPass(targetPos, context.Owner, requireWorker: false);
@@ -100,6 +103,11 @@ namespace GameDevTV.RTS.Commands
             if (HandIndex >= 0)
             {
                 targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
+                if (BuildingSiteRegistry.IsMineBuilding(Building)
+                    && DiscoverySystem.TrySnapToMineDeposit(Building, context.Hit.point, out Vector3 mineSnap, out _))
+                {
+                    targetPos = new Vector3(mineSnap.x, targetPos.y, mineSnap.z);
+                }
             }
 
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };

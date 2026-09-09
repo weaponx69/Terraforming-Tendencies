@@ -690,6 +690,17 @@ namespace GameDevTV.RTS.Player
                 hitPos = ColonyTileGrid.SnapForPlacement(
                     hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
 
+                // Mines lock to the matching discovered deposit tile (not free ground).
+                if (activeCommand is BuildBuildingCommand mineBbc
+                    && BuildingSiteRegistry.IsMineBuilding(mineBbc.Building)
+                    && DiscoverySystem.TrySnapToMineDeposit(
+                        mineBbc.Building, hitPos.Value, out Vector3 mineSnap, out Vector2Int mineCell))
+                {
+                    hitPos = mineSnap;
+                    tileGhostStickyCell = mineCell;
+                    joinCount = ColonyTileGrid.CountOrthogonalNeighbors(mineCell, Owner.Player1);
+                }
+
                 // Tick when the ghost settles on a new grid cell (louder when joining a neighbor).
                 if (tileGhostStickyCell.HasValue
                     && (!previousSticky.HasValue || previousSticky.Value != tileGhostStickyCell.Value))
@@ -719,6 +730,12 @@ namespace GameDevTV.RTS.Player
             bool allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
             if (cardTilePlace && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
+            {
+                allRestrictionsPass = false;
+            }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand mineGateBbc
+                && BuildingSiteRegistry.IsMineBuilding(mineGateBbc.Building)
+                && !DiscoverySystem.IsOnDiscoveredMineDeposit(mineGateBbc.Building, snapTarget))
             {
                 allRestrictionsPass = false;
             }
@@ -1292,6 +1309,15 @@ namespace GameDevTV.RTS.Player
                 if (UnityEngine.AI.NavMesh.SamplePosition(placePoint, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
                     placePoint = new Vector3(placePoint.x, navHit.position.y, placePoint.z);
 
+                if (activeCommand is BuildBuildingCommand placeMine
+                    && BuildingSiteRegistry.IsMineBuilding(placeMine.Building)
+                    && DiscoverySystem.TrySnapToMineDeposit(
+                        placeMine.Building, placePoint, out Vector3 minePlace, out Vector2Int mineCell))
+                {
+                    placePoint = new Vector3(minePlace.x, placePoint.y, minePlace.z);
+                    tileGhostStickyCell = mineCell;
+                }
+
                 hit.point = placePoint;
             }
 
@@ -1363,10 +1389,10 @@ namespace GameDevTV.RTS.Player
                     ExplorationManager.NotifyExplorationFailed(
                         $"Discover a {type ?? "resource"} deposit before placing this mine.");
                 }
-                else if (!DiscoverySystem.HasDiscoveredMineDepositNear(failedMine.Building, hit.point))
+                else if (!DiscoverySystem.IsOnDiscoveredMineDeposit(failedMine.Building, hit.point))
                 {
                     ExplorationManager.NotifyExplorationFailed(
-                        "Place this mine next to a discovered deposit of the matching resource.");
+                        "Place this mine on a discovered deposit of the matching resource.");
                 }
             }
 

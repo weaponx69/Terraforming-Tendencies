@@ -69,7 +69,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
 * **Climate cards:** no force-seat. Heat↔Air / Air↔Water / Water↔Heat **adjacency combos** queue the missing third channel as a hand offer (once per Act per channel). Draw pile gets a few extra Heat/Air copies so combos can start.
 * **Hand size 24** (scrollable); draw pile is not limited to 5.
-* **Mine tiles** require a **discovered** matching deposit, and must be placed **near** that deposit.
+* **Mine tiles** require a **discovered** matching deposit, and must be placed **on that deposit’s tile** (not nearby free ground).
 * On clear: camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
 * Final sector Act clear → victory.
@@ -82,7 +82,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 2. **Week** — most commits spend **1 week** (`SpendWeek` on consume). Solar and scouting/discovery are free.
 3. **Placement gates**
    * Power: if `PowerUpkeep > 0` and board generation cannot cover **board upkeep + this tile**, placement is blocked.
-   * Mines: require a discovered matching deposit and placement near it.
+   * Mines: require a discovered matching deposit and placement **on that deposit’s tile**.
    * Generators / zero-upkeep tiles always place (power-wise).
    * No Materials / drone / pad requirement on **card** plays.
 4. **Free tile placement** — card ghost snaps to the 12 m grid under the cursor (sticky cell). Click places; ghost rises (**no drone**). Score / climate apply when construction finishes. Ghost snap + place play short SFX.
