@@ -502,10 +502,12 @@ namespace GameDevTV.RTS.UI.Containers
                 float used = PowerGridManager.GetBoardPowerUpkeep(owner);
                 float need = PowerGridManager.GetBuildingPowerUpkeep(building);
                 float free = gen - used;
-                ExplorationManager.NotifyExplorationFailed(
+                Vector3 hint = ResolveErrorHintPosition();
+                ExplorationManager.NotifyPlacementFailed(
                     $"Not enough spare power for {building.Name} " +
-                    $"(needs +{need:0.#}; {gen:0.#} gen, {used:0.#} used, {free:0.#} free). " +
-                    "Build more Solar or demolish other consumers.");
+                    $"(needs +{need:0.#}; {gen:0.#} gen / {used:0.#} used / {free:0.#} free). " +
+                    "Build more Solar or demolish consumers.",
+                    hint);
                 return;
             }
 
@@ -513,8 +515,9 @@ namespace GameDevTV.RTS.UI.Containers
             int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
             if (matCost > 0 && haveMats < matCost)
             {
-                ExplorationManager.NotifyExplorationFailed(
-                    $"Need {matCost} Materials to place {building.Name} (have {haveMats}).");
+                ExplorationManager.NotifyPlacementFailed(
+                    $"Need {matCost} Materials to place {building.Name} (have {haveMats}).",
+                    ResolveErrorHintPosition());
                 return;
             }
 
@@ -524,15 +527,17 @@ namespace GameDevTV.RTS.UI.Containers
                 if (!DiscoverySystem.HasDiscoveredMineDeposit(building))
                 {
                     DiscoverySystem.TryGetMineResourceType(building, out string type);
-                    ExplorationManager.NotifyExplorationFailed(
-                        $"No discovered {type ?? "resource"} deposit yet. Explore / discover mines before placing {building.Name}.");
+                    ExplorationManager.NotifyPlacementFailed(
+                        $"No discovered {type ?? "resource"} deposit yet. Explore / discover mines before placing {building.Name}.",
+                        ResolveErrorHintPosition());
                     return;
                 }
 
                 if (!DiscoverySystem.TryGetAutoMinePlacement(building, out Vector3 minePos, out string failReason))
                 {
-                    ExplorationManager.NotifyExplorationFailed(
-                        failReason ?? $"No free {building.Name} deposit tile.");
+                    ExplorationManager.NotifyPlacementFailed(
+                        failReason ?? $"No free {building.Name} deposit tile.",
+                        ResolveErrorHintPosition());
                     return;
                 }
 
@@ -562,6 +567,22 @@ namespace GameDevTV.RTS.UI.Containers
             buildCmd.HandIndex = cardIndex;
             buildCmd.GhostPrefab = FindGhostPrefabForBuilding(building);
             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(buildCmd));
+        }
+
+        private static Vector3 ResolveErrorHintPosition()
+        {
+            if (Camera.main != null && Mouse.current != null)
+            {
+                Vector2 screen = Mouse.current.position.ReadValue();
+                Ray ray = Camera.main.ScreenPointToRay(screen);
+                if (Physics.Raycast(ray, out RaycastHit hit, 5000f, Physics.DefaultRaycastLayers,
+                        QueryTriggerInteraction.Ignore))
+                    return hit.point;
+            }
+
+            var camTarget = GameObject.Find("Camera Target");
+            if (camTarget != null) return camTarget.transform.position + Vector3.up * 2f;
+            return Vector3.zero;
         }
 
         private GameObject FindGhostPrefabForBuilding(BuildingSO buildingSO)

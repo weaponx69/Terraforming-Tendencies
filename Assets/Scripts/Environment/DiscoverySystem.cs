@@ -19,12 +19,71 @@ namespace GameDevTV.RTS.Environment
         /// before they can mine them.
         /// </summary>
         private static HashSet<string> discoveredTypes = new();
+        private static readonly HashSet<SectorManager.SectorFeature> discoveredFeatures = new();
+
+        /// <summary>Fired when a mine resource type or sector geological feature is newly revealed.</summary>
+        public static event System.Action OnDiscoveryChanged;
 
         /// <summary>Check if a resource type has been discovered.</summary>
         public static bool IsTypeDiscovered(string typeName)
         {
             if (string.IsNullOrEmpty(typeName)) return false;
             return discoveredTypes.Contains(typeName);
+        }
+
+        /// <summary>True if this sector geological feature has been revealed to the player.</summary>
+        public static bool IsSectorFeatureDiscovered(SectorManager.SectorFeature feature)
+        {
+            if (feature == SectorManager.SectorFeature.None) return true;
+            return discoveredFeatures.Contains(feature);
+        }
+
+        /// <summary>
+        /// Sector feature a building requires (Subglacial→WaterDeposit, Lava Tube→LavaTube, …).
+        /// Returns false when the building is free-place climate/infra (no geology gate).
+        /// </summary>
+        public static bool TryGetRequiredSectorFeature(BuildingSO building, out SectorManager.SectorFeature feature)
+        {
+            feature = SectorManager.SectorFeature.None;
+            if (building == null || string.IsNullOrEmpty(building.Name)) return false;
+
+            string name = building.Name;
+            if (name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Biosphere", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                feature = SectorManager.SectorFeature.WaterDeposit;
+                return true;
+            }
+            if (name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Subterranean", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                feature = SectorManager.SectorFeature.LavaTube;
+                return true;
+            }
+            if (name.IndexOf("Sector Command", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Magnetic Shield", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                feature = SectorManager.SectorFeature.FaultLine;
+                return true;
+            }
+            // Water Ice Aquifer is a normal climate tile — not geology-gated.
+            return false;
+        }
+
+        /// <summary>
+        /// False when the card must stay out of hand: undiscovered mine deposit
+        /// or undiscovered sector geological feature.
+        /// </summary>
+        public static bool IsBuildingGeologicallyAvailable(BuildingSO building)
+        {
+            if (building == null) return false;
+            if (BuildingSiteRegistry.IsMineBuilding(building)
+                && !HasDiscoveredMineDeposit(building))
+                return false;
+            if (TryGetRequiredSectorFeature(building, out var feature)
+                && !IsSectorFeatureDiscovered(feature))
+                return false;
+            return true;
         }
 
         /// <summary>Reveal a resource type, making all nodes of that type visible in explored sectors.</summary>
@@ -36,7 +95,24 @@ namespace GameDevTV.RTS.Environment
             {
                 Debug.Log($"[DiscoverySystem] Resource type '{typeName}' discovered!");
                 DiscoverAllNodesOfType(typeName);
+                OnDiscoveryChanged?.Invoke();
             }
+        }
+
+        /// <summary>Reveal a sector geological feature (WaterDeposit, LavaTube, FaultLine, …).</summary>
+        public static void RevealSectorFeature(SectorManager.SectorFeature feature)
+        {
+            if (feature == SectorManager.SectorFeature.None) return;
+            if (!discoveredFeatures.Add(feature)) return;
+            Debug.Log($"[DiscoverySystem] Sector feature '{feature}' discovered!");
+            OnDiscoveryChanged?.Invoke();
+        }
+
+        /// <summary>Reveal whatever geological feature the given sector has (if any).</summary>
+        public static void RevealFeaturesForSector(SectorManager.Sector sector)
+        {
+            if (sector == null) return;
+            RevealSectorFeature(sector.Feature);
         }
 
         /// <summary>Get all currently discovered resource type names.</summary>
@@ -93,6 +169,7 @@ namespace GameDevTV.RTS.Environment
         public static void Reset()
         {
             discoveredTypes.Clear();
+            discoveredFeatures.Clear();
             // No default types — Sector 0 force-discovery handles the starting resources
         }
 

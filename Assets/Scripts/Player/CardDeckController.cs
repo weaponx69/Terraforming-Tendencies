@@ -78,9 +78,11 @@ namespace GameDevTV.RTS.Player
             Supplies.OnPowerChanged += HandleSupplyGateChanged;
             Supplies.OnPopulationChanged += HandleSupplyGateChanged;
             SectorManager.OnSectorUnlocked += HandleSectorUnlocked;
+            SectorManager.OnSectorExplored += HandleSectorExplored;
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
             GenerationManager.OnGenerationStarted += HandleGenerationStarted;
             GenerationManager.OnGenerationEnded += HandleGenerationEnded;
+            DiscoverySystem.OnDiscoveryChanged += HandleDiscoveryChanged;
         }
 
         private void OnDisable()
@@ -97,9 +99,11 @@ namespace GameDevTV.RTS.Player
             Supplies.OnPowerChanged -= HandleSupplyGateChanged;
             Supplies.OnPopulationChanged -= HandleSupplyGateChanged;
             SectorManager.OnSectorUnlocked -= HandleSectorUnlocked;
+            SectorManager.OnSectorExplored -= HandleSectorExplored;
             PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
             GenerationManager.OnGenerationStarted -= HandleGenerationStarted;
             GenerationManager.OnGenerationEnded -= HandleGenerationEnded;
+            DiscoverySystem.OnDiscoveryChanged -= HandleDiscoveryChanged;
         }
 
         private void HandleBuildingSpawned(BuildingSpawnEvent _) => RefreshHand();
@@ -133,6 +137,16 @@ namespace GameDevTV.RTS.Player
                 EnsureBootstrapUnlockInHand("Command Post");
             RefreshHand();
         }
+
+        private void HandleSectorExplored(int sectorIndex)
+        {
+            var sm = SectorManager.Instance;
+            if (sm != null && sectorIndex >= 0 && sectorIndex < sm.Sectors.Count)
+                DiscoverySystem.RevealFeaturesForSector(sm.Sectors[sectorIndex]);
+            RefreshHand();
+        }
+
+        private void HandleDiscoveryChanged() => RefreshHand();
 
         /// <summary>
         /// After auto-colonizing a sector and the player acknowledges the handoff UI,
@@ -535,7 +549,7 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void FillHand()
         {
-            StripUndiscoveredMineCardsFromHand();
+            StripUndiscoveredGeologicalCardsFromHand();
             StripExcludedColonyCardsFromHand();
             EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
             EnsureMiningDroneInHand();
@@ -870,7 +884,8 @@ namespace GameDevTV.RTS.Player
         {
             return card is UnlockBuildingCardSO unlock
                 && unlock.buildingToUnlock != null
-                && BuildingSiteRegistry.IsPowerGeneratorBuilding(unlock.buildingToUnlock);
+                && BuildingSiteRegistry.IsPowerGeneratorBuilding(unlock.buildingToUnlock)
+                && DiscoverySystem.IsBuildingGeologicallyAvailable(unlock.buildingToUnlock);
         }
 
         private bool IsSolarUnlockCardInHand() => hand.Any(IsSolarUnlockCard);
@@ -975,7 +990,7 @@ namespace GameDevTV.RTS.Player
                 || name.IndexOf("Culture Serum", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        /// <summary>Keep real cards; mines only enter the hand after a matching deposit is discovered.</summary>
+        /// <summary>Keep real cards; mines / geology tiles only after discovery.</summary>
         private static bool ShouldKeepInHand(BlueprintCardSO card)
         {
             if (card == null) return false;
@@ -984,22 +999,20 @@ namespace GameDevTV.RTS.Player
             {
                 if (unlock.buildingToUnlock == null || unlock.buildingToUnlock.Prefab == null)
                     return false;
-                if (BuildingSiteRegistry.IsMineBuilding(unlock.buildingToUnlock)
-                    && !DiscoverySystem.HasDiscoveredMineDeposit(unlock.buildingToUnlock))
+                if (!DiscoverySystem.IsBuildingGeologicallyAvailable(unlock.buildingToUnlock))
                     return false;
                 return true;
             }
             return true;
         }
 
-        private void StripUndiscoveredMineCardsFromHand()
+        private void StripUndiscoveredGeologicalCardsFromHand()
         {
             for (int i = hand.Count - 1; i >= 0; i--)
             {
                 if (hand[i] is not UnlockBuildingCardSO unlock) continue;
                 if (unlock.buildingToUnlock == null) continue;
-                if (!BuildingSiteRegistry.IsMineBuilding(unlock.buildingToUnlock)) continue;
-                if (DiscoverySystem.HasDiscoveredMineDeposit(unlock.buildingToUnlock)) continue;
+                if (DiscoverySystem.IsBuildingGeologicallyAvailable(unlock.buildingToUnlock)) continue;
                 discardPile.Add(hand[i]);
                 hand.RemoveAt(i);
             }

@@ -16,7 +16,7 @@ MonoBehaviour:
   lifeSupportRadius: 10
   buildTimeMultiplier: 1
   biomassUpkeep: 0
-  powerUpkeep: 3
+  powerUpkeep: 2
   oxygenUpkeep: 0
   biomassGeneration: 5
   powerGeneration: 0

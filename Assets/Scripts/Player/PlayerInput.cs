@@ -130,7 +130,13 @@ namespace GameDevTV.RTS.Player
             else
             {
                 startingFollowOffset = cinemachineFollow.FollowOffset;
-                targetZoomDistance = startingFollowOffset.y;
+                // Start a bit more zoomed out than the scene default follow height.
+                const float startZoomOutFactor = 1.75f;
+                targetZoomDistance = startingFollowOffset.y * startZoomOutFactor;
+                cinemachineFollow.FollowOffset = new Vector3(
+                    startingFollowOffset.x,
+                    targetZoomDistance,
+                    startingFollowOffset.z * startZoomOutFactor);
                 maxRotationAmount = Mathf.Abs(cinemachineFollow.FollowOffset.z);
             }
 
@@ -1395,21 +1401,13 @@ namespace GameDevTV.RTS.Player
 
             if (handled && cardTilePlace)
                 AudioManager.Instance.PlayPlaceClickSound();
-            else if (!handled && cardTilePlace
-                && activeCommand is BuildBuildingCommand failedMine
-                && BuildingSiteRegistry.IsMineBuilding(failedMine.Building))
+            else if (!handled && cardTilePlace && activeCommand is BuildBuildingCommand failedCard)
             {
-                if (!DiscoverySystem.HasDiscoveredMineDeposit(failedMine.Building))
-                {
-                    DiscoverySystem.TryGetMineResourceType(failedMine.Building, out string type);
-                    ExplorationManager.NotifyExplorationFailed(
-                        $"Discover a {type ?? "resource"} deposit before placing this mine.");
-                }
-                else if (!DiscoverySystem.IsOnDiscoveredMineDeposit(failedMine.Building, hit.point))
-                {
-                    ExplorationManager.NotifyExplorationFailed(
-                        "Place this mine on a discovered deposit of the matching resource.");
-                }
+                Vector3 hint = hit.point;
+                if (ghostInstance != null) hint = ghostInstance.transform.position;
+                string reason = failedCard.ExplainCardPlacementFailure(hint, Owner.Player1)
+                    ?? "Can't place this card here.";
+                ExplorationManager.NotifyPlacementFailed(reason, hint);
             }
 
 

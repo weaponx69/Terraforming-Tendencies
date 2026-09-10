@@ -453,6 +453,7 @@ namespace GameDevTV.RTS.Environment
             sector.IsLocked = false;
             sector.IsExplored = true;
             sector.IsDiscovered = true;
+            DiscoverySystem.RevealFeaturesForSector(sector);
             if (claimTerraformingFocus || TerraformingSector == null)
                 BeginTerraformingOn(sector);
             else if (ActiveSector == null)
@@ -495,6 +496,7 @@ namespace GameDevTV.RTS.Environment
             if (index < 0 || index >= Sectors.Count) return;
             if (Sectors[index].IsExplored) return;
             Sectors[index].IsExplored = true;
+            DiscoverySystem.RevealFeaturesForSector(Sectors[index]);
             OnSectorExplored?.Invoke(index);
         }
 
@@ -517,6 +519,7 @@ namespace GameDevTV.RTS.Environment
                 if (Sectors[i].IsLocked && !Sectors[i].IsExplored)
                 {
                     Sectors[i].IsExplored = true;
+                    DiscoverySystem.RevealFeaturesForSector(Sectors[i]);
                     OnSectorExplored?.Invoke(i);
                     Debug.Log($"[SectorManager] Sector {i} explored (scouted).");
                     return i;

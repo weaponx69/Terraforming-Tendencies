@@ -155,23 +155,17 @@ namespace GameDevTV.RTS.Commands
                 {
                     if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
-                        float gen = PowerGridManager.GetBoardPowerGeneration(context.Owner);
-                        float used = PowerGridManager.GetBoardPowerUpkeep(context.Owner);
-                        float need = PowerGridManager.GetBuildingPowerUpkeep(Building);
-                        float free = gen - used;
-                        ExplorationManager.NotifyExplorationFailed(
-                            $"Not enough spare power for {Building.Name} " +
-                            $"(needs +{need:0.#}; {gen:0.#} gen, {used:0.#} used, {free:0.#} free). " +
-                            "Build more Solar or demolish other consumers.");
+                        string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
+                            ?? "Not enough spare power to place this card.";
+                        ExplorationManager.NotifyPlacementFailed(reason, targetPos);
                         return;
                     }
 
                     if (!HasEnoughMaterialsForCard(context.Owner))
                     {
-                        int need = ReservedSiteBuildUtility.GetMaterialsCost(Building);
-                        int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(context.Owner, out int m) ? m : 0;
-                        ExplorationManager.NotifyExplorationFailed(
-                            $"Need {need} Materials to place {Building.Name} (have {have}).");
+                        string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
+                            ?? $"Need materials to place {Building.Name}.";
+                        ExplorationManager.NotifyPlacementFailed(reason, targetPos);
                         return;
                     }
 
@@ -180,8 +174,9 @@ namespace GameDevTV.RTS.Commands
                         if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
                         {
                             DiscoverySystem.TryGetMineResourceType(Building, out string type);
-                            ExplorationManager.NotifyExplorationFailed(
-                                $"Discover a {type ?? "resource"} deposit before placing this mine.");
+                            ExplorationManager.NotifyPlacementFailed(
+                                $"Discover a {type ?? "resource"} deposit before placing this mine.",
+                                targetPos);
                             return;
                         }
                         if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
@@ -190,8 +185,9 @@ namespace GameDevTV.RTS.Commands
                                 targetPos = autoPos;
                             else
                             {
-                                ExplorationManager.NotifyExplorationFailed(
-                                    "Place this mine on a discovered deposit of the matching resource.");
+                                ExplorationManager.NotifyPlacementFailed(
+                                    "Place this mine on a discovered deposit of the matching resource.",
+                                    targetPos);
                                 return;
                             }
                         }
@@ -199,14 +195,18 @@ namespace GameDevTV.RTS.Commands
 
                     if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
                     {
-                        ExplorationManager.NotifyExplorationFailed("Can't place here.");
+                        string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
+                            ?? "Can't place here.";
+                        ExplorationManager.NotifyPlacementFailed(reason, targetPos);
                         return;
                     }
 
                     if (!ReservedSiteBuildUtility.TrySpendMaterials(Building, context.Owner))
                     {
-                        ExplorationManager.NotifyExplorationFailed(
-                            $"Need {ReservedSiteBuildUtility.GetMaterialsCost(Building)} Materials to place {Building.Name}.");
+                        int need = ReservedSiteBuildUtility.GetMaterialsCost(Building);
+                        ExplorationManager.NotifyPlacementFailed(
+                            $"Need {need} Materials to place {Building.Name}.",
+                            targetPos);
                         return;
                     }
 
@@ -419,33 +419,115 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
-            // Check sector feature requirement for themed buildings
-            string bldName = Building.Name;
-            var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
-            bool requiresFeature = bldName.Contains("Lava Tube") || bldName.Contains("Subterranean") ||
-                                   bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield") ||
-                                   bldName.Contains("Subglacial") || bldName.Contains("Biosphere");
-            if (requiresFeature && sectorMgr != null)
+            // Check sector feature requirement for themed buildings (legacy non-card path).
+            // Card plays use DiscoverySystem geology gates instead (hand + ExplainCardPlacementFailure).
+            if (HandIndex < 0)
             {
-                var nearestSector = sectorMgr.GetNearestSector(new Vector3(point.x, 0, point.z));
-                if (nearestSector != null)
+                string bldName = Building.Name;
+                var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
+                bool requiresFeature = bldName.Contains("Lava Tube") || bldName.Contains("Subterranean") ||
+                                       bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield") ||
+                                       bldName.Contains("Subglacial") || bldName.Contains("Biosphere");
+                if (requiresFeature && sectorMgr != null)
                 {
-                    bool hasFeature = false;
-                    if (bldName.Contains("Lava Tube") || bldName.Contains("Subterranean"))
-                        hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.LavaTube;
-                    else if (bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield"))
-                        hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.FaultLine;
-                    else if (bldName.Contains("Subglacial") || bldName.Contains("Biosphere"))
-                        hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.WaterDeposit;
-
-                    if (!hasFeature && nearestSector.IsExplored)
+                    var nearestSector = sectorMgr.GetNearestSector(new Vector3(point.x, 0, point.z));
+                    if (nearestSector != null)
                     {
-                        return false;
+                        bool hasFeature = false;
+                        if (bldName.Contains("Lava Tube") || bldName.Contains("Subterranean"))
+                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.LavaTube;
+                        else if (bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield"))
+                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.FaultLine;
+                        else if (bldName.Contains("Subglacial") || bldName.Contains("Biosphere"))
+                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.WaterDeposit;
+
+                        if (!hasFeature && nearestSector.IsExplored)
+                        {
+                            return false;
+                        }
                     }
                 }
             }
+            else if (!DiscoverySystem.IsBuildingGeologicallyAvailable(Building))
+            {
+                return false;
+            }
 
             return true;
+        }
+
+        /// <summary>Human-readable reason a card tile cannot be placed at <paramref name="point"/>.</summary>
+        public string ExplainCardPlacementFailure(Vector3 point, Owner owner)
+        {
+            if (Building == null) return "No building on this card.";
+
+            if (!PowerGridManager.CanPlayBuildingForPower(Building, owner))
+            {
+                float gen = PowerGridManager.GetBoardPowerGeneration(owner);
+                float used = PowerGridManager.GetBoardPowerUpkeep(owner);
+                float need = PowerGridManager.GetBuildingPowerUpkeep(Building);
+                float free = gen - used;
+                return $"Not enough spare power for {Building.Name} " +
+                       $"(needs +{need:0.#}; {gen:0.#} gen / {used:0.#} used / {free:0.#} free). " +
+                       "Build more Solar or demolish consumers.";
+            }
+
+            int matCost = ReservedSiteBuildUtility.GetMaterialsCost(Building);
+            int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
+            if (matCost > 0 && haveMats < matCost)
+                return $"Need {matCost} Materials (have {haveMats}).";
+
+            if (BuildingSiteRegistry.IsMineBuilding(Building))
+            {
+                if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
+                {
+                    DiscoverySystem.TryGetMineResourceType(Building, out string type);
+                    return $"Discover a {type ?? "resource"} deposit first.";
+                }
+                if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, point))
+                    return "Place this mine on the matching discovered deposit tile.";
+            }
+
+            if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature)
+                && !DiscoverySystem.IsSectorFeatureDiscovered(feature))
+            {
+                return $"Discover a {feature} geological feature first (scout / reach that sector).";
+            }
+
+            if (!AllRestrictionsPass(point, owner, requireWorker: false))
+            {
+                // Overlap is the usual card-place blocker after power/materials.
+                if (Restrictions != null)
+                {
+                    foreach (BuildingRestrictionSO restriction in Restrictions)
+                    {
+                        Collider[] colliders = restriction.HitDetectionStyle switch
+                        {
+                            BuildingRestrictionSO.OverlapStyle.Sphere =>
+                                Physics.OverlapSphere(point, restriction.Radius, restriction.LayerMask),
+                            BuildingRestrictionSO.OverlapStyle.Box =>
+                                Physics.OverlapBox(point, restriction.Extents, Quaternion.identity, restriction.LayerMask),
+                            _ => System.Array.Empty<Collider>()
+                        };
+                        foreach (var col in colliders)
+                        {
+                            if (col == null) continue;
+                            var other = col.GetComponentInParent<BaseBuilding>();
+                            if (other != null
+                                && other.Progress.State != BuildingProgress.BuildingState.Destroyed)
+                            {
+                                string otherName = other.ResolvedBuildingSO != null
+                                    ? other.ResolvedBuildingSO.Name
+                                    : other.name;
+                                return $"Blocked — too close to {otherName}. Move to an empty tile.";
+                            }
+                        }
+                    }
+                }
+                return "Can't place here — tile blocked or invalid ground.";
+            }
+
+            return null;
         }
 
         public override bool IsLocked(CommandContext context)

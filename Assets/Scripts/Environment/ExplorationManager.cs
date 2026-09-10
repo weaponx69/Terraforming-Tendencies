@@ -44,6 +44,9 @@ namespace GameDevTV.RTS.Environment
         /// <summary>Fired when exploration is blocked (insufficient energy, no target, etc.).</summary>
         public static event System.Action<string> OnExplorationFailed;
 
+        /// <summary>Fired when a card/building placement fails, with a world-space hint position.</summary>
+        public static event System.Action<string, Vector3> OnPlacementFailed;
+
         /// <summary>Whether exploration is currently in progress.</summary>
         public bool IsExploring { get; private set; }
 
@@ -397,6 +400,13 @@ namespace GameDevTV.RTS.Environment
         }
 
         public static void NotifyExplorationFailed(string message) => ReportExplorationFailed(message);
+
+        /// <summary>Placement blocked — show reason near <paramref name="worldHint"/> (ghost / click point).</summary>
+        public static void NotifyPlacementFailed(string message, Vector3 worldHint)
+        {
+            Debug.Log($"[ExplorationManager] {message}");
+            OnPlacementFailed?.Invoke(message, worldHint);
+        }
 
         private void CompleteExploration()
         {

@@ -205,6 +205,8 @@ namespace GameDevTV.RTS.Player
             int i = Mathf.Clamp(sectorIndex, 0, sm.Sectors.Count - 1);
             var sector = sm.Sectors[i];
             sm.BeginTerraformingOn(sector);
+            // Reaching this Act's sector reveals its geology (WaterDeposit / LavaTube / …).
+            DiscoverySystem.RevealFeaturesForSector(sector);
 
             if (announce)
                 PlayerInput.FocusCameraOnWorldPosition(sector.Center);
