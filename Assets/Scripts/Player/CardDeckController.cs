@@ -695,13 +695,8 @@ namespace GameDevTV.RTS.Player
 
             if (climateComboOffersThisAct.Contains(goal)) return null;
 
-            if (hand.Any(c =>
-                    string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)))
-            {
-                climateComboOffersThisAct.Add(goal);
-                return null;
-            }
-
+            // Always grant the combo tile once per Act — even if a Water/Heat/Atmos
+            // card is already seated from need-based draw (that used to silently skip).
             BlueprintCardSO template = FindPreferredClimateComboTemplate(goal);
             if (template == null) return null;
 

@@ -5,18 +5,23 @@ using UnityEngine.UI;
 namespace GameDevTV.RTS.UI.Components
 {
     /// <summary>
-    /// Always-visible world-space health bar under a building (repair state at a glance).
+    /// Always-visible world-space health bar at the base of a building.
+    /// Lives in the scene root (not under the building) so building visual rebuilds
+    /// cannot destroy the bar transform mid-Start.
     /// </summary>
     [RequireComponent(typeof(BaseBuilding))]
     public class BuildingHealthBar : MonoBehaviour
     {
-        private const float BarWidth = 2.4f;
-        private const float BarHeight = 0.22f;
-        private const float GroundClearance = 0.35f;
+        private const float BarWidth = 2.8f;
+        private const float BarHeight = 0.28f;
+        private const float BaseLift = 0.25f;
+
+        private static Sprite s_WhiteSprite;
 
         private BaseBuilding building;
         private Image fillImage;
-        private Transform barRoot;
+        private GameObject barGo;
+        private Canvas canvas;
         private int lastHealth = int.MinValue;
         private int lastMax = int.MinValue;
 
@@ -27,42 +32,48 @@ namespace GameDevTV.RTS.UI.Components
 
         private void Start()
         {
-            if (building == null) return;
-            if (IsGhostOrInvalid())
+            if (building == null || IsGhostOrInvalid())
             {
                 enabled = false;
                 return;
             }
 
-            EnsureBar();
+            if (!TryBuildBar()) return;
             building.OnHealthUpdated += HandleHealthUpdated;
-            Refresh();
+            ApplyFill();
         }
 
         private void OnDestroy()
         {
             if (building != null)
                 building.OnHealthUpdated -= HandleHealthUpdated;
+            DestroyBarGo();
         }
 
         private void LateUpdate()
         {
-            if (building == null || barRoot == null) return;
-            if (IsGhostOrInvalid())
+            if (building == null || IsGhostOrInvalid())
             {
-                if (barRoot.gameObject.activeSelf) barRoot.gameObject.SetActive(false);
+                if (barGo != null) barGo.SetActive(false);
                 return;
             }
 
-            PositionUnderBuilding();
+            if (barGo == null && !TryBuildBar()) return;
+            if (barGo == null) return;
+
+            if (canvas != null && canvas.worldCamera == null && Camera.main != null)
+                canvas.worldCamera = Camera.main;
+
+            PositionAtBase();
             if (Camera.main != null)
-                barRoot.rotation = Quaternion.LookRotation(barRoot.position - Camera.main.transform.position);
+                barGo.transform.rotation = Quaternion.LookRotation(
+                    barGo.transform.position - Camera.main.transform.position);
 
             if (building.CurrentHealth != lastHealth || building.MaxHealth != lastMax)
-                Refresh();
+                ApplyFill();
         }
 
-        private void HandleHealthUpdated(AbstractCommandable _, int __, int ___) => Refresh();
+        private void HandleHealthUpdated(AbstractCommandable _, int __, int ___) => ApplyFill();
 
         private bool IsGhostOrInvalid()
         {
@@ -73,60 +84,94 @@ namespace GameDevTV.RTS.UI.Components
                 || n.StartsWith("GhostPreview_", System.StringComparison.Ordinal);
         }
 
-        private void EnsureBar()
+        private bool TryBuildBar()
         {
-            if (barRoot != null) return;
+            if (barGo != null && fillImage != null) return true;
+            DestroyBarGo();
 
-            var root = new GameObject("Building Health Bar");
-            root.transform.SetParent(transform, false);
-            barRoot = root.transform;
+            barGo = new GameObject("Building Health Bar");
+            // Scene root — avoid parenting under buildings that rebuild/destroy children.
+            barGo.transform.SetParent(null, false);
 
-            var canvas = root.AddComponent<Canvas>();
+            canvas = barGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            canvas.sortingOrder = 40;
-            var rt = root.GetComponent<RectTransform>();
+            canvas.sortingOrder = 80;
+            if (Camera.main != null)
+                canvas.worldCamera = Camera.main;
+
+            var rt = barGo.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(BarWidth * 100f, BarHeight * 100f);
-            root.transform.localScale = Vector3.one * 0.01f;
+            barGo.transform.localScale = Vector3.one * 0.01f;
+            barGo.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 10f;
 
-            root.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 10f;
+            Sprite white = GetWhiteSprite();
+            if (white == null)
+            {
+                DestroyBarGo();
+                return false;
+            }
 
-            // Background
             var bgGo = new GameObject("Background", typeof(RectTransform));
-            bgGo.transform.SetParent(root.transform, false);
+            bgGo.transform.SetParent(barGo.transform, false);
             var bgRt = bgGo.GetComponent<RectTransform>();
             bgRt.anchorMin = Vector2.zero;
             bgRt.anchorMax = Vector2.one;
             bgRt.offsetMin = Vector2.zero;
             bgRt.offsetMax = Vector2.zero;
             var bgImg = bgGo.AddComponent<Image>();
-            bgImg.color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+            bgImg.sprite = white;
+            bgImg.color = new Color(0.05f, 0.06f, 0.08f, 0.92f);
             bgImg.raycastTarget = false;
 
-            // Fill
             var fillGo = new GameObject("Fill", typeof(RectTransform));
-            fillGo.transform.SetParent(root.transform, false);
+            fillGo.transform.SetParent(barGo.transform, false);
             var fillRt = fillGo.GetComponent<RectTransform>();
             fillRt.anchorMin = Vector2.zero;
             fillRt.anchorMax = Vector2.one;
-            fillRt.offsetMin = new Vector2(2f, 2f);
-            fillRt.offsetMax = new Vector2(-2f, -2f);
+            fillRt.offsetMin = new Vector2(3f, 3f);
+            fillRt.offsetMax = new Vector2(-3f, -3f);
             fillImage = fillGo.AddComponent<Image>();
+            fillImage.sprite = white;
             fillImage.type = Image.Type.Filled;
             fillImage.fillMethod = Image.FillMethod.Horizontal;
             fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
             fillImage.color = new Color(0.35f, 0.9f, 0.4f, 1f);
             fillImage.raycastTarget = false;
 
-            PositionUnderBuilding();
+            PositionAtBase();
+            return fillImage != null && barGo != null;
         }
 
-        private void PositionUnderBuilding()
+        private void DestroyBarGo()
         {
-            if (barRoot == null || building == null) return;
+            fillImage = null;
+            canvas = null;
+            if (barGo != null)
+            {
+                Destroy(barGo);
+                barGo = null;
+            }
+        }
+
+        private static Sprite GetWhiteSprite()
+        {
+            if (s_WhiteSprite != null) return s_WhiteSprite;
+
+            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply(false, false);
+            s_WhiteSprite = Sprite.Create(tex, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 100f);
+            s_WhiteSprite.name = "BuildingHealthBarWhite";
+            return s_WhiteSprite;
+        }
+
+        private void PositionAtBase()
+        {
+            if (barGo == null || building == null) return;
             Bounds bounds = GetVisualBounds();
             Vector3 pos = bounds.center;
-            pos.y = bounds.min.y - GroundClearance;
-            barRoot.position = pos;
+            pos.y = Mathf.Min(bounds.min.y, building.transform.position.y) + BaseLift;
+            barGo.transform.position = pos;
         }
 
         private Bounds GetVisualBounds()
@@ -151,18 +196,18 @@ namespace GameDevTV.RTS.UI.Components
             return b;
         }
 
-        private void Refresh()
+        private void ApplyFill()
         {
-            if (building == null || fillImage == null) return;
-            if (barRoot != null && !barRoot.gameObject.activeSelf)
-                barRoot.gameObject.SetActive(true);
+            if (building == null || fillImage == null || barGo == null) return;
+
+            if (!barGo.activeSelf)
+                barGo.SetActive(true);
 
             lastHealth = building.CurrentHealth;
             lastMax = Mathf.Max(1, building.MaxHealth);
             float t = Mathf.Clamp01(lastHealth / (float)lastMax);
             fillImage.fillAmount = t;
 
-            // Green → yellow → red
             if (t > 0.6f)
                 fillImage.color = Color.Lerp(new Color(0.95f, 0.85f, 0.2f), new Color(0.3f, 0.9f, 0.35f), (t - 0.6f) / 0.4f);
             else if (t > 0.3f)

@@ -155,7 +155,14 @@ namespace GameDevTV.RTS.Commands
                 {
                     if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
-                        ExplorationManager.NotifyExplorationFailed("Not enough power to place this card.");
+                        float gen = PowerGridManager.GetBoardPowerGeneration(context.Owner);
+                        float used = PowerGridManager.GetBoardPowerUpkeep(context.Owner);
+                        float need = PowerGridManager.GetBuildingPowerUpkeep(Building);
+                        float free = gen - used;
+                        ExplorationManager.NotifyExplorationFailed(
+                            $"Not enough spare power for {Building.Name} " +
+                            $"(needs +{need:0.#}; {gen:0.#} gen, {used:0.#} used, {free:0.#} free). " +
+                            "Build more Solar or demolish other consumers.");
                         return;
                     }
 

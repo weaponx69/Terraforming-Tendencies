@@ -499,9 +499,13 @@ namespace GameDevTV.RTS.UI.Containers
             if (!PowerGridManager.CanPlayBuildingForPower(building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
+                float used = PowerGridManager.GetBoardPowerUpkeep(owner);
                 float need = PowerGridManager.GetBuildingPowerUpkeep(building);
+                float free = gen - used;
                 ExplorationManager.NotifyExplorationFailed(
-                    $"Not enough power for {building.Name} (needs {need:0.#} upkeep, generating {gen:0.#}). Build more Solar first.");
+                    $"Not enough spare power for {building.Name} " +
+                    $"(needs +{need:0.#}; {gen:0.#} gen, {used:0.#} used, {free:0.#} free). " +
+                    "Build more Solar or demolish other consumers.");
                 return;
             }
 
