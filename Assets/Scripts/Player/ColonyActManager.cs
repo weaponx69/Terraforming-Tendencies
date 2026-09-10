@@ -15,6 +15,8 @@ namespace GameDevTV.RTS.Player
 
         public static event Action OnActStateChanged;
         public static event Action<int> OnActCleared; // act index 1-based
+        /// <summary>Fired after an Act clears when another Act remains — open the between-sector shop.</summary>
+        public static event Action OnBetweenActShopRequested;
         public static event Action OnRunVictory;
         public static event Action OnActFailed;
 
@@ -550,6 +552,27 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
+            // Permanent between-sector shop — pause here until Continue.
+            statusBanner = $"<color=#7CFF9A><b>SECTOR ACT CLEARED!</b></color>  Visit the Supply Depot before Act {cleared + 1}.";
+            statusBannerUntil = Time.unscaledTime + 8f;
+            OnActStateChanged?.Invoke();
+            OnBetweenActShopRequested?.Invoke();
+            // Fallback if the shop listener missed the event (scene load race).
+            if (!GameDevTV.RTS.UI.BetweenActShopUI.IsOpen)
+                GameDevTV.RTS.UI.BetweenActShopUI.Instance?.Open();
+        }
+
+        /// <summary>
+        /// Called by <see cref="GameDevTV.RTS.UI.BetweenActShopUI"/> after the player finishes shopping.
+        /// Seeds Solar + Command Post, then advances focus to the next sector Act.
+        /// </summary>
+        public void CompleteBetweenActShopAndAdvance()
+        {
+            if (runEnded || !IsBetweenActs) return;
+            if (actIndex >= acts.Count - 1) return;
+
+            CardDeckController.Instance?.GrantSectorTransitionBootstrap();
+
             // Carry a fraction of excess into the next act's starting score.
             int excess = Mathf.Max(0, colonyScore - TargetScore);
             int carried = Mathf.RoundToInt(colonyScore * ScoreCarryFraction) + excess;
@@ -560,7 +583,7 @@ namespace GameDevTV.RTS.Player
             IsBetweenActs = false;
             ApplyFocusSector(FocusSectorIndex, announce: true);
             CardDeckController.Instance?.NotifyActClimateComboReset();
-            statusBanner = $"<color=#7CFF9A><b>SECTOR ACT CLEARED!</b></color>  Now: {CurrentActName}";
+            statusBanner = $"<color=#7CFF9A><b>NEXT SECTOR</b></color>  {CurrentActName} — Solar + Command Post ready.";
             statusBannerUntil = Time.unscaledTime + 6f;
 
             Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start score {colonyScore}/{TargetScore}, weeks {weeksRemaining}, focus sector {FocusSectorIndex}");

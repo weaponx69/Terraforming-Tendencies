@@ -10,9 +10,12 @@ namespace GameDevTV.RTS.Player
 {
     public class Supplies : MonoBehaviour
     {
+        /// <summary>Colony Acts lean start — keep in sync with PROJECT_KNOWLEDGE.</summary>
+        public const int DefaultStartingMaterials = 300;
+
         [SerializeField] private float mineralsToMaterialsRate = 1f;
         [SerializeField] private float gasToMaterialsRate = 1f;
-        [SerializeField] private int startingMaterials = 250;
+        [SerializeField] private int startingMaterials = DefaultStartingMaterials;
         [SerializeField] private float startingOxygen = 0f;
 
         public static int StartingMaterials
@@ -21,9 +24,12 @@ namespace GameDevTV.RTS.Player
             {
                 if (Instance != null)
                 {
+                    // Migrate stale scene-serialized 1000 from the old RTS default.
+                    if (Instance.startingMaterials >= 1000)
+                        Instance.startingMaterials = DefaultStartingMaterials;
                     return Instance.startingMaterials;
                 }
-                return 1000;
+                return DefaultStartingMaterials;
             }
         }
 
@@ -306,9 +312,10 @@ namespace GameDevTV.RTS.Player
             _water = new Dictionary<Owner, float>();
 
             float initialOxygen = (Instance != null) ? Instance.startingOxygen : 0f;
+            int startMats = StartingMaterials;
             foreach (Owner owner in Enum.GetValues(typeof(Owner)))
             {
-                _materials[owner] = (owner == Owner.Player1) ? 1000 : 0;
+                _materials[owner] = (owner == Owner.Player1) ? startMats : 0;
                 _biomass[owner] = 0f;
                 _food[owner] = (owner == Owner.Player1) ? 50f : 0f;
                 _power[owner] = 0f;
@@ -326,6 +333,10 @@ namespace GameDevTV.RTS.Player
         {
             Instance = this;
             ColonyIntegrityActive = false;
+
+            // Stale Inspector / scene values from the old 1000 RTS start.
+            if (startingMaterials >= 1000)
+                startingMaterials = DefaultStartingMaterials;
 
             // Re-initialize to ensure instance settings (startingMaterials) are applied
             _materials = new Dictionary<Owner, int>();

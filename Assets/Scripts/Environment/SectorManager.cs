@@ -176,6 +176,10 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
+            int nonStartCount = Mathf.Max(0, sectorCoordinates.Count - 1);
+            List<SectorFeature> featureBag = BuildShuffledSectorFeatures(nonStartCount);
+            int featureCursor = 0;
+
             for (int i = 0; i < sectorCoordinates.Count; i++)
             {
                     int x = sectorCoordinates[i].x;
@@ -194,11 +198,9 @@ namespace GameDevTV.RTS.Environment
 
                     bool isFirst = i == 0;
                     SectorFeature feature = SectorFeature.None;
-                    if (!isFirst)
-                    {
-                        int featureIndex = 1 + ((Sectors.Count - 1) % 4);
-                        feature = (SectorFeature)featureIndex;
-                    }
+                    if (!isFirst && featureCursor < featureBag.Count)
+                        feature = featureBag[featureCursor++];
+
                     // Sector lockdown retired (whole-board terraforming): pads/builds available planet-wide.
                     Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = false, IsExplored = true, Feature = feature });
             }
@@ -217,6 +219,39 @@ namespace GameDevTV.RTS.Environment
                 OnSectorUnlocked?.Invoke();
             }
             Debug.Log($"[SectorManager] Initialized {Sectors.Count} sectors for {worldWidth}x{worldHeight} map. Sector lockdown disabled (whole planet open).");
+        }
+
+        /// <summary>
+        /// Random sector geology for every non-start sector. Ensures each feature type
+        /// (Volcano / FaultLine / LavaTube / WaterDeposit) appears at least once when
+        /// there are enough sectors, then fills the rest at random and shuffles.
+        /// </summary>
+        private static List<SectorFeature> BuildShuffledSectorFeatures(int count)
+        {
+            var bag = new List<SectorFeature>(Mathf.Max(0, count));
+            if (count <= 0) return bag;
+
+            SectorFeature[] all =
+            {
+                SectorFeature.Volcano,
+                SectorFeature.FaultLine,
+                SectorFeature.LavaTube,
+                SectorFeature.WaterDeposit
+            };
+
+            for (int i = 0; i < all.Length && bag.Count < count; i++)
+                bag.Add(all[i]);
+
+            while (bag.Count < count)
+                bag.Add(all[UnityEngine.Random.Range(0, all.Length)]);
+
+            for (int i = bag.Count - 1; i > 0; i--)
+            {
+                int j = UnityEngine.Random.Range(0, i + 1);
+                (bag[i], bag[j]) = (bag[j], bag[i]);
+            }
+
+            return bag;
         }
 
         public void ReinitializeSectors()

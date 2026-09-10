@@ -32,6 +32,8 @@ namespace GameDevTV.RTS.Utilities
 
             if (BlueprintDraftUI.IsDraftVisible) return true;
 
+            if (BetweenActShopUI.IsOpen) return true;
+
             var draftingUIs = Object.FindObjectsByType<DraftingUI>(FindObjectsInactive.Exclude);
             foreach (var ui in draftingUIs)
             {

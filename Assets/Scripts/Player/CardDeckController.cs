@@ -336,6 +336,113 @@ namespace GameDevTV.RTS.Player
             hand.RemoveAt(dropIdx);
         }
 
+        /// <summary>
+        /// After the between-Act shop, force Solar + Command Post into hand for the next sector
+        /// (does not require CanApply — pads may not exist in the new sector yet).
+        /// </summary>
+        public void GrantSectorTransitionBootstrap()
+        {
+            ForceBootstrapUnlockIntoHand("Command Post");
+            ForceBootstrapUnlockIntoHand("Solar");
+            RefreshHand();
+            OnHandChanged?.Invoke();
+            Debug.Log("[CardDeckController] Granted Solar + Command Post for next sector Act.");
+        }
+
+        /// <summary>Add a purchased shop card into the hand (makes room if needed).</summary>
+        public void AddCardToHandFromShop(BlueprintCardSO card)
+        {
+            if (card == null) return;
+            if (hand.Contains(card))
+            {
+                // Already holding this instance — clone a playable copy for the purchase.
+                card = CloneCardInstance(card);
+            }
+            else
+            {
+                drawPile.Remove(card);
+                discardPile.Remove(card);
+            }
+
+            if (hand.Count >= handSize)
+                MakeHandRoomForHandoffCard(card);
+            if (hand.Count >= handSize)
+            {
+                // Still full — put purchase at front of draw so next fill gets it.
+                drawPile.Insert(0, card);
+                OnHandChanged?.Invoke();
+                return;
+            }
+
+            hand.Insert(0, card);
+            TrimHandToSize();
+            OnHandChanged?.Invoke();
+            Debug.Log($"[CardDeckController] Shop purchased '{card.cardName}' into hand.");
+        }
+
+        private void ForceBootstrapUnlockIntoHand(string nameContains)
+        {
+            if (hand.Any(c => c is UnlockBuildingCardSO u &&
+                              u.buildingToUnlock != null &&
+                              u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            BlueprintCardSO found = drawPile.FirstOrDefault(c =>
+                c is UnlockBuildingCardSO u &&
+                u.buildingToUnlock != null &&
+                u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+            if (found != null)
+            {
+                drawPile.Remove(found);
+            }
+            else
+            {
+                found = discardPile.FirstOrDefault(c =>
+                    c is UnlockBuildingCardSO u &&
+                    u.buildingToUnlock != null &&
+                    u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+                if (found != null) discardPile.Remove(found);
+            }
+
+            if (found == null)
+            {
+                found = masterDeck.FirstOrDefault(c =>
+                    c is UnlockBuildingCardSO u &&
+                    u.buildingToUnlock != null &&
+                    u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+                if (found != null)
+                    found = CloneCardInstance(found);
+            }
+
+            if (found == null) return;
+
+            if (hand.Count >= handSize)
+                MakeHandRoomForHandoffCard(found);
+            if (hand.Count >= handSize) return;
+
+            hand.Insert(0, found);
+            TrimHandToSize();
+        }
+
+        private static BlueprintCardSO CloneCardInstance(BlueprintCardSO source)
+        {
+            if (source == null) return null;
+            if (source is UnlockBuildingCardSO unlock)
+            {
+                var created = ScriptableObject.CreateInstance<UnlockBuildingCardSO>();
+                created.cardName = unlock.cardName;
+                created.cardDescription = unlock.cardDescription;
+                created.buildingToUnlock = unlock.buildingToUnlock;
+                created.icon = unlock.icon;
+                created.name = $"{unlock.name}_ShopClone";
+                return created;
+            }
+
+            return source;
+        }
+
         private void EnsureBootstrapUnlockInHand(string nameContains)
         {
             if (hand.Any(c => c is UnlockBuildingCardSO u &&
