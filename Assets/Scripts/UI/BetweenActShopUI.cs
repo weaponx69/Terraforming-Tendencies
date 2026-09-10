@@ -17,7 +17,7 @@ namespace GameDevTV.RTS.UI
         public static BetweenActShopUI Instance { get; private set; }
         public static bool IsOpen { get; private set; }
 
-        private const int OfferCount = 4;
+        private const int OfferCount = 3;
         private const int RerollCost = 25;
         private const float ShopPriceScale = 0.85f;
 
@@ -70,7 +70,8 @@ namespace GameDevTV.RTS.UI
 
         public void Open()
         {
-            EnsureUi();
+            // Rebuild each open so layout fixes apply even if a prior oversized panel was cached.
+            RebuildUi();
             IsOpen = true;
             savedTimeScale = Time.timeScale;
             if (Time.timeScale > 0.01f)
@@ -86,6 +87,22 @@ namespace GameDevTV.RTS.UI
         {
             IsOpen = false;
             if (root != null) root.SetActive(false);
+        }
+
+        private void RebuildUi()
+        {
+            if (root != null)
+            {
+                Destroy(root);
+                root = null;
+            }
+            slots.Clear();
+            titleText = null;
+            materialsText = null;
+            hintText = null;
+            continueButton = null;
+            rerollButton = null;
+            EnsureUi();
         }
 
         private void ContinueToNextSector()
@@ -250,7 +267,10 @@ namespace GameDevTV.RTS.UI
             var canvas = root.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 6000;
-            root.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            var scaler = root.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
             root.AddComponent<GraphicRaycaster>();
 
             var dim = new GameObject("Dim", typeof(RectTransform));
@@ -261,28 +281,30 @@ namespace GameDevTV.RTS.UI
             dimImg.color = new Color(0.02f, 0.04f, 0.08f, 0.82f);
             dimImg.raycastTarget = true;
 
+            // Anchored panel — stays on-screen at common resolutions (no fixed 980×620).
             var panel = new GameObject("Panel", typeof(RectTransform));
             panel.transform.SetParent(root.transform, false);
             var panelRt = panel.GetComponent<RectTransform>();
-            panelRt.anchorMin = new Vector2(0.5f, 0.5f);
-            panelRt.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRt.sizeDelta = new Vector2(980f, 620f);
-            panelRt.anchoredPosition = Vector2.zero;
+            panelRt.anchorMin = new Vector2(0.22f, 0.28f);
+            panelRt.anchorMax = new Vector2(0.78f, 0.72f);
+            panelRt.offsetMin = Vector2.zero;
+            panelRt.offsetMax = Vector2.zero;
             var panelImg = panel.AddComponent<Image>();
             panelImg.color = new Color(0.10f, 0.14f, 0.20f, 0.98f);
 
-            titleText = CreateText(panel.transform, "Title", 28f, FontStyles.Bold,
-                new Vector2(0.05f, 0.82f), new Vector2(0.95f, 0.98f));
-            materialsText = CreateText(panel.transform, "Materials", 22f, FontStyles.Bold,
-                new Vector2(0.05f, 0.74f), new Vector2(0.50f, 0.82f));
+            titleText = CreateText(panel.transform, "Title", 22f, FontStyles.Bold,
+                new Vector2(0.04f, 0.84f), new Vector2(0.96f, 0.98f));
+            titleText.alignment = TextAlignmentOptions.Center;
+            materialsText = CreateText(panel.transform, "Materials", 18f, FontStyles.Bold,
+                new Vector2(0.04f, 0.76f), new Vector2(0.50f, 0.84f));
             materialsText.color = new Color(0.85f, 0.95f, 0.55f);
-            hintText = CreateText(panel.transform, "Hint", 16f, FontStyles.Normal,
-                new Vector2(0.05f, 0.66f), new Vector2(0.95f, 0.74f));
+            hintText = CreateText(panel.transform, "Hint", 13f, FontStyles.Normal,
+                new Vector2(0.04f, 0.68f), new Vector2(0.96f, 0.76f));
             hintText.color = new Color(0.75f, 0.82f, 0.90f);
 
-            float slotW = 0.21f;
-            float gap = 0.02f;
-            float startX = 0.06f;
+            float slotW = 0.28f;
+            float gap = 0.03f;
+            float startX = 0.05f;
             for (int i = 0; i < OfferCount; i++)
             {
                 float x0 = startX + i * (slotW + gap);
@@ -291,18 +313,18 @@ namespace GameDevTV.RTS.UI
                 slotGo.transform.SetParent(panel.transform, false);
                 var srt = slotGo.GetComponent<RectTransform>();
                 srt.anchorMin = new Vector2(x0, 0.22f);
-                srt.anchorMax = new Vector2(x1, 0.64f);
+                srt.anchorMax = new Vector2(x1, 0.66f);
                 srt.offsetMin = Vector2.zero;
                 srt.offsetMax = Vector2.zero;
                 var bg = slotGo.AddComponent<Image>();
                 bg.color = new Color(0.16f, 0.22f, 0.30f, 1f);
 
-                var title = CreateText(slotGo.transform, "CardTitle", 18f, FontStyles.Bold,
+                var title = CreateText(slotGo.transform, "CardTitle", 15f, FontStyles.Bold,
                     new Vector2(0.06f, 0.72f), new Vector2(0.94f, 0.96f));
-                var price = CreateText(slotGo.transform, "Price", 16f, FontStyles.Bold,
+                var price = CreateText(slotGo.transform, "Price", 14f, FontStyles.Bold,
                     new Vector2(0.06f, 0.58f), new Vector2(0.94f, 0.72f));
                 price.color = new Color(1f, 0.85f, 0.35f);
-                var desc = CreateText(slotGo.transform, "Desc", 13f, FontStyles.Normal,
+                var desc = CreateText(slotGo.transform, "Desc", 12f, FontStyles.Normal,
                     new Vector2(0.06f, 0.28f), new Vector2(0.94f, 0.58f));
                 desc.color = new Color(0.8f, 0.86f, 0.92f);
 
@@ -317,7 +339,7 @@ namespace GameDevTV.RTS.UI
                 buyImg.color = new Color(0.20f, 0.55f, 0.35f, 1f);
                 var buyBtn = buyGo.AddComponent<Button>();
                 buyBtn.targetGraphic = buyImg;
-                var buyLabel = CreateText(buyGo.transform, "BuyLabel", 16f, FontStyles.Bold,
+                var buyLabel = CreateText(buyGo.transform, "BuyLabel", 14f, FontStyles.Bold,
                     Vector2.zero, Vector2.one);
                 buyLabel.text = "BUY";
                 buyLabel.alignment = TextAlignmentOptions.Center;
@@ -333,11 +355,11 @@ namespace GameDevTV.RTS.UI
             }
 
             rerollButton = CreateBottomButton(panel.transform, "Reroll", $"REROLL ({RerollCost})",
-                new Vector2(0.08f, 0.06f), new Vector2(0.38f, 0.16f),
+                new Vector2(0.06f, 0.05f), new Vector2(0.36f, 0.16f),
                 new Color(0.35f, 0.40f, 0.55f, 1f), TryReroll);
 
-            continueButton = CreateBottomButton(panel.transform, "Continue", "CONTINUE TO NEXT SECTOR",
-                new Vector2(0.42f, 0.06f), new Vector2(0.92f, 0.16f),
+            continueButton = CreateBottomButton(panel.transform, "Continue", "CONTINUE →",
+                new Vector2(0.40f, 0.05f), new Vector2(0.94f, 0.16f),
                 new Color(0.15f, 0.55f, 0.75f, 1f), ContinueToNextSector);
         }
 
@@ -357,7 +379,7 @@ namespace GameDevTV.RTS.UI
             var btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
             btn.onClick.AddListener(onClick);
-            var text = CreateText(go.transform, "Label", 18f, FontStyles.Bold, Vector2.zero, Vector2.one);
+            var text = CreateText(go.transform, "Label", 15f, FontStyles.Bold, Vector2.zero, Vector2.one);
             text.text = label;
             text.alignment = TextAlignmentOptions.Center;
             return btn;

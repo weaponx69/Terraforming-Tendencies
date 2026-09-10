@@ -344,6 +344,23 @@ namespace GameDevTV.RTS.Player
         {
             ForceBootstrapUnlockIntoHand("Command Post");
             ForceBootstrapUnlockIntoHand("Solar");
+
+            // Hard guarantee: never enter a new sector without Solar Panel in hand.
+            if (!hand.Any(IsSolarUnlockCard))
+            {
+                BlueprintCardSO template = masterDeck.FirstOrDefault(IsSolarUnlockCard)
+                    ?? drawPile.FirstOrDefault(IsSolarUnlockCard)
+                    ?? discardPile.FirstOrDefault(IsSolarUnlockCard);
+                if (template != null)
+                {
+                    BlueprintCardSO clone = CloneCardInstance(template) ?? UnityEngine.Object.Instantiate(template);
+                    if (hand.Count >= handSize)
+                        MakeHandRoomForHandoffCard(clone);
+                    if (hand.Count < handSize)
+                        hand.Insert(0, clone);
+                }
+            }
+
             RefreshHand();
             OnHandChanged?.Invoke();
             Debug.Log("[CardDeckController] Granted Solar + Command Post for next sector Act.");
@@ -382,41 +399,33 @@ namespace GameDevTV.RTS.Player
 
         private void ForceBootstrapUnlockIntoHand(string nameContains)
         {
-            if (hand.Any(c => c is UnlockBuildingCardSO u &&
-                              u.buildingToUnlock != null &&
-                              u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase)))
-            {
-                return;
-            }
+            bool Match(BlueprintCardSO c) => MatchesBootstrapUnlock(c, nameContains);
 
-            BlueprintCardSO found = drawPile.FirstOrDefault(c =>
-                c is UnlockBuildingCardSO u &&
-                u.buildingToUnlock != null &&
-                u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+            if (hand.Any(Match)) return;
+
+            BlueprintCardSO found = drawPile.FirstOrDefault(Match);
             if (found != null)
             {
                 drawPile.Remove(found);
             }
             else
             {
-                found = discardPile.FirstOrDefault(c =>
-                    c is UnlockBuildingCardSO u &&
-                    u.buildingToUnlock != null &&
-                    u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+                found = discardPile.FirstOrDefault(Match);
                 if (found != null) discardPile.Remove(found);
             }
 
             if (found == null)
             {
-                found = masterDeck.FirstOrDefault(c =>
-                    c is UnlockBuildingCardSO u &&
-                    u.buildingToUnlock != null &&
-                    u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+                found = masterDeck.FirstOrDefault(Match);
                 if (found != null)
                     found = CloneCardInstance(found);
             }
 
-            if (found == null) return;
+            if (found == null)
+            {
+                Debug.LogWarning($"[CardDeckController] Could not find bootstrap unlock matching '{nameContains}'.");
+                return;
+            }
 
             if (hand.Count >= handSize)
                 MakeHandRoomForHandoffCard(found);
@@ -424,6 +433,24 @@ namespace GameDevTV.RTS.Player
 
             hand.Insert(0, found);
             TrimHandToSize();
+            Debug.Log($"[CardDeckController] Force-seated bootstrap '{found.cardName}' for sector transition.");
+        }
+
+        /// <summary>
+        /// "Solar" means Solar Panel only — not Solar Greenhouse / other names containing Solar.
+        /// </summary>
+        private static bool MatchesBootstrapUnlock(BlueprintCardSO card, string nameContains)
+        {
+            if (card is not UnlockBuildingCardSO unlock || unlock.buildingToUnlock == null)
+                return false;
+
+            if (nameContains.Equals("Solar", StringComparison.OrdinalIgnoreCase))
+                return BuildingSiteRegistry.IsSolarBuilding(unlock.buildingToUnlock);
+
+            if (nameContains.Equals("Command Post", StringComparison.OrdinalIgnoreCase))
+                return unlock.buildingToUnlock.Name.IndexOf("Command Post", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return unlock.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase);
         }
 
         private static BlueprintCardSO CloneCardInstance(BlueprintCardSO source)
@@ -445,27 +472,18 @@ namespace GameDevTV.RTS.Player
 
         private void EnsureBootstrapUnlockInHand(string nameContains)
         {
-            if (hand.Any(c => c is UnlockBuildingCardSO u &&
-                              u.buildingToUnlock != null &&
-                              u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase)))
-            {
-                return;
-            }
+            bool Match(BlueprintCardSO c) => MatchesBootstrapUnlock(c, nameContains);
 
-            BlueprintCardSO found = drawPile.FirstOrDefault(c =>
-                c is UnlockBuildingCardSO u &&
-                u.buildingToUnlock != null &&
-                u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+            if (hand.Any(Match)) return;
+
+            BlueprintCardSO found = drawPile.FirstOrDefault(Match);
             if (found != null)
             {
                 drawPile.Remove(found);
             }
             else
             {
-                found = discardPile.FirstOrDefault(c =>
-                    c is UnlockBuildingCardSO u &&
-                    u.buildingToUnlock != null &&
-                    u.buildingToUnlock.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+                found = discardPile.FirstOrDefault(Match);
                 if (found != null) discardPile.Remove(found);
             }
 

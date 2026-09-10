@@ -31,8 +31,8 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private float bottomMargin = 16f;
         [SerializeField] private float leftMargin = 16f;
         [SerializeField] private int visibleCardCount = 5;
-        // Input System wheel deltas are often ~±120 per notch; ~1.5 → one card per tick.
-        [SerializeField] private float scrollSpeed = 1.5f;
+        // Cards advanced per mouse-wheel notch (Linux trackpads often send tiny deltas).
+        [SerializeField] private float scrollCardsPerNotch = 2.5f;
 
         private bool isBuilt;
         private Owner owner = Owner.Player1;
@@ -99,8 +99,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             UndoBrokenScrollHierarchy();
             HideChromeBackground();
-            // Always use a wheel-friendly speed (serialized prefab values can stick at old 80).
-            scrollSpeed = 1.5f;
+            if (scrollCardsPerNotch < 1.5f) scrollCardsPerNotch = 2.5f;
             ApplyPlayingCardLayout();
 
             isBuilt = true;
@@ -357,7 +356,13 @@ namespace GameDevTV.RTS.UI.Containers
             float delta = scroll.y + scroll.x;
             if (Mathf.Abs(delta) < 0.01f) return;
 
-            scrollOffset += delta * scrollSpeed;
+            // Mouse wheels often report ±120; trackpads report small floats. Normalize to notches.
+            float notches = Mathf.Abs(delta) >= 20f
+                ? delta / 120f
+                : Mathf.Sign(delta) * Mathf.Max(1f, Mathf.Abs(delta));
+
+            float cardStep = cardSize.x + cardSpacing;
+            scrollOffset += notches * cardStep * scrollCardsPerNotch;
             ClampScroll();
             ApplyScrollOffset();
         }
