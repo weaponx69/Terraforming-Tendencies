@@ -1501,7 +1501,27 @@ namespace GameDevTV.RTS.Units
         private Coroutine selfBuildCoroutine;
 
         /// <summary>
-        /// Combolands card / free place: ghost → rise animation → complete, no drone required.
+        /// Combolands card place: building finishes immediately (no rise timer / drone).
+        /// Defers Colony Act score until after <see cref="CardDeckController.ConsumeCardAfterBuild"/>.
+        /// </summary>
+        public void CompleteInstantCardPlace(Owner owner, BuildingSO definition = null)
+        {
+            if (definition != null)
+                BindBuildingDefinition(definition);
+
+            Owner = owner;
+            enabled = true;
+            hasCompletedConstruction = false;
+            Progress = new BuildingProgress(BuildingProgress.BuildingState.Building, Time.time, 0);
+
+            DeferColonyActScoreOnce();
+            CompleteConstruction();
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.GroundBuilding(this);
+        }
+
+        /// <summary>
+        /// Free place / no-drone fallback: ghost → rise animation → complete.
+        /// Card plays use <see cref="CompleteInstantCardPlace"/> instead.
         /// </summary>
         public void BeginSelfConstruction(Owner owner, BuildingSO definition = null, Material ghostMaterial = null)
         {

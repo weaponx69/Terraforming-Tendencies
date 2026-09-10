@@ -206,7 +206,8 @@ namespace GameDevTV.RTS.Commands
                     GameObject cardInstance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                     if (cardInstance.TryGetComponent(out BaseBuilding cardBuilding))
                     {
-                        cardBuilding.BeginSelfConstruction(context.Owner, Building, Building.PlacementMaterial);
+                        // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
+                        cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
                         BlueprintDraftManager.LockBuilding(Building.Name);
                         if (CardDeckController.Instance != null)
                         {

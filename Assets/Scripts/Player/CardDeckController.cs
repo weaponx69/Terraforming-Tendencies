@@ -489,8 +489,9 @@ namespace GameDevTV.RTS.Player
             played.Apply();
 
             // Week first, then deferred instant-build score (and non-building card score).
-            if (CardCostsWeek(played))
-                ColonyActManager.Instance?.SpendWeek();
+            int weekCost = GetWeekCost(played);
+            if (weekCost > 0)
+                ColonyActManager.Instance?.SpendWeeks(weekCost);
             BaseBuilding.FlushAllDeferredColonyActScores();
             ColonyActManager.Instance?.GrantCardScore(played);
 
@@ -550,10 +551,76 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Legacy climate force-seat — disabled for Combolands free hand selection.
+        /// When an Act climate channel is still unmet, keep at least one matching card in hand
+        /// (need-based — avoids Water famine without flooding the deck).
         /// </summary>
         private void EnsureMvpClimateGoalsInHand()
         {
+            var acts = ColonyActManager.Instance;
+            if (acts == null || !acts.IsRunActive) return;
+
+            acts.GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
+            if (waterGain + 0.0005f < GenerationManager.SectorWaterDelta)
+                EnsureClimateGoalCardInHand("WATER");
+            if (atmosGain + 0.0005f < GenerationManager.SectorAtmosphereDelta)
+                EnsureClimateGoalCardInHand("ATMOSPHERE");
+            if (tempGain + 0.0005f < GenerationManager.SectorTemperatureDelta)
+                EnsureClimateGoalCardInHand("TEMPERATURE");
+        }
+
+        private void EnsureClimateGoalCardInHand(string goal)
+        {
+            if (string.IsNullOrEmpty(goal)) return;
+            if (hand.Any(c =>
+                    string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            BlueprintCardSO found = FindCardInPiles(c =>
+                string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase)
+                && ShouldKeepInHand(c));
+
+            if (found == null)
+            {
+                found = FindCardInPiles(c =>
+                    c is UnlockBuildingCardSO unlock
+                    && unlock.buildingToUnlock != null
+                    && string.Equals(
+                        UnlockBuildingCardSO.ClassifyBuildingGoal(unlock.buildingToUnlock),
+                        goal,
+                        StringComparison.OrdinalIgnoreCase)
+                    && ShouldKeepInHand(c));
+            }
+
+            if (found == null)
+            {
+                // Clone so an unmet channel can never soft-lock the run.
+                string preferred = goal switch
+                {
+                    "WATER" => "Water Ice Aquifer",
+                    "ATMOSPHERE" => "Atmospheric Condenser",
+                    "TEMPERATURE" => "GHG Factory",
+                    _ => null
+                };
+                BlueprintCardSO template = null;
+                if (!string.IsNullOrEmpty(preferred))
+                {
+                    template = masterDeck.FirstOrDefault(c =>
+                        c != null && c.cardName != null
+                        && c.cardName.IndexOf(preferred, StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+                template ??= masterDeck.FirstOrDefault(c =>
+                    string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase));
+                if (template == null) return;
+                found = UnityEngine.Object.Instantiate(template);
+                found.name = $"{template.name} (Climate Reserve)";
+            }
+
+            MakeHandRoomForClimateGoal(goal, found);
+            if (hand.Count >= handSize) return;
+            if (drawPile.Contains(found)) drawPile.Remove(found);
+            if (discardPile.Contains(found)) discardPile.Remove(found);
+            hand.Add(found);
+            Debug.Log($"[CardDeckController] Seated unmet climate card '{found.cardName}' ({goal}).");
         }
 
         /// <summary>Legacy force-seat — disabled so the player freely picks any hand card.</summary>
@@ -1028,8 +1095,9 @@ namespace GameDevTV.RTS.Player
             played.Apply();
 
             // Week first so Act-clear from GrantCardScore cannot leave the week on the next Act.
-            if (CardCostsWeek(played))
-                ColonyActManager.Instance?.SpendWeek();
+            int weekCost = GetWeekCost(played);
+            if (weekCost > 0)
+                ColonyActManager.Instance?.SpendWeeks(weekCost);
             ColonyActManager.Instance?.GrantCardScore(played);
 
             // Notify GameFlowManager that an action was taken
@@ -1255,11 +1323,11 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            // Heat / Air extras to start climate play; modest Water extras (not a flood).
+            // Balanced climate extras: enough Water without dominating the hand.
             extras += AddClimateChannelExtras("TEMPERATURE", "GHG Factory", 3);
             extras += AddClimateChannelExtras("ATMOSPHERE", "Atmospheric Condenser", 3);
-            extras += AddClimateChannelExtras("WATER", "Water Ice Aquifer", 3);
-            extras += AddClimateChannelExtras("WATER", "Subglacial Water Extractor", 2);
+            extras += AddClimateChannelExtras("WATER", "Water Ice Aquifer", 5);
+            extras += AddClimateChannelExtras("WATER", "Subglacial Water Extractor", 3);
 
             Debug.Log($"[CardDeckController] Draw pile ready: {drawPile.Count} cards " +
                       $"({masterDeck.Count} base + {extras} sector-win/infra duplicates).");
@@ -1316,33 +1384,60 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Solar and scouting/discovery are free infrastructure — they do not burn Act weeks.
-        /// Climate, industry, and other tile plays still cost 1 week.
+        /// Act week cost for a card play. Varies by tile role (0–2) so budgeting matters —
+        /// not everything is exactly 1 week.
         /// </summary>
-        private static bool CardCostsWeek(BlueprintCardSO card)
+        public static int GetWeekCost(BlueprintCardSO card)
         {
-            if (card == null) return true;
-            if (card is ScoutingCardSO) return false;
+            if (card == null) return 1;
+            if (card is ScoutingCardSO) return 0;
 
-            if (card is UnlockBuildingCardSO unlock
-                && unlock.buildingToUnlock != null
-                && BuildingSiteRegistry.IsSolarBuilding(unlock.buildingToUnlock))
-            {
-                return false;
-            }
+            if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
+                return GetWeekCost(unlock.buildingToUnlock);
+
+            if (card is SpawnUnitCardSO)
+                return 1;
 
             string name = card.cardName ?? string.Empty;
-            if (name.IndexOf("solar", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                return false;
-            if (name.IndexOf("discover", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("scout", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("survey", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("orbital scan", System.StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return false;
-            }
+            if (name.IndexOf("discover", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("scout", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("survey", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("orbital scan", StringComparison.OrdinalIgnoreCase) >= 0)
+                return 0;
 
-            return true;
+            return 1;
+        }
+
+        public static int GetWeekCost(BuildingSO building)
+        {
+            if (building == null) return 1;
+
+            string goal = UnlockBuildingCardSO.ClassifyBuildingGoal(building);
+            string name = building.Name ?? string.Empty;
+
+            // Heavier colony investments cost more weeks.
+            if (goal == "COMMAND POST"
+                || name.IndexOf("Command", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Spaceport", StringComparison.OrdinalIgnoreCase) >= 0)
+                return 2;
+
+            if (BuildingSiteRegistry.IsMineBuilding(building)
+                || goal == "MATERIALS"
+                || name.IndexOf("Mine", StringComparison.OrdinalIgnoreCase) >= 0)
+                return 2;
+
+            // Power, climate, life, housing, default tiles: 1 week.
+            if (BuildingSiteRegistry.IsPowerGeneratorBuilding(building)
+                || BuildingSiteRegistry.IsSolarBuilding(building)
+                || goal == "POWER"
+                || goal == "TEMPERATURE"
+                || goal == "ATMOSPHERE"
+                || goal == "WATER"
+                || goal == "OXYGEN"
+                || goal == "POPULATION")
+                return 1;
+
+            return 1;
         }
     }
 }

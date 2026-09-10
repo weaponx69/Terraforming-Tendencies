@@ -292,13 +292,17 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>Spend one week when a hand card is committed (played / placed).</summary>
-        public void SpendWeek()
+        public void SpendWeek() => SpendWeeks(1);
+
+        /// <summary>Spend multiple Act weeks for a card play (clamped to remaining).</summary>
+        public void SpendWeeks(int weeks)
         {
             if (!started || runEnded || IsBetweenActs) return;
-            if (weeksRemaining <= 0) return;
+            if (weeksRemaining <= 0 || weeks <= 0) return;
 
-            weeksRemaining--;
-            Debug.Log($"[ColonyActManager] Week spent — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
+            int spent = Mathf.Min(weeks, weeksRemaining);
+            weeksRemaining -= spent;
+            Debug.Log($"[ColonyActManager] Spent {spent} week(s) — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
             TryOfferClimateComboCards(null, null);
             OnActStateChanged?.Invoke();
             TryResolveWeekExhaustion();
@@ -739,7 +743,7 @@ namespace GameDevTV.RTS.Player
 
             string weekColor = weeksRemaining <= 2 ? "#FF8A8A" : (weeksRemaining <= 4 ? "#FFE08A" : "#C8D0D8");
             sb.AppendLine($"<color={weekColor}>WEEKS LEFT  {weeksRemaining}</color>");
-            sb.AppendLine($"  <color=#A8B0B8>1 card play = 1 week</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Card week costs vary (0–2). Check the card chip.</color>");
             return sb.ToString();
         }
 

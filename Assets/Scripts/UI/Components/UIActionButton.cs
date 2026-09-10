@@ -81,7 +81,7 @@ namespace GameDevTV.RTS.UI.Components
             EnsureCardTextLayout();
             SetLabel(command.Name);
             int cost = materialsCostOverride >= 0 ? materialsCostOverride : ResolveMaterialsCost(command);
-            SetCost(cost);
+            SetCost(command, cost);
             button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
             button.onClick.AddListener(onClick);
             isActive = true;
@@ -128,7 +128,7 @@ namespace GameDevTV.RTS.UI.Components
         {
             SetIcon(null);
             SetLabel(null);
-            SetCost(-1);
+            SetCost(null, -1);
             ClearGoalAccent();
             if (button != null)
             {
@@ -249,7 +249,7 @@ namespace GameDevTV.RTS.UI.Components
             }
         }
 
-        private void SetCost(int materialsCost)
+        private void SetCost(BaseCommand command, int materialsCost)
         {
             EnsureCardTextLayout();
             if (costLabel == null) return;
@@ -261,13 +261,28 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
-            // Card plays cost 1 week + Materials (store / roguelike).
             costLabel.gameObject.SetActive(true);
+            int weeks = 1;
+            if (command is BuildBuildingCommand bbc && bbc.Building != null)
+                weeks = CardDeckController.GetWeekCost(bbc.Building);
+
+            string weekPart = FormatWeekCost(weeks);
             if (materialsCost > 0)
-                costLabel.text = $"1 Week\n{materialsCost} Mat";
+                costLabel.text = $"{weekPart}\n{materialsCost} Mat";
             else
-                costLabel.text = "1 Week";
-            costLabel.color = new Color(0.75f, 0.9f, 1f, 1f);
+                costLabel.text = weekPart;
+            costLabel.color = weeks <= 0
+                ? new Color(0.55f, 0.95f, 0.65f, 1f)
+                : weeks >= 2
+                    ? new Color(1f, 0.78f, 0.45f, 1f)
+                    : new Color(0.75f, 0.9f, 1f, 1f);
+        }
+
+        private static string FormatWeekCost(int weeks)
+        {
+            if (weeks <= 0) return "0 Weeks";
+            if (weeks == 1) return "1 Week";
+            return $"{weeks} Weeks";
         }
 
         private static int ResolveMaterialsCost(BaseCommand command)
@@ -410,7 +425,13 @@ namespace GameDevTV.RTS.UI.Components
             {
                 ColonyActManager.GetTileValues(building, out int score, out float hab, out string tag);
                 tooltipText = $"<b>+{score} Score</b>  [{tag}]\n{command.Name}\n";
-                tooltipText += "Costs <b>1 Week</b> when played.\n";
+                int weeks = CardDeckController.GetWeekCost(building);
+                if (weeks <= 0)
+                    tooltipText += "Costs <b>0 Weeks</b> when played.\n";
+                else if (weeks == 1)
+                    tooltipText += "Costs <b>1 Week</b> when played.\n";
+                else
+                    tooltipText += $"Costs <b>{weeks} Weeks</b> when played.\n";
                 int matCost = ReservedSiteBuildUtility.GetMaterialsCost(building);
                 if (matCost > 0)
                     tooltipText += $"Costs <b>{matCost} Materials</b> to place.\n";
