@@ -68,8 +68,9 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Climate ticks** from powered Heat/Air/Water buildings in the **current focus sector** only (auto-link to nearby generators within 4 tiles). Unpowered consumers do nothing.
 * **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
 * **Climate cards:** if a climate channel is still unmet for this Act, hand keeps at least one matching card (need-based seat — no Water famine). Draw pile extras: +5 Aquifer / +3 Subglacial / +3 Heat / +3 Air. Heat+Air in sector still queues a Water combo offer once per Act.
-* **Hand size 24** (scrollable); deck excludes combat clutter (**Barracks**, Infantry School). Spaceport and Deploy Engineer stay.
+* **Hand size 24** (scrollable); deck excludes combat clutter (**Barracks**, Infantry School) and **shipment** cards (instant Materials/Biomass dumps). Spaceport and Deploy Engineer stay.
 * **Mine tiles** only enter the hand after a matching deposit is **discovered**; clicking the card **auto-builds on that deposit’s tile**.
+* **Climate card colors:** Heat=amber, Atmos=fuchsia, Water=**blue**. Heat badges say **Play w/ Atmos → Water card**; Atmos badges say **Play w/ Heat → Water card**.
 * On clear: camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
 * Final sector Act clear → victory.

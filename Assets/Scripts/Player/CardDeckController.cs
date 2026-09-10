@@ -942,16 +942,20 @@ namespace GameDevTV.RTS.Player
         private static bool IsDrawableNow(BlueprintCardSO card) => ShouldKeepInHand(card);
 
         /// <summary>
-        /// Colony Acts deck: drop RTS combat clutter that doesn't serve
-        /// score + climate tile play (Barracks, Infantry School). Spaceport and
-        /// Deploy Engineer stay in the deck.
+        /// Colony Acts deck: drop RTS combat clutter and one-shot shipment boosts
+        /// that aren't placeable tiles (Barracks, Infantry School, ResourceShipment).
+        /// Spaceport and Deploy Engineer stay.
         /// </summary>
         public static bool IsExcludedFromColonyDeck(BlueprintCardSO card)
         {
             if (card == null) return true;
 
+            // Instant Temp/Atmos/Water/Materials dumps — not Combolands tiles.
+            if (card is ResourceShipmentCardSO) return true;
+
             string name = card.cardName ?? card.name ?? string.Empty;
             if (NameLooksLikeMilitaryClutter(name)) return true;
+            if (NameLooksLikeShipmentClutter(name)) return true;
 
             if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
             {
@@ -967,6 +971,13 @@ namespace GameDevTV.RTS.Player
             if (string.IsNullOrEmpty(name)) return false;
             return name.IndexOf("Barracks", StringComparison.OrdinalIgnoreCase) >= 0
                 || name.IndexOf("Infantry", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool NameLooksLikeShipmentClutter(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.IndexOf("Shipment", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Culture Serum", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>Keep real cards; mines only enter the hand after a matching deposit is discovered.</summary>
@@ -1329,8 +1340,39 @@ namespace GameDevTV.RTS.Player
             extras += AddClimateChannelExtras("WATER", "Water Ice Aquifer", 5);
             extras += AddClimateChannelExtras("WATER", "Subglacial Water Extractor", 3);
 
+            // Pull real climate tiles (esp. blue Water) near the front so the opening
+            // hand isn't only Air/Heat while Aquifers sit at the bottom of FIFO.
+            PrioritizeClimateCardsNearFront();
+
             Debug.Log($"[CardDeckController] Draw pile ready: {drawPile.Count} cards " +
                       $"({masterDeck.Count} base + {extras} sector-win/infra duplicates).");
+        }
+
+        /// <summary>
+        /// Move one Water / Atmos / Temp unlock near the front of the draw pile
+        /// so blue Aquifer cards appear early instead of only after dozens of draws.
+        /// </summary>
+        private void PrioritizeClimateCardsNearFront()
+        {
+            if (drawPile == null || drawPile.Count < 2) return;
+
+            string[] goals = { "WATER", "ATMOSPHERE", "TEMPERATURE" };
+            var pulled = new List<BlueprintCardSO>(goals.Length);
+            foreach (string goal in goals)
+            {
+                int idx = drawPile.FindIndex(c =>
+                    c is UnlockBuildingCardSO
+                    && string.Equals(
+                        TerraformingGoalColors.GetSectorGoalForCard(c),
+                        goal,
+                        StringComparison.OrdinalIgnoreCase));
+                if (idx < 0) continue;
+                pulled.Add(drawPile[idx]);
+                drawPile.RemoveAt(idx);
+            }
+
+            for (int i = pulled.Count - 1; i >= 0; i--)
+                drawPile.Insert(0, pulled[i]);
         }
 
         private int AddClimateChannelExtras(string goal, string preferredCardName, int count)

@@ -147,6 +147,8 @@ namespace GameDevTV.RTS.Player
             RecordClimateBaselines();
             ApplyFocusSector(FocusSectorIndex, announce: false);
             CardDeckController.Instance?.NotifyActClimateComboReset();
+            // Seat unmet climate tiles (esp. blue Water) now that Act baselines exist.
+            CardDeckController.Instance?.RefreshHand();
             Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining}, climate from sector {FocusSectorIndex}");
             OnActStateChanged?.Invoke();
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();

@@ -103,11 +103,32 @@ namespace GameDevTV.RTS.UI.Components
                 if (goalBadge != null)
                 {
                     goalBadge.gameObject.SetActive(true);
-                    if (tag == "Heat" || tag == "Air")
-                        goalBadge.SetText($"+{score}\n→Water");
+                    // Heat/Atmos: spell out the partner so pink Atmos cards are not read as Water.
+                    if (tag == "Heat")
+                    {
+                        goalBadge.SetText($"+{score}\nPlay w/ Atmos\n→ Water card");
+                        goalBadge.fontSize = 10f;
+                        StretchGoalBadgeForCombo();
+                    }
+                    else if (tag == "Air")
+                    {
+                        goalBadge.SetText($"+{score}\nPlay w/ Heat\n→ Water card");
+                        goalBadge.fontSize = 10f;
+                        StretchGoalBadgeForCombo();
+                    }
+                    else if (!string.IsNullOrEmpty(goalKey))
+                    {
+                        goalBadge.SetText($"+{score}\n{TerraformingGoalColors.ShortLabel(goalKey)}");
+                        goalBadge.fontSize = 12f;
+                        ResetGoalBadgeLayout();
+                    }
                     else
+                    {
                         goalBadge.SetText($"+{score}");
-                    goalBadge.color = new Color(1f, 0.92f, 0.45f, 1f);
+                        goalBadge.fontSize = 12f;
+                        goalBadge.color = new Color(1f, 0.92f, 0.45f, 1f);
+                        ResetGoalBadgeLayout();
+                    }
                 }
             }
 
@@ -414,6 +435,30 @@ namespace GameDevTV.RTS.UI.Components
             badgeGO.SetActive(false);
         }
 
+        /// <summary>Give Heat/Air combo hints enough vertical room on the card face.</summary>
+        private void StretchGoalBadgeForCombo()
+        {
+            if (goalBadge == null) return;
+            RectTransform rt = goalBadge.rectTransform;
+            rt.anchorMin = new Vector2(0.04f, 0.72f);
+            rt.anchorMax = new Vector2(0.96f, 0.98f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            goalBadge.alignment = TextAlignmentOptions.TopRight;
+            goalBadge.enableWordWrapping = true;
+            goalBadge.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        private void ResetGoalBadgeLayout()
+        {
+            if (goalBadge == null) return;
+            RectTransform rt = goalBadge.rectTransform;
+            rt.anchorMin = new Vector2(0.05f, 0.86f);
+            rt.anchorMax = new Vector2(0.95f, 0.98f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
+
         private string GetTooltipText(BaseCommand command, string cardGoal)
         {
             string tooltipText = command.Name + "\n";
@@ -445,11 +490,11 @@ namespace GameDevTV.RTS.UI.Components
                 if (hab > 0f) tooltipText += $"Habitability +{hab:F0}\n";
 
                 if (tag == "Heat")
-                    tooltipText += "<b>Combo:</b> With an Air tile in this sector → unlocks <b>Water</b> card.\n";
+                    tooltipText += "<b>Combo:</b> Place next to an <b>Atmosphere</b> tile in this sector → unlock a <b>Water</b> card.\n";
                 else if (tag == "Air")
-                    tooltipText += "<b>Combo:</b> With a Heat tile in this sector → unlocks <b>Water</b> card.\n";
+                    tooltipText += "<b>Combo:</b> Place next to a <b>Heat</b> tile in this sector → unlock a <b>Water</b> card.\n";
                 else if (tag == "Water")
-                    tooltipText += "<b>Combo:</b> Pairs with Heat/Air to unlock the missing climate card.\n";
+                    tooltipText += "<b>Combo:</b> Place next to Heat or Atmosphere to unlock the missing climate card.\n";
                 else if (BuildingSiteRegistry.IsMineBuilding(building))
                     tooltipText += "Builds automatically on a matching discovered deposit.\n";
             }
