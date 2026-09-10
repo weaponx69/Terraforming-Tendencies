@@ -49,6 +49,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Oxygen / Power / Pop as win primaries | **Retired** |
 | Fixed 4 Acts independent of map size | **Retired** — Act count = sector count |
 | Mining / materials depletion as run loss | **Retired** (while Colony Acts are active) |
+| Emergency Caches free Materials card | **Retired** from Colony Acts deck |
 
 Climate tickers **do** count for Act clear (with Colony Score). They are not the *only* win meter.
 
@@ -69,12 +70,22 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Climate ticks** from powered Heat/Air/Water buildings in the **current focus sector** only (auto-link to nearby generators within 4 tiles). Unpowered consumers do nothing.
 * **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
 * **Climate cards:** if a climate channel is still unmet for this Act, hand keeps at least one matching card (need-based seat — no Water famine). Draw pile extras: +5 Aquifer / +3 Subglacial / +3 Heat / +3 Air. Heat+Air in sector still queues a Water combo offer once per Act.
-* **Hand size 24** (scrollable); deck excludes combat clutter (**Barracks**, Infantry School) and **shipment** cards (instant Materials/Biomass dumps). Spaceport and Deploy Engineer stay.
+* **Hand size 24** (scrollable; ~**2.5 cards per mouse-wheel notch**); deck excludes combat clutter (**Barracks**, Infantry School), **shipment** cards, and **Emergency Caches**. Spaceport and Deploy Engineer stay.
 * **Mine tiles** and **geology tiles** (Subglacial / Lava Tube / Magnetic Shield / …) only enter the hand after the matching deposit or sector feature is **discovered**. Water Ice Aquifer stays a normal climate tile. Mines auto-build on their deposit tile.
 * Card water that needs geology (Subglacial) unlocks when a **WaterDeposit** sector feature is revealed (Act focus / explore). Sector features are **randomized** each planet (start sector has none; other sectors get a shuffled mix of Volcano / FaultLine / LavaTube / WaterDeposit).
-* On clear: **between-sector Supply Depot shop** (Materials → tile offers / reroll) is mandatory before the next Act. Continue grants **Solar + Command Post** into hand, then camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
+* On clear: **between-sector Supply Depot shop** (Materials → tile offers / reroll) is **mandatory and permanent** before the next Act. Continue always grants **Solar Panel + Command Post** into hand (Solar Panel only — not Solar Greenhouse), then camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
+* **Oxygen** is flavor / life support — **not** an Act-clear meter. One Oxygen Processor ≈ **~20 min** to 100% (hard-capped ≤0.08%/sec). Prior-sector processors stop when focus moves.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
 * Final sector Act clear → victory.
+
+### Permanent UX (do not regress)
+| Feature | Rule |
+|---------|------|
+| Between-Act shop | Always pause on Act clear (non-final); [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) |
+| Sector bootstrap cards | Continue → Solar Panel + Command Post via `GrantSectorTransitionBootstrap` |
+| Hand scroll | Notch-based, ~2.5 cards/tick (`BottomBarActionsUI.scrollCardsPerNotch`) |
+| Top resource strip | Fixed-width metric boxes (`RuntimeUI.EnsureFixedMetricBox`) — no digit jitter |
+| Emergency Caches | Excluded from Colony Acts deck |
 
 ---
 
@@ -199,7 +210,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 ## 3. Support systems (keep, demoted)
 
 ### 3.1 UI chrome
-* Hand lower-left; selection info far right; top resource strip for readability.
+* Hand lower-left; selection info far right; top resource strip for readability with **fixed-width** metric boxes (no digit jitter).
 * Goal colors still tint Heat / Air / Water card accents — cosmetic.
 
 ### 3.2 Deck

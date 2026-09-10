@@ -1088,9 +1088,15 @@ namespace GameDevTV.RTS.Player
             // Instant Temp/Atmos/Water/Materials dumps — not Combolands tiles.
             if (card is ResourceShipmentCardSO) return true;
 
+            // Emergency Caches is a free Materials safety-net card — not part of Colony Acts.
+            if (card is ScoutingCardSO scout
+                && scout.scoutingType == ScoutingCardSO.ScoutingType.EmergencyCaches)
+                return true;
+
             string name = card.cardName ?? card.name ?? string.Empty;
             if (NameLooksLikeMilitaryClutter(name)) return true;
             if (NameLooksLikeShipmentClutter(name)) return true;
+            if (name.IndexOf("Emergency Cache", StringComparison.OrdinalIgnoreCase) >= 0) return true;
 
             if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
             {
@@ -1356,20 +1362,12 @@ namespace GameDevTV.RTS.Player
         {
             if (masterDeck == null || masterDeck.Count == 0) return null;
 
-            BlueprintCardSO emergencyCaches = masterDeck.FirstOrDefault(c =>
-                c is ScoutingCardSO s && s.scoutingType == ScoutingCardSO.ScoutingType.EmergencyCaches);
-
             var curatedPool = masterDeck
-                .Where(c => c != emergencyCaches)
+                .Where(c => !IsExcludedFromColonyDeck(c))
                 .Where(c => c.IsGateMet())
                 .ToList();
 
-            if (curatedPool.Count == 0)
-            {
-                var fallbackHand = new List<BlueprintCardSO>();
-                if (emergencyCaches != null) fallbackHand.Add(emergencyCaches);
-                return fallbackHand;
-            }
+            if (curatedPool.Count == 0) return new List<BlueprintCardSO>();
 
             curatedPool = curatedPool.OrderBy(_ => UnityEngine.Random.value).ToList();
             var scoutingCards = curatedPool.Where(c => c is ScoutingCardSO).ToList();
@@ -1391,11 +1389,6 @@ namespace GameDevTV.RTS.Player
             for (int i = 0; i < slotsRemaining && i < mixedPool.Count; i++)
             {
                 hand.Add(mixedPool[i]);
-            }
-
-            if (emergencyCaches != null && !hand.Contains(emergencyCaches))
-            {
-                hand.Add(emergencyCaches);
             }
 
             return hand;

@@ -499,12 +499,13 @@ namespace GameDevTV.RTS.UI
                 if (containerParent.GetComponent<Canvas>() == null && containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
                     HorizontalLayoutGroup hlg = containerParent.gameObject.AddComponent<HorizontalLayoutGroup>();
-                    hlg.childControlWidth = false;
-                    hlg.childControlHeight = false;
+                    hlg.childControlWidth = true;
+                    hlg.childControlHeight = true;
                     hlg.childForceExpandWidth = false;
                     hlg.childForceExpandHeight = false;
-                    hlg.spacing = 20f;
+                    hlg.spacing = 12f;
                     hlg.childAlignment = TextAnchor.UpperLeft;
+                    hlg.padding = new RectOffset(8, 8, 4, 4);
                 }
                 else if (containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
@@ -756,6 +757,24 @@ namespace GameDevTV.RTS.UI
                 StyleValueText(populationText);
                 populationText.color = TerraformingGoalColors.Population;
             }
+
+            // Re-assert fixed widths every readability pass (HLG may already exist from scene).
+            Transform strip = null;
+            if (materialsValueText != null) strip = materialsValueText.transform.parent;
+            while (strip != null && strip.GetComponent<HorizontalLayoutGroup>() == null)
+                strip = strip.parent;
+            if (strip != null)
+            {
+                var hlg = strip.GetComponent<HorizontalLayoutGroup>();
+                if (hlg != null)
+                {
+                    hlg.childControlWidth = true;
+                    hlg.childControlHeight = true;
+                    hlg.childForceExpandWidth = false;
+                    hlg.childForceExpandHeight = false;
+                    hlg.spacing = 12f;
+                }
+            }
         }
 
         /// <summary>
@@ -877,6 +896,79 @@ namespace GameDevTV.RTS.UI
             }
 
             StyleValueText(value);
+            EnsureFixedMetricBox(label, value, ResolveMetricBoxWidth(fallbackLabel));
+        }
+
+        /// <summary>
+        /// Fixed-width metric slots so digit growth (99 → 100, -9.9 → -10.0) cannot
+        /// resize neighbors and make the top strip jitter.
+        /// </summary>
+        private static float ResolveMetricBoxWidth(string fallbackLabel)
+        {
+            return fallbackLabel switch
+            {
+                "Materials" => 128f,
+                "Biomass" => 168f,
+                "Oxygen" => 118f,
+                "Power" => 108f,
+                "Integrity" => 118f,
+                "Sectors" => 148f,
+                "Temp" => 126f,
+                "Atmos" => 132f,
+                "Water" => 118f,
+                _ => 124f
+            };
+        }
+
+        private static void EnsureFixedMetricBox(TextMeshProUGUI label, TextMeshProUGUI value, float width)
+        {
+            Transform probe = value != null ? value.transform : label != null ? label.transform : null;
+            if (probe == null) return;
+
+            Transform container = probe;
+            while (container != null
+                   && (string.IsNullOrEmpty(container.name) || !container.name.EndsWith("Container")))
+            {
+                container = container.parent;
+            }
+            if (container == null) container = probe.parent;
+            if (container == null) return;
+
+            var csf = container.GetComponent<ContentSizeFitter>();
+            if (csf != null) csf.enabled = false;
+
+            var le = container.GetComponent<LayoutElement>();
+            if (le == null) le = container.gameObject.AddComponent<LayoutElement>();
+            le.minWidth = width;
+            le.preferredWidth = width;
+            le.flexibleWidth = 0f;
+            le.minHeight = 56f;
+            le.preferredHeight = 56f;
+
+            if (container is RectTransform crt)
+            {
+                crt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+            }
+
+            if (value != null)
+            {
+                value.enableWordWrapping = false;
+                value.overflowMode = TextOverflowModes.Overflow;
+                value.alignment = TextAlignmentOptions.MidlineRight;
+                var vCsf = value.GetComponent<ContentSizeFitter>();
+                if (vCsf != null) vCsf.enabled = false;
+                var vLe = value.GetComponent<LayoutElement>();
+                if (vLe == null) vLe = value.gameObject.AddComponent<LayoutElement>();
+                vLe.minWidth = width * 0.58f;
+                vLe.preferredWidth = width * 0.58f;
+                vLe.flexibleWidth = 0f;
+            }
+
+            if (label != null)
+            {
+                label.enableWordWrapping = false;
+                label.overflowMode = TextOverflowModes.Ellipsis;
+            }
         }
 
         private static void StyleValueText(TextMeshProUGUI value)

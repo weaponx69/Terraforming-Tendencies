@@ -7,9 +7,15 @@ namespace GameDevTV.RTS.Units
     [IncludeInSettings(true)]
     public class OxygenProcessor : BaseBuilding
     {
-        [Tooltip("Percentage of oxygen generated per tick (e.g. 0.001)")]
-        [SerializeField] private float oxygenPerTick = 0.001f;
-        
+        /// <summary>
+        /// Soft cap so a single Life tile cannot slam Oxygen to 100% in seconds.
+        /// Prefab historically shipped at 5%/tick — Colony Acts treats Oxygen as flavor, not a win meter.
+        /// </summary>
+        private const float MaxOxygenPerTick = 0.08f;
+
+        [Tooltip("Percentage of oxygen generated per tick (e.g. 0.08 ≈ ~20 min to 100% with one tile)")]
+        [SerializeField] private float oxygenPerTick = 0.08f;
+
         [Tooltip("How often in seconds the oxygen tick occurs")]
         [SerializeField] private float tickRate = 1f;
 
@@ -44,7 +50,8 @@ namespace GameDevTV.RTS.Units
                     tickTimer -= tickRate;
                     if (Supplies.Oxygen.ContainsKey(Owner))
                     {
-                        Supplies.UpdateOxygen(Owner, Supplies.Oxygen[Owner] + oxygenPerTick);
+                        float rate = Mathf.Min(Mathf.Max(0f, oxygenPerTick), MaxOxygenPerTick);
+                        Supplies.UpdateOxygen(Owner, Supplies.Oxygen[Owner] + rate);
                     }
                 }
             }
