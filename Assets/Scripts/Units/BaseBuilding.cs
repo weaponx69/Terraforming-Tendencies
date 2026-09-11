@@ -1015,7 +1015,8 @@ namespace GameDevTV.RTS.Units
             if (!gameObject.activeInHierarchy) return;
             if (Progress.State != BuildingProgress.BuildingState.Completed) return;
 
-            // Colony Acts: only the focus sector's climate buildings push the meters.
+            // Colony Acts: climate buildings anywhere on the planet push Act meters.
+            // (Geography expands via Command Posts; Acts are independent of sectors.)
             if (SectorManager.Instance != null
                 && !SectorManager.Instance.DoesBuildingCountForActiveClimate(this))
             {

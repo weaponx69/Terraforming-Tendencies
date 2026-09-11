@@ -132,8 +132,8 @@ namespace GameDevTV.RTS.Player
         private void HandleSectorUnlocked()
         {
             EnsureBootstrapUnlockInHand("Solar");
-            // Fallback only — SectorManager auto-places a CP before this event fires.
-            if (GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
+            // Keep a Command Post available while free sectors remain (player-driven expansion).
+            if (GameDevTV.RTS.Utilities.SectorColonization.GetNextFreeSectorIndex() >= 0)
                 EnsureBootstrapUnlockInHand("Command Post");
             RefreshHand();
         }
@@ -337,15 +337,14 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// After the between-Act shop, force Solar + Command Post into hand for the next sector
-        /// (does not require CanApply — pads may not exist in the new sector yet).
+        /// After the between-Act shop, ensure Solar stays available for the next Act.
+        /// Command Posts are player-driven expansion (not granted on Act Continue).
         /// </summary>
         public void GrantSectorTransitionBootstrap()
         {
-            ForceBootstrapUnlockIntoHand("Command Post");
             ForceBootstrapUnlockIntoHand("Solar");
 
-            // Hard guarantee: never enter a new sector without Solar Panel in hand.
+            // Hard guarantee: never enter a new Act without Solar Panel in hand.
             if (!hand.Any(IsSolarUnlockCard))
             {
                 BlueprintCardSO template = masterDeck.FirstOrDefault(IsSolarUnlockCard)
@@ -363,7 +362,7 @@ namespace GameDevTV.RTS.Player
 
             RefreshHand();
             OnHandChanged?.Invoke();
-            Debug.Log("[CardDeckController] Granted Solar + Command Post for next sector Act.");
+            Debug.Log("[CardDeckController] Granted Solar for next Act (Command Post is player-driven).");
         }
 
         /// <summary>Add a purchased shop card into the hand (makes room if needed).</summary>

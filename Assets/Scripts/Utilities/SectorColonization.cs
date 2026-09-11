@@ -139,13 +139,99 @@ namespace GameDevTV.RTS.Utilities
             if (sector == null || sector.IsLocked) return;
 
             RevealSectorBuildSites(sector);
-            bool placed = TryAutoPlaceCommandPost(sector, owner, out string failureReason);
+
+            // Colony Acts: player plays Command Post cards to claim sectors — no free auto-CP.
+            bool skipAutoCp = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            bool placed = false;
+            string failureReason = null;
+            if (!skipAutoCp)
+                placed = TryAutoPlaceCommandPost(sector, owner, out failureReason);
+
             BuildingSiteRegistry.RefreshAllMarkers();
             CardDeckController.Instance?.RefreshHand();
+
+            if (skipAutoCp)
+            {
+                Debug.Log($"[SectorColonization] Sector {sectorIndex} pads revealed (play Command Post card to claim).");
+                return;
+            }
 
             Debug.Log(placed
                 ? $"[SectorColonization] Sector {sectorIndex} claimed with Command Post; pads revealed."
                 : $"[SectorColonization] Sector {sectorIndex} pads revealed; Command Post not placed ({failureReason ?? "unknown"}).");
+        }
+
+        /// <summary>First sector index without a player Command Post, or -1.</summary>
+        public static int GetNextFreeSectorIndex()
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null) return -1;
+            for (int i = 0; i < sm.Sectors.Count; i++)
+            {
+                if (sm.Sectors[i] == null) continue;
+                if (!SectorHasCommandPost(sm.Sectors[i]))
+                    return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// World position for the next Command Post claim (CP pad or sector center).
+        /// Unlocks/reveals the sector if needed without auto-placing a free CP.
+        /// </summary>
+        public static bool TryGetNextCommandPostPlacement(out Vector3 worldPosition, out int sectorIndex)
+        {
+            worldPosition = Vector3.zero;
+            sectorIndex = GetNextFreeSectorIndex();
+            if (sectorIndex < 0) return false;
+
+            var sm = SectorManager.Instance;
+            var sector = sm.Sectors[sectorIndex];
+            if (sector == null) return false;
+
+            if (sector.IsLocked)
+            {
+                sector.IsLocked = false;
+                sector.IsExplored = true;
+                sector.IsDiscovered = true;
+                DiscoverySystem.RevealFeaturesForSector(sector);
+                RevealSectorBuildSites(sector);
+                BuildingSiteRegistry.RefreshAllMarkers();
+                SectorManager.Instance?.NotifySectorUnlocked();
+            }
+            else
+            {
+                RevealSectorBuildSites(sector);
+            }
+
+            return TryGetCommandPostFocusPosition(sector, out worldPosition);
+        }
+
+        /// <summary>Display name for sector index (feature or Sector N).</summary>
+        public static string GetSectorDisplayName(int sectorIndex)
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null || sectorIndex < 0 || sectorIndex >= sm.Sectors.Count)
+                return $"Sector {sectorIndex + 1}";
+
+            var sector = sm.Sectors[sectorIndex];
+            if (sector != null && sector.Feature != SectorManager.SectorFeature.None)
+                return $"Sector {sectorIndex + 1} · {sector.Feature}";
+
+            bool claimed = SectorHasCommandPost(sector);
+            return claimed ? $"Sector {sectorIndex + 1}" : $"Sector {sectorIndex + 1} · Unclaimed";
+        }
+
+        /// <summary>Focus camera on a sector (CP if present, else center).</summary>
+        public static void FocusCameraOnSector(int sectorIndex)
+        {
+            if (!TryGetCommandPostFocusPosition(sectorIndex, out Vector3 pos))
+            {
+                var sm = SectorManager.Instance;
+                if (sm == null || sectorIndex < 0 || sectorIndex >= sm.Sectors.Count) return;
+                pos = sm.Sectors[sectorIndex].Center;
+            }
+            PlayerInput.FocusCameraOnWorldPosition(pos);
         }
 
         public static void RevealSectorBuildSites(SectorManager.Sector sector)

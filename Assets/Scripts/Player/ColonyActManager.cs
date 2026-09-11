@@ -6,8 +6,9 @@ using UnityEngine;
 namespace GameDevTV.RTS.Player
 {
     /// <summary>
-    /// Combolands-style run spine: one Act per map sector. Colony Score + Temp/Atmos/Water
-    /// deltas within a week budget. Climate buildings only count in the current focus sector.
+    /// Combolands-style run spine: fixed named Acts (independent of sectors).
+    /// Act clear = Colony Score + planet climate gains. Geography expands via Command Posts.
+    /// Run win = all Acts cleared AND every sector terraformed.
     /// </summary>
     public class ColonyActManager : MonoBehaviour
     {
@@ -15,7 +16,7 @@ namespace GameDevTV.RTS.Player
 
         public static event Action OnActStateChanged;
         public static event Action<int> OnActCleared; // act index 1-based
-        /// <summary>Fired after an Act clears when another Act remains — open the between-sector shop.</summary>
+        /// <summary>Fired after an Act clears when another Act remains — open the between-Act shop.</summary>
         public static event Action OnBetweenActShopRequested;
         public static event Action OnRunVictory;
         public static event Action OnActFailed;
@@ -25,7 +26,6 @@ namespace GameDevTV.RTS.Player
             public string Name;
             public int TargetScore;
             public int WeekBudget;
-            public int SectorIndex;
         }
 
         private readonly System.Collections.Generic.List<ActDef> acts = new();
@@ -61,7 +61,8 @@ namespace GameDevTV.RTS.Player
         public int ColonyScore => colonyScore;
         public int TargetScore => CurrentActDef.TargetScore;
         public int WeeksRemaining => weeksRemaining;
-        public int FocusSectorIndex => CurrentActDef.SectorIndex;
+        /// <summary>Deprecated Act↔sector coupling — camera/sector focus is player-driven (Q/E).</summary>
+        public int FocusSectorIndex => 0;
         public float Habitability => habitability;
         public float HabitabilityProgress => Mathf.Clamp01(habitability / HabitabilityForLiving);
         public bool IsRunEnded => runEnded;
@@ -70,14 +71,15 @@ namespace GameDevTV.RTS.Player
         public bool IsBetweenActs { get; private set; }
         public bool IsScoreMet => colonyScore >= TargetScore;
         public bool IsClimateMet => GetClimateProgress(out _, out _, out _) >= 0.999f;
-        public bool IsActComplete => IsScoreMet && IsClimateMet;
+        public bool IsActComplete => IsScoreMet && IsClimateMet
+            && (actIndex < acts.Count - 1 || AreAllSectorsTerraformed());
 
         private ActDef CurrentActDef
         {
             get
             {
                 if (acts.Count == 0)
-                    return new ActDef { Name = "Survive", TargetScore = 40, WeekBudget = 8, SectorIndex = 0 };
+                    return new ActDef { Name = "Establish", TargetScore = 30, WeekBudget = 18 };
                 return acts[Mathf.Clamp(actIndex, 0, acts.Count - 1)];
             }
         }
@@ -138,7 +140,7 @@ namespace GameDevTV.RTS.Player
             if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count == 0)
                 SectorManager.Instance.InitializeSectors();
 
-            BuildActsFromSectors();
+            BuildFixedActLadder();
             actIndex = 0;
             colonyScore = 0;
             habitability = 0f;
@@ -147,94 +149,105 @@ namespace GameDevTV.RTS.Player
             weeksRemaining = CurrentActDef.WeekBudget;
             started = true;
             RecordClimateBaselines();
-            ApplyFocusSector(FocusSectorIndex, announce: false);
+            // Reveal geology planet-wide — Acts no longer unlock sectors.
+            RevealAllSectorFeatures();
             CardDeckController.Instance?.NotifyActClimateComboReset();
             GameDevTV.RTS.Utilities.SectorMiningDroneBootstrap.ResetForNewRun();
-            // Seat unmet climate tiles (esp. blue Water) now that Act baselines exist.
             CardDeckController.Instance?.RefreshHand();
-            Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining}, climate from sector {FocusSectorIndex}");
+            Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining} (Acts ≠ sectors)");
             OnActStateChanged?.Invoke();
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
         }
 
-        /// <summary>One Act per map sector — planet size drives run length.</summary>
-        private void BuildActsFromSectors()
+        /// <summary>Fixed Combolands-style Act ladder — independent of map sector count.</summary>
+        private void BuildFixedActLadder()
         {
             acts.Clear();
-            int sectorCount = SectorManager.Instance != null ? SectorManager.Instance.Sectors.Count : 0;
-            int n = Mathf.Max(1, sectorCount);
-
-            for (int i = 0; i < n; i++)
-            {
-                // Progressive score; scales gently so large maps are longer, not absurdly hard per Act.
-                int score = 40 + i * 35;
-                int weeks = i == 0 ? 16 : (i >= n - 1 ? 16 : 14);
-                string name = BuildActName(i, n);
-                acts.Add(new ActDef
-                {
-                    Name = name,
-                    TargetScore = score,
-                    WeekBudget = weeks,
-                    SectorIndex = i
-                });
-            }
+            acts.Add(new ActDef { Name = "Establish", TargetScore = 30, WeekBudget = 18 });
+            acts.Add(new ActDef { Name = "Survive", TargetScore = 140, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Settle", TargetScore = 220, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Expand", TargetScore = 300, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Thrive", TargetScore = 400, WeekBudget = 18 });
         }
 
-        private static string BuildActName(int index, int total)
-        {
-            string baseName;
-            if (total == 1) baseName = "Thrive";
-            else if (index == 0) baseName = "Survive";
-            else if (index == total - 1) baseName = "Thrive";
-            else if (index == 1) baseName = "Settle";
-            else baseName = $"Expand {index + 1}";
-
-            if (SectorManager.Instance != null
-                && index < SectorManager.Instance.Sectors.Count)
-            {
-                var feature = SectorManager.Instance.Sectors[index].Feature;
-                if (feature != SectorManager.SectorFeature.None)
-                    return $"{baseName} · {feature}";
-            }
-
-            return $"{baseName} · Sector {index + 1}";
-        }
-
-        private void ApplyFocusSector(int sectorIndex, bool announce)
+        private static void RevealAllSectorFeatures()
         {
             var sm = SectorManager.Instance;
-            if (sm == null || sm.Sectors == null || sm.Sectors.Count == 0) return;
-
-            int i = Mathf.Clamp(sectorIndex, 0, sm.Sectors.Count - 1);
-            var sector = sm.Sectors[i];
-            sm.BeginTerraformingOn(sector);
-            // Reaching this Act's sector reveals its geology (WaterDeposit / LavaTube / …).
-            DiscoverySystem.RevealFeaturesForSector(sector);
-
-            if (announce)
-                PlayerInput.FocusCameraOnWorldPosition(sector.Center);
+            if (sm?.Sectors == null) return;
+            for (int i = 0; i < sm.Sectors.Count; i++)
+            {
+                var sector = sm.Sectors[i];
+                if (sector == null) continue;
+                sector.IsExplored = true;
+                sector.IsDiscovered = true;
+                DiscoverySystem.RevealFeaturesForSector(sector);
+            }
         }
 
-        /// <summary>Which climate tags are present (completed) in the current focus sector.</summary>
+        /// <summary>Climate tags present anywhere on the planet (unlocked/claimed buildable sectors).</summary>
         public void GetFocusSectorClimatePresence(out bool heat, out bool air, out bool water)
         {
             heat = air = water = false;
-            var sm = SectorManager.Instance;
-            if (sm == null) return;
-            var focus = sm.GetClimateFocusSector();
-            if (focus == null) return;
-
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
                 if (b == null || b.Owner != Owner.Player1) continue;
                 if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
-                if (sm.GetNearestSector(b.transform.position) != focus) continue;
 
                 GetTileValues(b.ResolvedBuildingSO, out _, out _, out string tag);
                 if (tag == "Heat") heat = true;
                 else if (tag == "Air") air = true;
                 else if (tag == "Water") water = true;
             }
+        }
+
+        /// <summary>Sector is terraformed when it has a player CP and Heat+Air+Water tiles.</summary>
+        public static bool IsSectorTerraformed(SectorManager.Sector sector)
+        {
+            if (sector == null) return false;
+            if (!GameDevTV.RTS.Utilities.SectorColonization.SectorHasCommandPost(sector)) return false;
+
+            bool heat = false, air = false, water = false;
+            var sm = SectorManager.Instance;
+            if (sm == null) return false;
+
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b.Owner != Owner.Player1) continue;
+                if (b.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                if (sm.GetNearestSector(b.transform.position) != sector) continue;
+
+                GetTileValues(b.ResolvedBuildingSO, out _, out _, out string tag);
+                if (tag == "Heat") heat = true;
+                else if (tag == "Air") air = true;
+                else if (tag == "Water") water = true;
+            }
+
+            return heat && air && water;
+        }
+
+        public static bool AreAllSectorsTerraformed()
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null || sm.Sectors.Count == 0) return false;
+            for (int i = 0; i < sm.Sectors.Count; i++)
+            {
+                if (!IsSectorTerraformed(sm.Sectors[i])) return false;
+            }
+            return true;
+        }
+
+        public static int CountTerraformedSectors(out int total)
+        {
+            total = 0;
+            int done = 0;
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null) return 0;
+            total = sm.Sectors.Count;
+            for (int i = 0; i < sm.Sectors.Count; i++)
+            {
+                if (IsSectorTerraformed(sm.Sectors[i])) done++;
+            }
+            return done;
         }
 
         private void RecordClimateBaselines()
@@ -543,8 +556,9 @@ namespace GameDevTV.RTS.Player
             {
                 runEnded = true;
                 OnRunVictory?.Invoke();
+                int terraDone = CountTerraformedSectors(out int terraTotal);
                 GameOverManager.LastOutcomeDetail =
-                    $"All {TotalActs} sector Acts cleared — each region had score + climate before weeks ran out.";
+                    $"All {TotalActs} Acts cleared and {terraDone}/{terraTotal} sectors terraformed.";
                 if (GenerationManager.Instance != null)
                     GenerationManager.Instance.NotifyColonyActVictory();
                 else if (GameOverManager.Instance != null)
@@ -553,8 +567,8 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // Permanent between-sector shop — pause here until Continue.
-            statusBanner = $"<color=#7CFF9A><b>SECTOR ACT CLEARED!</b></color>  Visit the Supply Depot before Act {cleared + 1}.";
+            // Permanent between-Act shop — pause here until Continue.
+            statusBanner = $"<color=#7CFF9A><b>ACT CLEARED!</b></color>  Visit the Supply Depot before {acts[actIndex + 1].Name}.";
             statusBannerUntil = Time.unscaledTime + 8f;
             OnActStateChanged?.Invoke();
             OnBetweenActShopRequested?.Invoke();
@@ -565,7 +579,7 @@ namespace GameDevTV.RTS.Player
 
         /// <summary>
         /// Called by <see cref="GameDevTV.RTS.UI.BetweenActShopUI"/> after the player finishes shopping.
-        /// Seeds Solar + Command Post, then advances focus to the next sector Act.
+        /// Advances to the next named Act (does not unlock sectors — play Command Posts to expand).
         /// </summary>
         public void CompleteBetweenActShopAndAdvance()
         {
@@ -582,13 +596,11 @@ namespace GameDevTV.RTS.Player
             weeksRemaining = CurrentActDef.WeekBudget;
             RecordClimateBaselines();
             IsBetweenActs = false;
-            ApplyFocusSector(FocusSectorIndex, announce: true);
             CardDeckController.Instance?.NotifyActClimateComboReset();
-            GameDevTV.RTS.Utilities.SectorMiningDroneBootstrap.TryGrantForFocusSector();
-            statusBanner = $"<color=#7CFF9A><b>NEXT SECTOR</b></color>  {CurrentActName} — Solar + Command Post ready.";
+            statusBanner = $"<color=#7CFF9A><b>NEXT ACT</b></color>  {CurrentActName} — keep building score and climate.";
             statusBannerUntil = Time.unscaledTime + 6f;
 
-            Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start score {colonyScore}/{TargetScore}, weeks {weeksRemaining}, focus sector {FocusSectorIndex}");
+            Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start score {colonyScore}/{TargetScore}, weeks {weeksRemaining}");
             OnActStateChanged?.Invoke();
 
             if (IsActComplete)
@@ -686,11 +698,13 @@ namespace GameDevTV.RTS.Player
             if (!started)
                 return "<color=#C8D0D8>Waiting for planet…</color>";
 
+            int terraDone = CountTerraformedSectors(out int terraTotal);
+
             if (runEnded && IsActComplete && actIndex >= acts.Count - 1)
-                return "<color=#7CFF9A><b>YOU WIN</b></color>\nAll sector Acts cleared.";
+                return $"<color=#7CFF9A><b>YOU WIN</b></color>\nAll Acts cleared · {terraDone}/{terraTotal} sectors terraformed.";
 
             if (runEnded)
-                return "<color=#FF8A8A><b>YOU LOSE</b></color>\nWeeks ran out before this sector’s score + climate goals.";
+                return "<color=#FF8A8A><b>YOU LOSE</b></color>\nWeeks ran out before score + climate goals.";
 
             float climate = GetClimateProgress(out _, out _, out _);
             GetFocusSectorClimatePresence(out bool hasHeat, out bool hasAir, out bool hasWater);
@@ -703,8 +717,13 @@ namespace GameDevTV.RTS.Player
             string verdictColor;
             if (IsActComplete)
             {
-                verdict = "CLEARING SECTOR…";
+                verdict = "CLEARING ACT…";
                 verdictColor = "#7CFF9A";
+            }
+            else if (actIndex >= acts.Count - 1 && IsScoreMet && IsClimateMet && !AreAllSectorsTerraformed())
+            {
+                verdict = $"Need all sectors terraformed ({terraDone}/{terraTotal})";
+                verdictColor = "#FFE08A";
             }
             else if (weeksRemaining <= 2 && (!IsScoreMet || !IsClimateMet))
             {
@@ -713,7 +732,7 @@ namespace GameDevTV.RTS.Player
             }
             else if (IsScoreMet && !IsClimateMet)
             {
-                verdict = "Need climate in THIS sector";
+                verdict = "Need planet climate gains";
                 verdictColor = "#FFE08A";
             }
             else if (!IsScoreMet && IsClimateMet)
@@ -723,14 +742,14 @@ namespace GameDevTV.RTS.Player
             }
             else
             {
-                verdict = "Terraform this sector";
+                verdict = "Score + climate to clear Act";
                 verdictColor = "#8FE7FF";
             }
 
             sb.AppendLine($"<color={verdictColor}><b>{verdict}</b></color>");
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
-            sb.AppendLine($"<color=#A8B0B8>1 Act per sector ({TotalActs} on this planet).</color>");
-            sb.AppendLine("<color=#A8B0B8>WIN Act: score AND climate here. Climate only ticks from THIS sector.</color>");
+            sb.AppendLine($"<color=#A8B0B8>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
+            sb.AppendLine($"<color=#A8B0B8>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}).</color>");
             sb.AppendLine("<color=#A8B0B8>LOSE: weeks hit 0 first.</color>");
             sb.AppendLine();
 
@@ -743,21 +762,20 @@ namespace GameDevTV.RTS.Player
             string climateMark = IsClimateMet ? "✓" : "○";
             string climateColor = IsClimateMet ? "#7CFF9A" : "#FFE08A";
             sb.AppendLine($"<color={climateColor}>{climateMark} CLIMATE GAINS  {climate:P0}</color>");
-            // Fixed-width monospace so digits don't shove the rest of the line around.
             sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Temp  {FormatGain(tempGain, 1)} / +{GenerationManager.SectorTemperatureDelta:F0}.0 °C</mspace></color>");
             sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Atmos {FormatGain(atmosGain, 2)} / +{GenerationManager.SectorAtmosphereDelta:F2} atm</mspace></color>");
             sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Water {FormatGain(waterGain, 1)} / +{GenerationManager.SectorWaterDelta:F0}.0 %</mspace></color>");
-            sb.AppendLine($"  <color=#A8B0B8>Each sector must GAIN these deltas (not absolute planet floors).</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Planet-wide gains from Act baselines (any unlocked sector ticks).</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";
             string w = hasWater ? "<color=#7CFF9A>Water✓</color>" : "<color=#FF8A8A>Water○</color>";
-            sb.AppendLine($"  <color=#A8B0B8>In this sector:</color> {h}  {a}  {w}");
+            sb.AppendLine($"  <color=#A8B0B8>On planet:</color> {h}  {a}  {w}");
 
             if (!hasWater)
             {
                 if (hasHeat && hasAir)
-                    sb.AppendLine("  <color=#8FE7FF>Water unlock: Heat+Air in this sector → Water Ice Aquifer card</color>");
+                    sb.AppendLine("  <color=#8FE7FF>Water unlock: Heat+Air → Water Ice Aquifer card</color>");
                 else if (!hasHeat && !hasAir)
                     sb.AppendLine("  <color=#FFE08A>Need Heat (GHG) and Air (Condenser) tiles — together they unlock Water</color>");
                 else if (!hasHeat)

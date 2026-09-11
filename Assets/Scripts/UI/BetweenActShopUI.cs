@@ -9,8 +9,8 @@ using UnityEngine.UI;
 namespace GameDevTV.RTS.UI
 {
     /// <summary>
-    /// Permanent between-sector shop: after clearing an Act, spend Materials on
-    /// offer cards, then continue into the next sector with Solar + Command Post seeded.
+    /// Permanent between-Act shop: after clearing an Act, spend Materials on
+    /// offer cards, then continue into the next Act. Solar is seeded; Command Posts are player-driven.
     /// </summary>
     public class BetweenActShopUI : MonoBehaviour
     {
@@ -118,11 +118,11 @@ namespace GameDevTV.RTS.UI
             int cleared = ColonyActManager.Instance != null ? ColonyActManager.Instance.CurrentAct : 0;
             int next = cleared + 1;
             if (titleText != null)
-                titleText.text = $"SECTOR SUPPLY DEPOT\nAct {cleared} cleared → preparing Act {next}";
+                titleText.text = $"SUPPLY DEPOT\nAct {cleared} cleared → preparing Act {next}";
             if (materialsText != null)
                 materialsText.text = $"Materials: {mats}";
             if (hintText != null)
-                hintText.text = "Buy tiles for the next sector, then continue. Solar + Command Post are granted when you leave.";
+                hintText.text = "Buy tiles for the next Act, then continue. Solar is seated when you leave — play Command Posts to claim sectors.";
         }
 
         private void RefreshOffers(bool forceNew)

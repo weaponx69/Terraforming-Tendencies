@@ -92,12 +92,11 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Climate ticks only from the current Act’s focus sector — you must place
-        /// Heat / Air / Water infrastructure in each region to clear that Act.
+        /// Climate ticks from any powered climate building on the planet (Acts ≠ sectors).
         /// </summary>
         public bool DoesBuildingCountForActiveClimate(BaseBuilding building)
         {
-            return IsBuildingInActiveSector(building);
+            return building != null;
         }
 
         private float secW;
@@ -109,6 +108,12 @@ namespace GameDevTV.RTS.Environment
 
         /// <summary>Fired when a sector is explored (scouted) but not necessarily unlocked yet.</summary>
         public static event Action<int> OnSectorExplored;
+
+        public void NotifySectorUnlocked()
+        {
+            UpdateSectorBorders();
+            OnSectorUnlocked?.Invoke();
+        }
 
         private void Awake()
         {

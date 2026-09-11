@@ -568,24 +568,21 @@ namespace GameDevTV.RTS.Environment
 
         private void RevealStartingArea()
         {
-            if (!generateShroudOnStart || PlanetGenerator.Instance == null || PlanetGenerator.Instance.Config == null)
-            {
+            if (PlanetGenerator.Instance == null || PlanetGenerator.Instance.Config == null)
                 return;
-            }
 
             GenerateHexGrid();
 
-            Vector3 center = new Vector3(
-                PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize / 2f,
-                0f,
-                PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize / 2f);
-            if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-            {
-                center = SectorManager.Instance.Sectors[0].Center;
-            }
-
-            RevealHexesAroundPosition(center, startingAreaRevealRadius);
+            // Combolands-style: no strategic shroud — reveal the whole planet.
+            RevealAllHexes();
             OnStartingAreaRevealed?.Invoke();
+        }
+
+        /// <summary>Reveal every hex tile (disables shroud meshes).</summary>
+        public void RevealAllHexes()
+        {
+            foreach (var tile in hexGrid.Values)
+                tile?.Reveal();
         }
         
 

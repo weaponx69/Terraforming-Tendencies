@@ -138,19 +138,8 @@ namespace GameDevTV.RTS.Environment
 
         public static bool IsSiteVisibleToPlayer(BuildingSiteSlot site)
         {
-            if (site == null)
-            {
-                return true;
-            }
-
-            // Sector lock retired — idle pad ghosts still respect hex fog so the shroud stays meaningful.
-            // Card picking uses GetEligibleSites(..., visibleToPlayerOnly: false) for the whole planet.
-            if (HexGridManager.Instance != null)
-            {
-                return HexGridManager.IsWorldPositionRevealed(site.Position);
-            }
-
-            return true;
+            // No FoW — all pads visible (Combolands-style full map).
+            return site != null;
         }
 
         private static bool IsSiteValidForBuilding(BuildingSO building, BuildingSiteSlot site)

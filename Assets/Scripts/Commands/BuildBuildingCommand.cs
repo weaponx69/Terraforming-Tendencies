@@ -37,8 +37,14 @@ namespace GameDevTV.RTS.Commands
 
         public Vector3 SnapToNearestSector(Vector3 point)
         {
-            // Do NOT snap player-placed command buildings to the sector center.
-            // This allows placing them anywhere within the sector, avoiding starting resources.
+            // Command Posts auto-claim the next free sector (player does not free-place them).
+            if (IsCommandBuilding
+                && GameDevTV.RTS.Utilities.SectorColonization.TryGetNextCommandPostPlacement(
+                    out Vector3 claimPos, out _))
+            {
+                return claimPos;
+            }
+
             return point;
         }
 
@@ -99,21 +105,40 @@ namespace GameDevTV.RTS.Commands
         {
             IBuildingBuilder builder = context.Commandable as IBuildingBuilder;
 
+            bool isCommandPost = Building != null
+                && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
+            {
+                agentTypeID = 0,
+                areaMask = UnityEngine.AI.NavMesh.AllAreas
+            };
+
             // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
 
             // Card tiles snap to the Combolands square grid (join edges with neighbors).
+            // Command Posts auto-claim the next free sector pad instead.
             if (HandIndex >= 0)
             {
-                targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
-                if (BuildingSiteRegistry.IsMineBuilding(Building)
-                    && DiscoverySystem.TrySnapToMineDeposit(Building, context.Hit.point, out Vector3 mineSnap, out _))
+                if (isCommandPost
+                    && GameDevTV.RTS.Utilities.SectorColonization.TryGetNextCommandPostPlacement(
+                        out Vector3 claimPos, out _))
                 {
-                    targetPos = new Vector3(mineSnap.x, targetPos.y, mineSnap.z);
+                    targetPos = claimPos;
+                    if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit claimHit, 20f, filter))
+                        targetPos = new Vector3(targetPos.x, claimHit.position.y, targetPos.z);
+                }
+                else
+                {
+                    targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
+                    if (BuildingSiteRegistry.IsMineBuilding(Building)
+                        && DiscoverySystem.TrySnapToMineDeposit(Building, context.Hit.point, out Vector3 mineSnap, out _))
+                    {
+                        targetPos = new Vector3(mineSnap.x, targetPos.y, mineSnap.z);
+                    }
                 }
             }
 
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
             if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
             {
                 if (HandIndex >= 0)
@@ -123,7 +148,6 @@ namespace GameDevTV.RTS.Commands
             }
 
             // Check if this is the player's very first Command Post
-            bool isCommandPost = Building != null && (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
             bool isFirstCommandPost = false;
             if (isCommandPost)
             {
@@ -216,6 +240,8 @@ namespace GameDevTV.RTS.Commands
                         // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
                         cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
                         BlueprintDraftManager.LockBuilding(Building.Name);
+                        if (isCommandPost)
+                            PlayerInput.FocusCameraOnWorldPosition(targetPos);
                         if (CardDeckController.Instance != null)
                         {
                             CardDeckController.Instance.ConsumeCardAfterBuild(HandIndex);
@@ -541,57 +567,31 @@ namespace GameDevTV.RTS.Commands
             // Exception: allow building when no Command Post exists yet (player starts with nothing)
             if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
-                // Allow the first player-placed Command Post anytime if none exist in the world yet.
-                // This prevents softlocking on campaigns/start where the starting base is not yet active.
-                bool hasExistingCommandPost = false;
-                if (BaseBuilding.ActiveBuildings != null)
+                // Materials + remaining free sector only (Acts do not gate Command Posts).
+                bool hasFreeSector = GameDevTV.RTS.Utilities.SectorColonization.GetNextFreeSectorIndex() >= 0;
+                if (!hasFreeSector)
                 {
-                    foreach (var b in BaseBuilding.ActiveBuildings)
+                    // First CP of the run: still allow when no sectors list yet / none claimed.
+                    bool hasExistingCommandPost = false;
+                    if (BaseBuilding.ActiveBuildings != null)
                     {
-                        if (b != null && b.Owner == context.Owner && b.BuildingSO != null
-                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
-                            && !b.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase))
+                        foreach (var b in BaseBuilding.ActiveBuildings)
                         {
-                            // Filter for player-placed runtime buildings (whose GameObject names contain "(Clone)")
-                            if (b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            if (b != null && b.Owner == context.Owner && b.BuildingSO != null
+                                && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
+                                && !b.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase)
+                                && b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                             {
                                 hasExistingCommandPost = true;
                                 break;
                             }
                         }
                     }
-                }
-                
-                if (!hasExistingCommandPost)
-                {
-                    // If no player Command Post exists, they can always place it (it is unlocked)
-                    return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
+                    if (hasExistingCommandPost) return true;
                 }
 
-                // If they already have a player Command Post, allow another when an
-                // unlocked sector still needs claiming (exploration opened it). Expansion
-                // phase also allows this. Do not lock mid-run after Orbital Scan / Survey.
-                if (GenerationManager.Instance != null && !GenerationManager.Instance.IsExpansionPhase
-                    && !GameDevTV.RTS.Utilities.SectorColonization.HasUnclaimedUnlockedSector())
-                {
-                    return true;
-                }
-
-                // During expansion / colonization, check if there's an unoccupied sector.
-                var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
-                if (sectorMgr != null && sectorMgr.Sectors.Count > 0)
-                {
-                    bool hasUnoccupiedSector = false;
-                    foreach (var sector in sectorMgr.Sectors)
-                    {
-                        if (!sector.IsOccupied && !sector.IsLocked)
-                        {
-                            hasUnoccupiedSector = true;
-                            break;
-                        }
-                    }
-                    if (!hasUnoccupiedSector) return true; // Lock if no unoccupied sectors available
-                }
+                return !HasEnoughSupplies(context)
+                    || (HandIndex < 0 && Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
             }
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }

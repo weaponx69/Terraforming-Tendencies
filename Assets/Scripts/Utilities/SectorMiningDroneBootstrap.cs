@@ -42,20 +42,21 @@ namespace GameDevTV.RTS.Utilities
             return true;
         }
 
-        /// <summary>After between-Act Continue — spawn if a Command Post already exists in the focus sector.</summary>
+        /// <summary>After between-Act Continue — spawn if a Command Post already exists without a free drone.</summary>
         public static bool TryGrantForFocusSector()
         {
             var sm = SectorManager.Instance;
-            var acts = ColonyActManager.Instance;
-            if (sm == null || acts == null || !acts.IsRunActive) return false;
+            if (sm?.Sectors == null) return false;
 
-            int sectorIndex = acts.FocusSectorIndex;
-            if (grantedSectors.Contains(sectorIndex)) return false;
+            for (int i = 0; i < sm.Sectors.Count; i++)
+            {
+                if (grantedSectors.Contains(i)) continue;
+                BaseBuilding cp = FindCommandPostInSector(i);
+                if (cp == null) continue;
+                if (TryGrantForCommandPost(cp)) return true;
+            }
 
-            BaseBuilding cp = FindCommandPostInSector(sectorIndex);
-            if (cp == null) return false;
-
-            return TryGrantForCommandPost(cp);
+            return false;
         }
 
         private static int ResolveSectorIndex(Vector3 worldPos)

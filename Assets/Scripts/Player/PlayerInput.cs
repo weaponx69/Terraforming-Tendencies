@@ -73,7 +73,7 @@ namespace GameDevTV.RTS.Player
 
         private bool hasMouseMoved;
         private Vector2 lastMousePosition;
-        private int currentBaseIndex = -1;
+        private int currentSectorIndex = -1;
         private GlobalCommander globalCommander;
         private GameDevTV.RTS.Environment.HexGridManager.HexTile currentHex;
         private GameDevTV.RTS.Environment.HexGridManager.HexTile hoveredHex;
@@ -555,7 +555,7 @@ namespace GameDevTV.RTS.Player
                     BuildingSiteSelectionController.CycleFocus(-1);
                     return;
                 }
-                PageBases(-1);
+                PageSectors(-1);
             }
             else if (Keyboard.current.eKey.wasPressedThisFrame)
             {
@@ -564,7 +564,7 @@ namespace GameDevTV.RTS.Player
                     BuildingSiteSelectionController.CycleFocus(1);
                     return;
                 }
-                PageBases(1);
+                PageSectors(1);
             }
         }
 
@@ -606,37 +606,40 @@ namespace GameDevTV.RTS.Player
             }
         }
 
-        private void PageBases(int direction)
-        {   // use set builder notation to get all player-owned buildings and foundries in the game, 
-            // including ones that are not active. 
-            var commandPosts = BaseBuilding.ActiveBuildings
-                .Where(b => b != null && b.Owner == Owner.Player1 &&
-                       (b.name.Contains("Command") || b.name.Contains("Foundry") ||
-                       (b.BuildingSO != null && (b.BuildingSO.Name.Contains("Command") || b.BuildingSO.Name.Contains("Foundry")))) &&
-                       b.Progress.State == BuildingProgress.BuildingState.Completed)
-                .Cast<AbstractCommandable>()
-                .OrderBy(b => b.transform.position.x)
-                .ThenBy(b => b.transform.position.z)
-                .ToList();
+        /// <summary>
+        /// Q/E page the planet sector list. Focuses that sector's Command Post if present,
+        /// otherwise the sector center. Unclaimed sectors stay in the cycle.
+        /// </summary>
+        public void PageSectors(int direction)
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null || sm.Sectors.Count == 0) return;
 
-            if (commandPosts.Count == 0) return;
-
-            currentBaseIndex += direction;
-            if (currentBaseIndex < 0) currentBaseIndex = commandPosts.Count - 1;
-            if (currentBaseIndex >= commandPosts.Count) currentBaseIndex = 0;
-
-            AbstractCommandable target = commandPosts[currentBaseIndex];
-            if (target != null && cameraTarget != null)
+            int count = sm.Sectors.Count;
+            if (currentSectorIndex < 0)
             {
-                Vector3 pos = target.transform.position;
-                pos.y = cameraTarget.position.y; // Keep current camera height
-                cameraTarget.position = pos;
+                // Start from sector nearest the camera.
+                var nearest = sm.GetNearestSector(GetCameraFocusPosition());
+                currentSectorIndex = nearest != null ? sm.Sectors.IndexOf(nearest) : 0;
+            }
 
-                // Automatically select the base when paged to.
+            currentSectorIndex = (currentSectorIndex + direction) % count;
+            if (currentSectorIndex < 0) currentSectorIndex += count;
+
+            SectorColonization.FocusCameraOnSector(currentSectorIndex);
+
+            // Select CP when present (same feel as old base paging).
+            var sector = sm.Sectors[currentSectorIndex];
+            if (sector?.OccupyingBuilding != null
+                && sector.OccupyingBuilding is AbstractCommandable commandable
+                && sector.OccupyingBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
+            {
                 DeselectAllUnits();
-                target.Select();
+                commandable.Select();
             }
         }
+
+        private void PageBases(int direction) => PageSectors(direction);
 
         private void HandleSiteSelectionCancel()
         {
