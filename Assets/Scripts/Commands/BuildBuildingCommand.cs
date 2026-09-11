@@ -78,10 +78,11 @@ namespace GameDevTV.RTS.Commands
                     targetPos = navHit.position;
             }
 
-            // Card plays: power + Materials (store) + mine discovery.
+            // Card plays: Materials waived under Colony Acts; power is optional (not a place gate).
             if (HandIndex >= 0)
             {
-                if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+                if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
                 if (!HasEnoughMaterialsForCard(context.Owner))
                     return false;
@@ -177,7 +178,8 @@ namespace GameDevTV.RTS.Commands
 
                 if (HandIndex >= 0)
                 {
-                    if (!PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                    bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+                    if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Not enough spare power to place this card.";
@@ -491,7 +493,8 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null) return "No building on this card.";
 
-            if (!PowerGridManager.CanPlayBuildingForPower(Building, owner))
+            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
                 float used = PowerGridManager.GetBoardPowerUpkeep(owner);

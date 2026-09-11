@@ -1069,15 +1069,21 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
-            // Climate buildings on reserved pads often finish before the spawn-event power
-            // wire runs (or after a grid recalc). Retry cluster solar link if unpowered.
-            if (!IsOperating)
+            // Climate always ticks under Colony Acts (power is optional score, not a gate).
+            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            if (!colonyActs)
             {
-                if (config.PowerUpkeep > 0f)
+                if (!IsOperating)
                 {
-                    TryRepairClusterPowerLink();
+                    if (config.PowerUpkeep > 0f)
+                        TryRepairClusterPowerLink();
+                    if (!IsOperating) return;
                 }
-                if (!IsOperating) return;
+            }
+            else if (!IsOperating && config.PowerUpkeep > 0f)
+            {
+                // Still try to link for optional score / indicators, but do not block climate.
+                TryRepairClusterPowerLink();
             }
 
             Owner climateOwner = Owner != Owner.Invalid ? Owner : Owner.Player1;

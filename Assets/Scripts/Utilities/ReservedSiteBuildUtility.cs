@@ -613,9 +613,9 @@ namespace GameDevTV.RTS.Utilities
             }
 
             // Asset costs were tuned for the old RTS economy (100–400). Colony Acts
-            // uses a lean starting stock, so scale prices into a store-friendly range.
+            // is placement-first — no Materials gate (Terra-Coins are shop-only).
             if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
-                configured = Mathf.Max(25, Mathf.RoundToInt(configured * 0.35f));
+                return 0;
 
             return configured;
         }

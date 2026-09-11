@@ -25,6 +25,8 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
+                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                    return 0;
                 if (waiveMaterialsCost) return 0;
                 if (MaterialsCost > 0) return MaterialsCost;
                 var unit = unitPrefab != null ? unitPrefab.GetComponent<AbstractUnit>() : null;
@@ -35,7 +37,7 @@ namespace GameDevTV.RTS.Player
                         + unit.UnitSO.Cost.Gas * Supplies.GasToMaterialsRateStatic);
                     if (fromUnit > 0) return fromUnit;
                 }
-                return 100;
+                return 25;
             }
 
             public override void Apply()

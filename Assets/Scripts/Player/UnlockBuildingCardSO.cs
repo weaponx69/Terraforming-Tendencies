@@ -13,6 +13,12 @@ namespace GameDevTV.RTS.Player
             public override bool CanApply()
             {
                 if (buildingToUnlock == null) return false;
+                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                {
+                    if (!DiscoverySystem.IsBuildingGeologicallyAvailable(buildingToUnlock))
+                        return false;
+                    return true;
+                }
                 if (!CanAffordMaterials()) return false;
                 return ReservedSiteBuildUtility.CanBuildAtReservedSite(
                     buildingToUnlock, Owner.Player1, out _, requireUnlocked: false);
@@ -20,6 +26,8 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
+                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                    return 0;
                 int fromBuilding = ReservedSiteBuildUtility.GetMaterialsCost(buildingToUnlock);
                 int fromCard = MaterialsCost;
                 int priced = Mathf.Max(fromBuilding, fromCard);

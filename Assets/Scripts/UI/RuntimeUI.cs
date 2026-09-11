@@ -69,6 +69,8 @@ namespace GameDevTV.RTS.UI
             Supplies.OnTemperatureChanged += HandleTemperatureChanged;
             Supplies.OnAtmosphereChanged += HandleAtmosphereChanged;
             Supplies.OnWaterChanged += HandleWaterChanged;
+            ColonyActManager.OnTerraCoinsChanged += HandleTerraCoinsChanged;
+            ColonyActManager.OnActStateChanged += HandleActStateForCoins;
 
             InitializeUI();
         }
@@ -97,6 +99,8 @@ namespace GameDevTV.RTS.UI
             Supplies.OnTemperatureChanged -= HandleTemperatureChanged;
             Supplies.OnAtmosphereChanged -= HandleAtmosphereChanged;
             Supplies.OnWaterChanged -= HandleWaterChanged;
+            ColonyActManager.OnTerraCoinsChanged -= HandleTerraCoinsChanged;
+            ColonyActManager.OnActStateChanged -= HandleActStateForCoins;
 
             // Reset UI values when the component is disabled (e.g., game end)
             ResetUI();
@@ -800,14 +804,20 @@ namespace GameDevTV.RTS.UI
             if (materialsLabelText != null)
             {
                 materialsLabelText.gameObject.SetActive(true);
-                materialsLabelText.SetText("Materials");
+                bool acts = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+                materialsLabelText.SetText(acts ? "Terra-Coins" : "Materials");
             }
             if (materialsValueText != null)
             {
                 materialsValueText.gameObject.SetActive(true);
-                int mats = Supplies.Materials != null
-                    && Supplies.Materials.TryGetValue(displayedOwner, out int m) ? m : Supplies.StartingMaterials;
-                materialsValueText.SetText(mats.ToString());
+                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                    materialsValueText.SetText(ColonyActManager.Instance.TerraCoins.ToString());
+                else
+                {
+                    int mats = Supplies.Materials != null
+                        && Supplies.Materials.TryGetValue(displayedOwner, out int m) ? m : Supplies.StartingMaterials;
+                    materialsValueText.SetText(mats.ToString());
+                }
             }
 
             Transform container = FindMetricContainer(materialsValueText, "Minerals Container", "Materials Container")
@@ -1292,17 +1302,18 @@ namespace GameDevTV.RTS.UI
 
         private void HandleMaterialsChanged(Owner owner, int newValue)
         {
-            if (owner != displayedOwner) 
-            {
-                return;
-            }
+            if (owner != displayedOwner) return;
+            EnsureMaterialsMetricVisible();
+        }
 
-            if (materialsValueText == null) 
-            {
-                return;
-            }
+        private void HandleTerraCoinsChanged(int _)
+        {
+            EnsureMaterialsMetricVisible();
+        }
 
-            materialsValueText.SetText(newValue.ToString());
+        private void HandleActStateForCoins()
+        {
+            EnsureMaterialsMetricVisible();
         }
 
         private void HandleBiomassChanged(Owner owner, float newValue)

@@ -40,6 +40,8 @@ namespace GameDevTV.RTS.Player
         private const int ClimatePairBonus = 4;
         private const int LifeSynergyBonus = 4;
         private const int AdjacencySoftCap = 20;
+        private const int PowerGeneratorScoreBonus = 4;
+        private const int GeologyMatchBonus = 8;
 
         private int actIndex; // 0-based
         private int colonyScore;
@@ -47,6 +49,12 @@ namespace GameDevTV.RTS.Player
         private float habitability;
         private bool runEnded;
         private bool started;
+        private int terraCoins;
+        private float scoreMultiplier = 1f;
+        private int adjacencyBonusExtra;
+        private int geologyBonusExtra;
+        private int pendingWeekBonus;
+        private int powerScoreBonusExtra;
 
         private float baselineTemperature = -60f;
         private float baselineAtmosphere = 0.01f;
@@ -55,12 +63,15 @@ namespace GameDevTV.RTS.Player
         private string statusBanner = string.Empty;
         private float statusBannerUntil;
 
+        public static event Action<int> OnTerraCoinsChanged;
+
         public int CurrentAct => actIndex + 1;
         public int TotalActs => Mathf.Max(1, acts.Count);
         public string CurrentActName => CurrentActDef.Name;
         public int ColonyScore => colonyScore;
         public int TargetScore => CurrentActDef.TargetScore;
         public int WeeksRemaining => weeksRemaining;
+        public int TerraCoins => terraCoins;
         /// <summary>Deprecated Act↔sector coupling — camera/sector focus is player-driven (Q/E).</summary>
         public int FocusSectorIndex => 0;
         public float Habitability => habitability;
@@ -146,16 +157,22 @@ namespace GameDevTV.RTS.Player
             habitability = 0f;
             runEnded = false;
             IsBetweenActs = false;
+            terraCoins = 0;
+            scoreMultiplier = 1f;
+            adjacencyBonusExtra = 0;
+            geologyBonusExtra = 0;
+            pendingWeekBonus = 0;
+            powerScoreBonusExtra = 0;
             weeksRemaining = CurrentActDef.WeekBudget;
             started = true;
             RecordClimateBaselines();
-            // Reveal geology planet-wide — Acts no longer unlock sectors.
             RevealAllSectorFeatures();
             CardDeckController.Instance?.NotifyActClimateComboReset();
             GameDevTV.RTS.Utilities.SectorMiningDroneBootstrap.ResetForNewRun();
             CardDeckController.Instance?.RefreshHand();
             Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining} (Acts ≠ sectors)");
             OnActStateChanged?.Invoke();
+            OnTerraCoinsChanged?.Invoke(terraCoins);
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
         }
 
@@ -350,24 +367,103 @@ namespace GameDevTV.RTS.Player
             GetTileValues(building, out int score, out float hab, out string tag);
             int adjBonus = 0;
             int neighbors = 0;
+            int geoBonus = 0;
+            int powerBonus = 0;
             if (placed != null)
             {
                 adjBonus = CalculateAdjacencyBonus(placed, tag, out neighbors);
+                adjBonus += adjacencyBonusExtra * Mathf.Max(0, neighbors);
                 TryOfferClimateComboCards(placed, tag);
+                geoBonus = TryApplyGeologyPlacementRewards(placed, building, tag);
+                if (tag == "Power")
+                    powerBonus = PowerGeneratorScoreBonus + powerScoreBonusExtra;
             }
 
-            int total = score + adjBonus;
+            int raw = score + adjBonus + geoBonus + powerBonus;
+            int total = Mathf.Max(0, Mathf.RoundToInt(raw * scoreMultiplier));
             if (total <= 0 && hab <= 0f) return;
 
             colonyScore += total;
             habitability += hab;
-            if (adjBonus > 0)
-                Debug.Log($"[ColonyActManager] +{score} base +{adjBonus} adj ({neighbors} neighbors, {tag}) → {colonyScore}/{TargetScore}; hab={habitability:F0}");
-            else
-                Debug.Log($"[ColonyActManager] +{score} score ({tag}) → {colonyScore}/{TargetScore}; hab={habitability:F0}");
+            if (placed != null)
+                GameDevTV.RTS.UI.PlacementScorePopup.Spawn(placed.transform.position, total);
+
+            Debug.Log($"[ColonyActManager] +{total} score (base {score} adj {adjBonus} geo {geoBonus} power {powerBonus} ×{scoreMultiplier:F2}) → {colonyScore}/{TargetScore}");
             OnActStateChanged?.Invoke();
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
             TryResolveWeekExhaustion();
+        }
+
+        /// <summary>
+        /// Mine / aquifer / geothermal on matching deposits: extra score + terraforming supplies.
+        /// </summary>
+        private int TryApplyGeologyPlacementRewards(BaseBuilding placed, BuildingSO building, string tag)
+        {
+            if (placed == null || building == null) return 0;
+            Vector3 pos = placed.transform.position;
+            int bonus = 0;
+
+            if (BuildingSiteRegistry.IsMineBuilding(building)
+                && DiscoverySystem.IsOnDiscoveredMineDeposit(building, pos))
+            {
+                bonus += GeologyMatchBonus + geologyBonusExtra;
+                if (DiscoverySystem.TryGetMineResourceType(building, out string resourceType))
+                    GrantGeologyResourcePulse(resourceType);
+            }
+
+            string name = building.Name ?? string.Empty;
+            bool isAquifer = name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || tag == "Water";
+            bool isGeo = name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+            var nearest = SectorManager.Instance?.GetNearestSector(pos);
+            if (nearest != null && nearest.Feature != SectorManager.SectorFeature.None)
+            {
+                if (isAquifer && nearest.Feature == SectorManager.SectorFeature.WaterDeposit)
+                {
+                    bonus += GeologyMatchBonus + geologyBonusExtra;
+                    GrantGeologyResourcePulse("Water");
+                }
+                else if (isGeo && (nearest.Feature == SectorManager.SectorFeature.Volcano
+                    || nearest.Feature == SectorManager.SectorFeature.LavaTube
+                    || nearest.Feature == SectorManager.SectorFeature.FaultLine))
+                {
+                    bonus += GeologyMatchBonus + geologyBonusExtra;
+                    GrantGeologyResourcePulse("Heat");
+                }
+            }
+
+            return bonus;
+        }
+
+        private static void GrantGeologyResourcePulse(string resourceType)
+        {
+            if (string.IsNullOrEmpty(resourceType)) return;
+            if (resourceType.IndexOf("Mineral", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || resourceType.IndexOf("Iron", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || resourceType.IndexOf("Regolith", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Minerals/gas are flavor HUD; push climate-relevant meters for terraforming.
+                float t = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tv) ? tv : -60f;
+                Supplies.UpdateTemperature(Owner.Player1, t + 1.5f);
+            }
+            else if (resourceType.IndexOf("Gas", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                float a = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float av) ? av : 0.01f;
+                Supplies.UpdateAtmosphere(Owner.Player1, a + 0.03f);
+            }
+            else if (resourceType.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                float w = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wv) ? wv : 0f;
+                Supplies.UpdateWater(Owner.Player1, w + 1.5f);
+            }
+            else if (resourceType.IndexOf("Heat", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                float t = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tv) ? tv : -60f;
+                Supplies.UpdateTemperature(Owner.Player1, t + 2f);
+            }
         }
 
         /// <summary>
@@ -549,7 +645,8 @@ namespace GameDevTV.RTS.Player
             IsBetweenActs = true;
 
             int cleared = CurrentAct;
-            Debug.Log($"[ColonyActManager] Act {cleared} ({CurrentActName}) cleared!");
+            int earned = AwardTerraCoinsForClearedAct();
+            Debug.Log($"[ColonyActManager] Act {cleared} ({CurrentActName}) cleared! +{earned} Terra-Coins (bank {terraCoins}).");
             OnActCleared?.Invoke(cleared);
 
             if (actIndex >= acts.Count - 1)
@@ -567,14 +664,68 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // Permanent between-Act shop — pause here until Continue.
-            statusBanner = $"<color=#7CFF9A><b>ACT CLEARED!</b></color>  Visit the Supply Depot before {acts[actIndex + 1].Name}.";
+            statusBanner = $"<color=#7CFF9A><b>ACT CLEARED!</b></color>  +{earned} Terra-Coins — upgrade at the Depot before {acts[actIndex + 1].Name}.";
             statusBannerUntil = Time.unscaledTime + 8f;
             OnActStateChanged?.Invoke();
             OnBetweenActShopRequested?.Invoke();
-            // Fallback if the shop listener missed the event (scene load race).
             if (!GameDevTV.RTS.UI.BetweenActShopUI.IsOpen)
                 GameDevTV.RTS.UI.BetweenActShopUI.Instance?.Open();
+        }
+
+        /// <summary>15 + floor(score/10) + floor(excess/5); coins carry across Acts.</summary>
+        private int AwardTerraCoinsForClearedAct()
+        {
+            int excess = Mathf.Max(0, colonyScore - TargetScore);
+            int earned = 15 + (colonyScore / 10) + (excess / 5);
+            terraCoins += Mathf.Max(0, earned);
+            OnTerraCoinsChanged?.Invoke(terraCoins);
+            return earned;
+        }
+
+        public bool TrySpendTerraCoins(int cost)
+        {
+            if (cost <= 0) return true;
+            if (terraCoins < cost) return false;
+            terraCoins -= cost;
+            OnTerraCoinsChanged?.Invoke(terraCoins);
+            OnActStateChanged?.Invoke();
+            return true;
+        }
+
+        public void PurchaseUpgrade(ShopUpgradeId id)
+        {
+            switch (id)
+            {
+                case ShopUpgradeId.ExtraWeeks:
+                    pendingWeekBonus += 2;
+                    break;
+                case ShopUpgradeId.ScorePercent:
+                    scoreMultiplier += 0.10f;
+                    break;
+                case ShopUpgradeId.GeologyBonus:
+                    geologyBonusExtra += 5;
+                    break;
+                case ShopUpgradeId.AdjacencyBump:
+                    adjacencyBonusExtra += 1;
+                    break;
+                case ShopUpgradeId.PowerScoreBoost:
+                    powerScoreBonusExtra += 3;
+                    break;
+                case ShopUpgradeId.SeatClimateCard:
+                    CardDeckController.Instance?.QueueClimateComboOffer("WATER");
+                    break;
+            }
+            OnActStateChanged?.Invoke();
+        }
+
+        public enum ShopUpgradeId
+        {
+            ExtraWeeks,
+            ScorePercent,
+            GeologyBonus,
+            AdjacencyBump,
+            PowerScoreBoost,
+            SeatClimateCard
         }
 
         /// <summary>
@@ -588,19 +739,19 @@ namespace GameDevTV.RTS.Player
 
             CardDeckController.Instance?.GrantSectorTransitionBootstrap();
 
-            // Carry a fraction of excess into the next act's starting score.
             int excess = Mathf.Max(0, colonyScore - TargetScore);
             int carried = Mathf.RoundToInt(colonyScore * ScoreCarryFraction) + excess;
             actIndex++;
             colonyScore = carried;
-            weeksRemaining = CurrentActDef.WeekBudget;
+            weeksRemaining = CurrentActDef.WeekBudget + pendingWeekBonus;
+            pendingWeekBonus = 0;
             RecordClimateBaselines();
             IsBetweenActs = false;
             CardDeckController.Instance?.NotifyActClimateComboReset();
-            statusBanner = $"<color=#7CFF9A><b>NEXT ACT</b></color>  {CurrentActName} — keep building score and climate.";
+            statusBanner = $"<color=#7CFF9A><b>NEXT ACT</b></color>  {CurrentActName} — score + climate. Terra-Coins banked: {terraCoins}.";
             statusBannerUntil = Time.unscaledTime + 6f;
 
-            Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start score {colonyScore}/{TargetScore}, weeks {weeksRemaining}");
+            Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start score {colonyScore}/{TargetScore}, weeks {weeksRemaining}, coins {terraCoins}");
             OnActStateChanged?.Invoke();
 
             if (IsActComplete)
@@ -749,6 +900,7 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color={verdictColor}><b>{verdict}</b></color>");
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
             sb.AppendLine($"<color=#A8B0B8>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
+            sb.AppendLine($"<color=#A8B0B8>No Materials gate. Power boosts score; climate always ticks.</color>");
             sb.AppendLine($"<color=#A8B0B8>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}).</color>");
             sb.AppendLine("<color=#A8B0B8>LOSE: weeks hit 0 first.</color>");
             sb.AppendLine();
@@ -757,6 +909,7 @@ namespace GameDevTV.RTS.Player
             string scoreColor = IsScoreMet ? "#7CFF9A" : "#FFE08A";
             sb.AppendLine($"<color={scoreColor}>{scoreMark} SCORE  {colonyScore} / {TargetScore}</color>");
             sb.AppendLine($"  <color=#A8B0B8>{ProgressBar(colonyScore, TargetScore)}</color>");
+            sb.AppendLine($"<color=#FFE08A>TERRA-COINS  {terraCoins}</color>  <color=#A8B0B8>(shop on Act clear; carries)</color>");
 
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
             string climateMark = IsClimateMet ? "✓" : "○";

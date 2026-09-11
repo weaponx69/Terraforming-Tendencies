@@ -12,9 +12,9 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 ## 0. Authoritative Run Model — Combolands Colony Acts
 
-**One-sentence game:** Draw building **tiles** → place on the ground → spend **weeks** → earn **Colony Score** (base + adjacency) **and** push planet **Temp / Atmos / Water** → clear a fixed Act ladder → expand by playing **Command Posts** into new sectors → terraform **every** sector to win.
+**One-sentence game:** Draw building **tiles** → place on procedural geology for **Colony Score** (map `+N` popups) and **terraforming resources** → spend **weeks** → clear a fixed Act ladder → spend **Terra-Coins** on between-Act upgrades → expand with **Command Posts** → terraform **every** sector to win.
 
-**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) — place tiles for score under a turn budget; position and stacking matter. **Acts are independent of sectors.** Geography expands when you afford Command Posts.
+**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) — place tiles for score under a turn budget; position and stacking matter. **Acts are independent of sectors.** Geography expands when you place Command Posts.
 
 ### Owner scripts
 | Role | Script |
@@ -23,10 +23,8 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Tile grid / join snap | [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) |
 | Hand draw / consume card | [`CardDeckController`](Assets/Scripts/Player/CardDeckController.cs) |
 | Free ground place (cards) | [`BuildBuildingCommand`](Assets/Scripts/Commands/BuildBuildingCommand.cs) + [`BottomBarActionsUI`](Assets/Scripts/UI/Containers/BottomBarActionsUI.cs) |
-| Power place-gate | [`PowerGridManager`](Assets/Scripts/Environment/PowerGridManager.cs) (`CanPlayBuildingForPower`) |
-| Look / flora (no FoW) | [`ClimateVisualStages`](Assets/Scripts/Environment/ClimateVisualStages.cs), [`VegetationManager`](Assets/Scripts/Environment/VegetationManager.cs) |
-| Objectives HUD | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) |
-| Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) (permanent; Materials offers) |
+| Power place-gate | **Retired** under Colony Acts — power is optional score; climate always ticks |
+| Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — **Terra-Coin upgrades** (carry) |
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
 | Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
 | Tile snap / place SFX | [`AudioManager`](Assets/Scripts/Audio/AudioManager.cs) (`PlayTileSnapSound` / `PlayPlaceClickSound`) |
@@ -43,7 +41,9 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Sector unlock / colonization as Act progression | **Retired** — Acts ≠ sectors; CP expands map |
 | Act count = sector count | **Retired** — fixed 5-Act ladder |
 | Sector build lock / active-sector-only pads | **Retired** |
-| Card play gated by Materials | **Active again** for Colony Acts card places (store economy); lean starting Materials |
+| Card play gated by Materials | **Retired** under Colony Acts — placement is free; **Terra-Coins** are shop-only |
+| Power required to place / tick climate | **Retired** under Colony Acts — power tiles give **score boost**; climate always ticks |
+| Materials between-Act tile shop | **Retired** — shop is Terra-Coin **roguelike upgrades** |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
 | Auto-discard “unplayable” hand cards | **Retired** |
 | Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar always seated; Continue grants Solar only; climate seats when unmet; free Mining Drone is an **in-world unit** per CP sector |
@@ -70,47 +70,41 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Planet-wide gains — climate buildings in **any** sector tick.
-* **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector). Final Act also requires full-sector terraform.
-* **Command Posts** (when Materials allow) **auto-claim the next free sector** (repeatable). Acts do not unlock sectors.
-* **Q / E** page sectors (CP if present, else center). On-screen sector name labels are clickable.
-* **No FoW / shroud** — full map visible; climate mood fog only.
-* **Card week costs vary** (not everything is 1): scout/discover **0**; power / climate / housing / life **1**; mines / Command / Spaceport **2**. Spend via `SpendWeeks`.
-* **Power cards:** Solar Panel, Geothermal, Magnetic Shield — hand always keeps at least one generator; draw pile has extra Solar + Geothermal copies.
-* **Climate cards:** if a climate channel is still unmet for this Act, hand keeps at least one matching card. Draw pile extras: +5 Aquifer / +3 Subglacial / +3 Heat / +3 Air.
-* **Hand size 24** (scrollable; ~**2.5 cards per mouse-wheel notch**); deck excludes combat clutter (**Barracks**, Infantry School), **shipment** cards, and **Emergency Caches**.
-* **Mine / geology tiles** enter the hand after matching deposit or sector feature is discovered.
-* On Act clear: **between-Act Supply Depot shop** (Materials → tile offers / reroll) is **mandatory**. Continue grants **Solar** (not Command Post); ~**25%** score (+ excess) carries.
-* **One free working Mining Drone unit** spawns at each sector's Command Post (in-world).
-* **Oxygen** is flavor / life support — **not** an Act-clear meter.
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Planet-wide gains — climate buildings **always tick** (power optional).
+* **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
+* **Command Posts** (no Materials cost) **auto-claim the next free sector** (repeatable; card re-seats while sectors remain).
+* **Terra-Coins** earn on Act clear: `15 + floor(score/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
+* **Placement score** shows as world `+N` popups. Geology matches (mine on deposit, aquifer on WaterDeposit, geo on volcano/lava/fault) add bonus score + climate resource pulses.
+* **Q / E** page sectors; on-screen sector names; **no FoW**.
+* **Card week costs vary** (0–2). Spend via `SpendWeeks`.
+* **Power tiles** are optional score (base + upgrade boosts), not a place gate.
+* On Act clear: **upgrade depot** (Terra-Coins) is mandatory; Continue grants **Solar**; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without Act requirements → **Act fail / run loss**.
 
 ### Permanent UX (do not regress)
 | Feature | Rule |
 |---------|------|
-| Between-Act shop | Always pause on Act clear (non-final); [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) |
+| Between-Act shop | Terra-Coin upgrades; [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) |
 | Act Continue bootstrap | Solar only via `GrantSectorTransitionBootstrap` |
-| Free sector Mining Drone | **In-world unit** at Command Post via [`SectorMiningDroneBootstrap`](Assets/Scripts/Utilities/SectorMiningDroneBootstrap.cs) |
-| Sector travel | **Q/E** + [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) names |
+| Free sector Mining Drone | In-world at Command Post via [`SectorMiningDroneBootstrap`](Assets/Scripts/Utilities/SectorMiningDroneBootstrap.cs) |
+| Sector travel | **Q/E** + [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) |
 | No FoW | Hex shroud fully revealed on planet gen |
-| Hand scroll | Wheel/trackpad scrolls the strip; **offset is preserved** across hand refreshes/layout (do not reset to 0 on `OnHandChanged`). Re-apply after layout. ~2.5 cards/wheel-notch (`BottomBarActionsUI.scrollCardsPerNotch`); trackpad uses gentler scaling |
-| Top resource strip | Fixed-width metric boxes; **Materials** forced visible/left (`EnsureMaterialsMetricVisible`) |
+| Hand scroll | Offset preserved; ~2.5 cards/wheel-notch |
+| Top strip | Shows **Terra-Coins** during Colony Acts (`EnsureMaterialsMetricVisible`) |
+| Map score FX | [`PlacementScorePopup`](Assets/Scripts/UI/PlacementScorePopup.cs) |
 | Emergency Caches | Excluded from Colony Acts deck |
 
 ---
 
 ## 0.3 Loop (how a play works)
 
-1. **Hand (up to 24 cards, scrollable)** — at least one **power generator** is always seated. Playing uses a card up; draw fills remaining slots.
-2. **Week** — card plays spend a **variable** week cost (`GetWeekCost` / `SpendWeeks`).
-3. **Placement gates** — Power, Materials, mines as before. **Command Post** cards auto-seat in the next free sector when affordable (repeatable).
-4. **Free tile placement** — non-CP cards snap to the 12 m grid; complete instantly.
-5. **Score** — on complete: **Base Score + adjacency** (+ Habitability for climate tags).
-6. **Climate** — powered Heat/Air/Water buildings **anywhere** tick Temp / Atmos / Water toward Act gains. Sector terraform (for win) still needs the climate trio **in each sector**.
-7. Clear Act when **score AND climate gains** met (Thrive also needs all sectors terraformed) → shop → next Act (or win).
-8. **Q/E** jump between sectors; click sector name labels to focus.
+1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
+2. **Geology** — mines/aquifers/geo on matching spots → score + terraforming pulses + map `+N`.
+3. **Score / climate** — adjacency + optional power bonuses; climate tiles tick without power.
+4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
+5. **Q/E** between sectors; Command Posts expand the map.
 
-**Power note (vs Combolands):** consumers need watts; place them on the same auto-linked cluster as Solar/Geothermal.
+**Power note:** Generators are prestige/score, not a soft-lock. Climate does not need watts under Colony Acts.
 
 **Build source:** cards / tiles only. Selecting a building does **not** open an RTS build/train panel.
 
@@ -270,4 +264,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-08 — Acts require Colony Score + Temp/Atmos/Water deltas; Combolands placement rules unchanged.*
+*Last rewritten: 2026-09-11 — Placement-first Colony Acts: free place, Terra-Coin upgrade shop, climate always ticks, map +score FX, geology match bonuses.*
