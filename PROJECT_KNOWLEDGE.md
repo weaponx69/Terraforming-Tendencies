@@ -93,7 +93,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | Free sector Mining Drone | **In-world unit** at Command Post via [`SectorMiningDroneBootstrap`](Assets/Scripts/Utilities/SectorMiningDroneBootstrap.cs) |
 | Sector travel | **Q/E** + [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) names |
 | No FoW | Hex shroud fully revealed on planet gen |
-| Hand scroll | Notch-based, ~2.5 cards/tick (`BottomBarActionsUI.scrollCardsPerNotch`) |
+| Hand scroll | Wheel/trackpad scrolls the strip; **offset is preserved** across hand refreshes/layout (do not reset to 0 on `OnHandChanged`). Re-apply after layout. ~2.5 cards/wheel-notch (`BottomBarActionsUI.scrollCardsPerNotch`); trackpad uses gentler scaling |
 | Top resource strip | Fixed-width metric boxes; **Materials** forced visible/left (`EnsureMaterialsMetricVisible`) |
 | Emergency Caches | Excluded from Colony Acts deck |
 
@@ -207,7 +207,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 | Win / lose Acts | `ColonyActManager` |
 | Legacy `GenerationManager` | `MaxGenerations = 1` shell; victory via `NotifyColonyActVictory` — **not** climate progress |
 | `DoesBuildingCountForActiveClimate` | True only for buildings in the **current Act focus sector** |
-| Card UI | Lower-left hand (~5-card viewport + `RectMask2D`); hover lights the dock; wheel scrolls horizontally; cost chip shows **1 Week** |
+| Card UI | Lower-left hand (~5-card viewport + `RectMask2D`); hover lights the dock; wheel scrolls horizontally and **stays put** (no snap-back on hand seating); cost chip shows week cost |
 | Instant card place | Completes immediately; week spent on consume; score deferred until after week when needed |
 
 ---
