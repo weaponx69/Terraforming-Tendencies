@@ -44,7 +44,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Card play gated by Materials | **Active again** for Colony Acts card places (store economy); lean starting Materials |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
 | Auto-discard “unplayable” hand cards | **Retired** |
-| Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar always seated in-Act; **Solar + Command Post** force-granted on between-Act Continue; climate seats when unmet; Mining Drone force-seat stays retired |
+| Force-seat Solar / climate / Mining Drone into hand | **Partial** — Solar always seated in-Act; **Solar + Command Post** on between-Act Continue; climate seats when unmet; free Mining Drone is an **in-world unit** per sector |
 | Climate soft-gates blocking card draw/select | **Retired** |
 | Oxygen / Power / Pop as win primaries | **Retired** |
 | Fixed 4 Acts independent of map size | **Retired** — Act count = sector count |
@@ -73,7 +73,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Hand size 24** (scrollable; ~**2.5 cards per mouse-wheel notch**); deck excludes combat clutter (**Barracks**, Infantry School), **shipment** cards, and **Emergency Caches**. Spaceport and Deploy Engineer stay.
 * **Mine tiles** and **geology tiles** (Subglacial / Lava Tube / Magnetic Shield / …) only enter the hand after the matching deposit or sector feature is **discovered**. Water Ice Aquifer stays a normal climate tile. Mines auto-build on their deposit tile.
 * Card water that needs geology (Subglacial) unlocks when a **WaterDeposit** sector feature is revealed (Act focus / explore). Sector features are **randomized** each planet (start sector has none; other sectors get a shuffled mix of Volcano / FaultLine / LavaTube / WaterDeposit).
-* On clear: **between-sector Supply Depot shop** (Materials → tile offers / reroll) is **mandatory and permanent** before the next Act. Continue always grants **Solar Panel + Command Post** into hand (Solar Panel only — not Solar Greenhouse), then camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries.
+* On clear: **between-sector Supply Depot shop** (Materials → tile offers / reroll) is **mandatory and permanent** before the next Act. Continue always grants **Solar Panel + Command Post** into hand (Solar Panel only — not Solar Greenhouse), then camera pans to the next sector; climate baselines reset; ~**25%** score (+ excess) carries. **One free working Mining Drone unit** spawns at that sector's Command Post (in-world, not a hand card).
 * **Oxygen** is flavor / life support — **not** an Act-clear meter. One Oxygen Processor ≈ **~20 min** to 100% (hard-capped ≤0.08%/sec). Prior-sector processors stop when focus moves.
 * Weeks hit 0 without both requirements → **Act fail / run loss**.
 * Final sector Act clear → victory.
@@ -83,8 +83,9 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 |---------|------|
 | Between-Act shop | Always pause on Act clear (non-final); [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) |
 | Sector bootstrap cards | Continue → Solar Panel + Command Post via `GrantSectorTransitionBootstrap` |
+| Free sector Mining Drone | **In-world unit** at Command Post via [`SectorMiningDroneBootstrap`](Assets/Scripts/Utilities/SectorMiningDroneBootstrap.cs) — not a hand card |
 | Hand scroll | Notch-based, ~2.5 cards/tick (`BottomBarActionsUI.scrollCardsPerNotch`) |
-| Top resource strip | Fixed-width metric boxes (`RuntimeUI.EnsureFixedMetricBox`) — no digit jitter |
+| Top resource strip | Fixed-width metric boxes; **Materials** forced visible/left (`EnsureMaterialsMetricVisible`) |
 | Emergency Caches | Excluded from Colony Acts deck |
 
 ---
@@ -218,7 +219,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 * No climate force-seat; no purge for soft gates.
 
 ### 3.3 Colony integrity / UCC
-* Integrity inactive until first real `(Clone)` building; UCC invulnerable / excluded from integrity math — keep unless it blocks card plays.
+* **UCC deleted from the play scene** (was `GlobalCommander` / Universal Command Center). Do not re-place it. Colony status lives in **Active Objectives** / top HUD; bases are **Command Posts**. Integrity still inactive until first real `(Clone)` building.
 
 ### 3.4 Prefabs / ghosts
 * Prefer `BaseBuilding` variants; card ghost from command template when available.
@@ -230,6 +231,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 
 * Climate-trio / `TriggerMvpVictory` as win  
 * Sector lock or UnlockNextSector on Act clear  
+* Selectable Universal Command Center (UCC / `GlobalCommander`) hub with health UI  
 * Auto-discard hand for Materials / pads / climate gates  
 * Force-seat Water / drone reshuffling the hand (Solar + Command Post **are** granted on between-Act Continue)  
 * Materials or drone as card placement requirements  

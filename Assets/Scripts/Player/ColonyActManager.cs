@@ -149,6 +149,7 @@ namespace GameDevTV.RTS.Player
             RecordClimateBaselines();
             ApplyFocusSector(FocusSectorIndex, announce: false);
             CardDeckController.Instance?.NotifyActClimateComboReset();
+            GameDevTV.RTS.Utilities.SectorMiningDroneBootstrap.ResetForNewRun();
             // Seat unmet climate tiles (esp. blue Water) now that Act baselines exist.
             CardDeckController.Instance?.RefreshHand();
             Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining}, climate from sector {FocusSectorIndex}");
@@ -583,6 +584,7 @@ namespace GameDevTV.RTS.Player
             IsBetweenActs = false;
             ApplyFocusSector(FocusSectorIndex, announce: true);
             CardDeckController.Instance?.NotifyActClimateComboReset();
+            GameDevTV.RTS.Utilities.SectorMiningDroneBootstrap.TryGrantForFocusSector();
             statusBanner = $"<color=#7CFF9A><b>NEXT SECTOR</b></color>  {CurrentActName} — Solar + Command Post ready.";
             statusBannerUntil = Time.unscaledTime + 6f;
 

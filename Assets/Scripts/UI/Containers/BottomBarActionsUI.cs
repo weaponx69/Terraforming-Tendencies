@@ -61,7 +61,7 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingDeathEvent>.OnEvent[owner] += HandleRefresh;
             Bus<BuildingSpawnEvent>.OnEvent[owner] += HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] += HandleRefresh;
-            CardDeckController.OnHandChanged += RefreshBar;
+            CardDeckController.OnHandChanged += HandleHandChanged;
         }
 
         private void OnDisable()
@@ -74,7 +74,7 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingDeathEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<BuildingSpawnEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] -= HandleRefresh;
-            CardDeckController.OnHandChanged -= RefreshBar;
+            CardDeckController.OnHandChanged -= HandleHandChanged;
             if (instance == this) instance = null;
         }
 
@@ -403,6 +403,13 @@ namespace GameDevTV.RTS.UI.Containers
         private void HandleRefresh(BuildingSpawnEvent evt) { RefreshBar(); }
         private void HandleRefresh(UpgradeResearchedEvent evt) { RefreshBar(); }
 
+        private void HandleHandChanged()
+        {
+            // New draws / sector bootstrap put Mining Drone at the front — show it.
+            scrollOffset = 0f;
+            RefreshBar();
+        }
+
         public void RefreshBar()
         {
             if (!isBuilt || actionButtons == null) return;
@@ -553,15 +560,9 @@ namespace GameDevTV.RTS.UI.Containers
                 autoCmd.HandIndex = cardIndex;
                 autoCmd.GhostPrefab = FindGhostPrefabForBuilding(building);
 
-                GlobalCommander commander = Object.FindAnyObjectByType<GlobalCommander>(FindObjectsInactive.Exclude);
-                if (commander == null)
-                {
-                    ExplorationManager.NotifyExplorationFailed("Cannot place mine — Global Commander missing.");
-                    return;
-                }
-
                 var hit = new RaycastHit { point = minePos };
-                autoCmd.Handle(new CommandContext(commander, hit));
+                // No UCC hub — mine cards place with an owner-scoped context.
+                autoCmd.Handle(new CommandContext(owner, null, hit));
                 return;
             }
 

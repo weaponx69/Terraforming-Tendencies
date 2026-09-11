@@ -467,7 +467,19 @@ namespace GameDevTV.RTS.Player
                 return created;
             }
 
-            return source;
+            if (source is SpawnUnitCardSO spawn)
+            {
+                var created = ScriptableObject.CreateInstance<SpawnUnitCardSO>();
+                created.cardName = spawn.cardName;
+                created.cardDescription = spawn.cardDescription;
+                created.icon = spawn.icon;
+                created.unitPrefab = spawn.unitPrefab;
+                created.waiveMaterialsCost = spawn.waiveMaterialsCost;
+                created.name = $"{spawn.name}_SectorClone";
+                return created;
+            }
+
+            return UnityEngine.Object.Instantiate(source);
         }
 
         private void EnsureBootstrapUnlockInHand(string nameContains)
@@ -557,11 +569,8 @@ namespace GameDevTV.RTS.Player
                     if (unlock.buildingToUnlock != null && unlock.buildingToUnlock.Name == "Solar Panel")
                         solarCard = c;
                 }
-                if (c is SpawnUnitCardSO spawn)
-                {
-                    if (spawn.cardName == "Mining Drone")
-                        droneCard = c;
-                }
+                if (IsMiningDroneCard(c))
+                    droneCard = c;
             }
 
             cmdPostCard ??= EnsureStarterCard<UnlockBuildingCardSO>("Cards/CommandPostCard");
@@ -762,16 +771,20 @@ namespace GameDevTV.RTS.Player
             Debug.Log($"[CardDeckController] Seated unmet climate card '{found.cardName}' ({goal}).");
         }
 
-        /// <summary>Legacy force-seat — disabled so the player freely picks any hand card.</summary>
+        /// <summary>
+        /// Free Mining Drones are spawned in-world per sector (see SectorMiningDroneBootstrap).
+        /// Do not force-seat Mining Drone cards into the hand.
+        /// </summary>
         private void EnsureMiningDroneInHand()
         {
         }
 
         private static bool IsMiningDroneCard(BlueprintCardSO card)
         {
-            return card is SpawnUnitCardSO spawn
-                && spawn.cardName != null
-                && spawn.cardName.Contains("Mining Drone", StringComparison.OrdinalIgnoreCase);
+            if (card is not SpawnUnitCardSO spawn) return false;
+            string n = spawn.cardName ?? spawn.name ?? string.Empty;
+            return n.IndexOf("Mining Drone", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("MiningDrone", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>

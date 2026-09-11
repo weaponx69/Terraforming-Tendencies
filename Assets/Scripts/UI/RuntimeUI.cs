@@ -384,11 +384,11 @@ namespace GameDevTV.RTS.UI
 #endif
             }
 
-            FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header", "Biomass Header");
+            FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText, "Materials Header", "Minerals Header");
             FindAndLinkUI("Oxygen Container", ref oxygenLabelText, ref oxygenValueText, "Oxygen Header");
             FindAndLinkUI("Integrity Container", ref integrityLabelText, ref integrityValueText, "Integrity Header");
             FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
-            FindAndLinkUI("Gas Container", ref biomassLabelText, ref biomassValueText, "Biomass Header", "Gas Header");
+            // Do NOT remap Gas onto Biomass — that reused the same slot and overlapped Materials.
             FindAndLinkUI("Sectors Container", ref sectorsLabelText, ref sectorsValueText, "Sectors Header");
             
             // Setup layouts and alignments dynamically (Power, Temp, Atmos)
@@ -499,13 +499,15 @@ namespace GameDevTV.RTS.UI
                 if (containerParent.GetComponent<Canvas>() == null && containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
                     HorizontalLayoutGroup hlg = containerParent.gameObject.AddComponent<HorizontalLayoutGroup>();
-                    hlg.childControlWidth = true;
-                    hlg.childControlHeight = true;
+                    // Keep false: childControlWidth=true collapses unstyled siblings (e.g. Materials).
+                    hlg.childControlWidth = false;
+                    hlg.childControlHeight = false;
                     hlg.childForceExpandWidth = false;
                     hlg.childForceExpandHeight = false;
                     hlg.spacing = 12f;
                     hlg.childAlignment = TextAnchor.UpperLeft;
-                    hlg.padding = new RectOffset(8, 8, 4, 4);
+                    // Clear the left edge (~1") so Materials isn't covered by chrome / weeks / debug UI.
+                    hlg.padding = new RectOffset(96, 8, 4, 4);
                 }
                 else if (containerParent.GetComponent<HorizontalLayoutGroup>() == null)
                 {
@@ -758,7 +760,8 @@ namespace GameDevTV.RTS.UI
                 populationText.color = TerraformingGoalColors.Population;
             }
 
-            // Re-assert fixed widths every readability pass (HLG may already exist from scene).
+            // Keep Materials visible: fixed widths must not drive HLG childControlWidth
+            // (that collapses siblings that never got a LayoutElement).
             Transform strip = null;
             if (materialsValueText != null) strip = materialsValueText.transform.parent;
             while (strip != null && strip.GetComponent<HorizontalLayoutGroup>() == null)
@@ -768,13 +771,135 @@ namespace GameDevTV.RTS.UI
                 var hlg = strip.GetComponent<HorizontalLayoutGroup>();
                 if (hlg != null)
                 {
-                    hlg.childControlWidth = true;
-                    hlg.childControlHeight = true;
+                    hlg.childControlWidth = false;
+                    hlg.childControlHeight = false;
                     hlg.childForceExpandWidth = false;
                     hlg.childForceExpandHeight = false;
                     hlg.spacing = 12f;
+                    hlg.padding = new RectOffset(96, 8, 4, 4);
                 }
             }
+
+            EnsureMaterialsMetricVisible();
+            EnsureBiomassDoesNotCoverMaterials();
+        }
+
+        /// <summary>
+        /// Materials lives in the legacy "Minerals Container" — keep it active, labeled, and on-screen.
+        /// </summary>
+        private void EnsureMaterialsMetricVisible()
+        {
+            if (materialsLabelText == null || materialsValueText == null)
+            {
+                FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText,
+                    "Materials Header", "Minerals Header", "Biomass Header");
+                FindAndLinkUI("Materials Container", ref materialsLabelText, ref materialsValueText,
+                    "Materials Header", "Minerals Header");
+            }
+
+            if (materialsLabelText != null)
+            {
+                materialsLabelText.gameObject.SetActive(true);
+                materialsLabelText.SetText("Materials");
+            }
+            if (materialsValueText != null)
+            {
+                materialsValueText.gameObject.SetActive(true);
+                int mats = Supplies.Materials != null
+                    && Supplies.Materials.TryGetValue(displayedOwner, out int m) ? m : Supplies.StartingMaterials;
+                materialsValueText.SetText(mats.ToString());
+            }
+
+            Transform container = FindMetricContainer(materialsValueText, "Minerals Container", "Materials Container")
+                ?? FindChildRecursive(transform, "Minerals Container")
+                ?? FindChildRecursive(transform, "Materials Container");
+            if (container != null)
+            {
+                container.gameObject.SetActive(true);
+                EnsureFixedMetricBox(materialsLabelText, materialsValueText, ResolveMetricBoxWidth("Materials"));
+                container.SetAsFirstSibling();
+
+                if (container is RectTransform crt)
+                {
+                    // Clear left chrome (~1").
+                    Vector2 pos = crt.anchoredPosition;
+                    crt.anchoredPosition = new Vector2(Mathf.Max(96f, pos.x), pos.y);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Biomass + Food text is written at runtime and was overlapping Materials.
+        /// Keep Biomass in its own fixed slot immediately to the right of Materials.
+        /// </summary>
+        private void EnsureBiomassDoesNotCoverMaterials()
+        {
+            if (biomassLabelText == null || biomassValueText == null)
+            {
+                FindAndLinkUI("Biomass Container", ref biomassLabelText, ref biomassValueText, "Biomass Header");
+            }
+
+            Transform mats = FindMetricContainer(materialsValueText, "Minerals Container", "Materials Container")
+                ?? FindChildRecursive(transform, "Minerals Container")
+                ?? FindChildRecursive(transform, "Materials Container");
+            Transform bio = FindMetricContainer(biomassValueText, "Biomass Container", "Gas Container")
+                ?? FindChildRecursive(transform, "Biomass Container");
+            if (bio == null) return;
+
+            bio.gameObject.SetActive(true);
+            if (biomassLabelText != null)
+            {
+                biomassLabelText.gameObject.SetActive(true);
+                biomassLabelText.SetText("Bio/Food");
+            }
+
+            const float bioWidth = 200f;
+            EnsureFixedMetricBox(biomassLabelText, biomassValueText, bioWidth);
+            if (biomassValueText != null)
+            {
+                biomassValueText.enableWordWrapping = false;
+                biomassValueText.overflowMode = TextOverflowModes.Ellipsis;
+                biomassValueText.alignment = TextAlignmentOptions.MidlineLeft;
+            }
+
+            if (mats != null && bio.parent == mats.parent)
+            {
+                bio.SetSiblingIndex(mats.GetSiblingIndex() + 1);
+            }
+
+            if (bio is RectTransform bioRt && mats is RectTransform matsRt)
+            {
+                float matsWidth = ResolveMetricBoxWidth("Materials");
+                float spacing = 16f;
+                float targetX = matsRt.anchoredPosition.x + matsWidth + spacing;
+                bioRt.anchoredPosition = new Vector2(targetX, matsRt.anchoredPosition.y);
+                bioRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, bioWidth);
+            }
+
+            UpdateBiomassAndFoodUI();
+        }
+
+        private static Transform FindMetricContainer(TextMeshProUGUI value, params string[] preferredNames)
+        {
+            if (value != null)
+            {
+                Transform t = value.transform;
+                while (t != null)
+                {
+                    string n = t.name ?? string.Empty;
+                    for (int i = 0; i < preferredNames.Length; i++)
+                    {
+                        if (!string.IsNullOrEmpty(preferredNames[i])
+                            && n.IndexOf(preferredNames[i].Replace(" Container", ""), System.StringComparison.OrdinalIgnoreCase) >= 0
+                            && n.IndexOf("Container", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                            return t;
+                    }
+                    if (n.EndsWith("Container")) return t;
+                    t = t.parent;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -908,7 +1033,7 @@ namespace GameDevTV.RTS.UI
             return fallbackLabel switch
             {
                 "Materials" => 128f,
-                "Biomass" => 168f,
+                "Biomass" => 200f,
                 "Oxygen" => 118f,
                 "Power" => 108f,
                 "Integrity" => 118f,
@@ -1027,7 +1152,10 @@ namespace GameDevTV.RTS.UI
 
             if (biomassLabelText != null) biomassLabelText.SetText("Biomass");
             if (biomassValueText != null && Supplies.Biomass != null && Supplies.Biomass.TryGetValue(displayedOwner, out float bInitial))
-                biomassValueText.SetText($"{bInitial:F1}%");
+            {
+                float food = Supplies.Food != null && Supplies.Food.TryGetValue(displayedOwner, out float f) ? f : 0f;
+                biomassValueText.SetText($"{bInitial:F0}%  F{food:F0}");
+            }
 
             if (powerLabelText != null) powerLabelText.SetText("Power");
             if (powerValueText != null && Supplies.Power != null && Supplies.Power.TryGetValue(displayedOwner, out float pInitial))
@@ -1181,12 +1309,14 @@ namespace GameDevTV.RTS.UI
         {
             if (owner != displayedOwner) return;
             UpdateBiomassAndFoodUI();
+            EnsureBiomassDoesNotCoverMaterials();
         }
 
         private void HandleFoodChanged(Owner owner, float newValue)
         {
             if (owner != displayedOwner) return;
             UpdateBiomassAndFoodUI();
+            EnsureBiomassDoesNotCoverMaterials();
         }
 
         private void UpdateBiomassAndFoodUI()
@@ -1195,7 +1325,8 @@ namespace GameDevTV.RTS.UI
             {
                 float bio = Supplies.Biomass.TryGetValue(displayedOwner, out float b) ? b : 0f;
                 float food = Supplies.Food.TryGetValue(displayedOwner, out float f) ? f : 0f;
-                biomassValueText.SetText($"{bio:F1}% | Food: {food:F0}");
+                // Compact — the old "0.0% | Food: 0" string spilled over Materials at runtime.
+                biomassValueText.SetText($"{bio:F0}%  F{food:F0}");
             }
         }
 

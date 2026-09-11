@@ -9,6 +9,9 @@ namespace GameDevTV.RTS.Player
         {
             public GameObject unitPrefab;
 
+            /// <summary>When true, play cost is 0 (one free Mining Drone per sector Act).</summary>
+            [System.NonSerialized] public bool waiveMaterialsCost;
+
             public override bool IsGateMet()
             {
                 return FindPlayerCommandPost() != null;
@@ -22,6 +25,7 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
+                if (waiveMaterialsCost) return 0;
                 if (MaterialsCost > 0) return MaterialsCost;
                 var unit = unitPrefab != null ? unitPrefab.GetComponent<AbstractUnit>() : null;
                 if (unit?.UnitSO?.Cost != null)

@@ -113,14 +113,8 @@ namespace GameDevTV.RTS.UI.Containers
 
         public void EnableFor(AbstractCommandable item)
         {
-            gameObject.SetActive(true);
-            ReorganizeLayoutAndCreateObjectiveTexts();
-            if (titleText != null)
-            {
-                titleText.SetText("UNIVERSAL COMMAND CENTER");
-            }
-            UpdateSliderFromController();
-            UpdateObjectivesText();
+            // UCC panel retired — Colony Acts uses Active Objectives HUD instead.
+            Disable();
         }
 
         public void Disable()

@@ -439,17 +439,15 @@ namespace GameDevTV.RTS.Utilities
         private static CommandContext CreateContext(Owner owner, Vector3 position)
         {
             var hit = new RaycastHit { point = position };
-            AbstractCommandable commandable = Object.FindAnyObjectByType<GlobalCommander>();
-            if (commandable == null)
+            // Prefer a free worker when one exists; otherwise owner-only context (UCC retired).
+            AbstractCommandable commandable = null;
+            Worker[] workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+            foreach (var worker in workers)
             {
-                Worker[] workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
-                foreach (var worker in workers)
+                if (worker != null && worker.Owner == owner)
                 {
-                    if (worker != null && worker.Owner == owner)
-                    {
-                        commandable = worker;
-                        break;
-                    }
+                    commandable = worker;
+                    break;
                 }
             }
 

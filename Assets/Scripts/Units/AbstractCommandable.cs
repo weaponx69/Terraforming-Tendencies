@@ -167,7 +167,7 @@ namespace GameDevTV.RTS.Units
 
         public void TakeDamage(int damage)
         {
-            if (this is GlobalCommander) return; // The Universal Command Center (GlobalCommander) is completely invulnerable
+            if (this is GlobalCommander) return; // Legacy UCC type — invulnerable if any instance survives purge
 
             // Upgraded Armored Spacesuits (TubesAreSolid) reduce all damage to the colonist by 50%
             if (TryGetComponent<MartianColonist>(out var colonist))

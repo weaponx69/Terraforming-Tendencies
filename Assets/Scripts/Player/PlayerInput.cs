@@ -282,13 +282,6 @@ namespace GameDevTV.RTS.Player
             if (planetGenerator != null && planetGenerator.HasGenerated)
             {
                 Vector3 startingPosition = planetGenerator.StartingAreaCenter;
-                globalCommander = FindAnyObjectByType<GlobalCommander>();
-                if (globalCommander != null)
-                {
-                    startingPosition.y = globalCommander.transform.position.y;
-                    globalCommander.transform.position = startingPosition;
-                }
-
                 MoveToStartingHex(startingPosition);
                 hasCameraBeenFocused = true;
                 return;
@@ -618,21 +611,11 @@ namespace GameDevTV.RTS.Player
             // including ones that are not active. 
             var commandPosts = BaseBuilding.ActiveBuildings
                 .Where(b => b != null && b.Owner == Owner.Player1 &&
-                       (b.name.Contains("Command") || b.name.Contains("Foundry") || 
+                       (b.name.Contains("Command") || b.name.Contains("Foundry") ||
                        (b.BuildingSO != null && (b.BuildingSO.Name.Contains("Command") || b.BuildingSO.Name.Contains("Foundry")))) &&
                        b.Progress.State == BuildingProgress.BuildingState.Completed)
                 .Cast<AbstractCommandable>()
-                .ToList();
-
-            GlobalCommander commander = GetGlobalCommander();
-            if (commander != null)
-            {
-                commandPosts.Add(commander);
-            }
-
-
-
-            commandPosts = commandPosts.OrderBy(b => b.transform.position.x)
+                .OrderBy(b => b.transform.position.x)
                 .ThenBy(b => b.transform.position.z)
                 .ToList();
 
@@ -1010,17 +993,6 @@ namespace GameDevTV.RTS.Player
             {
                 selectionBox.gameObject.SetActive(false);
             }
-
-            // If the click landed on empty space (nothing got selected and it wasn't a UI
-            // interaction or an active command placement), fall back to selecting the Global Commander.
-            if (activeCommand == null && selectedUnits.Count == 0)
-            {
-                GlobalCommander commander = GetGlobalCommander();
-                if (commander != null)
-                {
-                    commander.Select();
-                }
-            }
         }
 
         private void HandleMouseDrag()
@@ -1370,18 +1342,23 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // Fallback for Global Commands: If no units are selected, the command is coming from the GlobalCommander
+            // Colony Acts: no UCC hub. Owner-scoped commands (card place, etc.) run without a selected unit.
             if (abstractCommandables.Count == 0)
             {
-                GlobalCommander commander = GetGlobalCommander();
-                if (commander != null)
+                CommandContext ownerContext = new(Owner.Player1, null, hit);
+                if (activeCommand.CanHandle(ownerContext))
                 {
-                    abstractCommandables.Add(commander);
+                    activeCommand.Handle(ownerContext);
                 }
                 else
                 {
-                    throw new System.InvalidOperationException("[PlayerInput] GlobalCommander is missing! The invulnerable starting base (Universal Command Center) has been destroyed or was not initialized.");
+                    Debug.LogWarning(
+                        $"[PlayerInput] Command '{activeCommand.name}' needs a selected unit (UCC hub removed).");
                 }
+
+                activeCommand = null;
+                commandTargetUnits.Clear();
+                return;
             }
 
             bool handled = false;

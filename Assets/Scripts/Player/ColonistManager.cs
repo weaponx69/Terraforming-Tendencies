@@ -271,15 +271,5 @@ namespace GameDevTV.RTS.Player
             // Schedule next
             nextArrivalTime = Time.time + Random.Range(arrivalIntervalMin, arrivalIntervalMax) + warningDuration;
         }
-
-#if UNITY_EDITOR
-        private void OnGUI()
-        {
-            if (GUI.Button(new Rect(10, 80, 220, 40), "Debug: Force Colonist Arrival"))
-            {
-                Arrive();
-            }
-        }
-#endif
     }
 }
