@@ -37,6 +37,8 @@ namespace GameDevTV.RTS.UI.Containers
         private bool isBuilt;
         private Owner owner = Owner.Player1;
         private float scrollOffset;
+        private int lastHandFingerprint = int.MinValue;
+        private int lastHandCount = -1;
         private float contentWidth;
         private float viewportWidth;
         private RectTransform cardsRt;
@@ -186,7 +188,8 @@ namespace GameDevTV.RTS.UI.Containers
             cardsRt.offsetMin = new Vector2(0f, 0f);
             cardsRt.offsetMax = new Vector2(0f, 0f);
             cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
-            cardsRt.anchoredPosition = Vector2.zero;
+            // Do not zero X here — preserve scroll; FitLayout re-applies scrollOffset.
+            cardsRt.anchoredPosition = new Vector2(scrollOffset, 0f);
             cardsRt.localScale = Vector3.one;
 
             var hlg = GetComponent<HorizontalLayoutGroup>();
@@ -294,6 +297,8 @@ namespace GameDevTV.RTS.UI.Containers
             ApplyScrollOffset();
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(cardsRt);
+            // Layout rebuild can clobber the strip position — re-apply after.
+            ApplyScrollOffset();
         }
 
         private void ClampScroll()
@@ -334,8 +339,17 @@ namespace GameDevTV.RTS.UI.Containers
 
             HandleMouseWheelScroll();
 
-            if (Time.frameCount % 30 == 0)
+            // Only rebuild when the hand actually changes — polling was fighting scroll
+            // and recreating ScriptableObjects every half-second.
+            if (Time.frameCount % 30 == 0 && HandFingerprintChanged())
                 RefreshBar();
+        }
+
+        private void LateUpdate()
+        {
+            if (!Application.isPlaying) return;
+            // Keep scroll sticky if any layout pass moved the strip this frame.
+            ApplyScrollOffset();
         }
 
         private void UpdateDockHoverGlow()
@@ -352,14 +366,15 @@ namespace GameDevTV.RTS.UI.Containers
             if (!IsPointerOverHand()) return;
 
             Vector2 scroll = Mouse.current.scroll.ReadValue();
-            // Vertical wheel scrolls the hand left/right; also accept horizontal axis.
-            float delta = scroll.y + scroll.x;
+            // Prefer vertical wheel; fall back to horizontal trackpad axis.
+            float delta = Mathf.Abs(scroll.y) >= Mathf.Abs(scroll.x) ? scroll.y : scroll.x;
             if (Mathf.Abs(delta) < 0.01f) return;
 
-            // Mouse wheels often report ±120; trackpads report small floats. Normalize to notches.
+            // Mouse wheels ≈ ±120 per notch. Trackpads send smaller values — scale
+            // them gently instead of forcing a full notch (that caused jumpy snaps).
             float notches = Mathf.Abs(delta) >= 20f
                 ? delta / 120f
-                : Mathf.Sign(delta) * Mathf.Max(1f, Mathf.Abs(delta));
+                : delta / 40f;
 
             float cardStep = cardSize.x + cardSpacing;
             scrollOffset += notches * cardStep * scrollCardsPerNotch;
@@ -405,9 +420,29 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void HandleHandChanged()
         {
-            // New draws / sector bootstrap put Mining Drone at the front — show it.
-            scrollOffset = 0f;
+            // Preserve where the player scrolled. Only clamp after layout — resetting
+            // to 0 made the strip snap back whenever RefreshHand / seating fired.
             RefreshBar();
+        }
+
+        private bool HandFingerprintChanged()
+        {
+            var hand = CardDeckController.Instance?.Hand;
+            if (hand == null) return lastHandCount != 0;
+
+            int fingerprint = hand.Count * 397;
+            for (int i = 0; i < hand.Count; i++)
+            {
+                var card = hand[i];
+                fingerprint = unchecked(fingerprint * 31 + (card != null ? card.GetInstanceID() : 0));
+            }
+
+            if (fingerprint == lastHandFingerprint && hand.Count == lastHandCount)
+                return false;
+
+            lastHandFingerprint = fingerprint;
+            lastHandCount = hand.Count;
+            return true;
         }
 
         public void RefreshBar()
@@ -417,6 +452,16 @@ namespace GameDevTV.RTS.UI.Containers
 
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
+
+            // Keep fingerprint in sync when refreshing from events.
+            lastHandCount = hand.Count;
+            int fingerprint = hand.Count * 397;
+            for (int i = 0; i < hand.Count; i++)
+            {
+                var card = hand[i];
+                fingerprint = unchecked(fingerprint * 31 + (card != null ? card.GetInstanceID() : 0));
+            }
+            lastHandFingerprint = fingerprint;
 
             EnsureHandSlotCount(hand.Count);
 
