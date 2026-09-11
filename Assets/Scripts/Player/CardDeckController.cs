@@ -337,6 +337,26 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// After a Command Post is placed, re-seat another CP card while free sectors remain
+        /// so expansion stays repeatable (Acts do not grant CPs).
+        /// </summary>
+        public void NotifyCommandPostPlaced()
+        {
+            BlueprintDraftManager.UnlockBuilding("Command Post");
+            if (GameDevTV.RTS.Utilities.SectorColonization.GetNextFreeSectorIndex() < 0)
+            {
+                RefreshHand();
+                OnHandChanged?.Invoke();
+                return;
+            }
+
+            ForceBootstrapUnlockIntoHand("Command Post");
+            RefreshHand();
+            OnHandChanged?.Invoke();
+            Debug.Log("[CardDeckController] Re-seated Command Post for next free sector.");
+        }
+
+        /// <summary>
         /// After the between-Act shop, ensure Solar stays available for the next Act.
         /// Command Posts are player-driven expansion (not granted on Act Continue).
         /// </summary>

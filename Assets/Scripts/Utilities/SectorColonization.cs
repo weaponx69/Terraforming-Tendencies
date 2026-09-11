@@ -104,6 +104,25 @@ namespace GameDevTV.RTS.Utilities
         public static bool SectorHasCommandPost(SectorManager.Sector sector)
         {
             if (sector == null) return false;
+
+            var sm = SectorManager.Instance;
+            if (sm != null && BaseBuilding.ActiveBuildings != null)
+            {
+                foreach (var building in BaseBuilding.ActiveBuildings)
+                {
+                    if (building == null || building.Owner != Owner.Player1) continue;
+                    if (building.BuildingSO == null
+                        || building.BuildingSO.Name.IndexOf("Command", System.StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+                    if (building.name.IndexOf("Ghost", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        continue;
+                    if (building.Progress.State == BuildingProgress.BuildingState.Destroyed)
+                        continue;
+                    if (sm.GetNearestSector(building.transform.position) == sector)
+                        return true;
+                }
+            }
+
             if (sector.IsOccupied && sector.OccupyingBuilding != null) return true;
 
             if (sector.BuildingSites != null)

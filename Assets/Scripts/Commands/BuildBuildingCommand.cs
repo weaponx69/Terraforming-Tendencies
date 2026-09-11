@@ -239,13 +239,17 @@ namespace GameDevTV.RTS.Commands
                     {
                         // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
                         cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
-                        BlueprintDraftManager.LockBuilding(Building.Name);
+                        // Command Posts must stay replayable across sectors — do not draft-lock them.
+                        if (!isCommandPost)
+                            BlueprintDraftManager.LockBuilding(Building.Name);
                         if (isCommandPost)
                             PlayerInput.FocusCameraOnWorldPosition(targetPos);
                         if (CardDeckController.Instance != null)
                         {
                             CardDeckController.Instance.ConsumeCardAfterBuild(HandIndex);
                             HandIndex = -1;
+                            if (isCommandPost)
+                                CardDeckController.Instance.NotifyCommandPostPlaced();
                         }
                     }
 
@@ -567,31 +571,16 @@ namespace GameDevTV.RTS.Commands
             // Exception: allow building when no Command Post exists yet (player starts with nothing)
             if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
             {
-                // Materials + remaining free sector only (Acts do not gate Command Posts).
-                bool hasFreeSector = GameDevTV.RTS.Utilities.SectorColonization.GetNextFreeSectorIndex() >= 0;
-                if (!hasFreeSector)
-                {
-                    // First CP of the run: still allow when no sectors list yet / none claimed.
-                    bool hasExistingCommandPost = false;
-                    if (BaseBuilding.ActiveBuildings != null)
-                    {
-                        foreach (var b in BaseBuilding.ActiveBuildings)
-                        {
-                            if (b != null && b.Owner == context.Owner && b.BuildingSO != null
-                                && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
-                                && !b.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase)
-                                && b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
-                            {
-                                hasExistingCommandPost = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (hasExistingCommandPost) return true;
-                }
+                // Repeatable expansion: allow while any sector still lacks a player Command Post.
+                if (GameDevTV.RTS.Utilities.SectorColonization.GetNextFreeSectorIndex() < 0)
+                    return true;
+
+                // Hand card plays ignore tech-tree lock; Materials still apply until economy pivot.
+                if (HandIndex >= 0)
+                    return !HasEnoughMaterialsForCard(context.Owner);
 
                 return !HasEnoughSupplies(context)
-                    || (HandIndex < 0 && Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
+                    || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
             }
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
