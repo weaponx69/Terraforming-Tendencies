@@ -38,10 +38,18 @@ namespace GameDevTV.RTS.Environment
             return discoveredFeatures.Contains(feature);
         }
 
-        /// <summary>
-        /// Sector feature a building requires (Aquifer→WaterDeposit, Lava Tube→LavaTube, …).
-        /// Returns false when the building is free-place climate/infra (no geology gate).
-        /// </summary>
+        /// <summary>Player-facing name for a sector geology feature.</summary>
+        public static string DescribeSectorFeature(SectorManager.SectorFeature feature)
+        {
+            return feature switch
+            {
+                SectorManager.SectorFeature.WaterDeposit => "Water Deposit (polar ice)",
+                SectorManager.SectorFeature.Volcano => "Volcano",
+                SectorManager.SectorFeature.FaultLine => "Fault Line",
+                SectorManager.SectorFeature.LavaTube => "Lava Tube",
+                _ => feature.ToString()
+            };
+        }
         public static bool TryGetRequiredSectorFeature(BuildingSO building, out SectorManager.SectorFeature feature)
         {
             feature = SectorManager.SectorFeature.None;

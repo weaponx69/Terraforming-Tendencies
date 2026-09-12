@@ -1376,10 +1376,16 @@ namespace GameDevTV.RTS.Player
                 {
                     activeCommand.Handle(ownerContext);
                 }
+                else if (activeCommand is BuildBuildingCommand failedPlace)
+                {
+                    string reason = failedPlace.ExplainCardPlacementFailure(hit.point, Owner.Player1)
+                        ?? $"Can't place {failedPlace.Building?.Name ?? "this tile"} here.";
+                    ExplorationManager.NotifyPlacementFailed(reason, hit.point);
+                }
                 else
                 {
                     Debug.LogWarning(
-                        $"[PlayerInput] Command '{activeCommand.name}' needs a selected unit (UCC hub removed).");
+                        $"[PlayerInput] Command '{activeCommand.name}' cannot run (no unit selected / invalid target).");
                 }
 
                 activeCommand = null;
