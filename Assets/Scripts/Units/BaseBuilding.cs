@@ -99,6 +99,11 @@ namespace GameDevTV.RTS.Units
         }
 
         //what does isOperating mean?
+        /// <summary>
+        /// True when fully powered (or needs no power). Under Colony Acts, unpowered
+        /// buildings still produce at <see cref="ProductionEfficiency"/> — this flag
+        /// means "full rate / powered", not "offline".
+        /// </summary>
         public bool IsOperating
         {
             get
@@ -113,9 +118,49 @@ namespace GameDevTV.RTS.Units
                 if (needsPower)
                 {
                     var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
-                    if (pNode != null && !pNode.IsPowered) return false;
+                    // Missing node = not on the grid yet → not fully powered.
+                    if (pNode == null || !pNode.IsPowered) return false;
                 }
                 return true;
+            }
+        }
+
+        /// <summary>
+        /// Colony Acts: unpowered consumers crawl at this fraction of config rates.
+        /// Powered (or no-upkeep) buildings run at 1.
+        /// </summary>
+        public const float UnpoweredProductionEfficiency = 0.2f;
+
+        /// <summary>
+        /// Multiplier for climate / turn production. Power is an efficiency bonus,
+        /// not an on/off gate under Colony Acts.
+        /// </summary>
+        public float ProductionEfficiency
+        {
+            get
+            {
+                if (Progress.State != BuildingProgress.BuildingState.Completed) return 0f;
+
+                BuildingSO def = ResolvedBuildingSO;
+                if (def == null) return 0f;
+
+                // Generators and zero-upkeep tiles are always full rate.
+                if (BuildingSiteRegistry.IsPowerGeneratorBuilding(def))
+                    return 1f;
+                if (def.BuildingConfig == null || def.BuildingConfig.PowerUpkeep <= 0f)
+                    return 1f;
+                if (def.Name != null
+                    && def.Name.IndexOf("Command", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    return 1f;
+
+                var pNode = GetComponent<GameDevTV.RTS.Environment.PowerNode>();
+                if (pNode != null && pNode.IsPowered)
+                    return 1f;
+
+                // Colony Acts: crawl. Legacy modes: treat unpowered as offline (0).
+                if (ColonyActManager.Instance != null)
+                    return UnpoweredProductionEfficiency;
+                return 0f;
             }
         }
 
@@ -972,28 +1017,25 @@ namespace GameDevTV.RTS.Units
             var config = BuildingSO.BuildingConfig;
             if (config == null) return;
 
-            // Legacy Energy-stockpile producers only. Climate ticks in real-time via Update.
-            float curEnergy = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float e) ? e : 0f;
-            bool energyOk = config.PowerUpkeep <= 0 || curEnergy >= config.PowerUpkeep
-                || IsOperating;
-
-            if (!energyOk) return;
+            float efficiency = ProductionEfficiency;
+            if (efficiency <= 0f) return;
 
             if (config.PowerGeneration > 0)
             {
                 float curE = Supplies.Energy != null && Supplies.Energy.TryGetValue(Owner, out float eng) ? eng : 0f;
-                Supplies.UpdateEnergy(Owner, curE + config.PowerGeneration);
+                Supplies.UpdateEnergy(Owner, curE + config.PowerGeneration * efficiency);
             }
 
             if (config.BiomassGeneration > 0)
             {
+                float bioGen = config.BiomassGeneration * efficiency;
                 float curBiomass = Supplies.Biomass != null && Supplies.Biomass.TryGetValue(Owner, out float b) ? b : 0f;
-                Supplies.UpdateBiomass(Owner, curBiomass + config.BiomassGeneration);
+                Supplies.UpdateBiomass(Owner, curBiomass + bioGen);
 
                 bool isGreenhouse = BuildingSO != null && BuildingSO.Name.Contains("Greenhouse", System.StringComparison.OrdinalIgnoreCase);
                 if (isGreenhouse)
                 {
-                    float foodGen = config.BiomassGeneration * 0.5f;
+                    float foodGen = bioGen * 0.5f;
                     if (MartianColonist.Instance != null && MartianColonist.Instance.IsInside && MartianColonist.Instance.CurrentBuilding == this)
                     {
                         foodGen *= 1.5f;
@@ -1005,9 +1047,8 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
-        /// Config climate rates are per-second. Tick in real time while grid-powered so
-        /// atmosphere/temp/water progress while the player is busy (not only on idle turns).
-        /// MVP: all powered completed climate buildings on the planet contribute.
+        /// Config climate rates are per-second. Scales by <see cref="ProductionEfficiency"/>
+        /// (unpowered crawl vs full when grid-powered).
         /// </summary>
         public void TickClimateGeneration(float dt)
         {
@@ -1069,22 +1110,18 @@ namespace GameDevTV.RTS.Units
                 return;
             }
 
-            // Climate always ticks under Colony Acts (power is optional score, not a gate).
-            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
-            if (!colonyActs)
-            {
-                if (!IsOperating)
-                {
-                    if (config.PowerUpkeep > 0f)
-                        TryRepairClusterPowerLink();
-                    if (!IsOperating) return;
-                }
-            }
-            else if (!IsOperating && config.PowerUpkeep > 0f)
-            {
-                // Still try to link for optional score / indicators, but do not block climate.
+            // Keep trying to link solar neighbors so efficiency can rise to full.
+            BuildingSO defForPower = def;
+            float powerNeed = defForPower.BuildingConfig != null ? defForPower.BuildingConfig.PowerUpkeep : 0f;
+            if (powerNeed > 0f && !IsOperating)
                 TryRepairClusterPowerLink();
-            }
+
+            float efficiency = ProductionEfficiency;
+            if (efficiency <= 0f) return;
+
+            tempRate *= efficiency;
+            atmosRate *= efficiency;
+            waterRate *= efficiency;
 
             Owner climateOwner = Owner != Owner.Invalid ? Owner : Owner.Player1;
 

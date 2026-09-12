@@ -50,6 +50,7 @@ namespace GameDevTV.RTS.Environment
         [Inspectable]
         public void TakeDamage(int damage)
         {
+            if (!GameDevTV.RTS.Units.DamageRules.Enabled) return;
             DieFromDamage();
         }
 
@@ -65,6 +66,7 @@ namespace GameDevTV.RTS.Environment
 
         private void DieFromDamage()
         {
+            if (!GameDevTV.RTS.Units.DamageRules.Enabled) return;
             if (manager != null)
             {
                 manager.HandleSegmentDestroyed(segmentIndex);
@@ -73,6 +75,7 @@ namespace GameDevTV.RTS.Environment
 
         private void OnTriggerEnter(Collider other)
         {
+            if (!GameDevTV.RTS.Units.DamageRules.Enabled) return;
             if (other.GetComponentInParent<NaturalEventImpact>() != null)
             {
                 DieFromDamage();

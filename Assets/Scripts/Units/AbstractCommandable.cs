@@ -167,6 +167,7 @@ namespace GameDevTV.RTS.Units
 
         public void TakeDamage(int damage)
         {
+            if (!DamageRules.Enabled) return;
             if (this is GlobalCommander) return; // Legacy UCC type — invulnerable if any instance survives purge
 
             // Upgraded Armored Spacesuits (TubesAreSolid) reduce all damage to the colonist by 50%

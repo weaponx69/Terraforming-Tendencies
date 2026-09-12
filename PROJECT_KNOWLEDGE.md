@@ -23,7 +23,8 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Tile grid / join snap | [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) |
 | Hand draw / consume card | [`CardDeckController`](Assets/Scripts/Player/CardDeckController.cs) |
 | Free ground place (cards) | [`BuildBuildingCommand`](Assets/Scripts/Commands/BuildBuildingCommand.cs) + [`BottomBarActionsUI`](Assets/Scripts/UI/Containers/BottomBarActionsUI.cs) |
-| Power place-gate | **Retired** under Colony Acts — power is optional score; climate always ticks |
+| Power place-gate | **Retired** — place freely; power raises production to full rate |
+| Power efficiency | [`BaseBuilding.ProductionEfficiency`](Assets/Scripts/Units/BaseBuilding.cs) — unpowered **20%**, powered **100%** |
 | Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — **Terra-Coin upgrades** (carry) |
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
 | Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
@@ -42,7 +43,8 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Act count = sector count | **Retired** — fixed 5-Act ladder |
 | Sector build lock / active-sector-only pads | **Retired** |
 | Card play gated by Materials | **Retired** under Colony Acts — placement is free; **Terra-Coins** are shop-only |
-| Power required to place / tick climate | **Retired** under Colony Acts — power tiles give **score boost**; climate always ticks |
+| Combat / hazard HP damage | **Retired** — [`DamageRules.Enabled`](Assets/Scripts/Units/DamageRules.cs) is false; TakeDamage is a no-op |
+| Power required to place / hard-gate climate | **Retired** — unpowered still crawls at 20%; power restores full rate + score boost |
 | Materials between-Act tile shop | **Retired** — shop is Terra-Coin **roguelike upgrades** |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
 | Auto-discard “unplayable” hand cards | **Retired** |
@@ -70,7 +72,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Planet-wide gains — climate buildings **always tick** (power optional).
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Planet-wide gains — climate always ticks; **unpowered = 20% rate**, **powered = full**.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** (no Materials cost) **auto-claim the next free sector** (repeatable; card re-seats while sectors remain).
 * **Terra-Coins** earn on Act clear: `15 + floor(score/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
@@ -79,7 +81,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Mine deposits** show large colored discs + type labels once discovered (Minerals/Gas from start). Old node-shroud no longer hides them.
 * **Q / E** page sectors; on-screen sector names; **no FoW**.
 * **Card week costs vary** (0–2). Spend via `SpendWeeks`.
-* **Power tiles** are optional score (base + upgrade boosts), not a place gate.
+* **Power** boosts production efficiency (and still grants placement score); not a place gate.
 * On Act clear: **upgrade depot** (Terra-Coins) is mandatory; Continue grants **Solar**; ~**25%** score (+ excess) carries.
 * Weeks hit 0 without Act requirements → **Act fail / run loss**.
 
@@ -103,11 +105,11 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
 2. **Geology** — mines must sit on deposit discs; aquifers must sit in `WaterDeposit` (polar ice) sectors; matching geology also grants score + terraforming pulses + map `+N`.
-3. **Score / climate** — adjacency + optional power bonuses; climate tiles tick without power.
+3. **Score / climate** — adjacency + power score; climate/production at **20%** until grid-powered, then full.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
 
-**Power note:** Generators are prestige/score, not a soft-lock. Climate does not need watts under Colony Acts.
+**Power note:** Generators restore full production on connected tiles and still grant placement score. Nothing is blocked from placing or crawling unpowered.
 
 **Build source:** cards / tiles only. Selecting a building does **not** open an RTS build/train panel.
 

@@ -175,12 +175,12 @@ namespace GameDevTV.RTS.UI.Components
             textGO.transform.SetParent(container.transform, false);
             
             var text = textGO.AddComponent<UnityEngine.UI.Text>();
-            text.text = "⚡ NO POWER";
+            text.text = "⚡ LOW POWER";
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (text.font == null) text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             text.fontSize = 24;
             text.alignment = TextAnchor.MiddleCenter;
-            text.color = Color.red;
+            text.color = new Color(1f, 0.75f, 0.2f, 1f);
 
             // Style layout
             RectTransform rect = text.GetComponent<RectTransform>();

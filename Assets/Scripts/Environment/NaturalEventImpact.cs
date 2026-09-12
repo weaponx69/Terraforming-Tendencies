@@ -68,6 +68,7 @@ namespace GameDevTV.RTS.Environment
         [Inspectable]
         public void TakeDamage(int damage)
         {
+            if (!DamageRules.Enabled) return;
             if (hasImpacted) return;
             currentHealth -= damage;
             if (currentHealth <= 0)
@@ -138,13 +139,16 @@ namespace GameDevTV.RTS.Environment
 
             // Dedupe so multi-collider targets only take damage once.
             HashSet<IDamageable> damaged = new();
-            Collider[] hits = Physics.OverlapSphere(impactPoint, damageRadius);
-            foreach (Collider hit in hits)
+            if (DamageRules.Enabled)
             {
-                IDamageable target = hit.GetComponentInParent<IDamageable>();
-                if (target != null && damaged.Add(target))
+                Collider[] hits = Physics.OverlapSphere(impactPoint, damageRadius);
+                foreach (Collider hit in hits)
                 {
-                    target.TakeDamage(damageAmount);
+                    IDamageable target = hit.GetComponentInParent<IDamageable>();
+                    if (target != null && damaged.Add(target))
+                    {
+                        target.TakeDamage(damageAmount);
+                    }
                 }
             }
 
