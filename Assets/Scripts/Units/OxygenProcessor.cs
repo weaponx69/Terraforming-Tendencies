@@ -8,12 +8,11 @@ namespace GameDevTV.RTS.Units
     public class OxygenProcessor : BaseBuilding
     {
         /// <summary>
-        /// Soft cap so a single Life tile cannot slam Oxygen to 100% in seconds.
-        /// Prefab historically shipped at 5%/tick — Colony Acts treats Oxygen as flavor, not a win meter.
+        /// Soft rate cap per tick. Planet share is additionally capped at 100/N % per sector.
         /// </summary>
         private const float MaxOxygenPerTick = 0.08f;
 
-        [Tooltip("Percentage of oxygen generated per tick (e.g. 0.08 ≈ ~20 min to 100% with one tile)")]
+        [Tooltip("Percentage of oxygen generated per tick")]
         [SerializeField] private float oxygenPerTick = 0.08f;
 
         [Tooltip("How often in seconds the oxygen tick occurs")]
@@ -23,38 +22,36 @@ namespace GameDevTV.RTS.Units
 
         private void Update()
         {
-            // Climate is driven by ClimateGenerationTicker (and BaseBuilding fallback).
-            // Derived Update replaces BaseBuilding.Update — keep oxygen ticks only.
+            if (Owner == Owner.Invalid) return;
+            if (Progress.State != BuildingProgress.BuildingState.Completed) return;
 
-            // Only generate oxygen if the building is fully operating and powered
-            if (Owner != Owner.Invalid && IsOperating)
+            float efficiency = ProductionEfficiency;
+            if (efficiency <= 0f) return;
+
+            bool shouldGenerateOxygen = BuildingSO != null && (
+                BuildingSO.Name.Contains("Oxygen Processor") ||
+                BuildingSO.Name.Contains("Algae Spreader") ||
+                BuildingSO.Name.Contains("Greenery Dome")
+            );
+            if (!shouldGenerateOxygen) return;
+
+            tickTimer += Time.deltaTime;
+            if (tickTimer < tickRate) return;
+            tickTimer -= tickRate;
+
+            if (Supplies.Oxygen == null || !Supplies.Oxygen.ContainsKey(Owner)) return;
+
+            float rate = Mathf.Min(Mathf.Max(0f, oxygenPerTick), MaxOxygenPerTick) * efficiency;
+            if (rate <= 0f) return;
+
+            var acts = ColonyActManager.Instance;
+            if (acts != null)
             {
-                bool shouldGenerateOxygen = BuildingSO != null && (
-                    BuildingSO.Name.Contains("Oxygen Processor") ||
-                    BuildingSO.Name.Contains("Algae Spreader") ||
-                    BuildingSO.Name.Contains("Greenery Dome")
-                );
-
-                if (!shouldGenerateOxygen) return;
-
-                // Sector mini-game: only the active sector's processors count toward oxygen goals.
-                if (Environment.SectorManager.Instance != null
-                    && !Environment.SectorManager.Instance.IsBuildingInActiveSector(this))
-                {
+                if (!acts.TryApplySectorOxygenContribution(transform.position, ref rate))
                     return;
-                }
-
-                tickTimer += Time.deltaTime;
-                if (tickTimer >= tickRate)
-                {
-                    tickTimer -= tickRate;
-                    if (Supplies.Oxygen.ContainsKey(Owner))
-                    {
-                        float rate = Mathf.Min(Mathf.Max(0f, oxygenPerTick), MaxOxygenPerTick);
-                        Supplies.UpdateOxygen(Owner, Supplies.Oxygen[Owner] + rate);
-                    }
-                }
             }
+
+            Supplies.UpdateOxygen(Owner, Supplies.Oxygen[Owner] + rate);
         }
     }
 }

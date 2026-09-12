@@ -72,7 +72,8 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Planet-wide gains — climate always ticks; **unpowered = 20% rate**, **powered = full**.
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (no single Air farm clears multiple sectors' worth). Powered = full rate; unpowered = 20%.
+* **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** (no Materials cost) **auto-claim the next free sector** (repeatable; card re-seats while sectors remain).
 * **Terra-Coins** earn on Act clear: `15 + floor(score/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).

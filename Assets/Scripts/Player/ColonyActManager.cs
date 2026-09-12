@@ -60,6 +60,23 @@ namespace GameDevTV.RTS.Player
         private float baselineAtmosphere = 0.01f;
         private float baselineWater = 0f;
 
+        /// <summary>
+        /// Per-sector climate contributed this Act (Temp °C, Atmos atm, Water %).
+        /// Each sector may supply at most (ActDelta / sectorCount) so one Air farm
+        /// cannot clear multiple sectors' worth of the Act meters.
+        /// </summary>
+        private readonly Dictionary<int, Vector3> sectorClimateContributed = new();
+        private readonly Dictionary<int, float> sectorOxygenContributed = new();
+
+        public float BaselineTemperature => baselineTemperature;
+        public float BaselineAtmosphere => baselineAtmosphere;
+        public float BaselineWater => baselineWater;
+
+        /// <summary>Hard ceiling for planet meters this Act (baseline + required delta).</summary>
+        public float ActAtmosphereCeiling => baselineAtmosphere + GenerationManager.SectorAtmosphereDelta;
+        public float ActTemperatureCeiling => baselineTemperature + GenerationManager.SectorTemperatureDelta;
+        public float ActWaterCeiling => baselineWater + GenerationManager.SectorWaterDelta;
+
         private string statusBanner = string.Empty;
         private float statusBannerUntil;
 
@@ -278,11 +295,117 @@ namespace GameDevTV.RTS.Player
                 baselineAtmosphere = a;
             if (Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float w))
                 baselineWater = w;
+
+            sectorClimateContributed.Clear();
+            sectorOxygenContributed.Clear();
+        }
+
+        /// <summary>How many sectors share the Act climate budget (at least 1).</summary>
+        public static int ClimateBudgetSectorCount
+        {
+            get
+            {
+                int n = SectorManager.Instance?.Sectors?.Count ?? 0;
+                return Mathf.Max(1, n);
+            }
+        }
+
+        /// <summary>Max Temp/Atmos/Water one sector may contribute toward this Act's deltas.</summary>
+        public void GetPerSectorClimateBudgets(out float maxTemp, out float maxAtmos, out float maxWater)
+        {
+            int n = ClimateBudgetSectorCount;
+            maxTemp = GenerationManager.SectorTemperatureDelta / n;
+            maxAtmos = GenerationManager.SectorAtmosphereDelta / n;
+            maxWater = GenerationManager.SectorWaterDelta / n;
+        }
+
+        /// <summary>
+        /// Clamp proposed climate adds to the building's sector remaining 1/N budget
+        /// and the Act ceilings. Returns false when nothing can be applied.
+        /// </summary>
+        public bool TryApplySectorClimateContribution(
+            Vector3 worldPos,
+            ref float tempAdd,
+            ref float atmosAdd,
+            ref float waterAdd)
+        {
+            if (!started || runEnded || IsBetweenActs)
+            {
+                tempAdd = atmosAdd = waterAdd = 0f;
+                return false;
+            }
+
+            GetPerSectorClimateBudgets(out float maxT, out float maxA, out float maxW);
+            int sectorIndex = ResolveSectorIndex(worldPos);
+            if (!sectorClimateContributed.TryGetValue(sectorIndex, out Vector3 used))
+                used = Vector3.zero;
+
+            // Also respect Act-wide remaining need so meters stop at 100% of the Act delta.
+            GetClimateGains(out float tGain, out float aGain, out float wGain);
+            float actRemainT = Mathf.Max(0f, GenerationManager.SectorTemperatureDelta - tGain);
+            float actRemainA = Mathf.Max(0f, GenerationManager.SectorAtmosphereDelta - aGain);
+            float actRemainW = Mathf.Max(0f, GenerationManager.SectorWaterDelta - wGain);
+
+            float remainT = Mathf.Min(Mathf.Max(0f, maxT - used.x), actRemainT);
+            float remainA = Mathf.Min(Mathf.Max(0f, maxA - used.y), actRemainA);
+            float remainW = Mathf.Min(Mathf.Max(0f, maxW - used.z), actRemainW);
+
+            tempAdd = Mathf.Clamp(tempAdd, 0f, remainT);
+            atmosAdd = Mathf.Clamp(atmosAdd, 0f, remainA);
+            waterAdd = Mathf.Clamp(waterAdd, 0f, remainW);
+
+            if (tempAdd <= 0f && atmosAdd <= 0f && waterAdd <= 0f)
+                return false;
+
+            used.x += tempAdd;
+            used.y += atmosAdd;
+            used.z += waterAdd;
+            sectorClimateContributed[sectorIndex] = used;
+            return true;
+        }
+
+        /// <summary>
+        /// Oxygen is flavor HUD (0–100%). Each sector may fill at most 100/N % of the planet meter.
+        /// </summary>
+        public bool TryApplySectorOxygenContribution(Vector3 worldPos, ref float oxygenAdd)
+        {
+            if (oxygenAdd <= 0f) return false;
+            int n = ClimateBudgetSectorCount;
+            float maxPerSector = 100f / n;
+            int sectorIndex = ResolveSectorIndex(worldPos);
+
+            // Track oxygen in the dictionary's unused w channel via a parallel map.
+            if (!sectorOxygenContributed.TryGetValue(sectorIndex, out float used))
+                used = 0f;
+
+            float remain = Mathf.Max(0f, maxPerSector - used);
+            // Also don't push planet Oxygen past 100.
+            float cur = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
+            remain = Mathf.Min(remain, Mathf.Max(0f, 100f - cur));
+
+            oxygenAdd = Mathf.Clamp(oxygenAdd, 0f, remain);
+            if (oxygenAdd <= 0f) return false;
+
+            sectorOxygenContributed[sectorIndex] = used + oxygenAdd;
+            return true;
+        }
+
+        private static int ResolveSectorIndex(Vector3 worldPos)
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null || sm.Sectors.Count == 0) return 0;
+            var nearest = sm.GetNearestSector(worldPos);
+            if (nearest == null) return 0;
+            for (int i = 0; i < sm.Sectors.Count; i++)
+            {
+                if (sm.Sectors[i] == nearest) return i;
+            }
+            return 0;
         }
 
         /// <summary>
         /// 0–1 bottleneck of Temp / Atmos / Water progress toward this Act's deltas
-        /// (+15°C / +0.25 atm / +5% from Act baselines). Only focus-sector buildings tick.
+        /// (+15°C / +0.25 atm / +5% from Act baselines). Each sector contributes at most 1/N.
         /// </summary>
         public float GetClimateProgress(out float tempProgress, out float atmosProgress, out float waterProgress)
         {
@@ -408,7 +531,7 @@ namespace GameDevTV.RTS.Player
             {
                 bonus += GeologyMatchBonus + geologyBonusExtra;
                 if (DiscoverySystem.TryGetMineResourceType(building, out string resourceType))
-                    GrantGeologyResourcePulse(resourceType);
+                    GrantGeologyResourcePulse(resourceType, pos);
             }
 
             string name = building.Name ?? string.Empty;
@@ -424,45 +547,65 @@ namespace GameDevTV.RTS.Player
                 if (isAquifer && nearest.Feature == SectorManager.SectorFeature.WaterDeposit)
                 {
                     bonus += GeologyMatchBonus + geologyBonusExtra;
-                    GrantGeologyResourcePulse("Water");
+                    GrantGeologyResourcePulse("Water", pos);
                 }
                 else if (isGeo && (nearest.Feature == SectorManager.SectorFeature.Volcano
                     || nearest.Feature == SectorManager.SectorFeature.LavaTube
                     || nearest.Feature == SectorManager.SectorFeature.FaultLine))
                 {
                     bonus += GeologyMatchBonus + geologyBonusExtra;
-                    GrantGeologyResourcePulse("Heat");
+                    GrantGeologyResourcePulse("Heat", pos);
                 }
             }
 
             return bonus;
         }
 
-        private static void GrantGeologyResourcePulse(string resourceType)
+        private void GrantGeologyResourcePulse(string resourceType, Vector3 worldPos)
         {
             if (string.IsNullOrEmpty(resourceType)) return;
+
+            float tempAdd = 0f;
+            float atmosAdd = 0f;
+            float waterAdd = 0f;
+
             if (resourceType.IndexOf("Mineral", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || resourceType.IndexOf("Iron", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || resourceType.IndexOf("Regolith", System.StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                // Minerals/gas are flavor HUD; push climate-relevant meters for terraforming.
-                float t = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tv) ? tv : -60f;
-                Supplies.UpdateTemperature(Owner.Player1, t + 1.5f);
+                tempAdd = 1.5f;
             }
             else if (resourceType.IndexOf("Gas", System.StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                float a = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float av) ? av : 0.01f;
-                Supplies.UpdateAtmosphere(Owner.Player1, a + 0.03f);
+                atmosAdd = 0.03f;
             }
             else if (resourceType.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                float w = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wv) ? wv : 0f;
-                Supplies.UpdateWater(Owner.Player1, w + 1.5f);
+                waterAdd = 1.5f;
             }
             else if (resourceType.IndexOf("Heat", System.StringComparison.OrdinalIgnoreCase) >= 0)
             {
+                tempAdd = 2f;
+            }
+            else return;
+
+            if (!TryApplySectorClimateContribution(worldPos, ref tempAdd, ref atmosAdd, ref waterAdd))
+                return;
+
+            if (tempAdd > 0f)
+            {
                 float t = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tv) ? tv : -60f;
-                Supplies.UpdateTemperature(Owner.Player1, t + 2f);
+                Supplies.UpdateTemperature(Owner.Player1, t + tempAdd);
+            }
+            if (atmosAdd > 0f)
+            {
+                float a = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float av) ? av : 0.01f;
+                Supplies.UpdateAtmosphere(Owner.Player1, a + atmosAdd);
+            }
+            if (waterAdd > 0f)
+            {
+                float w = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wv) ? wv : 0f;
+                Supplies.UpdateWater(Owner.Player1, w + waterAdd);
             }
         }
 
@@ -900,7 +1043,8 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color={verdictColor}><b>{verdict}</b></color>");
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
             sb.AppendLine($"<color=#A8B0B8>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
-            sb.AppendLine($"<color=#A8B0B8>No Materials gate. Power boosts score; climate always ticks.</color>");
+            sb.AppendLine($"<color=#A8B0B8>No Materials gate. Power = full climate rate (else 20%).</color>");
+            sb.AppendLine($"<color=#A8B0B8>Each sector ≤ 1/{ClimateBudgetSectorCount} of Act Temp/Atmos/Water.</color>");
             sb.AppendLine($"<color=#A8B0B8>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}).</color>");
             sb.AppendLine("<color=#A8B0B8>LOSE: weeks hit 0 first.</color>");
             sb.AppendLine();
@@ -912,6 +1056,9 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color=#FFE08A>TERRA-COINS  {terraCoins}</color>  <color=#A8B0B8>(shop on Act clear; carries)</color>");
 
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
+            tempGain = Mathf.Min(tempGain, GenerationManager.SectorTemperatureDelta);
+            atmosGain = Mathf.Min(atmosGain, GenerationManager.SectorAtmosphereDelta);
+            waterGain = Mathf.Min(waterGain, GenerationManager.SectorWaterDelta);
             string climateMark = IsClimateMet ? "✓" : "○";
             string climateColor = IsClimateMet ? "#7CFF9A" : "#FFE08A";
             sb.AppendLine($"<color={climateColor}>{climateMark} CLIMATE GAINS  {climate:P0}</color>");

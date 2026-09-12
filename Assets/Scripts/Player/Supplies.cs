@@ -452,6 +452,7 @@ namespace GameDevTV.RTS.Player
             maxBiomass = 100f;
             maxTemperature = 100f;
 
+            float unlockedFrac = 1f;
             if (SectorManager.Instance?.Sectors != null && SectorManager.Instance.Sectors.Count > 0)
             {
                 int total = SectorManager.Instance.Sectors.Count;
@@ -462,12 +463,12 @@ namespace GameDevTV.RTS.Player
                 }
 
                 unlocked = Mathf.Max(1, unlocked);
-                float frac = unlocked / (float)total;
-                maxAtmosphere = frac;
-                maxWater = frac * 100f;
-                maxOxygen = frac * 100f;
-                maxBiomass = frac * 100f;
-                maxTemperature = frac * 100f;
+                unlockedFrac = unlocked / (float)total;
+                maxAtmosphere = unlockedFrac;
+                maxWater = unlockedFrac * 100f;
+                maxOxygen = unlockedFrac * 100f;
+                maxBiomass = unlockedFrac * 100f;
+                maxTemperature = unlockedFrac * 100f;
             }
 
             // Always floor to at least generation-1 win formulas so caps cannot soft-lock
@@ -476,28 +477,22 @@ namespace GameDevTV.RTS.Player
             maxWater = Mathf.Max(maxWater, GenerationManager.SectorWaterDelta);
             maxTemperature = Mathf.Max(maxTemperature, -60f + GenerationManager.SectorTemperatureDelta);
 
-            // Colony Acts: each Act needs another +delta from rising baselines.
-            // Absolute caps like 1.0 atm soft-lock later Acts — keep headroom above current.
+            // Colony Acts: hard-cap meters at this Act's baseline + required delta
+            // so Temp/Atmos/Water cannot run past 100% of the Act climate goal.
             if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
             {
-                if (_atmosphere != null && _atmosphere.TryGetValue(Owner.Player1, out float curA))
-                    maxAtmosphere = Mathf.Max(maxAtmosphere, curA + GenerationManager.SectorAtmosphereDelta + 0.05f);
-                else
-                    maxAtmosphere = Mathf.Max(maxAtmosphere, 2.5f);
-
-                if (_water != null && _water.TryGetValue(Owner.Player1, out float curW))
-                    maxWater = Mathf.Max(maxWater, curW + GenerationManager.SectorWaterDelta + 1f);
-                else
-                    maxWater = Mathf.Max(maxWater, 100f);
-
-                if (_temperature != null && _temperature.TryGetValue(Owner.Player1, out float curT))
-                    maxTemperature = Mathf.Max(maxTemperature, curT + GenerationManager.SectorTemperatureDelta + 5f);
-                else
-                    maxTemperature = Mathf.Max(maxTemperature, 100f);
+                var acts = ColonyActManager.Instance;
+                maxAtmosphere = acts.ActAtmosphereCeiling;
+                maxWater = acts.ActWaterCeiling;
+                maxTemperature = acts.ActTemperatureCeiling;
+                maxOxygen = Mathf.Min(100f, unlockedFrac * 100f);
             }
 
             var gm = GenerationManager.Instance;
-            if (gm != null && !gm.IsExpansionPhase)
+            // Colony Acts owns climate ceilings — skip legacy generation headroom that
+            // was letting Temp/Atmos/Water run past 100% of the Act delta.
+            if (gm != null && !gm.IsExpansionPhase
+                && (ColonyActManager.Instance == null || !ColonyActManager.Instance.IsRunActive))
             {
                 int gen = Mathf.Max(1, gm.CurrentGeneration);
                 maxAtmosphere = Mathf.Max(maxAtmosphere, gm.GetTargetAtmosphere(gen));

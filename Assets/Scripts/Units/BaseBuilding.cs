@@ -1123,22 +1123,34 @@ namespace GameDevTV.RTS.Units
             atmosRate *= efficiency;
             waterRate *= efficiency;
 
+            float tempAdd = tempRate > 0f ? tempRate * dt : 0f;
+            float atmosAdd = atmosRate > 0f ? atmosRate * dt : 0f;
+            float waterAdd = waterRate > 0f ? waterRate * dt : 0f;
+
+            var acts = ColonyActManager.Instance;
+            if (acts != null && acts.IsRunActive)
+            {
+                if (!acts.TryApplySectorClimateContribution(
+                        transform.position, ref tempAdd, ref atmosAdd, ref waterAdd))
+                    return;
+            }
+
             Owner climateOwner = Owner != Owner.Invalid ? Owner : Owner.Player1;
 
-            if (tempRate > 0f)
+            if (tempAdd > 0f)
             {
                 float curTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(climateOwner, out float t) ? t : -60f;
-                Supplies.UpdateTemperature(climateOwner, curTemp + tempRate * dt);
+                Supplies.UpdateTemperature(climateOwner, curTemp + tempAdd);
             }
-            if (atmosRate > 0f)
+            if (atmosAdd > 0f)
             {
                 float curAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(climateOwner, out float a) ? a : 0.01f;
-                Supplies.UpdateAtmosphere(climateOwner, curAtmos + atmosRate * dt);
+                Supplies.UpdateAtmosphere(climateOwner, curAtmos + atmosAdd);
             }
-            if (waterRate > 0f)
+            if (waterAdd > 0f)
             {
                 float curWater = Supplies.Water != null && Supplies.Water.TryGetValue(climateOwner, out float w) ? w : 0f;
-                Supplies.UpdateWater(climateOwner, curWater + waterRate * dt);
+                Supplies.UpdateWater(climateOwner, curWater + waterAdd);
             }
         }
 
