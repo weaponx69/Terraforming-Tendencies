@@ -553,7 +553,8 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (building == null) return;
 
-            if (!PowerGridManager.CanPlayBuildingForPower(building, owner))
+            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
                 float used = PowerGridManager.GetBoardPowerUpkeep(owner);
@@ -574,6 +575,16 @@ namespace GameDevTV.RTS.UI.Containers
             {
                 ExplorationManager.NotifyPlacementFailed(
                     $"Need {matCost} Materials to place {building.Name} (have {haveMats}).",
+                    ResolveErrorHintPosition());
+                return;
+            }
+
+            // Geology-gated cards (Aquifers, etc.): must already have a matching sector available.
+            if (DiscoverySystem.TryGetRequiredSectorFeature(building, out var needFeature)
+                && !DiscoverySystem.IsSectorFeatureDiscovered(needFeature))
+            {
+                ExplorationManager.NotifyPlacementFailed(
+                    $"Discover a {needFeature} sector before placing {building.Name}.",
                     ResolveErrorHintPosition());
                 return;
             }

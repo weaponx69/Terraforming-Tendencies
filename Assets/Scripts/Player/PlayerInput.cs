@@ -713,6 +713,22 @@ namespace GameDevTV.RTS.Player
                     tileGhostStickyCell = mineCell;
                     joinCount = ColonyTileGrid.CountOrthogonalNeighbors(mineCell, Owner.Player1);
                 }
+                // Aquifers / feature tiles: soft-snap toward their geology sector when nearby.
+                else if (activeCommand is BuildBuildingCommand featureBbc
+                    && DiscoverySystem.TryGetRequiredSectorFeature(featureBbc.Building, out _)
+                    && !DiscoverySystem.IsOnRequiredSectorFeature(featureBbc.Building, hitPos.Value)
+                    && DiscoverySystem.TryGetAutoFeaturePlacement(
+                        featureBbc.Building, out Vector3 featureSnap, out _))
+                {
+                    float dist = Mathf.Sqrt(ColonyTileGrid.HorizontalDistSq(hitPos.Value, featureSnap));
+                    if (dist <= ColonyTileGrid.TileSize * 4f)
+                    {
+                        hitPos = featureSnap;
+                        tileGhostStickyCell = ColonyTileGrid.WorldToCell(featureSnap);
+                        joinCount = ColonyTileGrid.CountOrthogonalNeighbors(
+                            tileGhostStickyCell.Value, Owner.Player1);
+                    }
+                }
 
                 // Tick when the ghost settles on a new grid cell (louder when joining a neighbor).
                 if (tileGhostStickyCell.HasValue
@@ -741,7 +757,8 @@ namespace GameDevTV.RTS.Player
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
             bool allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
-            if (cardTilePlace && activeCommand is BuildBuildingCommand powerBbc
+            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            if (cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
             {
                 allRestrictionsPass = false;
@@ -749,6 +766,12 @@ namespace GameDevTV.RTS.Player
             if (cardTilePlace && activeCommand is BuildBuildingCommand mineGateBbc
                 && BuildingSiteRegistry.IsMineBuilding(mineGateBbc.Building)
                 && !DiscoverySystem.IsOnDiscoveredMineDeposit(mineGateBbc.Building, snapTarget))
+            {
+                allRestrictionsPass = false;
+            }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand featureGateBbc
+                && DiscoverySystem.TryGetRequiredSectorFeature(featureGateBbc.Building, out _)
+                && !DiscoverySystem.IsOnRequiredSectorFeature(featureGateBbc.Building, snapTarget))
             {
                 allRestrictionsPass = false;
             }

@@ -75,6 +75,8 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Command Posts** (no Materials cost) **auto-claim the next free sector** (repeatable; card re-seats while sectors remain).
 * **Terra-Coins** earn on Act clear: `15 + floor(score/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
 * **Placement score** shows as world `+N` popups. Geology matches (mine on deposit, aquifer on WaterDeposit, geo on volcano/lava/fault) add bonus score + climate resource pulses.
+* **Aquifers hard-locked** to `WaterDeposit` sectors (polar-biased ice zones). Ghost is red outside those sectors.
+* **Mine deposits** show large colored discs + type labels once discovered (Minerals/Gas from start). Old node-shroud no longer hides them.
 * **Q / E** page sectors; on-screen sector names; **no FoW**.
 * **Card week costs vary** (0–2). Spend via `SpendWeeks`.
 * **Power tiles** are optional score (base + upgrade boosts), not a place gate.
@@ -99,7 +101,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 ## 0.3 Loop (how a play works)
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
-2. **Geology** — mines/aquifers/geo on matching spots → score + terraforming pulses + map `+N`.
+2. **Geology** — mines must sit on deposit discs; aquifers must sit in `WaterDeposit` (polar ice) sectors; matching geology also grants score + terraforming pulses + map `+N`.
 3. **Score / climate** — adjacency + optional power bonuses; climate tiles tick without power.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
@@ -264,4 +266,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-11 — Placement-first Colony Acts: free place, Terra-Coin upgrade shop, climate always ticks, map +score FX, geology match bonuses.*
+*Last rewritten: 2026-09-11 — Aquifers hard-locked to polar WaterDeposit sectors; mine deposit markers visible planet-wide.*

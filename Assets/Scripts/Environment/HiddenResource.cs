@@ -51,6 +51,7 @@ namespace GameDevTV.RTS.Environment
                 supply.ToggleColliders(true);
                 supply.SetVisible(true);
             }
+            EnhanceDepositBeacon();
             Bus<ResourceDiscoveredEvent>.Raise(Owner.Unowned, new ResourceDiscoveredEvent(this));
         }
 
@@ -69,7 +70,41 @@ namespace GameDevTV.RTS.Environment
                 supply.ToggleColliders(true);
                 supply.SetVisible(true);
             }
+            EnhanceDepositBeacon();
             Bus<ResourceDiscoveredEvent>.Raise(Owner.Unowned, new ResourceDiscoveredEvent(this));
+        }
+
+        /// <summary>Larger emissive pad + floating type label so mine spots read from camera height.</summary>
+        private void EnhanceDepositBeacon()
+        {
+            transform.localScale = new Vector3(
+                Mathf.Max(transform.localScale.x, 1.4f),
+                Mathf.Max(transform.localScale.y, 0.15f),
+                Mathf.Max(transform.localScale.z, 1.4f));
+
+            if (TryGetComponent<MeshRenderer>(out var mr) && mr.material != null)
+            {
+                Color c = mr.material.color;
+                c.a = 1f;
+                mr.material.color = c;
+                if (mr.material.HasProperty("_EmissionColor"))
+                {
+                    mr.material.EnableKeyword("_EMISSION");
+                    mr.material.SetColor("_EmissionColor", c * 1.6f);
+                }
+            }
+
+            if (transform.Find("DepositLabel") != null) return;
+            var labelGo = new GameObject("DepositLabel");
+            labelGo.transform.SetParent(transform, false);
+            labelGo.transform.localPosition = Vector3.up * 2.8f;
+            var tmp = labelGo.AddComponent<TMPro.TextMeshPro>();
+            tmp.text = string.IsNullOrEmpty(ResourceTypeName) ? "Deposit" : ResourceTypeName;
+            tmp.fontSize = 5.5f;
+            tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            tmp.fontStyle = TMPro.FontStyles.Bold;
+            tmp.color = new Color(1f, 0.95f, 0.55f, 1f);
+            tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         }
     }
 }

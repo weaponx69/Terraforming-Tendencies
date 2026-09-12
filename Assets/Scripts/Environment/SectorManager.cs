@@ -181,43 +181,51 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            int nonStartCount = Mathf.Max(0, sectorCoordinates.Count - 1);
-            List<SectorFeature> featureBag = BuildShuffledSectorFeatures(nonStartCount);
-            int featureCursor = 0;
-
+            var pending = new List<(Vector2Int coord, Vector3 center, bool isFirst)>(sectorCoordinates.Count);
             for (int i = 0; i < sectorCoordinates.Count; i++)
             {
-                    int x = sectorCoordinates[i].x;
-                    int y = sectorCoordinates[i].y;
-                    Vector3 center = new Vector3(
-                        (x + 0.5f) * secW,
-                        0,
-                        (y + 0.5f) * secH
-                    );
+                int x = sectorCoordinates[i].x;
+                int y = sectorCoordinates[i].y;
+                Vector3 center = new Vector3(
+                    (x + 0.5f) * secW,
+                    0,
+                    (y + 0.5f) * secH
+                );
 
-                    // Snap to ground height
-                    if (Physics.Raycast(center + Vector3.up * 100f, Vector3.down, out RaycastHit hit, 200f, LayerMask.GetMask("Default", "Terrain")))
-                    {
-                        center.y = hit.point.y;
-                    }
+                if (Physics.Raycast(center + Vector3.up * 100f, Vector3.down, out RaycastHit hit, 200f,
+                        LayerMask.GetMask("Default", "Terrain")))
+                {
+                    center.y = hit.point.y;
+                }
 
-                    bool isFirst = i == 0;
-                    SectorFeature feature = SectorFeature.None;
-                    if (!isFirst && featureCursor < featureBag.Count)
-                        feature = featureBag[featureCursor++];
-
-                    // Sector lockdown retired (whole-board terraforming): pads/builds available planet-wide.
-                    Sectors.Add(new Sector { Center = center, IsOccupied = false, IsLocked = false, IsExplored = true, Feature = feature });
+                pending.Add((sectorCoordinates[i], center, i == 0));
             }
-            
+
+            List<SectorFeature> features = BuildPolarBiasedSectorFeatures(pending);
+            for (int i = 0; i < pending.Count; i++)
+            {
+                // Sector lockdown retired (whole-board terraforming): pads/builds available planet-wide.
+                Sectors.Add(new Sector
+                {
+                    Center = pending[i].center,
+                    IsOccupied = false,
+                    IsLocked = false,
+                    IsExplored = true,
+                    Feature = features[i]
+                });
+            }
+
             if (Sectors.Count > 0)
             {
                 BeginTerraformingOn(Sectors[0]);
 
                 // Force-discover Minerals and Gas types so the player can bootstrap.
-                // Individual deposit nodes still need hex reveal / exploration to appear.
                 DiscoverySystem.RevealResourceType("Minerals");
                 DiscoverySystem.RevealResourceType("Gas");
+
+                // FoW retired — geology features are known so Aquifers can hard-lock to WaterDeposit.
+                foreach (var sector in Sectors)
+                    DiscoverySystem.RevealFeaturesForSector(sector);
 
                 DiscoverStartingSectorResources();
                 UpdateSectorBorders();
@@ -227,9 +235,60 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Random sector geology for every non-start sector. Ensures each feature type
-        /// (Volcano / FaultLine / LavaTube / WaterDeposit) appears at least once when
-        /// there are enough sectors, then fills the rest at random and shuffles.
+        /// WaterDeposit (ice / aquifers) prefers polar map rows (extreme Z). Other features fill the rest.
+        /// </summary>
+        private static List<SectorFeature> BuildPolarBiasedSectorFeatures(
+            List<(Vector2Int coord, Vector3 center, bool isFirst)> pending)
+        {
+            var result = new List<SectorFeature>(pending.Count);
+            for (int i = 0; i < pending.Count; i++)
+                result.Add(SectorFeature.None);
+
+            var nonStart = new List<int>();
+            for (int i = 0; i < pending.Count; i++)
+            {
+                if (!pending[i].isFirst) nonStart.Add(i);
+            }
+            if (nonStart.Count == 0) return result;
+
+            float midZ = 0f;
+            foreach (var p in pending) midZ += p.center.z;
+            midZ /= Mathf.Max(1, pending.Count);
+
+            nonStart.Sort((a, b) =>
+            {
+                float da = Mathf.Abs(pending[a].center.z - midZ);
+                float db = Mathf.Abs(pending[b].center.z - midZ);
+                return db.CompareTo(da);
+            });
+
+            int waterBudget = Mathf.Clamp(Mathf.CeilToInt(nonStart.Count / 4f), 1, 3);
+            int cursor = 0;
+            for (int w = 0; w < waterBudget && cursor < nonStart.Count; w++, cursor++)
+                result[nonStart[cursor]] = SectorFeature.WaterDeposit;
+
+            SectorFeature[] others =
+            {
+                SectorFeature.Volcano,
+                SectorFeature.FaultLine,
+                SectorFeature.LavaTube
+            };
+            for (int o = 0; o < others.Length && cursor < nonStart.Count; o++, cursor++)
+                result[nonStart[cursor]] = others[o];
+
+            int otherIdx = 0;
+            while (cursor < nonStart.Count)
+            {
+                result[nonStart[cursor]] = others[otherIdx % others.Length];
+                otherIdx++;
+                cursor++;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Random sector geology bag (legacy). Prefer <see cref="BuildPolarBiasedSectorFeatures"/>.
         /// </summary>
         private static List<SectorFeature> BuildShuffledSectorFeatures(int count)
         {

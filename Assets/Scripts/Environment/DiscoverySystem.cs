@@ -39,7 +39,7 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Sector feature a building requires (Subglacial→WaterDeposit, Lava Tube→LavaTube, …).
+        /// Sector feature a building requires (Aquifer→WaterDeposit, Lava Tube→LavaTube, …).
         /// Returns false when the building is free-place climate/infra (no geology gate).
         /// </summary>
         public static bool TryGetRequiredSectorFeature(BuildingSO building, out SectorManager.SectorFeature feature)
@@ -48,8 +48,12 @@ namespace GameDevTV.RTS.Environment
             if (building == null || string.IsNullOrEmpty(building.Name)) return false;
 
             string name = building.Name;
-            if (name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("Biosphere", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            // Aquifers / ice water must sit in WaterDeposit (polar ice) sectors.
+            if (name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Biosphere", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || (name.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    && name.IndexOf("Ice", System.StringComparison.OrdinalIgnoreCase) >= 0))
             {
                 feature = SectorManager.SectorFeature.WaterDeposit;
                 return true;
@@ -66,8 +70,108 @@ namespace GameDevTV.RTS.Environment
                 feature = SectorManager.SectorFeature.FaultLine;
                 return true;
             }
-            // Water Ice Aquifer is a normal climate tile — not geology-gated.
             return false;
+        }
+
+        /// <summary>
+        /// True when <paramref name="worldPos"/> is inside a sector that has the building's
+        /// required geology feature (Aquifer → WaterDeposit, etc.). Free-place buildings always pass.
+        /// </summary>
+        public static bool IsOnRequiredSectorFeature(BuildingSO building, Vector3 worldPos)
+        {
+            if (!TryGetRequiredSectorFeature(building, out var feature)) return true;
+            var nearest = SectorManager.Instance?.GetNearestSector(worldPos);
+            return nearest != null && nearest.Feature == feature;
+        }
+
+        /// <summary>First free tile in a matching feature sector (for aquifer auto-place / snap).</summary>
+        public static bool TryGetAutoFeaturePlacement(BuildingSO building, out Vector3 worldPos, out string failReason)
+        {
+            worldPos = Vector3.zero;
+            failReason = null;
+            if (!TryGetRequiredSectorFeature(building, out var feature))
+            {
+                failReason = "No geology feature required.";
+                return false;
+            }
+            if (!IsSectorFeatureDiscovered(feature))
+            {
+                failReason = $"Discover a {feature} sector first.";
+                return false;
+            }
+            if (SectorManager.Instance == null || SectorManager.Instance.Sectors == null)
+            {
+                failReason = "No sectors.";
+                return false;
+            }
+
+            var occupied = ColonyTileGrid.GetOccupiedCells(Owner.Player1);
+            SectorManager.Sector focus = SectorManager.Instance.GetClimateFocusSector();
+            Vector3? focusPick = null;
+            Vector3? anyPick = null;
+
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector == null || sector.Feature != feature) continue;
+                Vector3 candidate = sector.Center;
+                // Prefer the feature node marker when present.
+                if (sector.Nodes != null)
+                {
+                    foreach (var node in sector.Nodes)
+                    {
+                        if (node != null && node.type == SectorNode.NodeType.Feature)
+                        {
+                            candidate = node.position;
+                            break;
+                        }
+                    }
+                }
+
+                var cell = ColonyTileGrid.WorldToCell(candidate);
+                if (occupied.Contains(cell))
+                {
+                    // Nudge to a free orthogonal neighbor.
+                    bool foundFree = false;
+                    Vector2Int[] dirs = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1), new(2, 0), new(0, 2) };
+                    foreach (var d in dirs)
+                    {
+                        var n = new Vector2Int(cell.x + d.x, cell.y + d.y);
+                        if (occupied.Contains(n)) continue;
+                        candidate = ColonyTileGrid.CellToWorld(n, candidate.y);
+                        cell = n;
+                        foundFree = true;
+                        break;
+                    }
+                    if (!foundFree) continue;
+                }
+
+                anyPick ??= candidate;
+                if (focus != null && sector == focus)
+                {
+                    focusPick = candidate;
+                    break;
+                }
+            }
+
+            Vector3? pick = focusPick ?? anyPick;
+            if (!pick.HasValue)
+            {
+                failReason = $"No free tile in a {feature} sector.";
+                return false;
+            }
+
+            worldPos = ColonyTileGrid.CellToWorld(ColonyTileGrid.WorldToCell(pick.Value), pick.Value.y);
+            return true;
+        }
+
+        /// <summary>
+        /// Re-apply type discovery to nodes spawned after the initial RevealResourceType call
+        /// (planet gen creates HiddenResources after SectorManager reveals Minerals/Gas).
+        /// </summary>
+        public static void RefreshDiscoveredResourceNodes()
+        {
+            foreach (string type in discoveredTypes)
+                DiscoverAllNodesOfType(type);
         }
 
         /// <summary>

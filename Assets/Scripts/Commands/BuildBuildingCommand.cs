@@ -96,6 +96,9 @@ namespace GameDevTV.RTS.Commands
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
                 }
+                if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
+                    && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
+                    return false;
                 return AllRestrictionsPass(targetPos, context.Owner, requireWorker: false);
             }
 
@@ -207,16 +210,20 @@ namespace GameDevTV.RTS.Commands
                         }
                         if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         {
-                            if (DiscoverySystem.TryGetAutoMinePlacement(Building, out Vector3 autoPos, out _))
-                                targetPos = autoPos;
-                            else
-                            {
-                                ExplorationManager.NotifyPlacementFailed(
-                                    "Place this mine on a discovered deposit of the matching resource.",
-                                    targetPos);
-                                return;
-                            }
+                            ExplorationManager.NotifyPlacementFailed(
+                                "Place this mine on a discovered deposit of the matching resource.",
+                                targetPos);
+                            return;
                         }
+                    }
+
+                    if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature)
+                        && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            $"Place {Building.Name} in a {needFeature} sector (polar ice / aquifer zones).",
+                            targetPos);
+                        return;
                     }
 
                     if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
@@ -452,14 +459,15 @@ namespace GameDevTV.RTS.Commands
             }
 
             // Check sector feature requirement for themed buildings (legacy non-card path).
-            // Card plays use DiscoverySystem geology gates instead (hand + ExplainCardPlacementFailure).
+            // Card plays also require standing in the matching feature sector.
             if (HandIndex < 0)
             {
                 string bldName = Building.Name;
                 var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
                 bool requiresFeature = bldName.Contains("Lava Tube") || bldName.Contains("Subterranean") ||
                                        bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield") ||
-                                       bldName.Contains("Subglacial") || bldName.Contains("Biosphere");
+                                       bldName.Contains("Subglacial") || bldName.Contains("Biosphere") ||
+                                       bldName.Contains("Aquifer");
                 if (requiresFeature && sectorMgr != null)
                 {
                     var nearestSector = sectorMgr.GetNearestSector(new Vector3(point.x, 0, point.z));
@@ -470,7 +478,8 @@ namespace GameDevTV.RTS.Commands
                             hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.LavaTube;
                         else if (bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield"))
                             hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.FaultLine;
-                        else if (bldName.Contains("Subglacial") || bldName.Contains("Biosphere"))
+                        else if (bldName.Contains("Subglacial") || bldName.Contains("Biosphere")
+                            || bldName.Contains("Aquifer"))
                             hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.WaterDeposit;
 
                         if (!hasFeature && nearestSector.IsExplored)
@@ -480,9 +489,12 @@ namespace GameDevTV.RTS.Commands
                     }
                 }
             }
-            else if (!DiscoverySystem.IsBuildingGeologicallyAvailable(Building))
+            else
             {
-                return false;
+                if (!DiscoverySystem.IsBuildingGeologicallyAvailable(Building))
+                    return false;
+                if (!DiscoverySystem.IsOnRequiredSectorFeature(Building, point))
+                    return false;
             }
 
             return true;
@@ -521,10 +533,12 @@ namespace GameDevTV.RTS.Commands
                     return "Place this mine on the matching discovered deposit tile.";
             }
 
-            if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature)
-                && !DiscoverySystem.IsSectorFeatureDiscovered(feature))
+            if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
             {
-                return $"Discover a {feature} geological feature first (scout / reach that sector).";
+                if (!DiscoverySystem.IsSectorFeatureDiscovered(feature))
+                    return $"Discover a {feature} geological feature first (scout / reach that sector).";
+                if (!DiscoverySystem.IsOnRequiredSectorFeature(Building, point))
+                    return $"Place {Building.Name} in a {feature} sector (polar ice / aquifer zones).";
             }
 
             if (!AllRestrictionsPass(point, owner, requireWorker: false))

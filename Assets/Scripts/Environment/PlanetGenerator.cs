@@ -618,11 +618,12 @@ namespace GameDevTV.RTS.Environment
                     // Build connection graph between nodes
                     BuildNodeConnections();
 
-                    // Spawn visual markers (small dots + "?" labels)
+                    // Spawn visual markers (colored discs + labels)
                     SpawnNodeVisuals();
 
                     // Resource types for Sector 0 are discovered before node visuals exist.
-                    // Run the discovery pass again now that their HiddenResource components are present.
+                    // Re-apply so Minerals/Gas discs light up planet-wide (FoW retired).
+                    DiscoverySystem.RefreshDiscoveredResourceNodes();
                     SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
 
                     // Set Sector 0's first node as explored (entry point from UCC)
@@ -948,26 +949,39 @@ namespace GameDevTV.RTS.Environment
                             float dotSize;
                             switch (node.type)
                             {
-                                case SectorNode.NodeType.Minerals:   dotColor = new Color(0.3f, 0.6f, 1f); dotSize = 0.15f; break;
-                                case SectorNode.NodeType.Gas:        dotColor = new Color(0.2f, 1f, 0.3f); dotSize = 0.15f; break;
-                                case SectorNode.NodeType.Iron:       dotColor = new Color(0.7f, 0.7f, 0.7f); dotSize = 0.15f; break;
-                                case SectorNode.NodeType.Regolith:   dotColor = new Color(0.6f, 0.4f, 0.2f); dotSize = 0.15f; break;
-                                case SectorNode.NodeType.Feature:    dotColor = new Color(1f, 0.5f, 0f); dotSize = 0.2f; break;
-                                case SectorNode.NodeType.Nexus:      dotColor = new Color(1f, 0f, 1f); dotSize = 0.2f; break;
-                                default: dotColor = Color.white; dotSize = 0.1f; break;
+                                case SectorNode.NodeType.Minerals:   dotColor = new Color(0.25f, 0.65f, 1f); dotSize = 0.55f; break;
+                                case SectorNode.NodeType.Gas:        dotColor = new Color(0.2f, 1f, 0.35f); dotSize = 0.55f; break;
+                                case SectorNode.NodeType.Iron:       dotColor = new Color(0.85f, 0.55f, 0.35f); dotSize = 0.55f; break;
+                                case SectorNode.NodeType.Regolith:   dotColor = new Color(0.75f, 0.55f, 0.25f); dotSize = 0.55f; break;
+                                case SectorNode.NodeType.Feature:
+                                    // WaterDeposit / ice aquifers read cyan; other geology orange.
+                                    bool waterFeature = !string.IsNullOrEmpty(node.labelOverride)
+                                        && node.labelOverride.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                                    dotColor = waterFeature
+                                        ? new Color(0.35f, 0.85f, 1f)
+                                        : new Color(1f, 0.55f, 0.15f);
+                                    dotSize = 0.85f;
+                                    break;
+                                case SectorNode.NodeType.Nexus:      dotColor = new Color(1f, 0f, 1f); dotSize = 0.55f; break;
+                                default: dotColor = Color.white; dotSize = 0.4f; break;
                             }
 
-                            // Use a flat cylinder (disc) for the dot — larger so visible
+                            // Use a flat cylinder (disc) for the dot — large enough to read as a deposit pad.
                             var dot = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                             dot.name = $"Node_{node.type}";
                             dot.transform.position = spawnPos;
-                            float visSize = Mathf.Max(dotSize, 0.4f); // Minimum visible size
-                            dot.transform.localScale = new Vector3(visSize, 0.1f, visSize);
+                            float visSize = Mathf.Max(dotSize, 0.7f);
+                            dot.transform.localScale = new Vector3(visSize, 0.12f, visSize);
                             dot.transform.parent = transform; // Parent to PlanetGenerator so AI can find it
                             dot.layer = LayerMask.NameToLayer("Supplies"); // Set to Supplies layer
                             var dotRenderer = dot.GetComponent<MeshRenderer>();
                             var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                             dotMat.color = dotColor;
+                            if (dotMat.HasProperty("_EmissionColor"))
+                            {
+                                dotMat.EnableKeyword("_EMISSION");
+                                dotMat.SetColor("_EmissionColor", dotColor * 1.4f);
+                            }
                             dotRenderer.material = dotMat;
 
                             // Make the collider larger and wider for easier clicking
@@ -1011,17 +1025,22 @@ namespace GameDevTV.RTS.Environment
                                                          var explorable = dot.AddComponent<ExplorableNode>();
                                                          explorable.NodeData = node;
                                                          
-                                                         // --- "?" floating label (much bigger) ---
+                                                         // --- Floating label (feature name or "?") ---
                                                          var qmGo = new GameObject($"QuestionMark_{node.type}");
-                                                         qmGo.transform.position = spawnPos + Vector3.up * 2.5f;
+                                                         qmGo.transform.position = spawnPos + Vector3.up * 3.2f;
                                                          qmGo.transform.parent = questionMarkRoot.transform;
                                                          var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
-                                                         qmText.text = "?";
-                                                         qmText.fontSize = 8f;
+                                                         string label = !string.IsNullOrEmpty(node.labelOverride)
+                                                             ? node.labelOverride
+                                                             : "?";
+                                                         qmText.text = label;
+                                                         qmText.fontSize = node.type == SectorNode.NodeType.Feature ? 6f : 5f;
                                                          qmText.alignment = TMPro.TextAlignmentOptions.Center;
-                                                         qmText.color = Color.yellow;
+                                                         qmText.color = node.type == SectorNode.NodeType.Feature
+                                                             ? new Color(0.55f, 0.95f, 1f)
+                                                             : Color.yellow;
                                                          qmText.fontStyle = TMPro.FontStyles.Bold;
-                                                         qmText.transform.localScale = Vector3.one * 0.8f;
+                                                         qmText.transform.localScale = Vector3.one * 0.9f;
                                                          node.questionMarkGO = qmGo;
                                                      }
                                                  }
@@ -1067,7 +1086,7 @@ namespace GameDevTV.RTS.Environment
                 }
 
                 /// <summary>
-                /// Update visibility of dots and "?" labels based on node states.
+                /// Update visibility of dots and labels. FoW / node shroud retired — show all markers.
                 /// </summary>
                 private void UpdateAllNodeVisibility()
                 {
@@ -1075,10 +1094,12 @@ namespace GameDevTV.RTS.Environment
                     {
                         foreach (var node in sector.Nodes)
                         {
-                            // Dot visible if explored OR discovered
-                            node.SetVisualVisible(node.isExplored || node.isDiscovered);
-                            // "?" visible only when discovered but not yet explored
-                            node.SetQuestionMarkVisible(node.isDiscovered && !node.isExplored);
+                            node.SetVisualVisible(true);
+                            // Feature / nexus keep name labels; hide legacy "?" on resources
+                            // (HiddenResource beacons carry the deposit name instead).
+                            bool showLabel = node.type == SectorNode.NodeType.Feature
+                                || node.type == SectorNode.NodeType.Nexus;
+                            node.SetQuestionMarkVisible(showLabel);
                         }
                     }
                 }
