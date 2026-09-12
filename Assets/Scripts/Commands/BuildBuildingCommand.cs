@@ -81,7 +81,7 @@ namespace GameDevTV.RTS.Commands
             // Card plays: Materials waived under Colony Acts; power is optional (not a place gate).
             if (HandIndex >= 0)
             {
-                bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+                bool colonyActs = ColonyActManager.Instance != null;
                 if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
                 if (!HasEnoughMaterialsForCard(context.Owner))
@@ -181,7 +181,7 @@ namespace GameDevTV.RTS.Commands
 
                 if (HandIndex >= 0)
                 {
-                    bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+                    bool colonyActs = ColonyActManager.Instance != null;
                     if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
@@ -505,7 +505,7 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null) return "No building on this card.";
 
-            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            bool colonyActs = ColonyActManager.Instance != null;
             if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);

@@ -553,7 +553,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (building == null) return;
 
-            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            bool colonyActs = ColonyActManager.Instance != null;
             if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);

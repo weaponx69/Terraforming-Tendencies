@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
-                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                if (ColonyActManager.Instance != null)
                     return 0;
                 if (waiveMaterialsCost) return 0;
                 if (MaterialsCost > 0) return MaterialsCost;

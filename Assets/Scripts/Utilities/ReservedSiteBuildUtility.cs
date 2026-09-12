@@ -536,12 +536,10 @@ namespace GameDevTV.RTS.Utilities
         private static bool HasEnoughMaterials(BuildingSO building, Owner owner)
         {
             if (building == null) return false;
-            if (Supplies.Materials == null || !Supplies.Materials.TryGetValue(owner, out int materials))
-            {
-                return false;
-            }
-
             int materialsCost = GetMaterialsCost(building);
+            if (materialsCost <= 0) return true;
+            if (Supplies.Materials == null || !Supplies.Materials.TryGetValue(owner, out int materials))
+                return false;
             return materialsCost <= materials;
         }
 
@@ -549,25 +547,15 @@ namespace GameDevTV.RTS.Utilities
         {
             if (building == null) return false;
 
-            _ = Supplies.Materials;
-
-            if (!Supplies.Materials.TryGetValue(owner, out int materials))
-            {
-                return false;
-            }
-
             int materialsCost = GetMaterialsCost(building);
-            if (materialsCost <= 0)
-            {
-                // Never treat a real building as free to place.
-                materialsCost = Mathf.Max(150, building.Cost != null ? building.Cost.Minerals : 150);
-                Debug.LogWarning($"[ReservedSiteBuild] {building.Name} resolved to 0 cost — charging {materialsCost} Materials.");
-            }
+            // Colony Acts intentionally prices cards at 0 — do not re-impose a legacy Materials tax.
+            if (materialsCost <= 0) return true;
+
+            if (Supplies.Materials == null || !Supplies.Materials.TryGetValue(owner, out int materials))
+                return false;
 
             if (materialsCost > materials)
-            {
                 return false;
-            }
 
             int remaining = materials - materialsCost;
             Supplies.Materials[owner] = remaining;
@@ -614,7 +602,8 @@ namespace GameDevTV.RTS.Utilities
 
             // Asset costs were tuned for the old RTS economy (100–400). Colony Acts
             // is placement-first — no Materials gate (Terra-Coins are shop-only).
-            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+            // Waive as soon as the Acts manager exists (including before BeginRun / after fail).
+            if (ColonyActManager.Instance != null)
                 return 0;
 
             return configured;

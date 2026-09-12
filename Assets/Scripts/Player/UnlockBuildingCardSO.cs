@@ -13,7 +13,7 @@ namespace GameDevTV.RTS.Player
             public override bool CanApply()
             {
                 if (buildingToUnlock == null) return false;
-                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                if (ColonyActManager.Instance != null)
                 {
                     if (!DiscoverySystem.IsBuildingGeologicallyAvailable(buildingToUnlock))
                         return false;
@@ -26,7 +26,7 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
-                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                if (ColonyActManager.Instance != null)
                     return 0;
                 int fromBuilding = ReservedSiteBuildUtility.GetMaterialsCost(buildingToUnlock);
                 int fromCard = MaterialsCost;

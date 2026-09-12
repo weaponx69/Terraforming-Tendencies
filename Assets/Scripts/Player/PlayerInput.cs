@@ -757,7 +757,7 @@ namespace GameDevTV.RTS.Player
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
             bool allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
-            bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
+            bool colonyActs = ColonyActManager.Instance != null;
             if (cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
             {

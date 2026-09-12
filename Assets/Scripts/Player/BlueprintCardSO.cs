@@ -33,7 +33,7 @@ namespace GameDevTV.RTS.Player
         /// <summary>Materials required to play this card (shown on the hand UI).</summary>
         public virtual int GetMaterialsPlayCost()
         {
-            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+            if (ColonyActManager.Instance != null)
                 return 0;
             return Mathf.Max(0, materialsCost);
         }
