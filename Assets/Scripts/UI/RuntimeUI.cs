@@ -548,6 +548,18 @@ namespace GameDevTV.RTS.UI
                         var rt = aObj.GetComponent<RectTransform>();
                         if (rt != null) rt.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX * 3f, 0f);
                     }
+                    if (wObj != null)
+                    {
+                        var rt = wObj.GetComponent<RectTransform>();
+                        if (rt != null) rt.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX * 4f, 0f);
+                    }
+                    var oObj = FindChildRecursive(containerParent, "Oxygen Container")
+                        ?? containerParent.Find("Oxygen Container");
+                    if (oObj != null)
+                    {
+                        var rt = oObj.GetComponent<RectTransform>();
+                        if (rt != null) rt.anchoredPosition = rtInt.anchoredPosition + new Vector2(stepX * 5f, 0f);
+                    }
                 }
 
                 // Force layout recalculation
@@ -601,8 +613,8 @@ namespace GameDevTV.RTS.UI
                 }
             }
             
-            // Special case for the duplicate population text if it exists
-            if (populationText == null && oxygenValueText != null) populationText = oxygenValueText;
+            // Do NOT alias Population onto Oxygen — that overwrote the O₂ % meter.
+            // Population is optional flavor; leave populationText null if no dedicated widget exists.
 
             GameObject probeContainer = GameObject.Find("Probe Progress Container");
             if (probeContainer == null)
@@ -786,6 +798,103 @@ namespace GameDevTV.RTS.UI
 
             EnsureMaterialsMetricVisible();
             EnsureBiomassDoesNotCoverMaterials();
+            EnsureClimateMetricsVisible();
+        }
+
+        /// <summary>
+        /// Force Temp / Atmos / Water / Oxygen containers on-screen with readable labels.
+        /// </summary>
+        private void EnsureClimateMetricsVisible()
+        {
+            ForceMetricContainerVisible(temperatureLabelText, temperatureValueText, "Temp", "TEMPERATURE",
+                "Temperature Container", "Temp Container");
+            ForceMetricContainerVisible(atmosphereLabelText, atmosphereValueText, "Atmos", "ATMOSPHERE",
+                "Atmosphere Container");
+            ForceMetricContainerVisible(waterLabelText, waterValueText, "Water", "WATER",
+                "Water Container");
+            ForceMetricContainerVisible(oxygenLabelText, oxygenValueText, "Oxygen", "OXYGEN",
+                "Oxygen Container");
+
+            // Refresh live values so they aren't stuck blank after layout rebuild.
+            if (temperatureValueText != null)
+            {
+                float tempVal = Supplies.Temperature != null
+                    && Supplies.Temperature.TryGetValue(displayedOwner, out float t) ? t : -60f;
+                temperatureValueText.SetText($"{tempVal:F1}°C");
+            }
+            if (atmosphereValueText != null)
+            {
+                float atmosVal = Supplies.Atmosphere != null
+                    && Supplies.Atmosphere.TryGetValue(displayedOwner, out float a) ? a : 0.01f;
+                atmosphereValueText.SetText($"{atmosVal:F2} atm");
+            }
+            if (waterValueText != null)
+            {
+                float waterVal = Supplies.Water != null
+                    && Supplies.Water.TryGetValue(displayedOwner, out float w) ? w : 0f;
+                waterValueText.SetText($"{waterVal:F1}%");
+            }
+            if (oxygenValueText != null)
+            {
+                float oxyVal = Supplies.Oxygen != null
+                    && Supplies.Oxygen.TryGetValue(displayedOwner, out float o) ? o : 0f;
+                oxygenValueText.SetText($"{oxyVal:F1}%");
+            }
+        }
+
+        private void ForceMetricContainerVisible(
+            TextMeshProUGUI label,
+            TextMeshProUGUI value,
+            string shortLabel,
+            string goalKey,
+            params string[] containerNames)
+        {
+            if (label != null)
+            {
+                label.gameObject.SetActive(true);
+                label.SetText(shortLabel);
+                label.color = TerraformingGoalColors.ForGoal(goalKey);
+                label.fontSize = Mathf.Max(label.fontSize, 18f);
+                label.fontStyle = FontStyles.Bold;
+                EnsureTextOutline(label, new Color(0f, 0f, 0f, 0.95f), new Vector2(1.5f, -1.5f));
+            }
+            if (value != null)
+            {
+                value.gameObject.SetActive(true);
+                StyleValueText(value);
+                value.fontSize = Mathf.Max(value.fontSize, 20f);
+                value.color = Color.white;
+                EnsureTextOutline(value, new Color(0f, 0f, 0f, 0.95f), new Vector2(1.5f, -1.5f));
+            }
+
+            Transform container = FindMetricContainer(value, containerNames)
+                ?? FindMetricContainer(label, containerNames);
+            foreach (string name in containerNames)
+            {
+                if (container != null) break;
+                container = FindChildRecursive(transform, name);
+            }
+            if (container == null) return;
+
+            container.gameObject.SetActive(true);
+            EnsureFixedMetricBox(label, value, ResolveMetricBoxWidth(shortLabel));
+            // Keep climate after Materials but ahead of obscure integrity/sectors if possible.
+            if (container.parent != null)
+            {
+                int materialsIndex = -1;
+                for (int i = 0; i < container.parent.childCount; i++)
+                {
+                    string n = container.parent.GetChild(i).name;
+                    if (n.IndexOf("Mineral", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Material", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        materialsIndex = i;
+                        break;
+                    }
+                }
+                if (materialsIndex >= 0)
+                    container.SetSiblingIndex(Mathf.Min(materialsIndex + 4, container.parent.childCount - 1));
+            }
         }
 
         /// <summary>
@@ -1044,13 +1153,13 @@ namespace GameDevTV.RTS.UI
             {
                 "Materials" => 128f,
                 "Biomass" => 200f,
-                "Oxygen" => 118f,
+                "Oxygen" => 130f,
                 "Power" => 108f,
                 "Integrity" => 118f,
                 "Sectors" => 148f,
-                "Temp" => 126f,
-                "Atmos" => 132f,
-                "Water" => 118f,
+                "Temp" => 140f,
+                "Atmos" => 148f,
+                "Water" => 130f,
                 _ => 124f
             };
         }

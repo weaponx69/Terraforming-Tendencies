@@ -25,8 +25,8 @@ namespace GameDevTV.RTS.UI.Containers
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
             // Tall right info column so Act goals / climate lines fit.
-            rect.sizeDelta = new Vector2(460f, 620f);
-            rect.anchoredPosition = new Vector2(-20f, -120f);
+            rect.sizeDelta = new Vector2(500f, 680f);
+            rect.anchoredPosition = new Vector2(-16f, -128f);
 
             if (layoutReady) return;
             layoutReady = true;
@@ -79,13 +79,16 @@ namespace GameDevTV.RTS.UI.Containers
 
             bodyText = bodyGO.AddComponent<TextMeshProUGUI>();
             if (projectFont != null) bodyText.font = projectFont;
-            bodyText.fontSize = 14f;
+            bodyText.fontSize = 16f;
             bodyText.alignment = TextAlignmentOptions.TopLeft;
             bodyText.textWrappingMode = TextWrappingModes.Normal;
-            bodyText.lineSpacing = 1.2f;
+            bodyText.lineSpacing = 4f;
             bodyText.color = Color.white;
             bodyText.richText = true;
             bodyText.raycastTarget = false;
+            var bodyOutline = bodyGO.AddComponent<Outline>();
+            bodyOutline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+            bodyOutline.effectDistance = new Vector2(1.2f, -1.2f);
         }
 
         private void Update()

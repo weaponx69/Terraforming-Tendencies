@@ -281,4 +281,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-12 — Command Posts / drones use focused sector (Q/E); full geology card↔feature map.*
+*Last rewritten: 2026-09-12 — Climate gains high-contrast in Active Objectives; Temp/Atmos/Water/Oxygen strip readability.*

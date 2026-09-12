@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 
@@ -1071,16 +1072,36 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color=#FFE08A>TERRA-COINS  {terraCoins}</color>  <color=#A8B0B8>(shop on Act clear; carries)</color>");
 
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
-            tempGain = Mathf.Min(tempGain, GenerationManager.SectorTemperatureDelta);
-            atmosGain = Mathf.Min(atmosGain, GenerationManager.SectorAtmosphereDelta);
-            waterGain = Mathf.Min(waterGain, GenerationManager.SectorWaterDelta);
+            float tempCap = GenerationManager.SectorTemperatureDelta;
+            float atmosCap = GenerationManager.SectorAtmosphereDelta;
+            float waterCap = GenerationManager.SectorWaterDelta;
+            tempGain = Mathf.Min(tempGain, tempCap);
+            atmosGain = Mathf.Min(atmosGain, atmosCap);
+            waterGain = Mathf.Min(waterGain, waterCap);
             string climateMark = IsClimateMet ? "✓" : "○";
             string climateColor = IsClimateMet ? "#7CFF9A" : "#FFE08A";
-            sb.AppendLine($"<color={climateColor}>{climateMark} CLIMATE GAINS  {climate:P0}</color>");
-            sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Temp  {FormatGain(tempGain, 1)} / +{GenerationManager.SectorTemperatureDelta:F0}.0 °C</mspace></color>");
-            sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Atmos {FormatGain(atmosGain, 2)} / +{GenerationManager.SectorAtmosphereDelta:F2} atm</mspace></color>");
-            sb.AppendLine($"  <color=#A8B0B8><mspace=0.55em>Water {FormatGain(waterGain, 1)} / +{GenerationManager.SectorWaterDelta:F0}.0 %</mspace></color>");
-            sb.AppendLine($"  <color=#A8B0B8>Planet-wide gains from Act baselines (any unlocked sector ticks).</color>");
+            sb.AppendLine($"<color={climateColor}><b>{climateMark} CLIMATE GAINS  {climate:P0}</b></color>");
+            sb.AppendLine($"  <color=#C8D0D8>{ProgressBar(Mathf.RoundToInt(climate * 100f), 100)}</color>");
+            sb.AppendLine(FormatClimateChannelLine(
+                "TEMP", "TEMPERATURE", tempGain, tempCap, "°C", 1));
+            sb.AppendLine(FormatClimateChannelLine(
+                "ATMOS", "ATMOSPHERE", atmosGain, atmosCap, "atm", 2));
+            sb.AppendLine(FormatClimateChannelLine(
+                "WATER", "WATER", waterGain, waterCap, "%", 1));
+
+            float oxy = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
+            string oxyHex = TerraformingGoalColors.ToHex(TerraformingGoalColors.Oxygen);
+            sb.AppendLine($"  <color={oxyHex}><b>OXYGEN</b>  {oxy:F1}%</color>  <color=#A8B0B8>(planet total)</color>");
+
+            float absTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
+            float absAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float at) ? at : 0.01f;
+            float absWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wt) ? wt : 0f;
+            sb.AppendLine(
+                $"  <color=#A8B0B8>Now:</color> " +
+                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature)}>{absTemp:F1}°C</color>  " +
+                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Atmosphere)}>{absAtmos:F2} atm</color>  " +
+                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Water)}>{absWater:F1}%</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start (any sector ticks; each ≤ 1/{ClimateBudgetSectorCount}).</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";
@@ -1117,15 +1138,35 @@ namespace GameDevTV.RTS.Player
             return new string('█', filled) + new string('░', width - filled);
         }
 
+        /// <summary>One high-contrast climate channel line for Active Objectives.</summary>
+        private static string FormatClimateChannelLine(
+            string shortLabel, string goalKey, float gain, float target, string unit, int decimals)
+        {
+            string hex = TerraformingGoalColors.ToHex(TerraformingGoalColors.ForGoal(goalKey));
+            bool met = target <= 0.0001f || gain >= target - 0.0005f;
+            string valueHex = met
+                ? TerraformingGoalColors.ToHex(TerraformingGoalColors.MetValue)
+                : TerraformingGoalColors.ToHex(TerraformingGoalColors.UnmetValue);
+            string gainText = FormatGain(gain, decimals);
+            string targetText = decimals <= 0
+                ? $"+{target:F0}"
+                : $"+{target.ToString($"F{decimals}")}";
+            int barMax = 100;
+            int barVal = target > 0.0001f
+                ? Mathf.RoundToInt(Mathf.Clamp01(gain / target) * barMax)
+                : barMax;
+            return $"  <color={hex}><b>{shortLabel}</b></color>  " +
+                   $"<color={valueHex}>{gainText} / {targetText} {unit}</color>  " +
+                   $"<color={hex}>{ProgressBar(barVal, barMax, 8)}</color>";
+        }
+
         /// <summary>Fixed-width signed gain so HUD lines don't jitter as values change.</summary>
         private static string FormatGain(float gain, int decimals)
         {
             string body = decimals <= 0
                 ? Mathf.Abs(gain).ToString("F0")
                 : Mathf.Abs(gain).ToString($"F{decimals}");
-            // Pad so "+12.3" and "+0.0" occupy similar width inside <mspace>.
-            string signed = (gain < -0.0005f ? "-" : "+") + body;
-            return signed.PadLeft(6 + decimals);
+            return (gain < -0.0005f ? "-" : "+") + body;
         }
     }
 }
