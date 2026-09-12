@@ -760,9 +760,11 @@ namespace GameDevTV.RTS.Player
             ghostInstance.transform.position = snapTarget;
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
-            bool allRestrictionsPass = cardTilePlace && activeCommand is BuildBuildingCommand cardBbc
-                ? cardBbc.AllRestrictionsPass(snapTarget, Owner.Player1, requireWorker: false)
-                : activeCommand.AllRestrictionsPass(snapTarget);
+            bool allRestrictionsPass;
+            if (cardTilePlace && activeCommand is BuildBuildingCommand restrictBbc)
+                allRestrictionsPass = restrictBbc.AllRestrictionsPass(snapTarget, Owner.Player1, requireWorker: false);
+            else
+                allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
             bool colonyActs = ColonyActManager.Instance != null;
             if (cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
@@ -1344,9 +1346,10 @@ namespace GameDevTV.RTS.Player
             }
 
             // Commit the cell the ghost/footprint was showing — not a fresh noisy ray hit.
-            bool cardTilePlace = activeCommand is BuildBuildingCommand placeBbc && placeBbc.HandIndex >= 0;
+            bool cardTilePlace = activeCommand is BuildBuildingCommand placeCmd && placeCmd.HandIndex >= 0;
             if (cardTilePlace)
             {
+                var placeBbc = (BuildBuildingCommand)activeCommand;
                 Vector3 placePoint;
 
                 // Command Posts: commit the focused sector pad (ignore start-colony tile sticky).
