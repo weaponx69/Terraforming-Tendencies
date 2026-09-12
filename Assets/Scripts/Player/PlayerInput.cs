@@ -789,6 +789,18 @@ namespace GameDevTV.RTS.Player
             {
                 allRestrictionsPass = false;
             }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand depositReserveBbc
+                && !BuildingSiteRegistry.IsMineBuilding(depositReserveBbc.Building)
+                && DiscoverySystem.IsOnAnyMineableDeposit(snapTarget))
+            {
+                allRestrictionsPass = false;
+            }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand centerReserveBbc
+                && !BuildingSiteRegistry.IsCommandPostBuilding(centerReserveBbc.Building)
+                && SectorColonization.IsReservedCommandPostTile(snapTarget))
+            {
+                allRestrictionsPass = false;
+            }
             if (cardTilePlace && activeCommand is BuildBuildingCommand featureGateBbc
                 && DiscoverySystem.TryGetRequiredSectorFeature(featureGateBbc.Building, out _)
                 && !DiscoverySystem.IsOnRequiredSectorFeature(featureGateBbc.Building, snapTarget))

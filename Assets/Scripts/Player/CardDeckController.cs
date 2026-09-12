@@ -1120,15 +1120,17 @@ namespace GameDevTV.RTS.Player
             // Instant Temp/Atmos/Water/Materials dumps — not Combolands tiles.
             if (card is ResourceShipmentCardSO) return true;
 
-            // Emergency Caches is a free Materials safety-net card — not part of Colony Acts.
+            // Emergency Caches / Pipeline Boost — Materials safety-net and retired exploration boost.
             if (card is ScoutingCardSO scout
-                && scout.scoutingType == ScoutingCardSO.ScoutingType.EmergencyCaches)
+                && (scout.scoutingType == ScoutingCardSO.ScoutingType.EmergencyCaches
+                    || scout.scoutingType == ScoutingCardSO.ScoutingType.PipelineBoost))
                 return true;
 
             string name = card.cardName ?? card.name ?? string.Empty;
             if (NameLooksLikeMilitaryClutter(name)) return true;
             if (NameLooksLikeShipmentClutter(name)) return true;
             if (name.IndexOf("Emergency Cache", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("Pipeline Boost", StringComparison.OrdinalIgnoreCase) >= 0) return true;
 
             if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
             {

@@ -104,6 +104,13 @@ namespace GameDevTV.RTS.Commands
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
                 }
+                else if (DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
+                {
+                    return false;
+                }
+                if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                    return false;
                 if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
                     return false;
@@ -246,6 +253,22 @@ namespace GameDevTV.RTS.Commands
                                 targetPos);
                             return;
                         }
+                    }
+                    else if (DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            "Deposit tiles are reserved for mines — place elsewhere.",
+                            targetPos);
+                        return;
+                    }
+
+                    if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                        && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            "Sector center is reserved for the Command Post — place elsewhere.",
+                            targetPos);
+                        return;
                     }
 
                     if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature)
@@ -486,6 +509,18 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
+            // Deposit tiles are mine-only; sector center / CP pad are Command Post–only.
+            if (!BuildingSiteRegistry.IsMineBuilding(Building)
+                && DiscoverySystem.IsOnAnyMineableDeposit(point))
+            {
+                return false;
+            }
+            if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
+            {
+                return false;
+            }
+
             // Check sector feature requirement for themed buildings (legacy non-card path).
             // Card plays also require standing in the matching feature sector.
             if (HandIndex < 0)
@@ -560,6 +595,16 @@ namespace GameDevTV.RTS.Commands
                 }
                 if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, point))
                     return "Place this mine on the matching discovered deposit tile.";
+            }
+            else if (DiscoverySystem.IsOnAnyMineableDeposit(point))
+            {
+                return "Deposit tiles are reserved for mines — place elsewhere.";
+            }
+
+            if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
+            {
+                return "Sector center is reserved for the Command Post — place elsewhere.";
             }
 
             if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))

@@ -384,6 +384,31 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
+        /// True when the tile hosts any mineable deposit (Minerals/Gas/Iron/Regolith),
+        /// discovered or not. Non-mine buildings must not place here.
+        /// </summary>
+        public static bool IsOnAnyMineableDeposit(Vector3 worldPos)
+        {
+            var cell = ColonyTileGrid.WorldToCell(worldPos);
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include))
+            {
+                if (hr == null || !IsMineableResourceType(hr.ResourceTypeName)) continue;
+                if (ColonyTileGrid.WorldToCell(hr.transform.position) == cell)
+                    return true;
+            }
+            return false;
+        }
+
+        public static bool IsMineableResourceType(string resourceType)
+        {
+            if (string.IsNullOrEmpty(resourceType)) return false;
+            return resourceType.Equals("Minerals", System.StringComparison.OrdinalIgnoreCase)
+                || resourceType.Equals("Gas", System.StringComparison.OrdinalIgnoreCase)
+                || resourceType.Equals("Iron", System.StringComparison.OrdinalIgnoreCase)
+                || resourceType.Equals("Regolith", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// Legacy name — same as <see cref="IsOnDiscoveredMineDeposit"/> (on-spot, not nearby).
         /// </summary>
         public static bool HasDiscoveredMineDepositNear(BuildingSO building, Vector3 worldPos, float radius = 28f)

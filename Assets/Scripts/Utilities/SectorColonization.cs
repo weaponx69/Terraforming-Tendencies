@@ -77,6 +77,35 @@ namespace GameDevTV.RTS.Utilities
             return true;
         }
 
+        /// <summary>
+        /// Sector center and Command Post pad tiles — only Command Posts may place here.
+        /// </summary>
+        public static bool IsReservedCommandPostTile(Vector3 worldPos)
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null) return false;
+
+            var sector = sm.GetNearestSector(worldPos);
+            if (sector == null) return false;
+
+            var cell = ColonyTileGrid.WorldToCell(worldPos);
+            if (ColonyTileGrid.WorldToCell(sector.Center) == cell)
+                return true;
+
+            // Prefer the unused CP pad position (not an already-built CP, which is just occupied).
+            if (sector.BuildingSites != null)
+            {
+                foreach (var site in sector.BuildingSites)
+                {
+                    if (site == null || site.Kind != BuildingSiteKind.CommandPost) continue;
+                    if (ColonyTileGrid.WorldToCell(site.Position) == cell)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
         private static Vector3 GetColonizationOrigin()
         {
             var sm = SectorManager.Instance;
