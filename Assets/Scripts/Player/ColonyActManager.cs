@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Player
@@ -302,13 +303,25 @@ namespace GameDevTV.RTS.Player
             sectorOxygenContributed.Clear();
         }
 
-        /// <summary>How many sectors share the Act climate budget (at least 1).</summary>
+        /// <summary>
+        /// How many sectors share the Act climate budget.
+        /// Uses claimed Command Post sectors only (min 1) so a single early colony
+        /// can still clear Act climate — not every empty map sector.
+        /// </summary>
         public static int ClimateBudgetSectorCount
         {
             get
             {
-                int n = SectorManager.Instance?.Sectors?.Count ?? 0;
-                return Mathf.Max(1, n);
+                var sm = SectorManager.Instance;
+                if (sm?.Sectors == null || sm.Sectors.Count == 0) return 1;
+
+                int claimed = 0;
+                foreach (var sector in sm.Sectors)
+                {
+                    if (SectorColonization.SectorHasCommandPost(sector))
+                        claimed++;
+                }
+                return Mathf.Max(1, claimed);
             }
         }
 
@@ -1060,7 +1073,15 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
             sb.AppendLine($"<color=#A8B0B8>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
             sb.AppendLine($"<color=#A8B0B8>No Materials gate. Power = full climate rate (else 20%).</color>");
-            sb.AppendLine($"<color=#A8B0B8>Each sector ≤ 1/{ClimateBudgetSectorCount} of Act Temp/Atmos/Water.</color>");
+            int claimed = ClimateBudgetSectorCount;
+            if (claimed <= 1)
+            {
+                sb.AppendLine($"<color=#A8B0B8>Climate: your Command Post sector can fill the full Act gain.</color>");
+            }
+            else
+            {
+                sb.AppendLine($"<color=#FFE08A>Climate shared across {claimed} claimed sectors (≤1/{claimed} each). Expand Heat/Air/Water outside the start.</color>");
+            }
             sb.AppendLine($"<color=#A8B0B8>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}).</color>");
             sb.AppendLine("<color=#A8B0B8>LOSE: weeks hit 0 first.</color>");
             sb.AppendLine();
@@ -1101,7 +1122,7 @@ namespace GameDevTV.RTS.Player
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature)}>{absTemp:F1}°C</color>  " +
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Atmosphere)}>{absAtmos:F2} atm</color>  " +
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Water)}>{absWater:F1}%</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start (any sector ticks; each ≤ 1/{ClimateBudgetSectorCount}).</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Gains from Act start. Share is across claimed CPs only (now {ClimateBudgetSectorCount}).</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";

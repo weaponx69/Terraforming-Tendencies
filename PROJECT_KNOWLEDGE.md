@@ -72,7 +72,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (no single Air farm clears multiple sectors' worth). Powered = full rate; unpowered = 20%.
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each **claimed** sector (has a Command Post) may contribute at most **1/claimed** of those deltas — empty map sectors do not shrink your budget. With one CP, that sector can fill the full Act climate. Powered = full rate; unpowered = 20%.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
@@ -282,4 +282,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-12 — Climate gains high-contrast in Active Objectives; Temp/Atmos/Water/Oxygen strip readability.*
+*Last rewritten: 2026-09-12 — Act climate budget uses claimed CP sectors (not all map sectors); climate rates tuned for Act clear.*

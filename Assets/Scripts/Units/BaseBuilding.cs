@@ -1081,14 +1081,14 @@ namespace GameDevTV.RTS.Units
                         || n.Contains("Carbon Dioxide Import", System.StringComparison.OrdinalIgnoreCase)
                         || n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase)))
                 {
-                    atmosRate = 0.012f;
+                    atmosRate = 0.018f;
                 }
                 if (tempRate <= 0f
                     && (n.Contains("GHG", System.StringComparison.OrdinalIgnoreCase)
                         || n.Contains("Geothermal", System.StringComparison.OrdinalIgnoreCase)
                         || n.Contains("Methanogenic", System.StringComparison.OrdinalIgnoreCase)))
                 {
-                    tempRate = 0.2f;
+                    tempRate = 0.35f;
                 }
                 if (waterRate <= 0f
                     && (n.Contains("Aquifer", System.StringComparison.OrdinalIgnoreCase)
@@ -1096,14 +1096,15 @@ namespace GameDevTV.RTS.Units
                         || (n.Contains("Water", System.StringComparison.OrdinalIgnoreCase)
                             && !n.Contains("Processor", System.StringComparison.OrdinalIgnoreCase))))
                 {
-                    waterRate = 0.1f;
+                    waterRate = 0.15f;
                 }
             }
 
-            // Soft caps so a single tile cannot clear an Act channel in seconds.
-            tempRate = Mathf.Min(tempRate, 0.3f);
-            atmosRate = Mathf.Min(atmosRate, 0.015f);
-            waterRate = Mathf.Min(waterRate, 0.12f);
+            // Soft caps so a single tile cannot clear an Act channel in a few seconds,
+            // but a powered trio in one claimed sector can finish Act climate in ~1–2 minutes.
+            tempRate = Mathf.Min(tempRate, 0.45f);
+            atmosRate = Mathf.Min(atmosRate, 0.022f);
+            waterRate = Mathf.Min(waterRate, 0.18f);
 
             if (tempRate <= 0f && atmosRate <= 0f && waterRate <= 0f)
             {
