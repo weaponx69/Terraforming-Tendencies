@@ -626,10 +626,11 @@ namespace GameDevTV.RTS.Player
             currentSectorIndex = (currentSectorIndex + direction) % count;
             if (currentSectorIndex < 0) currentSectorIndex += count;
 
+            var sector = sm.Sectors[currentSectorIndex];
+            sm.ActiveSector = sector;
             SectorColonization.FocusCameraOnSector(currentSectorIndex);
 
             // Select CP when present (same feel as old base paging).
-            var sector = sm.Sectors[currentSectorIndex];
             if (sector?.OccupyingBuilding != null
                 && sector.OccupyingBuilding is AbstractCommandable commandable
                 && sector.OccupyingBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
@@ -691,13 +692,16 @@ namespace GameDevTV.RTS.Player
 
             int joinCount = 0;
 
-            if (activeCommand is BuildBuildingCommand bbc && bbc.Building != null
-                && bbc.Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
-            {
-                hitPos = bbc.SnapToNearestSector(hitPos.Value);
-            }
+            bool isCommandPostGhost = activeCommand is BuildBuildingCommand cpGhostBbc
+                && BuildingSiteRegistry.IsCommandPostBuilding(cpGhostBbc.Building);
 
-            if (cardTilePlace)
+            if (isCommandPostGhost && activeCommand is BuildBuildingCommand bbc)
+            {
+                // Claim the focused sector pad — do not grid-snap back toward the start colony.
+                hitPos = bbc.SnapToNearestSector(hitPos.Value);
+                tileGhostStickyCell = ColonyTileGrid.WorldToCell(hitPos.Value);
+            }
+            else if (cardTilePlace)
             {
                 Vector2Int? previousSticky = tileGhostStickyCell;
                 hitPos = ColonyTileGrid.SnapForPlacement(
@@ -756,10 +760,24 @@ namespace GameDevTV.RTS.Player
             ghostInstance.transform.position = snapTarget;
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
-            bool allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
+            bool allRestrictionsPass = cardTilePlace && activeCommand is BuildBuildingCommand cardBbc
+                ? cardBbc.AllRestrictionsPass(snapTarget, Owner.Player1, requireWorker: false)
+                : activeCommand.AllRestrictionsPass(snapTarget);
             bool colonyActs = ColonyActManager.Instance != null;
             if (cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
+            {
+                allRestrictionsPass = false;
+            }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand weekBbc
+                && ColonyActManager.Instance != null
+                && CardDeckController.GetWeekCost(weekBbc.Building) > ColonyActManager.Instance.WeeksRemaining)
+            {
+                allRestrictionsPass = false;
+            }
+            if (cardTilePlace && activeCommand is BuildBuildingCommand cpBbc
+                && BuildingSiteRegistry.IsCommandPostBuilding(cpBbc.Building)
+                && SectorColonization.GetNextFreeSectorIndex() < 0)
             {
                 allRestrictionsPass = false;
             }
@@ -1295,6 +1313,16 @@ namespace GameDevTV.RTS.Player
                 {
                     ActivateAction(hitAny);
                 }
+                else if (activeCommand is BuildBuildingCommand missBbc && missBbc.HandIndex >= 0)
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        "Click the ground to place this tile.",
+                        missBbc.Building != null
+                            ? Camera.main != null
+                                ? Camera.main.transform.position + Camera.main.transform.forward * 20f
+                                : Vector3.zero
+                            : Vector3.zero);
+                }
             }
         }
 
@@ -1302,7 +1330,16 @@ namespace GameDevTV.RTS.Player
         {
             if (Time.timeScale <= 0.01f)
             {
-                Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Dismiss any draft/summary overlay first.");
+                if (activeCommand is BuildBuildingCommand pausedBbc && pausedBbc.HandIndex >= 0)
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        "Game is paused — dismiss the overlay before placing tiles.",
+                        hit.point);
+                }
+                else
+                {
+                    Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Dismiss any draft/summary overlay first.");
+                }
                 return;
             }
 
@@ -1311,7 +1348,24 @@ namespace GameDevTV.RTS.Player
             if (cardTilePlace)
             {
                 Vector3 placePoint;
-                if (tileGhostStickyCell.HasValue)
+
+                // Command Posts: commit the focused sector pad (ignore start-colony tile sticky).
+                if (BuildingSiteRegistry.IsCommandPostBuilding(placeBbc.Building))
+                {
+                    Vector3 hint = GetCameraFocusPosition();
+                    if (!SectorColonization.TryResolveCommandPostTargetSector(hint, out var cpSector, out string cpFail)
+                        || !SectorColonization.TryGetCommandPostFocusPosition(cpSector, out placePoint))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            cpFail ?? "Q/E to an unclaimed sector, then place the Command Post there.",
+                            hint);
+                        ClearGhostVisuals();
+                        activeCommand = null;
+                        commandTargetUnits.Clear();
+                        return;
+                    }
+                }
+                else if (tileGhostStickyCell.HasValue)
                 {
                     placePoint = ColonyTileGrid.CellToWorld(tileGhostStickyCell.Value, hit.point.y);
                 }

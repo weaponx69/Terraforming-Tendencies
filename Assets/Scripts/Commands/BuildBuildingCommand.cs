@@ -29,18 +29,20 @@ namespace GameDevTV.RTS.Commands
         public int HandIndex { get; set; } = -1;
 
         /// <summary>
-        /// Returns true if this building is a command-type building (Command Center, Command Post, etc.)
-        /// that should auto-place without requiring a worker selection.
+        /// True for expansion Command Posts only (auto-claim next free sector).
+        /// Sector Command Center is geology-gated and free-placed.
         /// </summary>
         public bool IsCommandBuilding =>
-            Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            BuildingSiteRegistry.IsCommandPostBuilding(Building);
 
         public Vector3 SnapToNearestSector(Vector3 point)
         {
-            // Command Posts auto-claim the next free sector (player does not free-place them).
+            // Ghost preview: resolve pad without unlocking. Actual place unlocks in Handle.
             if (IsCommandBuilding
-                && GameDevTV.RTS.Utilities.SectorColonization.TryGetNextCommandPostPlacement(
-                    out Vector3 claimPos, out _))
+                && GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
+                    point, out var sector, out _)
+                && GameDevTV.RTS.Utilities.SectorColonization.TryGetCommandPostFocusPosition(
+                    sector, out Vector3 claimPos))
             {
                 return claimPos;
             }
@@ -66,7 +68,7 @@ namespace GameDevTV.RTS.Commands
             
             // Check horizontal distance
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
-            if (HandIndex >= 0)
+            if (HandIndex >= 0 && !BuildingSiteRegistry.IsCommandPostBuilding(Building))
                 targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
 
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
@@ -85,6 +87,12 @@ namespace GameDevTV.RTS.Commands
                 if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
                 if (!HasEnoughMaterialsForCard(context.Owner))
+                    return false;
+                if (!HasEnoughWeeksForCard())
+                    return false;
+                if (BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    && !GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
+                        targetPos, out _, out _))
                     return false;
                 if (BuildingSiteRegistry.IsMineBuilding(Building))
                 {
@@ -109,8 +117,7 @@ namespace GameDevTV.RTS.Commands
         {
             IBuildingBuilder builder = context.Commandable as IBuildingBuilder;
 
-            bool isCommandPost = Building != null
-                && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+            bool isCommandPost = BuildingSiteRegistry.IsCommandPostBuilding(Building);
             UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
             {
                 agentTypeID = 0,
@@ -121,13 +128,19 @@ namespace GameDevTV.RTS.Commands
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
 
             // Card tiles snap to the Combolands square grid (join edges with neighbors).
-            // Command Posts auto-claim the next free sector pad instead.
+            // Command Posts claim the focused / clicked sector pad instead.
             if (HandIndex >= 0)
             {
-                if (isCommandPost
-                    && GameDevTV.RTS.Utilities.SectorColonization.TryGetNextCommandPostPlacement(
-                        out Vector3 claimPos, out _))
+                if (isCommandPost)
                 {
+                    if (!GameDevTV.RTS.Utilities.SectorColonization.TryGetFocusedCommandPostPlacement(
+                            context.Hit.point, out Vector3 claimPos, out _, out string cpFail))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            cpFail ?? "Q/E to an unclaimed sector, then place the Command Post there.",
+                            context.Hit.point);
+                        return;
+                    }
                     targetPos = claimPos;
                     if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit claimHit, 20f, filter))
                         targetPos = new Vector3(targetPos.x, claimHit.position.y, targetPos.z);
@@ -160,7 +173,7 @@ namespace GameDevTV.RTS.Commands
                 foreach (var b in buildings)
                 {
                     if (b != null && b.Owner == context.Owner && b.BuildingSO != null
-                        && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+                        && BuildingSiteRegistry.IsCommandPostBuilding(b.BuildingSO))
                     {
                         // Check if it's a player-placed building (which Unity names with "(Clone)")
                         if (b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
@@ -195,6 +208,24 @@ namespace GameDevTV.RTS.Commands
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? $"Need materials to place {Building.Name}.";
                         ExplorationManager.NotifyPlacementFailed(reason, targetPos);
+                        return;
+                    }
+
+                    if (!HasEnoughWeeksForCard())
+                    {
+                        string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
+                            ?? "Not enough weeks left to play this card.";
+                        ExplorationManager.NotifyPlacementFailed(reason, targetPos);
+                        return;
+                    }
+
+                    if (BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                        && !GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
+                            context.Hit.point, out _, out string cpGateFail))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            cpGateFail ?? "Q/E to an unclaimed sector, then place the Command Post there.",
+                            context.Hit.point);
                         return;
                     }
 
@@ -362,21 +393,19 @@ namespace GameDevTV.RTS.Commands
 
         public bool AllRestrictionsPass(Vector3 point, Owner owner, bool requireWorker = true)
         {
-            // If this is a Command Post, prevent placing multiple Command Posts in the same sector.
+            // Prevent placing multiple Command Posts in the same sector.
             // Ignore GlobalCommander (editor-placed starting base) — only count player-built "(Clone)" buildings.
-            bool isCommandBldg = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-            if (isCommandBldg)
+            if (BuildingSiteRegistry.IsCommandPostBuilding(Building))
             {
                 var sectorManager = GameDevTV.RTS.Environment.SectorManager.Instance;
                 var sector = sectorManager?.GetNearestSector(point);
                 if (sector != null)
                 {
-                    // Check if any player-built Command Post is already in this sector (completed or under construction)
                     var buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
                     foreach (var b in buildings)
                     {
                         if (b != null && b.Owner == owner && b.BuildingSO != null
-                            && b.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase)
+                            && BuildingSiteRegistry.IsCommandPostBuilding(b.BuildingSO)
                             && !b.name.Contains("Ghost", System.StringComparison.OrdinalIgnoreCase)
                             && b.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                         {
@@ -395,7 +424,7 @@ namespace GameDevTV.RTS.Commands
             // If we strictly check IsFullyOnNavMesh, players can never place buildings!
             if (Restrictions != null)
             {
-                bool isCommandBldgRestriction = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                bool isCommandPostRestriction = BuildingSiteRegistry.IsCommandPostBuilding(Building);
 
                 foreach (BuildingRestrictionSO restriction in Restrictions)
                 {
@@ -415,7 +444,7 @@ namespace GameDevTV.RTS.Commands
                         if (commandable != null)
                         {
                             // If placing a Command Post, ignore any editor pre-placed buildings (e.g. Universal Command Center / UCC starting base)
-                            if (isCommandBldgRestriction && !commandable.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
+                            if (isCommandPostRestriction && !commandable.name.Contains("Clone", System.StringComparison.OrdinalIgnoreCase))
                             {
                                 continue;
                             }
@@ -433,7 +462,7 @@ namespace GameDevTV.RTS.Commands
                     {
                         // Command posts crush supplies, so ignore those restrictions
                         bool isSuppliesRestriction = (restriction.LayerMask.value & LayerMask.GetMask("Supplies")) != 0;
-                        if (isCommandBldgRestriction && isSuppliesRestriction) continue;
+                        if (isCommandPostRestriction && isSuppliesRestriction) continue;
                         
                         return false;
                     }
@@ -441,8 +470,7 @@ namespace GameDevTV.RTS.Commands
             }
 
             // Enforce worker requirement for standard buildings (skipped for reserved-site card builds).
-            bool isCP = Building != null && Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
-            if (requireWorker && !isCP)
+            if (requireWorker && !BuildingSiteRegistry.IsCommandPostBuilding(Building))
             {
                 Worker[] workers = FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
                 bool hasWorker = false;
@@ -462,31 +490,14 @@ namespace GameDevTV.RTS.Commands
             // Card plays also require standing in the matching feature sector.
             if (HandIndex < 0)
             {
-                string bldName = Building.Name;
-                var sectorMgr = GameDevTV.RTS.Environment.SectorManager.Instance;
-                bool requiresFeature = bldName.Contains("Lava Tube") || bldName.Contains("Subterranean") ||
-                                       bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield") ||
-                                       bldName.Contains("Subglacial") || bldName.Contains("Biosphere") ||
-                                       bldName.Contains("Aquifer");
-                if (requiresFeature && sectorMgr != null)
+                if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature))
                 {
-                    var nearestSector = sectorMgr.GetNearestSector(new Vector3(point.x, 0, point.z));
-                    if (nearestSector != null)
+                    var nearestSector = SectorManager.Instance?.GetNearestSector(new Vector3(point.x, 0, point.z));
+                    if (nearestSector != null
+                        && nearestSector.Feature != needFeature
+                        && nearestSector.IsExplored)
                     {
-                        bool hasFeature = false;
-                        if (bldName.Contains("Lava Tube") || bldName.Contains("Subterranean"))
-                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.LavaTube;
-                        else if (bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield"))
-                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.FaultLine;
-                        else if (bldName.Contains("Subglacial"))
-                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.Glacier;
-                        else if (bldName.Contains("Biosphere") || bldName.Contains("Aquifer"))
-                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.WaterDeposit;
-
-                        if (!hasFeature && nearestSector.IsExplored)
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
             }
@@ -507,6 +518,13 @@ namespace GameDevTV.RTS.Commands
             if (Building == null) return "No building on this card.";
 
             bool colonyActs = ColonyActManager.Instance != null;
+            if (colonyActs && !HasEnoughWeeksForCard())
+            {
+                int need = CardDeckController.GetWeekCost(Building);
+                int have = ColonyActManager.Instance != null ? ColonyActManager.Instance.WeeksRemaining : 0;
+                return $"Need {need} week{(need == 1 ? "" : "s")} to play {Building.Name} (have {have}).";
+            }
+
             if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
@@ -522,6 +540,16 @@ namespace GameDevTV.RTS.Commands
             int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
             if (matCost > 0 && haveMats < matCost)
                 return $"Need {matCost} Materials (have {haveMats}).";
+
+            if (BuildingSiteRegistry.IsCommandPostBuilding(Building))
+            {
+                if (!GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
+                        point, out _, out string cpFail))
+                {
+                    return cpFail
+                        ?? "Q/E to an unclaimed sector, then place the Command Post there.";
+                }
+            }
 
             if (BuildingSiteRegistry.IsMineBuilding(Building))
             {
@@ -541,12 +569,7 @@ namespace GameDevTV.RTS.Commands
                     return $"Discover a {featureName} sector first (Q/E to scan sectors).";
                 if (!DiscoverySystem.IsOnRequiredSectorFeature(Building, point))
                 {
-                    string hint = feature == SectorManager.SectorFeature.Glacier
-                        ? "look for white Glacier markers at the poles"
-                        : feature == SectorManager.SectorFeature.WaterDeposit
-                            ? "look for cyan Water Deposit markers"
-                            : "Q/E to find the matching sector";
-                    return $"Place {Building.Name} in a {featureName} sector — {hint}.";
+                    return $"Place {Building.Name} in a {featureName} sector — {DiscoverySystem.DescribeFeaturePlacementHint(feature)}.";
                 }
             }
 
@@ -580,6 +603,12 @@ namespace GameDevTV.RTS.Commands
                         }
                     }
                 }
+
+                // Grid-occupied neighbor / sticky cell occupied.
+                var cell = ColonyTileGrid.WorldToCell(point);
+                if (ColonyTileGrid.GetOccupiedCells(owner).Contains(cell))
+                    return "That tile is already occupied. Move to an empty square.";
+
                 return "Can't place here — tile blocked or invalid ground.";
             }
 
@@ -593,27 +622,34 @@ namespace GameDevTV.RTS.Commands
             // Check if the tech tree is unlocked (card plays bypass — unlock happens on consume).
             if (HandIndex < 0 && !BlueprintDraftManager.IsBuildingUnlocked(Building)) return true;
 
-            // Check if the player has completed a round for Command Center.
-            // Exception: allow building when no Command Post exists yet (player starts with nothing)
-            if (Building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
+            // Expansion Command Posts: locked when every sector already has one.
+            if (BuildingSiteRegistry.IsCommandPostBuilding(Building))
             {
-                // Repeatable expansion: allow while any sector still lacks a player Command Post.
                 if (GameDevTV.RTS.Utilities.SectorColonization.GetNextFreeSectorIndex() < 0)
                     return true;
 
                 // Hand card plays ignore tech-tree lock; Materials still apply until economy pivot.
                 if (HandIndex >= 0)
-                    return !HasEnoughMaterialsForCard(context.Owner);
+                    return !HasEnoughMaterialsForCard(context.Owner) || !HasEnoughWeeksForCard();
 
                 return !HasEnoughSupplies(context)
                     || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
             }
+            if (HandIndex >= 0)
+                return !HasEnoughMaterialsForCard(context.Owner) || !HasEnoughWeeksForCard();
             return !HasEnoughSupplies(context) || (Building.TechTree != null && !Building.TechTree.IsUnlocked(context.Owner, Building));
         }
         public UnlockableSO[] GetUnmetDependencies(Owner owner)
         {
             if (Building.TechTree == null) return new UnlockableSO[0];
             return Building.TechTree.GetUnmetDependencies(owner, Building);
+        }
+
+        private bool HasEnoughWeeksForCard()
+        {
+            if (ColonyActManager.Instance == null) return true;
+            int need = CardDeckController.GetWeekCost(Building);
+            return ColonyActManager.Instance.WeeksRemaining >= need;
         }
 
         private bool HasEnoughSupplies(CommandContext context)

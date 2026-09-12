@@ -543,6 +543,9 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (!TryScreenToWorld(eventData.position, out Vector3 world)) return;
             PlayerInput.FocusCameraOnWorldPosition(world);
+            var nearest = SectorManager.Instance?.GetNearestSector(world);
+            if (nearest != null)
+                SectorManager.Instance.ActiveSector = nearest;
             MarkDirty();
         }
 
@@ -550,6 +553,9 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (!TryScreenToWorld(eventData.position, out Vector3 world)) return;
             PlayerInput.FocusCameraOnWorldPosition(world);
+            var nearest = SectorManager.Instance?.GetNearestSector(world);
+            if (nearest != null)
+                SectorManager.Instance.ActiveSector = nearest;
         }
 
         private bool TryScreenToWorld(Vector2 screenPos, out Vector3 world)

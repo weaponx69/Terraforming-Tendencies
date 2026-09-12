@@ -579,12 +579,36 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            // Geology-gated cards (Aquifers, etc.): must already have a matching sector available.
+            // Geology-gated cards: must already have a matching sector available.
             if (DiscoverySystem.TryGetRequiredSectorFeature(building, out var needFeature)
                 && !DiscoverySystem.IsSectorFeatureDiscovered(needFeature))
             {
                 ExplorationManager.NotifyPlacementFailed(
-                    $"Discover a {needFeature} sector before placing {building.Name}.",
+                    $"Discover a {DiscoverySystem.DescribeSectorFeature(needFeature)} sector before placing {building.Name}.",
+                    ResolveErrorHintPosition());
+                return;
+            }
+
+            if (ColonyActManager.Instance != null)
+            {
+                int weekCost = CardDeckController.GetWeekCost(building);
+                if (weekCost > ColonyActManager.Instance.WeeksRemaining)
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        $"Need {weekCost} week{(weekCost == 1 ? "" : "s")} to play {building.Name} (have {ColonyActManager.Instance.WeeksRemaining}).",
+                        ResolveErrorHintPosition());
+                    return;
+                }
+            }
+
+            if (BuildingSiteRegistry.IsCommandPostBuilding(building)
+                && !SectorColonization.TryResolveCommandPostTargetSector(
+                    Camera.main != null ? Camera.main.transform.position : Vector3.zero,
+                    out _,
+                    out string cpFail))
+            {
+                ExplorationManager.NotifyPlacementFailed(
+                    cpFail ?? "Q/E to an unclaimed sector, then place the Command Post there.",
                     ResolveErrorHintPosition());
                 return;
             }

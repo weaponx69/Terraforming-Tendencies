@@ -395,8 +395,7 @@ namespace GameDevTV.RTS.Environment
                     if (building.Owner != GameOverManager.MonitoredOwner) continue;
                     if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
 
-                    bool isCommandPost = building.BuildingSO != null
-                        && building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
+                    bool isCommandPost = BuildingSiteRegistry.IsCommandPostBuilding(building.BuildingSO);
                     if (!isCommandPost) continue;
 
                     if (GetNearestSector(building.transform.position) == sector)

@@ -44,9 +44,18 @@ namespace GameDevTV.RTS.Environment
                    building.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Expansion Command Post only — not Sector Command Center / other "Command" names.
+        /// </summary>
+        public static bool IsCommandPostBuilding(BuildingSO building)
+        {
+            return building != null
+                && building.Name.IndexOf("Command Post", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public static BuildingSiteKind GetRequiredKind(BuildingSO building)
         {
-            if (IsCommandBuilding(building)) return BuildingSiteKind.CommandPost;
+            if (IsCommandPostBuilding(building)) return BuildingSiteKind.CommandPost;
             if (IsMineBuilding(building)) return BuildingSiteKind.Mine;
             if (IsSolarBuilding(building)) return BuildingSiteKind.Solar;
             return BuildingSiteKind.PairedBuilding;

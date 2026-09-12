@@ -581,11 +581,11 @@ namespace GameDevTV.RTS.Environment
                         {
                             case SectorManager.SectorFeature.LavaTube:
                                 featureLabel = "Lava Tube";
-                                featureFlavor = "A vast lava tube network — ideal for sheltered colony expansion.";
+                                featureFlavor = "A vast lava tube network — place Lava Tube Outposts and Subterranean housing here.";
                                 break;
                             case SectorManager.SectorFeature.FaultLine:
                                 featureLabel = "Fault Line";
-                                featureFlavor = "A deep geological fault line — potential for geothermal energy.";
+                                featureFlavor = "A deep geological fault — place Magnetic Shields and Sector Command Centers here.";
                                 break;
                             case SectorManager.SectorFeature.WaterDeposit:
                                 featureLabel = "Water Deposit";
@@ -597,7 +597,7 @@ namespace GameDevTV.RTS.Environment
                                 break;
                             case SectorManager.SectorFeature.Volcano:
                                 featureLabel = "Volcanic Vent";
-                                featureFlavor = "An active volcanic vent — rich in minerals and thermal energy.";
+                                featureFlavor = "An active volcanic vent — place Geothermal Generators here.";
                                 break;
                         }
                         if (!string.IsNullOrEmpty(featureLabel))

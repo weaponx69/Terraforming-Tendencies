@@ -1214,7 +1214,15 @@ namespace GameDevTV.RTS.Player
             BlueprintCardSO played = hand[handIndex];
             if (!played.IsGateMet())
             {
-                Debug.LogWarning($"[CardDeckController] Card '{played.cardName}' cannot be played yet because its requirements are not met.");
+                string reason = $"Cannot play '{played.cardName}' yet — requirements not met.";
+                if (played is SpawnUnitCardSO)
+                {
+                    reason = "No Command Post in this sector. Q/E to a claimed sector, then spawn the drone.";
+                }
+                Debug.LogWarning($"[CardDeckController] {reason}");
+                ExplorationManager.NotifyPlacementFailed(
+                    reason,
+                    Camera.main != null ? Camera.main.transform.position : Vector3.zero);
                 return;
             }
 

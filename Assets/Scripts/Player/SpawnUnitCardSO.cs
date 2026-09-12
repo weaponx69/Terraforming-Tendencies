@@ -14,7 +14,7 @@ namespace GameDevTV.RTS.Player
 
             public override bool IsGateMet()
             {
-                return FindPlayerCommandPost() != null;
+                return SectorColonization.FindFocusedPlayerCommandPost() != null;
             }
 
             public override bool CanApply()
@@ -44,10 +44,13 @@ namespace GameDevTV.RTS.Player
             {
                 if (unitPrefab == null) return;
     
-                BaseBuilding spawnBase = FindPlayerCommandPost();
+                BaseBuilding spawnBase = SectorColonization.FindFocusedPlayerCommandPost();
                 if (spawnBase == null)
                 {
                     Debug.LogWarning($"[Blueprint] Cannot spawn '{cardName}' without a player Command Post.");
+                    GameDevTV.RTS.Environment.ExplorationManager.NotifyPlacementFailed(
+                        "No Command Post in this sector. Q/E to a claimed sector, then spawn the drone.",
+                        Camera.main != null ? Camera.main.transform.position : Vector3.zero);
                     return;
                 }
 
@@ -80,22 +83,7 @@ namespace GameDevTV.RTS.Player
                     worker.BeginAutoGather(spawnBase);
                 }
 
-                Debug.Log($"[Blueprint] Spawned unit: {unitPrefab.name} at {spawnPos}");
-            }
-
-            private static BaseBuilding FindPlayerCommandPost()
-            {
-                BaseBuilding[] buildings = UnityEngine.Object.FindObjectsByType<BaseBuilding>(FindObjectsInactive.Exclude);
-                foreach (BaseBuilding building in buildings)
-                {
-                    if (building != null && building.Owner == Owner.Player1 && building.BuildingSO != null &&
-                        building.BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
-                    {
-                        return building;
-                    }
-                }
-
-                return null;
+                Debug.Log($"[Blueprint] Spawned unit: {unitPrefab.name} at {spawnPos} (focused sector CP)");
             }
         }
 }

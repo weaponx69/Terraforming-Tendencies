@@ -89,7 +89,32 @@ namespace GameDevTV.RTS.Environment
                 feature = SectorManager.SectorFeature.FaultLine;
                 return true;
             }
+            // Geothermal power plants sit on Volcano sectors.
+            if (name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                feature = SectorManager.SectorFeature.Volcano;
+                return true;
+            }
             return false;
+        }
+
+        /// <summary>Short placement hint for a required geology feature.</summary>
+        public static string DescribeFeaturePlacementHint(SectorManager.SectorFeature feature)
+        {
+            return feature switch
+            {
+                SectorManager.SectorFeature.Glacier =>
+                    "look for white Glacier markers at the poles",
+                SectorManager.SectorFeature.WaterDeposit =>
+                    "look for cyan Water Deposit markers",
+                SectorManager.SectorFeature.Volcano =>
+                    "look for orange Volcanic Vent markers",
+                SectorManager.SectorFeature.FaultLine =>
+                    "look for Fault Line markers (Q/E)",
+                SectorManager.SectorFeature.LavaTube =>
+                    "look for Lava Tube markers (Q/E)",
+                _ => "Q/E to find the matching sector"
+            };
         }
 
         /// <summary>

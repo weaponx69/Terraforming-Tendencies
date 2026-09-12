@@ -110,20 +110,18 @@ namespace GameDevTV.RTS.Utilities
             {
                 foreach (var building in BaseBuilding.ActiveBuildings)
                 {
-                    if (building == null || building.Owner != Owner.Player1) continue;
-                    if (building.BuildingSO == null
-                        || building.BuildingSO.Name.IndexOf("Command", System.StringComparison.OrdinalIgnoreCase) < 0)
-                        continue;
-                    if (building.name.IndexOf("Ghost", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                        continue;
-                    if (building.Progress.State == BuildingProgress.BuildingState.Destroyed)
-                        continue;
+                    if (!IsPlayerCommandPost(building)) continue;
                     if (sm.GetNearestSector(building.transform.position) == sector)
                         return true;
                 }
             }
 
-            if (sector.IsOccupied && sector.OccupyingBuilding != null) return true;
+            if (sector.IsOccupied
+                && sector.OccupyingBuilding != null
+                && IsPlayerCommandPost(sector.OccupyingBuilding))
+            {
+                return true;
+            }
 
             if (sector.BuildingSites != null)
             {
@@ -131,6 +129,7 @@ namespace GameDevTV.RTS.Utilities
                 {
                     if (site == null || site.Kind != BuildingSiteKind.CommandPost || !site.IsOccupied) continue;
                     if (site.OccupyingBuilding != null
+                        && IsPlayerCommandPost(site.OccupyingBuilding)
                         && site.OccupyingBuilding.Progress.State == BuildingProgress.BuildingState.Completed)
                     {
                         return true;
@@ -195,35 +194,186 @@ namespace GameDevTV.RTS.Utilities
         }
 
         /// <summary>
-        /// World position for the next Command Post claim (CP pad or sector center).
-        /// Unlocks/reveals the sector if needed without auto-placing a free CP.
+        /// Sector the player is currently viewing (ActiveSector), else nearest to camera, else 0.
         /// </summary>
-        public static bool TryGetNextCommandPostPlacement(out Vector3 worldPosition, out int sectorIndex)
+        public static int GetFocusedSectorIndex()
         {
-            worldPosition = Vector3.zero;
-            sectorIndex = GetNextFreeSectorIndex();
-            if (sectorIndex < 0) return false;
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null || sm.Sectors.Count == 0) return -1;
+
+            if (sm.ActiveSector != null)
+            {
+                int idx = sm.Sectors.IndexOf(sm.ActiveSector);
+                if (idx >= 0) return idx;
+            }
+
+            if (Camera.main != null)
+            {
+                var nearest = sm.GetNearestSector(Camera.main.transform.position);
+                if (nearest != null)
+                {
+                    int idx = sm.Sectors.IndexOf(nearest);
+                    if (idx >= 0) return idx;
+                }
+            }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Pick which unclaimed sector a Command Post should claim (no unlock side effects).
+        /// Prefers the sector under <paramref name="preferredHint"/>, then ActiveSector.
+        /// </summary>
+        public static bool TryResolveCommandPostTargetSector(
+            Vector3 preferredHint,
+            out SectorManager.Sector target,
+            out string failReason)
+        {
+            target = null;
+            failReason = null;
 
             var sm = SectorManager.Instance;
-            var sector = sm.Sectors[sectorIndex];
-            if (sector == null) return false;
-
-            if (sector.IsLocked)
+            if (sm?.Sectors == null || sm.Sectors.Count == 0)
             {
-                sector.IsLocked = false;
-                sector.IsExplored = true;
-                sector.IsDiscovered = true;
-                DiscoverySystem.RevealFeaturesForSector(sector);
-                RevealSectorBuildSites(sector);
+                failReason = "No sectors available.";
+                return false;
+            }
+
+            var underHint = sm.GetNearestSector(preferredHint);
+
+            // Prefer the sector the player traveled to (Q/E / minimap) when it still needs a CP.
+            if (sm.ActiveSector != null && !SectorHasCommandPost(sm.ActiveSector))
+            {
+                target = sm.ActiveSector;
+                return true;
+            }
+
+            // Else claim the unclaimed sector under the cursor / ghost.
+            if (underHint != null && !SectorHasCommandPost(underHint))
+            {
+                target = underHint;
+                return true;
+            }
+
+            var focus = sm.ActiveSector ?? underHint;
+            if (focus != null && SectorHasCommandPost(focus))
+            {
+                failReason =
+                    "This sector already has a Command Post. Q/E to an unclaimed sector, then place again.";
+            }
+            else
+            {
+                failReason =
+                    "Q/E to an unclaimed sector (or click inside one), then place the Command Post there.";
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// World position to claim a Command Post in the sector the player is viewing
+        /// (or the unclaimed sector under <paramref name="preferredHint"/>).
+        /// Does NOT jump to the first free sector on the planet.
+        /// </summary>
+        public static bool TryGetFocusedCommandPostPlacement(
+            Vector3 preferredHint,
+            out Vector3 worldPosition,
+            out int sectorIndex,
+            out string failReason)
+        {
+            worldPosition = Vector3.zero;
+            sectorIndex = -1;
+
+            if (!TryResolveCommandPostTargetSector(preferredHint, out var target, out failReason))
+                return false;
+
+            var sm = SectorManager.Instance;
+            sectorIndex = sm.Sectors.IndexOf(target);
+            if (sectorIndex < 0)
+            {
+                failReason = "Invalid sector.";
+                return false;
+            }
+
+            // Keep travel focus on the sector we're claiming.
+            sm.ActiveSector = target;
+
+            if (target.IsLocked)
+            {
+                target.IsLocked = false;
+                target.IsExplored = true;
+                target.IsDiscovered = true;
+                DiscoverySystem.RevealFeaturesForSector(target);
+                RevealSectorBuildSites(target);
                 BuildingSiteRegistry.RefreshAllMarkers();
                 SectorManager.Instance?.NotifySectorUnlocked();
             }
             else
             {
-                RevealSectorBuildSites(sector);
+                RevealSectorBuildSites(target);
             }
 
-            return TryGetCommandPostFocusPosition(sector, out worldPosition);
+            return TryGetCommandPostFocusPosition(target, out worldPosition);
+        }
+
+        /// <summary>
+        /// Legacy: next free sector pad (starting-sector-first). Prefer
+        /// <see cref="TryGetFocusedCommandPostPlacement"/> for player card plays.
+        /// </summary>
+        public static bool TryGetNextCommandPostPlacement(out Vector3 worldPosition, out int sectorIndex)
+        {
+            return TryGetFocusedCommandPostPlacement(
+                Camera.main != null ? Camera.main.transform.position : Vector3.zero,
+                out worldPosition,
+                out sectorIndex,
+                out _);
+        }
+
+        /// <summary>Player Command Post in the focused sector only (no cross-sector fallback).</summary>
+        public static BaseBuilding FindFocusedPlayerCommandPost()
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null) return null;
+
+            int focusIdx = GetFocusedSectorIndex();
+            if (focusIdx < 0 || focusIdx >= sm.Sectors.Count) return null;
+            return FindCommandPostInSector(sm.Sectors[focusIdx]);
+        }
+
+        public static BaseBuilding FindCommandPostInSector(SectorManager.Sector sector)
+        {
+            if (sector == null || BaseBuilding.ActiveBuildings == null) return null;
+            var sm = SectorManager.Instance;
+            foreach (var building in BaseBuilding.ActiveBuildings)
+            {
+                if (!IsPlayerCommandPost(building)) continue;
+                if (sm != null && sm.GetNearestSector(building.transform.position) == sector)
+                    return building;
+            }
+
+            if (sector.OccupyingBuilding != null && IsPlayerCommandPost(sector.OccupyingBuilding))
+                return sector.OccupyingBuilding;
+
+            return null;
+        }
+
+        /// <summary>Any player Command Post on the planet (legacy callers).</summary>
+        public static BaseBuilding FindAnyPlayerCommandPost()
+        {
+            if (BaseBuilding.ActiveBuildings == null) return null;
+            foreach (var building in BaseBuilding.ActiveBuildings)
+            {
+                if (IsPlayerCommandPost(building))
+                    return building;
+            }
+            return null;
+        }
+
+        private static bool IsPlayerCommandPost(BaseBuilding building)
+        {
+            if (building == null || building.Owner != Owner.Player1) return false;
+            if (building.Progress.State == BuildingProgress.BuildingState.Destroyed) return false;
+            if (building.name.IndexOf("Ghost", System.StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            return BuildingSiteRegistry.IsCommandPostBuilding(building.BuildingSO);
         }
 
         /// <summary>Display name for sector index (feature or Sector N).</summary>

@@ -75,10 +75,21 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (no single Air farm clears multiple sectors' worth). Powered = full rate; unpowered = 20%.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
-* **Command Posts** (no Materials cost) **auto-claim the next free sector** (repeatable; card re-seats while sectors remain).
+* **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
 * **Terra-Coins** earn on Act clear: `15 + floor(score/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
-* **Placement score** shows as world `+N` popups. Geology matches (mine on deposit, aquifer on WaterDeposit, Subglacial on Glacier, geo on volcano/lava/fault) add bonus score + climate resource pulses.
-* **Aquifers hard-locked** to `WaterDeposit` sectors; **Subglacial Water Extractors** hard-locked to `Glacier` sectors (both polar-biased). Ghost is red outside those sectors.
+* **Placement score** shows as world `+N` popups. Geology matches (mine on deposit, aquifer on WaterDeposit, Subglacial on Glacier, Geothermal on Volcano, Lava Tube on LavaTube, Magnetic Shield / Sector Command on FaultLine) add bonus score + climate resource pulses.
+* **Geology hard locks** (red ghost + toast outside the feature):
+
+| Card / building | Required feature |
+|-----------------|------------------|
+| Water Ice Aquifer | `WaterDeposit` |
+| Subglacial Water Extractor | `Glacier` |
+| Geothermal Generator | `Volcano` |
+| Lava Tube Outpost / Subterranean Apartment | `LavaTube` |
+| Magnetic Shield / Sector Command Center | `FaultLine` |
+| Deep-Core Mining Laser | Minerals deposit tile |
+| Basalt Strip-Mine | Regolith deposit tile |
+
 * **Mine deposits** show large colored discs + type labels once discovered (Minerals/Gas from start). Old node-shroud no longer hides them.
 * **Q / E** page sectors; on-screen sector names; **no FoW**.
 * **Card week costs vary** (0–2). Spend via `SpendWeeks`.
@@ -105,7 +116,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 ## 0.3 Loop (how a play works)
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
-2. **Geology** — mines must sit on deposit discs; aquifers on `WaterDeposit`; Subglacial on `Glacier` (polar ice); matching geology also grants score + terraforming pulses + map `+N`.
+2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner.
 3. **Score / climate** — adjacency + power score; climate/production at **20%** until grid-powered, then full.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
@@ -270,4 +281,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-12 — Glacier sector feature for Subglacial extractors; Aquifers stay on WaterDeposit.*
+*Last rewritten: 2026-09-12 — Command Posts / drones use focused sector (Q/E); full geology card↔feature map.*

@@ -536,11 +536,12 @@ namespace GameDevTV.RTS.Player
             }
 
             string name = building.Name ?? string.Empty;
-            bool isAquifer = name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || tag == "Water";
+            bool isAquifer = name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0;
             bool isSubglacial = name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0;
-            bool isGeo = name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isGeo = name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isLavaTubeBld = name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isFaultBld = name.IndexOf("Magnetic Shield", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Sector Command", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
             var nearest = SectorManager.Instance?.GetNearestSector(pos);
             if (nearest != null && nearest.Feature != SectorManager.SectorFeature.None)
@@ -555,9 +556,17 @@ namespace GameDevTV.RTS.Player
                     bonus += GeologyMatchBonus + geologyBonusExtra;
                     GrantGeologyResourcePulse("Water", pos);
                 }
-                else if (isGeo && (nearest.Feature == SectorManager.SectorFeature.Volcano
-                    || nearest.Feature == SectorManager.SectorFeature.LavaTube
-                    || nearest.Feature == SectorManager.SectorFeature.FaultLine))
+                else if (isGeo && nearest.Feature == SectorManager.SectorFeature.Volcano)
+                {
+                    bonus += GeologyMatchBonus + geologyBonusExtra;
+                    GrantGeologyResourcePulse("Heat", pos);
+                }
+                else if (isLavaTubeBld && nearest.Feature == SectorManager.SectorFeature.LavaTube)
+                {
+                    bonus += GeologyMatchBonus + geologyBonusExtra;
+                    GrantGeologyResourcePulse("Heat", pos);
+                }
+                else if (isFaultBld && nearest.Feature == SectorManager.SectorFeature.FaultLine)
                 {
                     bonus += GeologyMatchBonus + geologyBonusExtra;
                     GrantGeologyResourcePulse("Heat", pos);
