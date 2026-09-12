@@ -2,17 +2,17 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Player;
 
 namespace GameDevTV.RTS.UI
 {
     /// <summary>
-    /// Shows placement / play failures next to the problem (world or screen),
-    /// not under the top status HUD.
+    /// Shows placement / play failures as a bright on-screen toast
+    /// (and mirrors to the Colony Acts status banner).
     /// </summary>
     public class PlacementErrorUI : MonoBehaviour
     {
-        private const float Lifetime = 4.5f;
-        private const float RiseSpeed = 0.55f;
+        private const float Lifetime = 5f;
 
         private static PlacementErrorUI instance;
 
@@ -21,8 +21,6 @@ namespace GameDevTV.RTS.UI
         private TextMeshProUGUI label;
         private Image panelBg;
         private float hideAt;
-        private Vector3? followWorld;
-        private Vector3 driftOffset;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoSpawn()
@@ -57,12 +55,7 @@ namespace GameDevTV.RTS.UI
             if (Time.unscaledTime >= hideAt)
             {
                 panelRt.gameObject.SetActive(false);
-                followWorld = null;
-                return;
             }
-
-            driftOffset += Vector3.up * (RiseSpeed * Time.unscaledDeltaTime);
-            PositionPanel();
         }
 
         private void HandleFailed(string message) => Show(message, null);
@@ -86,44 +79,18 @@ namespace GameDevTV.RTS.UI
             if (label == null || panelRt == null) return;
 
             label.text = message ?? string.Empty;
-            followWorld = worldPos;
-            driftOffset = Vector3.up * 1.2f;
             hideAt = Time.unscaledTime + Lifetime;
             panelRt.gameObject.SetActive(true);
             PositionPanel();
+
+            ColonyActManager.Instance?.ShowStatusBanner($"<color=#ffccaa>{message}</color>", 4.5f);
         }
 
         private void PositionPanel()
         {
             if (panelRt == null) return;
-            Camera cam = Camera.main;
-            Vector2 screen;
-
-            if (followWorld.HasValue && cam != null)
-            {
-                Vector3 sp = cam.WorldToScreenPoint(followWorld.Value + driftOffset);
-                if (sp.z < 0.1f)
-                {
-                    // Behind camera — fall back to lower-center HUD.
-                    screen = new Vector2(Screen.width * 0.5f, Screen.height * 0.28f);
-                }
-                else
-                {
-                    screen = new Vector2(sp.x, sp.y);
-                }
-            }
-            else
-            {
-                // Clear of top resource strip / objectives.
-                screen = new Vector2(Screen.width * 0.5f, Screen.height * 0.30f);
-            }
-
-            // Keep on-screen with padding.
-            float pad = 24f;
-            screen.x = Mathf.Clamp(screen.x, pad, Screen.width - pad);
-            screen.y = Mathf.Clamp(screen.y, pad, Screen.height - pad - 120f);
-
-            panelRt.position = screen;
+            // Fixed lower-center — always readable regardless of click world position.
+            panelRt.position = new Vector2(Screen.width * 0.5f, Screen.height * 0.32f);
         }
 
         private void EnsureUi()
@@ -142,11 +109,11 @@ namespace GameDevTV.RTS.UI
             panelGo.transform.SetParent(canvasGo.transform, false);
             panelRt = panelGo.GetComponent<RectTransform>();
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRt.pivot = new Vector2(0.5f, 0f);
-            panelRt.sizeDelta = new Vector2(520f, 90f);
+            panelRt.pivot = new Vector2(0.5f, 0.5f);
+            panelRt.sizeDelta = new Vector2(640f, 110f);
 
             panelBg = panelGo.AddComponent<Image>();
-            panelBg.color = new Color(0.55f, 0.08f, 0.08f, 0.92f);
+            panelBg.color = new Color(0.55f, 0.08f, 0.08f, 0.95f);
             panelBg.raycastTarget = false;
 
             var outline = panelGo.AddComponent<Outline>();
@@ -158,15 +125,17 @@ namespace GameDevTV.RTS.UI
             var trt = textGo.GetComponent<RectTransform>();
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;
-            trt.offsetMin = new Vector2(14f, 10f);
-            trt.offsetMax = new Vector2(-14f, -10f);
+            trt.offsetMin = new Vector2(16f, 12f);
+            trt.offsetMax = new Vector2(-16f, -12f);
 
             label = textGo.AddComponent<TextMeshProUGUI>();
             label.alignment = TextAlignmentOptions.Center;
-            label.fontSize = 22f;
+            label.fontSize = 24f;
             label.color = Color.white;
             label.enableWordWrapping = true;
             label.raycastTarget = false;
+            if (TMP_Settings.defaultFontAsset != null)
+                label.font = TMP_Settings.defaultFontAsset;
 
             panelGo.SetActive(false);
         }

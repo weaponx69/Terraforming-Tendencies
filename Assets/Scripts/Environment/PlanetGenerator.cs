@@ -589,7 +589,11 @@ namespace GameDevTV.RTS.Environment
                                 break;
                             case SectorManager.SectorFeature.WaterDeposit:
                                 featureLabel = "Water Deposit";
-                                featureFlavor = "Subterranean water ice detected — a vital resource for the colony.";
+                                featureFlavor = "Subsurface aquifer — place Aquifers and biosphere water works here.";
+                                break;
+                            case SectorManager.SectorFeature.Glacier:
+                                featureLabel = "Glacier";
+                                featureFlavor = "Polar ice sheet — place Subglacial Water Extractors here.";
                                 break;
                             case SectorManager.SectorFeature.Volcano:
                                 featureLabel = "Volcanic Vent";
@@ -954,12 +958,14 @@ namespace GameDevTV.RTS.Environment
                                 case SectorNode.NodeType.Iron:       dotColor = new Color(0.85f, 0.55f, 0.35f); dotSize = 0.55f; break;
                                 case SectorNode.NodeType.Regolith:   dotColor = new Color(0.75f, 0.55f, 0.25f); dotSize = 0.55f; break;
                                 case SectorNode.NodeType.Feature:
-                                    // WaterDeposit / ice aquifers read cyan; other geology orange.
-                                    bool waterFeature = !string.IsNullOrEmpty(node.labelOverride)
-                                        && node.labelOverride.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0;
-                                    dotColor = waterFeature
-                                        ? new Color(0.35f, 0.85f, 1f)
-                                        : new Color(1f, 0.55f, 0.15f);
+                                    // WaterDeposit cyan; Glacier white-blue; other geology orange.
+                                    string fl = node.labelOverride ?? string.Empty;
+                                    if (fl.IndexOf("Glacier", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                                        dotColor = new Color(0.85f, 0.95f, 1f);
+                                    else if (fl.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                                        dotColor = new Color(0.35f, 0.85f, 1f);
+                                    else
+                                        dotColor = new Color(1f, 0.55f, 0.15f);
                                     dotSize = 0.85f;
                                     break;
                                 case SectorNode.NodeType.Nexus:      dotColor = new Color(1f, 0f, 1f); dotSize = 0.55f; break;

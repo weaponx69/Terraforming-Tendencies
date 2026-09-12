@@ -11,7 +11,7 @@ namespace GameDevTV.RTS.Environment
     {
         public static SectorManager Instance { get; private set; }
 
-        public enum SectorFeature { None, Volcano, FaultLine, LavaTube, WaterDeposit }
+        public enum SectorFeature { None, Volcano, FaultLine, LavaTube, WaterDeposit, Glacier }
 
         [System.Serializable]
         public class Sector
@@ -223,7 +223,7 @@ namespace GameDevTV.RTS.Environment
                 DiscoverySystem.RevealResourceType("Minerals");
                 DiscoverySystem.RevealResourceType("Gas");
 
-                // FoW retired — geology features are known so Aquifers can hard-lock to WaterDeposit.
+                // FoW retired — geology features are known so Aquifers lock to WaterDeposit and Subglacial to Glacier.
                 foreach (var sector in Sectors)
                     DiscoverySystem.RevealFeaturesForSector(sector);
 
@@ -235,7 +235,7 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// WaterDeposit (ice / aquifers) prefers polar map rows (extreme Z). Other features fill the rest.
+        /// Polar ice: WaterDeposit + Glacier prefer extreme Z. Other features fill the rest.
         /// </summary>
         private static List<SectorFeature> BuildPolarBiasedSectorFeatures(
             List<(Vector2Int coord, Vector3 center, bool isFirst)> pending)
@@ -262,10 +262,27 @@ namespace GameDevTV.RTS.Environment
                 return db.CompareTo(da);
             });
 
-            int waterBudget = Mathf.Clamp(Mathf.CeilToInt(nonStart.Count / 4f), 1, 3);
+            // At least one Glacier and one WaterDeposit when the map has room.
+            int iceBudget = Mathf.Clamp(Mathf.CeilToInt(nonStart.Count / 3f), 2, 4);
             int cursor = 0;
-            for (int w = 0; w < waterBudget && cursor < nonStart.Count; w++, cursor++)
-                result[nonStart[cursor]] = SectorFeature.WaterDeposit;
+            bool placeGlacierNext = true;
+            for (int w = 0; w < iceBudget && cursor < nonStart.Count; w++, cursor++)
+            {
+                result[nonStart[cursor]] = placeGlacierNext
+                    ? SectorFeature.Glacier
+                    : SectorFeature.WaterDeposit;
+                placeGlacierNext = !placeGlacierNext;
+            }
+            // Guarantee Glacier exists if we only got WaterDeposit somehow.
+            bool hasGlacier = false;
+            for (int i = 0; i < result.Count; i++)
+            {
+                if (result[i] == SectorFeature.Glacier) { hasGlacier = true; break; }
+            }
+            if (!hasGlacier && cursor < nonStart.Count)
+                result[nonStart[cursor++]] = SectorFeature.Glacier;
+            else if (!hasGlacier && nonStart.Count > 0)
+                result[nonStart[0]] = SectorFeature.Glacier;
 
             SectorFeature[] others =
             {
@@ -300,7 +317,8 @@ namespace GameDevTV.RTS.Environment
                 SectorFeature.Volcano,
                 SectorFeature.FaultLine,
                 SectorFeature.LavaTube,
-                SectorFeature.WaterDeposit
+                SectorFeature.WaterDeposit,
+                SectorFeature.Glacier
             };
 
             for (int i = 0; i < all.Length && bag.Count < count; i++)

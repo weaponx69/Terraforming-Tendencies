@@ -30,6 +30,7 @@ namespace GameDevTV.RTS.UI.Containers
         private static readonly Color32 GridLine = new(48, 54, 64, 255);
         private static readonly Color32 Occupied = new(70, 110, 90, 255);
         private static readonly Color32 Water = new(55, 140, 180, 255);
+        private static readonly Color32 Glacier = new(200, 230, 245, 255);
         private static readonly Color32 Volcano = new(160, 70, 40, 255);
         private static readonly Color32 Fault = new(150, 120, 50, 255);
         private static readonly Color32 Lava = new(180, 80, 30, 255);
@@ -406,6 +407,7 @@ namespace GameDevTV.RTS.UI.Containers
             return sector.Feature switch
             {
                 SectorManager.SectorFeature.WaterDeposit => Water,
+                SectorManager.SectorFeature.Glacier => Glacier,
                 SectorManager.SectorFeature.Volcano => Volcano,
                 SectorManager.SectorFeature.FaultLine => Fault,
                 SectorManager.SectorFeature.LavaTube => Lava,

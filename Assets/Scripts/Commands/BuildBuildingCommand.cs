@@ -221,7 +221,7 @@ namespace GameDevTV.RTS.Commands
                         && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
-                            $"Place {Building.Name} in a {needFeature} sector (polar ice / aquifer zones).",
+                            $"Place {Building.Name} in a {DiscoverySystem.DescribeSectorFeature(needFeature)} sector.",
                             targetPos);
                         return;
                     }
@@ -478,8 +478,9 @@ namespace GameDevTV.RTS.Commands
                             hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.LavaTube;
                         else if (bldName.Contains("Sector Command") || bldName.Contains("Magnetic Shield"))
                             hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.FaultLine;
-                        else if (bldName.Contains("Subglacial") || bldName.Contains("Biosphere")
-                            || bldName.Contains("Aquifer"))
+                        else if (bldName.Contains("Subglacial"))
+                            hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.Glacier;
+                        else if (bldName.Contains("Biosphere") || bldName.Contains("Aquifer"))
                             hasFeature = nearestSector.Feature == GameDevTV.RTS.Environment.SectorManager.SectorFeature.WaterDeposit;
 
                         if (!hasFeature && nearestSector.IsExplored)
@@ -535,10 +536,18 @@ namespace GameDevTV.RTS.Commands
 
             if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
             {
+                string featureName = DiscoverySystem.DescribeSectorFeature(feature);
                 if (!DiscoverySystem.IsSectorFeatureDiscovered(feature))
-                    return $"Discover a {feature} geological feature first (scout / reach that sector).";
+                    return $"Discover a {featureName} sector first (Q/E to scan sectors).";
                 if (!DiscoverySystem.IsOnRequiredSectorFeature(Building, point))
-                    return $"Place {Building.Name} in a {feature} sector (polar ice / aquifer zones).";
+                {
+                    string hint = feature == SectorManager.SectorFeature.Glacier
+                        ? "look for white Glacier markers at the poles"
+                        : feature == SectorManager.SectorFeature.WaterDeposit
+                            ? "look for cyan Water Deposit markers"
+                            : "Q/E to find the matching sector";
+                    return $"Place {Building.Name} in a {featureName} sector — {hint}.";
+                }
             }
 
             if (!AllRestrictionsPass(point, owner, requireWorker: false))

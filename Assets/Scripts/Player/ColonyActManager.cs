@@ -537,8 +537,8 @@ namespace GameDevTV.RTS.Player
 
             string name = building.Name ?? string.Empty;
             bool isAquifer = name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || tag == "Water";
+            bool isSubglacial = name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0;
             bool isGeo = name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
@@ -546,6 +546,11 @@ namespace GameDevTV.RTS.Player
             if (nearest != null && nearest.Feature != SectorManager.SectorFeature.None)
             {
                 if (isAquifer && nearest.Feature == SectorManager.SectorFeature.WaterDeposit)
+                {
+                    bonus += GeologyMatchBonus + geologyBonusExtra;
+                    GrantGeologyResourcePulse("Water", pos);
+                }
+                else if (isSubglacial && nearest.Feature == SectorManager.SectorFeature.Glacier)
                 {
                     bonus += GeologyMatchBonus + geologyBonusExtra;
                     GrantGeologyResourcePulse("Water", pos);

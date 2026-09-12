@@ -43,22 +43,33 @@ namespace GameDevTV.RTS.Environment
         {
             return feature switch
             {
-                SectorManager.SectorFeature.WaterDeposit => "Water Deposit (polar ice)",
+                SectorManager.SectorFeature.WaterDeposit => "Water Deposit",
+                SectorManager.SectorFeature.Glacier => "Glacier",
                 SectorManager.SectorFeature.Volcano => "Volcano",
                 SectorManager.SectorFeature.FaultLine => "Fault Line",
                 SectorManager.SectorFeature.LavaTube => "Lava Tube",
                 _ => feature.ToString()
             };
         }
+
+        /// <summary>
+        /// Sector feature a building requires (Aquifer→WaterDeposit, Subglacial→Glacier, …).
+        /// Returns false when the building is free-place climate/infra (no geology gate).
+        /// </summary>
         public static bool TryGetRequiredSectorFeature(BuildingSO building, out SectorManager.SectorFeature feature)
         {
             feature = SectorManager.SectorFeature.None;
             if (building == null || string.IsNullOrEmpty(building.Name)) return false;
 
             string name = building.Name;
-            // Aquifers / ice water must sit in WaterDeposit (polar ice) sectors.
+            // Subglacial extractors need Glacier sectors (polar ice sheets).
+            if (name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                feature = SectorManager.SectorFeature.Glacier;
+                return true;
+            }
+            // Aquifers / biosphere / water-ice sit on WaterDeposit sectors.
             if (name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || name.IndexOf("Biosphere", System.StringComparison.OrdinalIgnoreCase) >= 0
                 || (name.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0
                     && name.IndexOf("Ice", System.StringComparison.OrdinalIgnoreCase) >= 0))
@@ -104,7 +115,7 @@ namespace GameDevTV.RTS.Environment
             }
             if (!IsSectorFeatureDiscovered(feature))
             {
-                failReason = $"Discover a {feature} sector first.";
+                failReason = $"Discover a {DescribeSectorFeature(feature)} sector first.";
                 return false;
             }
             if (SectorManager.Instance == null || SectorManager.Instance.Sectors == null)
@@ -164,7 +175,7 @@ namespace GameDevTV.RTS.Environment
             Vector3? pick = focusPick ?? anyPick;
             if (!pick.HasValue)
             {
-                failReason = $"No free tile in a {feature} sector.";
+                failReason = $"No free tile in a {DescribeSectorFeature(feature)} sector.";
                 return false;
             }
 
