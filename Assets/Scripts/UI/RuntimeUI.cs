@@ -217,8 +217,8 @@ namespace GameDevTV.RTS.UI
                 Transform border = bottomBar.Find("Border");
                 if (border != null) border.gameObject.SetActive(false);
 
-                ClearUiImage(bottomBar.Find("Minimap Container/Background"));
                 ClearUiImage(bottomBar.Find("Menu Container"));
+                // Keep Minimap Container/Background visible — MinimapUI mounts into it.
 
                 // Remove retired RTS action menu (builds are card-hand only).
                 Transform actionsContainer = bottomBar.Find("Actions Container");
@@ -242,7 +242,7 @@ namespace GameDevTV.RTS.UI
 
         /// <summary>
         /// Card hand docks bottom-left. Pin "Building Selected Container" to the far right
-        /// of the Bottom Bar (short panel) so it never sits under the card hand.
+        /// of the Bottom Bar as a tall info strip.
         /// </summary>
         private void ShiftBuildingSelectedPanelRight(Transform bottomBar)
         {
@@ -252,11 +252,11 @@ namespace GameDevTV.RTS.UI
                 selected = FindChildRecursive(bottomBar, "Building Selected Container");
             if (selected is not RectTransform rt) return;
 
-            // Far-right dock, short panel (~280px wide).
-            rt.anchorMin = new Vector2(1f, 0.12f);
-            rt.anchorMax = new Vector2(1f, 0.78f);
+            // Far-right dock — taller strip so selection/info content fits.
+            rt.anchorMin = new Vector2(1f, 0.04f);
+            rt.anchorMax = new Vector2(1f, 0.96f);
             rt.pivot = new Vector2(1f, 0.5f);
-            rt.sizeDelta = new Vector2(280f, 0f);
+            rt.sizeDelta = new Vector2(300f, 0f);
             rt.anchoredPosition = new Vector2(-12f, 0f);
             rt.offsetMin = new Vector2(rt.offsetMin.x, 0f);
             rt.offsetMax = new Vector2(rt.offsetMax.x, 0f);

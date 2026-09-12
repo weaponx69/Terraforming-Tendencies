@@ -52,7 +52,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Oxygen / Power / Pop as win primaries | **Retired** |
 | Strategic fog / hex shroud | **Retired** — full planet visible (Combolands) |
 | Mining / materials depletion as run loss | **Retired** (while Colony Acts are active) |
-| Emergency Caches free Materials card | **Retired** from Colony Acts deck |
+| Minimap Camera / live RT | **Never shipped** — only empty Bottom Bar shell; schematic [`MinimapUI`](Assets/Scripts/UI/Containers/MinimapUI.cs) is the implementation |
 
 Climate tickers **do** count for Act clear (with Colony Score). They are not the *only* win meter.
 
@@ -90,6 +90,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | Act Continue bootstrap | Solar only via `GrantSectorTransitionBootstrap` |
 | Free sector Mining Drone | In-world at Command Post via [`SectorMiningDroneBootstrap`](Assets/Scripts/Utilities/SectorMiningDroneBootstrap.cs) |
 | Sector travel | **Q/E** + [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) |
+| Minimap | Schematic overlay in scene [`Minimap Container`](Assets/Scripts/UI/Containers/MinimapUI.cs) (user-placed); click to jump |
 | No FoW | Hex shroud fully revealed on planet gen |
 | Hand scroll | Offset preserved; ~2.5 cards/wheel-notch |
 | Top strip | Shows **Terra-Coins** during Colony Acts (`EnsureMaterialsMetricVisible`) |

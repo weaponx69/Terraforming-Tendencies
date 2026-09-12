@@ -19,16 +19,17 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void SetupLayout()
         {
-            if (layoutReady) return;
-            layoutReady = true;
-
             RectTransform rect = gameObject.GetComponent<RectTransform>();
             if (rect == null) rect = gameObject.AddComponent<RectTransform>();
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(440f, 400f);
-            rect.anchoredPosition = new Vector2(-20f, -140f);
+            // Tall right info column so Act goals / climate lines fit.
+            rect.sizeDelta = new Vector2(460f, 620f);
+            rect.anchoredPosition = new Vector2(-20f, -120f);
+
+            if (layoutReady) return;
+            layoutReady = true;
 
             background = gameObject.GetComponent<Image>();
             if (background == null) background = gameObject.AddComponent<Image>();

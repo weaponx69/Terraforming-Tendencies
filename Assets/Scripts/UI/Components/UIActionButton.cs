@@ -126,9 +126,10 @@ namespace GameDevTV.RTS.UI.Components
                     {
                         goalBadge.SetText($"+{score}");
                         goalBadge.fontSize = 12f;
-                        goalBadge.color = new Color(1f, 0.92f, 0.45f, 1f);
+                        EnsureReadableBlackText(goalBadge);
                         ResetGoalBadgeLayout();
                     }
+                    EnsureReadableBlackText(goalBadge);
                 }
             }
 
@@ -215,7 +216,8 @@ namespace GameDevTV.RTS.UI.Components
             label.fontSizeMax = 16f;
             label.enableAutoSizing = true;
             label.alignment = TextAlignmentOptions.Bottom;
-            label.color = Color.white;
+            label.color = Color.black;
+            label.fontStyle = FontStyles.Bold;
             label.richText = true;
             label.raycastTarget = false;
             label.textWrappingMode = TextWrappingModes.Normal;
@@ -228,6 +230,7 @@ namespace GameDevTV.RTS.UI.Components
             labelRt.offsetMin = Vector2.zero;
             labelRt.offsetMax = Vector2.zero;
             labelRt.pivot = new Vector2(0.5f, 0f);
+            EnsureReadableBlackText(label);
 
             if (costLabel == null)
             {
@@ -240,11 +243,12 @@ namespace GameDevTV.RTS.UI.Components
             costLabel.fontSize = 16f;
             costLabel.fontStyle = FontStyles.Bold;
             costLabel.alignment = TextAlignmentOptions.TopLeft;
-            costLabel.color = new Color(1f, 0.92f, 0.45f, 1f);
+            costLabel.color = Color.black;
             costLabel.richText = true;
             costLabel.raycastTarget = false;
             costLabel.margin = new Vector4(8f, 6f, 4f, 2f);
             if (label != null && label.font != null) costLabel.font = label.font;
+            EnsureReadableBlackText(costLabel);
 
             RectTransform costRt = costLabel.rectTransform;
             costRt.anchorMin = new Vector2(0.04f, 0.72f);
@@ -253,11 +257,18 @@ namespace GameDevTV.RTS.UI.Components
             costRt.offsetMax = Vector2.zero;
             costRt.pivot = new Vector2(0f, 1f);
             costLabel.transform.SetAsLastSibling();
+        }
 
-            var costOutline = costLabel.GetComponent<UnityEngine.UI.Outline>();
-            if (costOutline == null) costOutline = costLabel.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            costOutline.effectColor = new Color(0f, 0f, 0f, 0.85f);
-            costOutline.effectDistance = new Vector2(1.5f, -1.5f);
+        /// <summary>Black face text + soft light outline so it stays readable on tinted cards.</summary>
+        private static void EnsureReadableBlackText(TextMeshProUGUI tmp)
+        {
+            if (tmp == null) return;
+            tmp.color = Color.black;
+            var outline = tmp.GetComponent<UnityEngine.UI.Outline>();
+            if (outline == null) outline = tmp.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = new Color(1f, 1f, 1f, 0.75f);
+            outline.effectDistance = new Vector2(1.2f, -1.2f);
+            outline.enabled = true;
         }
 
         private void SetLabel(string text)
@@ -292,11 +303,7 @@ namespace GameDevTV.RTS.UI.Components
                 costLabel.text = $"{weekPart}\n{materialsCost} Mat";
             else
                 costLabel.text = weekPart;
-            costLabel.color = weeks <= 0
-                ? new Color(0.55f, 0.95f, 0.65f, 1f)
-                : weeks >= 2
-                    ? new Color(1f, 0.78f, 0.45f, 1f)
-                    : new Color(0.75f, 0.9f, 1f, 1f);
+            EnsureReadableBlackText(costLabel);
         }
 
         private static string FormatWeekCost(int weeks)
@@ -356,7 +363,8 @@ namespace GameDevTV.RTS.UI.Components
 
             if (label != null)
             {
-                label.color = accent;
+                // Goal tint stays on the plate/outline — face text stays black for readability.
+                EnsureReadableBlackText(label);
                 label.richText = true;
             }
 
@@ -381,7 +389,7 @@ namespace GameDevTV.RTS.UI.Components
                 goalBadge.gameObject.SetActive(show);
                 if (show)
                 {
-                    goalBadge.color = accent;
+                    EnsureReadableBlackText(goalBadge);
                     goalBadge.SetText(TerraformingGoalColors.ShortLabel(goalKey));
                 }
             }
@@ -390,7 +398,7 @@ namespace GameDevTV.RTS.UI.Components
         private void ClearGoalAccent()
         {
             goalKey = string.Empty;
-            if (label != null) label.color = Color.white;
+            if (label != null) EnsureReadableBlackText(label);
             if (buttonImage != null) buttonImage.color = defaultButtonColor;
             if (goalOutline != null) goalOutline.enabled = false;
             if (goalBadge != null) goalBadge.gameObject.SetActive(false);
