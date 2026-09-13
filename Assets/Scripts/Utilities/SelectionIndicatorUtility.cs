@@ -68,6 +68,10 @@ namespace GameDevTV.RTS.Utilities
 
             indicator.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
+            // Building-sized ring — not the full colony cell (that made pads look enormous).
+            float ring = Mathf.Clamp(GameDevTV.RTS.Player.ColonyTileGrid.TileSize * 0.7f, 9f, 12f);
+            indicator.transform.localScale = new Vector3(ring, ring, 1f);
+
             MeshRenderer meshRenderer = indicator.GetComponent<MeshRenderer>();
             if (meshRenderer != null)
             {

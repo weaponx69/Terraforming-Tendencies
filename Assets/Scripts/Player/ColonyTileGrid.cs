@@ -10,7 +10,7 @@ namespace GameDevTV.RTS.Player
     /// </summary>
     public static class ColonyTileGrid
     {
-        public const float TileSize = 24f;
+        public const float TileSize = 16f;
 
         /// <summary>Stay on the current snap cell until the cursor clearly enters another.</summary>
         public const float StickRadius = TileSize * 0.62f;

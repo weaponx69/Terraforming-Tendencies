@@ -518,53 +518,77 @@ namespace GameDevTV.RTS.Environment
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
                         Vector3 sectorMin = sector.Center - new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.45f, 0, secH * 0.45f);
-                        // Keep deposits off the Command Post colony tile (same cell as center / CP pad).
+                        // Keep deposits off the Command Post colony tile; sparse grid so non-mines have room.
                         Vector2Int cpCell = ColonyTileGrid.WorldToCell(sector.Center);
-                        float exclusionRadius = ColonyTileGrid.TileSize * 0.55f;
-
-                        System.Func<Vector3, bool> isClearOfCommandPost = candidate =>
-                        {
-                            if (ColonyTileGrid.WorldToCell(candidate) == cpCell) return false;
-                            if (Vector3.Distance(candidate, sector.Center) < exclusionRadius) return false;
-                            return true;
-                        };
+                        var usedDepositCells = new System.Collections.Generic.HashSet<Vector2Int> { cpCell };
 
                         bool isStartingSector = sectorIndex == 0;
                         float revealRadius = HexGridManager.Instance != null
                             ? HexGridManager.Instance.StartingAreaRevealRadius
                             : 15f;
-                        float bootstrapRadius = Mathf.Max(ColonyTileGrid.TileSize, revealRadius * 0.7f);
+                        float bootstrapRadius = Mathf.Max(ColonyTileGrid.TileSize * 2f, revealRadius * 0.7f);
+
+                        System.Func<Vector3, bool> tryClaimDepositCell = candidate =>
+                        {
+                            Vector2Int cell = ColonyTileGrid.WorldToCell(candidate);
+                            if (usedDepositCells.Contains(cell)) return false;
+                            foreach (var used in usedDepositCells)
+                            {
+                                // Leave at least one empty ring between deposits / CP.
+                                if (Mathf.Max(Mathf.Abs(used.x - cell.x), Mathf.Abs(used.y - cell.y)) < 2)
+                                    return false;
+                            }
+                            usedDepositCells.Add(cell);
+                            return true;
+                        };
 
                         System.Func<Vector3> randomPos = () =>
                         {
-                            for (int attempt = 0; attempt < 12; attempt++)
+                            for (int attempt = 0; attempt < 40; attempt++)
                             {
                                 float rx = Random.Range(sectorMin.x, sectorMax.x);
                                 float rz = Random.Range(sectorMin.z, sectorMax.z);
-                                var candidate = new Vector3(rx, 0, rz);
-                                if (isClearOfCommandPost(candidate))
+                                var candidate = ColonyTileGrid.SnapToTile(new Vector3(rx, 0, rz));
+                                if (tryClaimDepositCell(candidate))
                                     return candidate;
                             }
-                            // Fallback: push outward from center onto a different tile.
+                            // Fallback: walk outward from center onto a free snapped tile.
+                            for (int ring = 2; ring <= 8; ring++)
+                            {
+                                for (int dx = -ring; dx <= ring; dx++)
+                                {
+                                    for (int dz = -ring; dz <= ring; dz++)
+                                    {
+                                        if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz)) != ring) continue;
+                                        Vector3 candidate = ColonyTileGrid.CellToWorld(
+                                            new Vector2Int(cpCell.x + dx, cpCell.y + dz), 0f);
+                                        if (tryClaimDepositCell(candidate))
+                                            return candidate;
+                                    }
+                                }
+                            }
                             Vector2 dir = Random.insideUnitCircle.normalized;
                             if (dir.sqrMagnitude < 0.01f) dir = Vector2.right;
-                            return sector.Center + new Vector3(dir.x, 0f, dir.y) * (ColonyTileGrid.TileSize + 2f);
+                            return ColonyTileGrid.SnapToTile(
+                                sector.Center + new Vector3(dir.x, 0f, dir.y) * (ColonyTileGrid.TileSize * 3f));
                         };
 
-                        // 3 Minerals — keep outside Command Post keepout (center reserved).
-                        for (int i = 0; i < 3; i++)
+                        // Sparse deposits (richer yield applied at spawn) — board stays placeable.
+                        for (int i = 0; i < 2; i++)
                         {
                             Vector3 pos;
                             if (isStartingSector && i == 0)
                             {
-                                pos = sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f);
-                                if (!isClearOfCommandPost(pos))
+                                pos = ColonyTileGrid.SnapToTile(
+                                    sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f));
+                                if (!tryClaimDepositCell(pos))
                                     pos = randomPos();
                             }
                             else if (isStartingSector && i == 1)
                             {
-                                pos = sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f);
-                                if (!isClearOfCommandPost(pos))
+                                pos = ColonyTileGrid.SnapToTile(
+                                    sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f));
+                                if (!tryClaimDepositCell(pos))
                                     pos = randomPos();
                             }
                             else
@@ -574,26 +598,9 @@ namespace GameDevTV.RTS.Environment
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                         }
 
-                        // 2 Gas
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Vector3 pos = randomPos();
-                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, pos, "Vaporous gases seep from fissures in the ground.", "Gas"));
-                        }
-
-                        // 2 Iron
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Vector3 pos = randomPos();
-                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, pos, "A rich iron ore deposit, suitable for smelting.", "Iron"));
-                        }
-
-                        // 2 Regolith
-                        for (int i = 0; i < 2; i++)
-                        {
-                            Vector3 pos = randomPos();
-                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, pos, "Loose regolith, useful for construction.", "Regolith"));
-                        }
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, randomPos(), "Vaporous gases seep from fissures in the ground.", "Gas"));
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, randomPos(), "A rich iron ore deposit, suitable for smelting.", "Iron"));
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, randomPos(), "Loose regolith, useful for construction.", "Regolith"));
 
                         // Feature node (based on sector's assigned feature)
                         string featureLabel = "";
@@ -637,7 +644,7 @@ namespace GameDevTV.RTS.Environment
                             sector.Nodes.Add(nexusNode);
                         }
 
-                        EnsureMinimumSectorResources(sector, sectorIndex, sector.Center, exclusionRadius, randomPos);
+                        EnsureMinimumSectorResources(sector, sectorIndex);
                     }
 
                     // Build connection graph between nodes
@@ -672,36 +679,27 @@ namespace GameDevTV.RTS.Environment
                 }
 
                 /// <summary>
-                /// Top up gatherable nodes until the sector meets the completion budget.
+                /// Log nominal SO yield. Actual materials budget is met by richer Amount on the
+                /// sparse deposit set at spawn — do not flood the sector with extra mine tiles.
                 /// </summary>
-                private void EnsureMinimumSectorResources(
-                    SectorManager.Sector sector,
-                    int sectorIndex,
-                    Vector3 sectorCenter,
-                    float exclusionRadius,
-                    System.Func<Vector3> randomPos)
+                private void EnsureMinimumSectorResources(SectorManager.Sector sector, int sectorIndex)
                 {
                     SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
                     SupplySO regolithSO = Resources.Load<SupplySO>("Gatherable Supplies/Regolith");
-
-                    int safety = 0;
-                    while (SectorResourceBudget.CalculateGatherableYield(
-                               sector, MineralsSupplySO, GasSupplySO, ironSO, regolithSO)
-                           < SectorResourceBudget.MinGatherableMaterialsPerSector
-                           && safety++ < 16)
-                    {
-                        Vector3 pos = randomPos();
-                        if (Vector3.Distance(pos, sectorCenter) < exclusionRadius) pos = randomPos();
-                        sector.Nodes.Add(new SectorNode(
-                            SectorNode.NodeType.Minerals,
-                            pos,
-                            "A crystalline mineral deposit glistens in the light.",
-                            "Minerals"));
-                    }
-
-                    int yield = SectorResourceBudget.CalculateGatherableYield(
+                    int nominal = SectorResourceBudget.CalculateGatherableYield(
                         sector, MineralsSupplySO, GasSupplySO, ironSO, regolithSO);
-                    Debug.Log($"[PlanetGenerator] Sector {sectorIndex} gatherable budget: {yield} / {SectorResourceBudget.MinGatherableMaterialsPerSector} materials.");
+                    int nodes = 0;
+                    if (sector?.Nodes != null)
+                    {
+                        foreach (var n in sector.Nodes)
+                        {
+                            if (n != null && SectorResourceBudget.IsGatherableNodeType(n.type))
+                                nodes++;
+                        }
+                    }
+                    Debug.Log(
+                        $"[PlanetGenerator] Sector {sectorIndex}: {nodes} deposits " +
+                        $"(nominal SO yield {nominal}; spawn Amount tops to {SectorResourceBudget.MinGatherableMaterialsPerSector}+).");
                 }
 
                 /// <summary>
@@ -957,6 +955,21 @@ namespace GameDevTV.RTS.Environment
 
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
+                        int gatherableCount = 0;
+                        if (sector.Nodes != null)
+                        {
+                            foreach (var n in sector.Nodes)
+                            {
+                                if (n != null && SectorResourceBudget.IsGatherableNodeType(n.type))
+                                    gatherableCount++;
+                            }
+                        }
+                        int amountPerDeposit = Mathf.Max(
+                            250,
+                            Mathf.CeilToInt(
+                                (float)SectorResourceBudget.MinGatherableMaterialsPerSector
+                                / Mathf.Max(1, gatherableCount)));
+
                         foreach (var node in sector.Nodes)
                         {
                             if (node.visualGO != null) continue;
@@ -1039,7 +1052,8 @@ namespace GameDevTV.RTS.Environment
                                 {
                                     var gs = dot.AddComponent<GatherableSupply>();
                                     gs.Supply = supplySO;
-                                    gs.Amount = supplySO.MaxAmount;
+                                    // Sparse deposits: each node carries a share of the sector materials budget.
+                                    gs.Amount = Mathf.Max(supplySO.MaxAmount > 0 ? supplySO.MaxAmount : 250, amountPerDeposit);
                                     gs.SetVisible(false);
                                     gs.ToggleColliders(false);
 

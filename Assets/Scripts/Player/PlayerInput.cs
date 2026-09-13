@@ -921,16 +921,18 @@ namespace GameDevTV.RTS.Player
             }
 
             tileFootprint.SetActive(true);
-            float s = ColonyTileGrid.TileSize * 0.92f;
+            // Quad shows the snap cell; keep it readable without swallowing the camera.
+            float s = ColonyTileGrid.TileSize * 0.9f;
             tileFootprint.transform.position = center + Vector3.up * 0.12f;
             tileFootprint.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             tileFootprint.transform.localScale = new Vector3(s, s, 1f);
 
-            if (joinCount != lastJoinCount && tileFootprintMaterial != null)
+            if (tileFootprintMaterial != null
+                && (joinCount != lastJoinCount || !tileFootprint.activeSelf))
             {
                 Color c = joinCount > 0
                     ? new Color(0.15f, 1f, 0.4f, 0.55f)
-                    : new Color(0.25f, 0.75f, 1f, 0.4f);
+                    : new Color(0.25f, 0.75f, 1f, 0.5f);
                 if (tileFootprintMaterial.HasProperty("_BaseColor")) tileFootprintMaterial.SetColor("_BaseColor", c);
                 else if (tileFootprintMaterial.HasProperty("_Color")) tileFootprintMaterial.SetColor("_Color", c);
                 else tileFootprintMaterial.color = c;

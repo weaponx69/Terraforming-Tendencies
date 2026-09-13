@@ -119,7 +119,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 ## 0.3 Loop (how a play works)
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play. Hand strip filters to the sector you are viewing.
-2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits (**Command Posts exempt** — CP pad wins over a deposit on the same tile). Adjacent tiles are free.
+2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on **discovered** mineable deposits (**Command Posts exempt** — CP pad wins over a deposit on the same tile). Undiscovered Iron/Regolith do not reserve tiles. Deposits are sparse (~5/sector, snapped with spacing) so climate tiles have room.
 3. **Score / climate** — low base score; adjacency/combos pay. Climate ticks at **20%** unpowered / full when powered, then × adjacency climate combo (pair / same-tag / trio / power neighbor). Combo **card offers** require edge adjacency.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
@@ -150,7 +150,7 @@ Non-building cards grant a small flat score on play (no adjacency). **Most score
 
 ## 0.5 Adjacency (stacking)
 
-**Grid:** card buildings snap to a **24 m square tile grid** ([`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs)). Only **orthogonal edge** neighbors count (N/E/S/W) — same cells the placement magnet snaps to.
+**Grid:** card buildings snap to a **16 m square tile grid** ([`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs)). Only **orthogonal edge** neighbors count (N/E/S/W) — same cells the placement magnet snaps to. Selection rings stay building-sized (~9–12 m); ghost footprints mark the snap cell without swallowing the view.
 
 ### Placement feedback (ghost)
 * Semi-transparent **tile footprint** under the ghost (locks to the snap cell immediately).
@@ -199,7 +199,7 @@ First climate-pair join in a sector also pulses ~7% of remaining sector budget (
 
 ## 0.7 Board, power, sectors
 
-* **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (24 m cells). **Acts** advance sector-by-sector.
+* **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (16 m cells). **Acts** advance sector-by-sector.
 * **Power:** only hard **placement** gate for cards (`PowerGridManager.CanPlayBuildingForPower`). Hand may hold cards the player cannot place yet. **Adjacent tiles auto-link** on the power graph when construction completes (`BaseBuilding.AutoConnectAdjacentPowerNodes`) — no manual Connect Power.
 * **Sectors:** map-gen count drives **Act count**. Each Act focuses terraforming on one sector (`SectorManager.BeginTerraformingOn`). No old unlock/pad lockdown.
 * Reserved pads / drones may still exist in the scene for legacy systems; **card plays ignore them**.
@@ -301,4 +301,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-13 — Combo-first score + climate rate multipliers; 24 m tiles; hard ban on changing per-sector climate goals.*
+*Last rewritten: 2026-09-13 — Colony tiles 16 m; building-sized selection rings; sparse rich deposits (no node flood); discovered-only mine tile lock; combo climate rates; hard ban on changing per-sector climate goals.*

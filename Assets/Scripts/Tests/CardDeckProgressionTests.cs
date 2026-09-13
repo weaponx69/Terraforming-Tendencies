@@ -56,27 +56,20 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
-        public void SectorResourceBudget_MeetsMinimumForTypicalSectorLayout()
+        public void SectorResourceBudget_FiveRichDepositsMeetMaterialsFloor()
         {
             var sector = new SectorManager.Sector();
             var minerals = ScriptableObject.CreateInstance<SupplySO>();
-            SetSupplyMax(minerals, 250);
+            SetSupplyMax(minerals, 800);
 
-            for (int i = 0; i < 9; i++)
+            // Planet gen uses ~5 deposits with Amount boosted to cover MinGatherable.
+            for (int i = 0; i < 5; i++)
             {
                 sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, Vector3.zero, "", "Minerals"));
             }
 
-            int baseYield = SectorResourceBudget.CalculateGatherableYield(sector, minerals, minerals, minerals, minerals);
-            Assert.Less(baseYield, SectorResourceBudget.MinGatherableMaterialsPerSector);
-
-            for (int i = 0; i < 8; i++)
-            {
-                sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, Vector3.zero, "", "Minerals"));
-            }
-
-            int toppedUp = SectorResourceBudget.CalculateGatherableYield(sector, minerals, minerals, minerals, minerals);
-            Assert.GreaterOrEqual(toppedUp, SectorResourceBudget.MinGatherableMaterialsPerSector);
+            int yield = SectorResourceBudget.CalculateGatherableYield(sector, minerals, minerals, minerals, minerals);
+            Assert.GreaterOrEqual(yield, SectorResourceBudget.MinGatherableMaterialsPerSector);
         }
 
         [Test]

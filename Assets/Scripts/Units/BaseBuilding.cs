@@ -231,27 +231,17 @@ namespace GameDevTV.RTS.Units
                     indicatorGO.transform.localPosition = new Vector3(0f, 0.15f, 0f);
                     indicatorGO.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
-                    float scale = 8f;
-                    BuildingSO = UnitSO as BuildingSO;
-                    var checkSO = BuildingSO != null ? BuildingSO : (UnitSO as BuildingSO);
-                    if (checkSO != null)
-                    {
-                        if (checkSO.Name.Contains("Solar", System.StringComparison.OrdinalIgnoreCase))
-                        {
-                            scale = 10f;
-                        }
-                        else if (checkSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
-                        {
-                            scale = 15f;
-                        }
-                    }
+                    float scale = Mathf.Clamp(ColonyTileGrid.TileSize * 0.7f, 9f, 12f);
                     indicatorGO.transform.localScale = new Vector3(scale, scale, 1f);
                     indicatorGO.SetActive(false);
                     selectionIndicator = indicatorGO;
                 }
             }
 
+            // Resize prefab rings (baked ~15 for old 12 m cells) to the current colony tile.
             EnsureSelectionIndicatorRing();
+            if (selectionIndicator != null)
+                selectionIndicator.SetActive(false);
 
             BuildingSO = UnitSO as BuildingSO;
             MaxHealth = BuildingSO != null ? BuildingSO.Health : 1000;
@@ -453,14 +443,7 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            if (BuildingSO != null && BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase))
-            {
-                if (selectionIndicator != null)
-                {
-                    // Shrink it down to be closer to the outer perimeter
-                    selectionIndicator.transform.localScale *= 0.6f; 
-                }
-            }
+            // Selection ring size is set by SelectionIndicatorUtility from ColonyTileGrid.TileSize.
         }
 
         private bool hasCompletedConstruction = false;

@@ -434,15 +434,16 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// True when the tile hosts any mineable deposit (Minerals/Gas/Iron/Regolith),
-        /// discovered or not. Non-mine buildings must not place here.
+        /// True when the tile hosts a <b>discovered</b> mineable deposit.
+        /// Undiscovered nodes do not block free tile placement.
         /// </summary>
         public static bool IsOnAnyMineableDeposit(Vector3 worldPos)
         {
             var cell = ColonyTileGrid.WorldToCell(worldPos);
-            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include))
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {
-                if (hr == null || !IsMineableResourceType(hr.ResourceTypeName)) continue;
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!IsMineableResourceType(hr.ResourceTypeName)) continue;
                 if (ColonyTileGrid.WorldToCell(hr.transform.position) == cell)
                     return true;
             }
