@@ -3,6 +3,7 @@ using UnityEngine.AI;
 using Unity.AI.Navigation;
 using System.Linq;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -516,7 +517,7 @@ namespace GameDevTV.RTS.Environment
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
                         Vector3 sectorMin = sector.Center - new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.45f, 0, secH * 0.45f);
-                        float exclusionRadius = 5f;
+                        float exclusionRadius = Mathf.Max(22f, SectorColonization.CommandPostKeepoutRadius);
                         bool isStartingSector = sectorIndex == 0;
                         float revealRadius = HexGridManager.Instance != null
                             ? HexGridManager.Instance.StartingAreaRevealRadius
@@ -525,27 +526,39 @@ namespace GameDevTV.RTS.Environment
 
                         System.Func<Vector3> randomPos = () =>
                         {
-                            float rx = Random.Range(sectorMin.x, sectorMax.x);
-                            float rz = Random.Range(sectorMin.z, sectorMax.z);
-                            return new Vector3(rx, 0, rz);
+                            for (int attempt = 0; attempt < 12; attempt++)
+                            {
+                                float rx = Random.Range(sectorMin.x, sectorMax.x);
+                                float rz = Random.Range(sectorMin.z, sectorMax.z);
+                                var candidate = new Vector3(rx, 0, rz);
+                                if (Vector3.Distance(candidate, sector.Center) >= exclusionRadius)
+                                    return candidate;
+                            }
+                            // Fallback: push outward from center.
+                            Vector2 dir = Random.insideUnitCircle.normalized;
+                            if (dir.sqrMagnitude < 0.01f) dir = Vector2.right;
+                            return sector.Center + new Vector3(dir.x, 0f, dir.y) * (exclusionRadius + 4f);
                         };
 
-                        // 3 Minerals — Sector 0 keeps two deposits inside the starting reveal.
+                        // 3 Minerals — keep outside Command Post keepout (center reserved).
                         for (int i = 0; i < 3; i++)
                         {
                             Vector3 pos;
                             if (isStartingSector && i == 0)
                             {
-                                pos = sector.Center + new Vector3(-bootstrapRadius * 0.55f, 0f, bootstrapRadius * 0.4f);
+                                pos = sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f);
+                                if (Vector3.Distance(pos, sector.Center) < exclusionRadius)
+                                    pos = randomPos();
                             }
                             else if (isStartingSector && i == 1)
                             {
-                                pos = sector.Center + new Vector3(bootstrapRadius * 0.5f, 0f, -bootstrapRadius * 0.35f);
+                                pos = sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f);
+                                if (Vector3.Distance(pos, sector.Center) < exclusionRadius)
+                                    pos = randomPos();
                             }
                             else
                             {
                                 pos = randomPos();
-                                if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
                             }
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                         }
@@ -554,7 +567,6 @@ namespace GameDevTV.RTS.Environment
                         for (int i = 0; i < 2; i++)
                         {
                             Vector3 pos = randomPos();
-                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, pos, "Vaporous gases seep from fissures in the ground.", "Gas"));
                         }
 
@@ -562,7 +574,6 @@ namespace GameDevTV.RTS.Environment
                         for (int i = 0; i < 2; i++)
                         {
                             Vector3 pos = randomPos();
-                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, pos, "A rich iron ore deposit, suitable for smelting.", "Iron"));
                         }
 
@@ -570,7 +581,6 @@ namespace GameDevTV.RTS.Environment
                         for (int i = 0; i < 2; i++)
                         {
                             Vector3 pos = randomPos();
-                            if (Vector3.Distance(pos, sector.Center) < exclusionRadius) pos = randomPos();
                             sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, pos, "Loose regolith, useful for construction.", "Regolith"));
                         }
 

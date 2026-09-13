@@ -78,7 +78,13 @@ namespace GameDevTV.RTS.Utilities
         }
 
         /// <summary>
-        /// Sector center and Command Post pad tiles — only Command Posts may place here.
+        /// Keepout around sector center / Command Post pad. Only Command Posts may place here.
+        /// ~1.75 tiles so mines and other buildings cannot share the CP claim spot.
+        /// </summary>
+        public const float CommandPostKeepoutRadius = 21f; // ColonyTileGrid.TileSize * 1.75f
+
+        /// <summary>
+        /// Sector center and Command Post pad (plus keepout) — only Command Posts may place here.
         /// </summary>
         public static bool IsReservedCommandPostTile(Vector3 worldPos)
         {
@@ -88,22 +94,34 @@ namespace GameDevTV.RTS.Utilities
             var sector = sm.GetNearestSector(worldPos);
             if (sector == null) return false;
 
-            var cell = ColonyTileGrid.WorldToCell(worldPos);
-            if (ColonyTileGrid.WorldToCell(sector.Center) == cell)
+            if (HorizontalDist(worldPos, sector.Center) <= CommandPostKeepoutRadius)
                 return true;
 
-            // Prefer the unused CP pad position (not an already-built CP, which is just occupied).
             if (sector.BuildingSites != null)
             {
                 foreach (var site in sector.BuildingSites)
                 {
                     if (site == null || site.Kind != BuildingSiteKind.CommandPost) continue;
-                    if (ColonyTileGrid.WorldToCell(site.Position) == cell)
+                    if (HorizontalDist(worldPos, site.Position) <= CommandPostKeepoutRadius)
                         return true;
                 }
             }
 
+            // Already-built CP: keep neighbors clear too.
+            if (sector.OccupyingBuilding != null
+                && HorizontalDist(worldPos, sector.OccupyingBuilding.transform.position) <= CommandPostKeepoutRadius)
+            {
+                return true;
+            }
+
             return false;
+        }
+
+        private static float HorizontalDist(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return Mathf.Sqrt(dx * dx + dz * dz);
         }
 
         private static Vector3 GetColonizationOrigin()

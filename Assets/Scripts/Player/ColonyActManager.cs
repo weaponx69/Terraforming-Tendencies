@@ -88,6 +88,17 @@ namespace GameDevTV.RTS.Player
         public int CurrentAct => actIndex + 1;
         public int TotalActs => Mathf.Max(1, acts.Count);
         public string CurrentActName => CurrentActDef.Name;
+        /// <summary>Name of the Act the between-Act shop is preparing for (still on cleared Act index).</summary>
+        public string UpcomingActName
+        {
+            get
+            {
+                int next = actIndex + 1;
+                if (next < 0 || next >= acts.Count) return string.Empty;
+                return acts[next].Name;
+            }
+        }
+        public int UpcomingActNumber => actIndex + 2;
         public int ColonyScore => colonyScore;
         public int TargetScore => CurrentActDef.TargetScore;
         public int WeeksRemaining => weeksRemaining;

@@ -118,15 +118,35 @@ namespace GameDevTV.RTS.UI
 
         private void UpdateHeader()
         {
-            int coins = ColonyActManager.Instance != null ? ColonyActManager.Instance.TerraCoins : 0;
-            int cleared = ColonyActManager.Instance != null ? ColonyActManager.Instance.CurrentAct : 0;
-            int next = cleared + 1;
+            var acts = ColonyActManager.Instance;
+            int coins = acts != null ? acts.TerraCoins : 0;
+            int cleared = acts != null ? acts.CurrentAct : 0;
+            string clearedName = acts != null ? acts.CurrentActName : string.Empty;
+            int nextNum = acts != null ? acts.UpcomingActNumber : cleared + 1;
+            string nextName = acts != null ? acts.UpcomingActName : string.Empty;
+
             if (titleText != null)
-                titleText.text = $"UPGRADE DEPOT\nAct {cleared} cleared → preparing Act {next}";
+            {
+                if (!string.IsNullOrEmpty(nextName))
+                {
+                    titleText.text =
+                        $"UPGRADE DEPOT\n" +
+                        $"<size=90%>Act {cleared} — {clearedName} cleared</size>\n" +
+                        $"<color=#8FE7FF>Preparing Act {nextNum} — {nextName}</color>";
+                }
+                else
+                {
+                    titleText.text = $"UPGRADE DEPOT\nAct {cleared} — {clearedName} cleared";
+                }
+            }
             if (coinsText != null)
                 coinsText.text = $"Terra-Coins: {coins}";
             if (hintText != null)
-                hintText.text = "Spend Terra-Coins on run upgrades. Coins carry between Acts. Solar seats when you continue.";
+            {
+                hintText.text = !string.IsNullOrEmpty(nextName)
+                    ? $"Spend Terra-Coins for run upgrades before <b>{nextName}</b>. Coins carry. Solar seats when you continue."
+                    : "Spend Terra-Coins on run upgrades. Coins carry between Acts. Solar seats when you continue.";
+            }
         }
 
         private void RefreshOffers(bool forceNew)
@@ -327,15 +347,18 @@ namespace GameDevTV.RTS.UI
             panelRt.offsetMax = Vector2.zero;
             panel.AddComponent<Image>().color = new Color(0.10f, 0.14f, 0.20f, 0.98f);
 
-            titleText = CreateText(panel.transform, "Title", 22f, FontStyles.Bold,
-                new Vector2(0.04f, 0.84f), new Vector2(0.96f, 0.98f));
+            titleText = CreateText(panel.transform, "Title", 20f, FontStyles.Bold,
+                new Vector2(0.04f, 0.80f), new Vector2(0.96f, 0.98f));
             titleText.alignment = TextAlignmentOptions.Center;
+            titleText.richText = true;
+            titleText.enableWordWrapping = true;
             coinsText = CreateText(panel.transform, "Coins", 18f, FontStyles.Bold,
-                new Vector2(0.04f, 0.76f), new Vector2(0.50f, 0.84f));
+                new Vector2(0.04f, 0.72f), new Vector2(0.50f, 0.80f));
             coinsText.color = new Color(1f, 0.88f, 0.35f);
             hintText = CreateText(panel.transform, "Hint", 13f, FontStyles.Normal,
-                new Vector2(0.04f, 0.68f), new Vector2(0.96f, 0.76f));
+                new Vector2(0.04f, 0.64f), new Vector2(0.96f, 0.72f));
             hintText.color = new Color(0.75f, 0.82f, 0.90f);
+            hintText.richText = true;
 
             float slotW = 0.28f;
             float gap = 0.03f;

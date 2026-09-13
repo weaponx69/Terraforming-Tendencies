@@ -103,6 +103,9 @@ namespace GameDevTV.RTS.Commands
                         targetPos = mineSnap;
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
+                    // Mines still cannot claim the sector-center / Command Post keepout.
+                    if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                        return false;
                 }
                 else if (DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                 {
@@ -250,6 +253,13 @@ namespace GameDevTV.RTS.Commands
                         {
                             ExplorationManager.NotifyPlacementFailed(
                                 "Place this mine on a discovered deposit of the matching resource.",
+                                targetPos);
+                            return;
+                        }
+                        if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                        {
+                            ExplorationManager.NotifyPlacementFailed(
+                                "Sector center is reserved for the Command Post — mine a deposit outside the center.",
                                 targetPos);
                             return;
                         }
@@ -595,6 +605,8 @@ namespace GameDevTV.RTS.Commands
                 }
                 if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, point))
                     return "Place this mine on the matching discovered deposit tile.";
+                if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
+                    return "Sector center is reserved for the Command Post — mine a deposit outside the center.";
             }
             else if (DiscoverySystem.IsOnAnyMineableDeposit(point))
             {

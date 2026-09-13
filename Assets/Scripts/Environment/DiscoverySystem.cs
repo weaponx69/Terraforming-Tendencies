@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Environment
@@ -439,6 +440,9 @@ namespace GameDevTV.RTS.Environment
                 if (hr == null || !hr.IsDiscovered) continue;
                 if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
                     continue;
+                // Never snap mines onto the Command Post keepout / sector center.
+                if (SectorColonization.IsReservedCommandPostTile(hr.transform.position))
+                    continue;
                 float d = Mathf.Sqrt(ColonyTileGrid.HorizontalDistSq(cursorWorld, hr.transform.position));
                 if (d > bestDist) continue;
                 bestDist = d;
@@ -479,6 +483,8 @@ namespace GameDevTV.RTS.Environment
                 if (hr == null || !hr.IsDiscovered) continue;
                 if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
                     continue;
+                if (SectorColonization.IsReservedCommandPostTile(hr.transform.position))
+                    continue;
                 var cell = ColonyTileGrid.WorldToCell(hr.transform.position);
                 if (occupied.Contains(cell)) continue;
 
@@ -494,7 +500,7 @@ namespace GameDevTV.RTS.Environment
             var chosen = focusBest != null ? focusBest : anyBest;
             if (chosen == null)
             {
-                failReason = $"All discovered {type} deposits already have a mine.";
+                failReason = $"No free {type} deposit outside the Command Post center.";
                 return false;
             }
 
