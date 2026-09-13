@@ -103,7 +103,7 @@ namespace GameDevTV.RTS.Commands
                         targetPos = mineSnap;
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
-                    // Mines still cannot claim the sector-center / Command Post keepout.
+                    // Mines still cannot claim the Command Post tile.
                     if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         return false;
                 }
@@ -259,7 +259,7 @@ namespace GameDevTV.RTS.Commands
                         if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         {
                             ExplorationManager.NotifyPlacementFailed(
-                                "Sector center is reserved for the Command Post — mine a deposit outside the center.",
+                                "That tile is the Command Post pad — mine a deposit on another tile.",
                                 targetPos);
                             return;
                         }
@@ -276,7 +276,7 @@ namespace GameDevTV.RTS.Commands
                         && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
-                            "Sector center is reserved for the Command Post — place elsewhere.",
+                            "That tile is reserved for the Command Post — place on an adjacent tile.",
                             targetPos);
                         return;
                     }
@@ -606,7 +606,7 @@ namespace GameDevTV.RTS.Commands
                 if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, point))
                     return "Place this mine on the matching discovered deposit tile.";
                 if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
-                    return "Sector center is reserved for the Command Post — mine a deposit outside the center.";
+                    return "That tile is the Command Post pad — mine a deposit on another tile.";
             }
             else if (DiscoverySystem.IsOnAnyMineableDeposit(point))
             {
@@ -616,7 +616,7 @@ namespace GameDevTV.RTS.Commands
             if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
                 && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
             {
-                return "Sector center is reserved for the Command Post — place elsewhere.";
+                return "That tile is reserved for the Command Post — place on an adjacent tile.";
             }
 
             if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))

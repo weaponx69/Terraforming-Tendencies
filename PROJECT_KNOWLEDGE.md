@@ -72,7 +72,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each **claimed** sector (has a Command Post) may contribute at most **1/claimed** of those deltas — empty map sectors do not shrink your budget. With one CP, that sector can fill the full Act climate. Powered = full rate; unpowered = 20%.
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (N = map sector count — one Air farm cannot clear multiple sectors' worth). Powered = full rate; unpowered = 20%.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
@@ -107,7 +107,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | Minimap | Schematic overlay in scene [`Minimap Container`](Assets/Scripts/UI/Containers/MinimapUI.cs) (user-placed); click to jump |
 | No FoW | Hex shroud fully revealed on planet gen |
 | Hand scroll | Offset preserved; ~2.5 cards/wheel-notch |
-| Top strip | Shows **Terra-Coins** during Colony Acts (`EnsureMaterialsMetricVisible`) |
+| Top strip | Shows **Materials**; during Colony Acts shows **Mats/Coins** (`materials / terraCoins`) |
 | Map score FX | [`PlacementScorePopup`](Assets/Scripts/UI/PlacementScorePopup.cs) |
 | Emergency Caches | Excluded from Colony Acts deck |
 | Pipeline Boost | Excluded from Colony Acts deck (retired exploration speed boost) |
@@ -117,7 +117,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 ## 0.3 Loop (how a play works)
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
-2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits; **sector center + ~21 m keepout** (CP pad) is Command Post only — mines included.
+2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits; **Command Post tile only** (sector center / CP pad cell) is reserved — adjacent tiles are free.
 3. **Score / climate** — adjacency + power score; climate/production at **20%** until grid-powered, then full.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
@@ -282,4 +282,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-12 — Act climate budget uses claimed CP sectors (not all map sectors); climate rates tuned for Act clear.*
+*Last rewritten: 2026-09-13 — Act climate per-sector cap restored to 1/N map sectors; CP keepout is CP tile only.*

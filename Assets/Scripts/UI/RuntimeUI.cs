@@ -796,9 +796,10 @@ namespace GameDevTV.RTS.UI
                 }
             }
 
+            EnsureClimateMetricsVisible();
+            // Materials last so climate sibling reordering cannot bury Mats/Coins.
             EnsureMaterialsMetricVisible();
             EnsureBiomassDoesNotCoverMaterials();
-            EnsureClimateMetricsVisible();
         }
 
         /// <summary>
@@ -899,6 +900,7 @@ namespace GameDevTV.RTS.UI
 
         /// <summary>
         /// Materials lives in the legacy "Minerals Container" — keep it active, labeled, and on-screen.
+        /// During Colony Acts show Materials and Terra-Coins together (Mats/Coins).
         /// </summary>
         private void EnsureMaterialsMetricVisible()
         {
@@ -910,23 +912,29 @@ namespace GameDevTV.RTS.UI
                     "Materials Header", "Minerals Header");
             }
 
+            int mats = Supplies.Materials != null
+                && Supplies.Materials.TryGetValue(displayedOwner, out int m) ? m : Supplies.StartingMaterials;
+            int coins = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive
+                ? ColonyActManager.Instance.TerraCoins
+                : -1;
+            float matsWidth = coins >= 0 ? 156f : ResolveMetricBoxWidth("Materials");
+
             if (materialsLabelText != null)
             {
                 materialsLabelText.gameObject.SetActive(true);
-                bool acts = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
-                materialsLabelText.SetText(acts ? "Terra-Coins" : "Materials");
+                // Do not overwrite with Terra-Coins alone — that hid Materials from the top bar.
+                materialsLabelText.SetText(coins >= 0 ? "Mats/Coins" : "Materials");
+                materialsLabelText.color = TerraformingGoalColors.Neutral;
+                materialsLabelText.fontSize = Mathf.Max(materialsLabelText.fontSize, 17f);
+                EnsureTextOutline(materialsLabelText, new Color(0f, 0f, 0f, 0.95f), new Vector2(1.4f, -1.4f));
             }
             if (materialsValueText != null)
             {
                 materialsValueText.gameObject.SetActive(true);
-                if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
-                    materialsValueText.SetText(ColonyActManager.Instance.TerraCoins.ToString());
-                else
-                {
-                    int mats = Supplies.Materials != null
-                        && Supplies.Materials.TryGetValue(displayedOwner, out int m) ? m : Supplies.StartingMaterials;
-                    materialsValueText.SetText(mats.ToString());
-                }
+                materialsValueText.SetText(coins >= 0 ? $"{mats} / {coins}" : mats.ToString());
+                StyleValueText(materialsValueText);
+                materialsValueText.fontSize = Mathf.Max(materialsValueText.fontSize, 20f);
+                materialsValueText.color = Color.white;
             }
 
             Transform container = FindMetricContainer(materialsValueText, "Minerals Container", "Materials Container")
@@ -935,15 +943,27 @@ namespace GameDevTV.RTS.UI
             if (container != null)
             {
                 container.gameObject.SetActive(true);
-                EnsureFixedMetricBox(materialsLabelText, materialsValueText, ResolveMetricBoxWidth("Materials"));
+                EnsureFixedMetricBox(materialsLabelText, materialsValueText, matsWidth);
                 container.SetAsFirstSibling();
 
+                // Clear left chrome (Sector Travel / weeks) when not under HLG drive.
                 if (container is RectTransform crt)
                 {
-                    // Clear left chrome (~1").
                     Vector2 pos = crt.anchoredPosition;
-                    crt.anchoredPosition = new Vector2(Mathf.Max(96f, pos.x), pos.y);
+                    crt.anchoredPosition = new Vector2(Mathf.Max(110f, pos.x), pos.y);
                 }
+
+                var cg = container.GetComponent<CanvasGroup>();
+                if (cg == null) cg = container.gameObject.AddComponent<CanvasGroup>();
+                cg.alpha = 1f;
+                cg.interactable = false;
+                cg.blocksRaycasts = false;
+
+                // Dedicated overlay canvas so sibling metrics cannot bury this slot.
+                var overlay = container.GetComponent<Canvas>();
+                if (overlay == null) overlay = container.gameObject.AddComponent<Canvas>();
+                overlay.overrideSorting = true;
+                overlay.sortingOrder = 120;
             }
         }
 
@@ -988,7 +1008,9 @@ namespace GameDevTV.RTS.UI
 
             if (bio is RectTransform bioRt && mats is RectTransform matsRt)
             {
-                float matsWidth = ResolveMetricBoxWidth("Materials");
+                float matsWidth = matsRt.rect.width > 1f
+                    ? matsRt.rect.width
+                    : ResolveMetricBoxWidth("Materials");
                 float spacing = 16f;
                 float targetX = matsRt.anchoredPosition.x + matsWidth + spacing;
                 bioRt.anchoredPosition = new Vector2(targetX, matsRt.anchoredPosition.y);

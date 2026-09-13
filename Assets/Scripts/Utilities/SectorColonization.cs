@@ -78,13 +78,14 @@ namespace GameDevTV.RTS.Utilities
         }
 
         /// <summary>
-        /// Keepout around sector center / Command Post pad. Only Command Posts may place here.
-        /// ~1.75 tiles so mines and other buildings cannot share the CP claim spot.
+        /// Half-tile radius — only the Command Post's own cell is reserved.
+        /// Used by planet gen deposit exclusion; placement uses same-cell checks below.
         /// </summary>
-        public const float CommandPostKeepoutRadius = 21f; // ColonyTileGrid.TileSize * 1.75f
+        public static float CommandPostKeepoutRadius => ColonyTileGrid.TileSize * 0.5f;
 
         /// <summary>
-        /// Sector center and Command Post pad (plus keepout) — only Command Posts may place here.
+        /// True when <paramref name="worldPos"/> snaps to the sector Command Post cell
+        /// (center pad or built CP). Adjacent tiles are free — only overlap is blocked.
         /// </summary>
         public static bool IsReservedCommandPostTile(Vector3 worldPos)
         {
@@ -94,7 +95,9 @@ namespace GameDevTV.RTS.Utilities
             var sector = sm.GetNearestSector(worldPos);
             if (sector == null) return false;
 
-            if (HorizontalDist(worldPos, sector.Center) <= CommandPostKeepoutRadius)
+            Vector2Int cell = ColonyTileGrid.WorldToCell(worldPos);
+
+            if (cell == ColonyTileGrid.WorldToCell(sector.Center))
                 return true;
 
             if (sector.BuildingSites != null)
@@ -102,26 +105,18 @@ namespace GameDevTV.RTS.Utilities
                 foreach (var site in sector.BuildingSites)
                 {
                     if (site == null || site.Kind != BuildingSiteKind.CommandPost) continue;
-                    if (HorizontalDist(worldPos, site.Position) <= CommandPostKeepoutRadius)
+                    if (cell == ColonyTileGrid.WorldToCell(site.Position))
                         return true;
                 }
             }
 
-            // Already-built CP: keep neighbors clear too.
             if (sector.OccupyingBuilding != null
-                && HorizontalDist(worldPos, sector.OccupyingBuilding.transform.position) <= CommandPostKeepoutRadius)
+                && cell == ColonyTileGrid.WorldToCell(sector.OccupyingBuilding.transform.position))
             {
                 return true;
             }
 
             return false;
-        }
-
-        private static float HorizontalDist(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return Mathf.Sqrt(dx * dx + dz * dz);
         }
 
         private static Vector3 GetColonizationOrigin()

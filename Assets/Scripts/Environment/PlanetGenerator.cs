@@ -4,6 +4,7 @@ using Unity.AI.Navigation;
 using System.Linq;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.Player;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -517,7 +518,9 @@ namespace GameDevTV.RTS.Environment
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
                         Vector3 sectorMin = sector.Center - new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.45f, 0, secH * 0.45f);
-                        float exclusionRadius = Mathf.Max(22f, SectorColonization.CommandPostKeepoutRadius);
+                        // Keep deposits off the Command Post tile only (same cell / half-tile).
+                        float exclusionRadius = Mathf.Max(ColonyTileGrid.TileSize * 0.55f,
+                            SectorColonization.CommandPostKeepoutRadius);
                         bool isStartingSector = sectorIndex == 0;
                         float revealRadius = HexGridManager.Instance != null
                             ? HexGridManager.Instance.StartingAreaRevealRadius
