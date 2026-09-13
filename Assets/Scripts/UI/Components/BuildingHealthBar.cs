@@ -66,9 +66,7 @@ namespace GameDevTV.RTS.UI.Components
                 canvas.worldCamera = Camera.main;
 
             PositionAboveBuilding();
-            if (Camera.main != null)
-                barGo.transform.rotation = Quaternion.LookRotation(
-                    barGo.transform.position - Camera.main.transform.position);
+            // FaceCamera billboards the bar to the player camera (screen-aligned).
 
             if (building.CurrentHealth != lastHealth || building.MaxHealth != lastMax)
                 ApplyFill();
@@ -144,6 +142,9 @@ namespace GameDevTV.RTS.UI.Components
             fillImage.raycastTarget = false;
             if (overlayMat != null) fillImage.material = overlayMat;
 
+            if (barGo.GetComponent<FaceCamera>() == null)
+                barGo.AddComponent<FaceCamera>();
+
             PositionAboveBuilding();
             return fillImage != null && barGo != null;
         }
@@ -193,9 +194,12 @@ namespace GameDevTV.RTS.UI.Components
         {
             if (barGo == null || building == null) return;
             Bounds bounds = GetVisualBounds();
-            Vector3 pos = bounds.center;
-            pos.y = bounds.max.y + TopLift;
-            barGo.transform.position = pos;
+            // Anchor XZ to the building pivot so skewed mesh AABBs don't shove the bar sideways.
+            float topY = Mathf.Max(bounds.max.y, building.transform.position.y + 1.5f);
+            barGo.transform.position = new Vector3(
+                building.transform.position.x,
+                topY + TopLift,
+                building.transform.position.z);
         }
 
         private Bounds GetVisualBounds()
