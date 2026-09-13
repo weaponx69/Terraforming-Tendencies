@@ -350,6 +350,55 @@ namespace GameDevTV.RTS.Environment
             return HasDiscoveredDepositOfType(type);
         }
 
+        /// <summary>
+        /// True when the focused sector has a discovered deposit matching this mine.
+        /// </summary>
+        public static bool HasDiscoveredMineDepositInSector(
+            BuildingSO building,
+            SectorManager.Sector sector)
+        {
+            if (sector == null) return HasDiscoveredMineDeposit(building);
+            if (!TryGetMineResourceType(building, out string type)) return true;
+            if (!IsTypeDiscovered(type)) return false;
+
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (SectorManager.Instance?.GetNearestSector(hr.transform.position) == sector)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Whether a building card makes sense to play while focused on <paramref name="sector"/>:
+        /// Command Post only on unclaimed sectors; feature/mine cards only when that sector matches;
+        /// other tiles only once the sector has a Command Post.
+        /// </summary>
+        public static bool IsBuildingRelevantInSector(BuildingSO building, SectorManager.Sector sector)
+        {
+            if (building == null) return false;
+            if (sector == null) return IsBuildingGeologicallyAvailable(building);
+
+            bool claimed = SectorColonization.SectorHasCommandPost(sector);
+
+            if (BuildingSiteRegistry.IsCommandPostBuilding(building))
+                return !claimed;
+
+            if (!claimed)
+                return false;
+
+            if (TryGetRequiredSectorFeature(building, out var feature))
+                return sector.Feature == feature;
+
+            if (BuildingSiteRegistry.IsMineBuilding(building))
+                return HasDiscoveredMineDepositInSector(building, sector);
+
+            return true;
+        }
+
         public static bool HasDiscoveredDepositOfType(string resourceType)
         {
             if (string.IsNullOrEmpty(resourceType)) return false;

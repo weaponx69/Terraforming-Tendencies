@@ -40,6 +40,26 @@ namespace GameDevTV.RTS.Player
         /// <summary>The player's current hand of cards (max handSize).</summary>
         public IReadOnlyList<BlueprintCardSO> Hand => hand;
 
+        /// <summary>
+        /// True when this hand card makes sense to show while focused on the active sector.
+        /// Filters geology / mine / Command Post / drone cards; keeps the full hand intact.
+        /// </summary>
+        public static bool IsCardRelevantInFocusedSector(BlueprintCardSO card)
+        {
+            if (card == null) return false;
+            var sector = SectorManager.Instance?.ActiveSector;
+            if (sector == null) return true;
+
+            if (card is UnlockBuildingCardSO unlock)
+                return DiscoverySystem.IsBuildingRelevantInSector(unlock.buildingToUnlock, sector);
+
+            if (card is SpawnUnitCardSO)
+                return SectorColonization.SectorHasCommandPost(sector);
+
+            // Scouting / discovery / other non-building cards stay visible.
+            return true;
+        }
+
         /// <summary>Fired when the hand changes (card played, drawn, etc.).</summary>
         public static event Action OnHandChanged;
 

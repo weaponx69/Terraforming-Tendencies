@@ -64,6 +64,7 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingSpawnEvent>.OnEvent[owner] += HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] += HandleRefresh;
             CardDeckController.OnHandChanged += HandleHandChanged;
+            SectorManager.OnActiveSectorChanged += HandleFocusedSectorChanged;
         }
 
         private void OnDisable()
@@ -77,6 +78,7 @@ namespace GameDevTV.RTS.UI.Containers
             Bus<BuildingSpawnEvent>.OnEvent[owner] -= HandleRefresh;
             Bus<UpgradeResearchedEvent>.OnEvent[owner] -= HandleRefresh;
             CardDeckController.OnHandChanged -= HandleHandChanged;
+            SectorManager.OnActiveSectorChanged -= HandleFocusedSectorChanged;
             if (instance == this) instance = null;
         }
 
@@ -425,6 +427,12 @@ namespace GameDevTV.RTS.UI.Containers
             RefreshBar();
         }
 
+        private void HandleFocusedSectorChanged()
+        {
+            scrollOffset = 0f;
+            RefreshBar();
+        }
+
         private bool HandFingerprintChanged()
         {
             var hand = CardDeckController.Instance?.Hand;
@@ -436,6 +444,8 @@ namespace GameDevTV.RTS.UI.Containers
                 var card = hand[i];
                 fingerprint = unchecked(fingerprint * 31 + (card != null ? card.GetInstanceID() : 0));
             }
+            var focus = SectorManager.Instance?.ActiveSector;
+            fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
 
             if (fingerprint == lastHandFingerprint && hand.Count == lastHandCount)
                 return false;
@@ -453,28 +463,36 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
-            // Keep fingerprint in sync when refreshing from events.
-            lastHandCount = hand.Count;
-            int fingerprint = hand.Count * 397;
+            // Visible subset for the focused sector — real hand indices stay on the commands.
+            var visible = new List<(BlueprintCardSO card, int handIndex)>(hand.Count);
             for (int i = 0; i < hand.Count; i++)
             {
                 var card = hand[i];
-                fingerprint = unchecked(fingerprint * 31 + (card != null ? card.GetInstanceID() : 0));
+                if (card == null) continue;
+                if (!CardDeckController.IsCardRelevantInFocusedSector(card)) continue;
+                visible.Add((card, i));
             }
+
+            lastHandCount = hand.Count;
+            int fingerprint = visible.Count * 397;
+            for (int i = 0; i < visible.Count; i++)
+                fingerprint = unchecked(fingerprint * 31 + visible[i].card.GetInstanceID());
+            var focus = SectorManager.Instance?.ActiveSector;
+            fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
             lastHandFingerprint = fingerprint;
 
-            EnsureHandSlotCount(hand.Count);
+            EnsureHandSlotCount(Mathf.Max(visible.Count, 1));
 
-            int cardsToShow = Mathf.Min(hand.Count, actionButtons.Length);
+            int cardsToShow = Mathf.Min(visible.Count, actionButtons.Length);
 
             for (int i = 0; i < actionButtons.Length; i++)
             {
                 if (actionButtons[i] == null) continue;
 
-                if (i < cardsToShow && hand[i] != null)
+                if (i < cardsToShow && visible[i].card != null)
                 {
-                    var card = hand[i];
-                    int cardIndex = i;
+                    var card = visible[i].card;
+                    int cardIndex = visible[i].handIndex;
                     string sectorGoal = TerraformingGoalColors.GetSectorGoalForCard(card);
 
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)

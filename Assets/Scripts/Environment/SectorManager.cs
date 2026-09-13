@@ -34,7 +34,21 @@ namespace GameDevTV.RTS.Environment
         }
 
         public List<Sector> Sectors = new List<Sector>();
-        public Sector ActiveSector { get; set; }
+
+        private Sector activeSector;
+        /// <summary>Sector the camera / Q-E focus is on. Changing it refreshes the sector-filtered hand.</summary>
+        public Sector ActiveSector
+        {
+            get => activeSector;
+            set
+            {
+                if (activeSector == value) return;
+                activeSector = value;
+                OnActiveSectorChanged?.Invoke();
+            }
+        }
+
+        public static event Action OnActiveSectorChanged;
 
         /// <summary>
         /// Sector climate ticks apply to this round. Mid-round unlocks must not overwrite it

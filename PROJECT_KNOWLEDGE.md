@@ -107,6 +107,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | Minimap | Schematic overlay in scene [`Minimap Container`](Assets/Scripts/UI/Containers/MinimapUI.cs) (user-placed); click to jump |
 | No FoW | Hex shroud fully revealed on planet gen |
 | Hand scroll | Offset preserved; ~2.5 cards/wheel-notch |
+| Sector-filtered hand | Bottom bar shows only cards relevant to **focused sector** (Q/E / minimap): CP on unclaimed; geology/mines matching that sector; other tiles only when claimed |
 | Top strip | Shows **Materials**; during Colony Acts shows **Mats/Coins** (`materials / terraCoins`) |
 | Map score FX | [`PlacementScorePopup`](Assets/Scripts/UI/PlacementScorePopup.cs) |
 | Emergency Caches | Excluded from Colony Acts deck |
@@ -116,7 +117,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 ## 0.3 Loop (how a play works)
 
-1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
+1. **Hand** — place tiles freely (no Materials). Weeks spend on play. Hand strip filters to the sector you are viewing.
 2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits (**Command Posts exempt** — CP pad wins over a deposit on the same tile). Adjacent tiles are free.
 3. **Score / climate** — adjacency + power score; climate/production at **20%** until grid-powered, then full.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
