@@ -150,16 +150,14 @@ namespace GameDevTV.RTS.UI.Containers
                     if (acts != null && acts.IsRunActive)
                     {
                         acts.GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
-                        float needT = GameDevTV.RTS.Player.GenerationManager.SectorTemperatureDelta;
-                        float needA = GameDevTV.RTS.Player.GenerationManager.SectorAtmosphereDelta;
-                        float needW = GameDevTV.RTS.Player.GenerationManager.SectorWaterDelta;
+                        acts.GetActClimateRequirements(out float needT, out float needA, out float needW);
                         string tempColor = tempGain + 0.0005f >= needT ? "#55FF55" : "#FF5555";
                         string atmosColor = atmosGain + 0.0005f >= needA ? "#55FF55" : "#FF5555";
                         string waterColor = waterGain + 0.0005f >= needW ? "#55FF55" : "#FF5555";
 
-                        sb.AppendLine($"  <color=#CCCCCC>• Temp gain:</color> <color={tempColor}><mspace=0.5em>{FormatStableGain(tempGain, 1)} / +{needT:F0}.0°C</mspace></color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Temp gain:</color> <color={tempColor}><mspace=0.5em>{FormatStableGain(tempGain, 1)} / +{needT:F1}°C</mspace></color>");
                         sb.AppendLine($"  <color=#CCCCCC>• Atmos gain:</color> <color={atmosColor}><mspace=0.5em>{FormatStableGain(atmosGain, 2)} / +{needA:F2}</mspace></color>");
-                        sb.AppendLine($"  <color=#CCCCCC>• Water gain:</color> <color={waterColor}><mspace=0.5em>{FormatStableGain(waterGain, 1)} / +{needW:F0}.0%</mspace></color>");
+                        sb.AppendLine($"  <color=#CCCCCC>• Water gain:</color> <color={waterColor}><mspace=0.5em>{FormatStableGain(waterGain, 1)} / +{needW:F1}%</mspace></color>");
                     }
                     else
                     {

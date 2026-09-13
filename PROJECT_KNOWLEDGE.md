@@ -55,7 +55,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Strategic fog / hex shroud | **Retired** — full planet visible (Combolands) |
 | Mining / materials depletion as run loss | **Retired** (while Colony Acts are active) |
 | Minimap Camera / live RT | **Never shipped** — only empty Bottom Bar shell; schematic [`MinimapUI`](Assets/Scripts/UI/Containers/MinimapUI.cs) is the implementation |
-| Changing per-sector climate goals / 1/N budgets to make Acts easier | **Forbidden forever** — Act deltas stay +15°C / +0.25 atm / +5%; each sector ≤ **1/N** (N = map sector count). Meet goals only via placement **combos** (rate multipliers, score, card offers). Never switch to claimed-CP-only budgets or raise ceilings to soft-lock-fix |
+| Changing per-sector contribution share (1/N of reference deltas) | **Forbidden** — each sector may still add at most **reference Δ / N** (N = map sector count). Never switch to claimed-CP-only budgets. **Act clear climate need is also Δ/N** (one sector share) — more sectors → smaller Act climate bar. Reference constants stay +15°C / +0.25 atm / +5%; do not inflate a single sector's share to soft-lock-fix |
 
 Climate tickers **do** count for Act clear (with Colony Score). They are not the *only* win meter.
 
@@ -73,7 +73,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (N = map sector count — one Air farm cannot clear multiple sectors' worth). **These per-sector climate goals are permanent — never retune them;** help players with adjacency climate **rate combos** instead. Powered = full rate; unpowered = 20%; stacked Heat/Air/Water (+Power) multiply rate up to 2.5×.
+* **Act clear = Colony Score target AND Temp/Atmos/Water gains** from Act baselines. Need per Act = **one sector share**: reference (+15°C / +0.25 atm / +5%) **÷ N**. Each sector may contribute at most that same **1/N** (one Air farm cannot dump multiple sectors' worth). More map sectors → smaller Act climate bars. Help fill via adjacency climate **rate combos**. Powered = full rate; unpowered = 20%; stacked Heat/Air/Water (+Power) multiply rate up to 2.5×.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
@@ -167,7 +167,7 @@ Non-building cards grant a small flat score on play (no adjacency). **Most score
 | Climate pair Heat↔Air, Air↔Water, Water↔Heat | +8 |
 | Life next to Water or Anchor | +6 |
 
-### Climate rate combos (1/N budgets unchanged)
+### Climate rate combos (per-sector 1/N share unchanged)
 | Neighbor situation | Rate multiplier |
 |--------------------|----------------:|
 | Same climate tag | 1.35× |
@@ -272,7 +272,7 @@ First climate-pair join in a sector also pulses ~7% of remaining sector budget (
 * Materials or drone as card placement requirements  
 * Hand power-budget trim that removes cards the player wanted to keep  
 * Act length tied to sector count  
-* Changing per-sector climate goals / 1/N budgets / claimed-only climate share to make Acts easier  
+* Inflating one sector's climate share above 1/N (claimed-only budgets, etc.) to soft-lock-fix Acts  
 
 ---
 
@@ -301,4 +301,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-13 — Colony placement is building-sized hexes (~5 m); HexGridManager synced to ColonyTileGrid; sparse rich deposits; discovered-only mine lock; combo climate rates; hard ban on changing per-sector climate goals.*
+*Last rewritten: 2026-09-13 — Act climate need = one sector share (Δ/N); ban is only on inflating per-sector 1/N contribution; building-sized hexes; sparse deposits; combo climate rates.*

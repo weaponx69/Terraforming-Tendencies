@@ -5,18 +5,19 @@ using UnityEngine.UI;
 namespace GameDevTV.RTS.UI.Components
 {
     /// <summary>
-    /// Always-visible world-space health bar at the base of a building.
+    /// Always-visible world-space health bar floating above a building.
     /// Lives in the scene root (not under the building) so building visual rebuilds
-    /// cannot destroy the bar transform mid-Start.
+    /// cannot destroy the bar transform mid-Start. Draws through world meshes.
     /// </summary>
     [RequireComponent(typeof(BaseBuilding))]
     public class BuildingHealthBar : MonoBehaviour
     {
         private const float BarWidth = 2.8f;
         private const float BarHeight = 0.28f;
-        private const float BaseLift = 0.25f;
+        private const float TopLift = 0.55f;
 
         private static Sprite s_WhiteSprite;
+        private static Material s_OverlayUiMaterial;
 
         private BaseBuilding building;
         private Image fillImage;
@@ -64,7 +65,7 @@ namespace GameDevTV.RTS.UI.Components
             if (canvas != null && canvas.worldCamera == null && Camera.main != null)
                 canvas.worldCamera = Camera.main;
 
-            PositionAtBase();
+            PositionAboveBuilding();
             if (Camera.main != null)
                 barGo.transform.rotation = Quaternion.LookRotation(
                     barGo.transform.position - Camera.main.transform.position);
@@ -95,7 +96,8 @@ namespace GameDevTV.RTS.UI.Components
 
             canvas = barGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            canvas.sortingOrder = 80;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 5000;
             if (Camera.main != null)
                 canvas.worldCamera = Camera.main;
 
@@ -111,6 +113,8 @@ namespace GameDevTV.RTS.UI.Components
                 return false;
             }
 
+            Material overlayMat = GetOverlayUiMaterial();
+
             var bgGo = new GameObject("Background", typeof(RectTransform));
             bgGo.transform.SetParent(barGo.transform, false);
             var bgRt = bgGo.GetComponent<RectTransform>();
@@ -122,6 +126,7 @@ namespace GameDevTV.RTS.UI.Components
             bgImg.sprite = white;
             bgImg.color = new Color(0.05f, 0.06f, 0.08f, 0.92f);
             bgImg.raycastTarget = false;
+            if (overlayMat != null) bgImg.material = overlayMat;
 
             var fillGo = new GameObject("Fill", typeof(RectTransform));
             fillGo.transform.SetParent(barGo.transform, false);
@@ -137,8 +142,9 @@ namespace GameDevTV.RTS.UI.Components
             fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
             fillImage.color = new Color(0.35f, 0.9f, 0.4f, 1f);
             fillImage.raycastTarget = false;
+            if (overlayMat != null) fillImage.material = overlayMat;
 
-            PositionAtBase();
+            PositionAboveBuilding();
             return fillImage != null && barGo != null;
         }
 
@@ -165,12 +171,30 @@ namespace GameDevTV.RTS.UI.Components
             return s_WhiteSprite;
         }
 
-        private void PositionAtBase()
+        private static Material GetOverlayUiMaterial()
+        {
+            if (s_OverlayUiMaterial != null) return s_OverlayUiMaterial;
+
+            Shader shader = Shader.Find("UI/Default");
+            if (shader == null) return null;
+
+            s_OverlayUiMaterial = new Material(shader)
+            {
+                name = "BuildingHealthBarOverlay",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            // Always pass depth so the bar sits visually on top of building meshes.
+            s_OverlayUiMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+            s_OverlayUiMaterial.renderQueue = 5000;
+            return s_OverlayUiMaterial;
+        }
+
+        private void PositionAboveBuilding()
         {
             if (barGo == null || building == null) return;
             Bounds bounds = GetVisualBounds();
             Vector3 pos = bounds.center;
-            pos.y = Mathf.Min(bounds.min.y, building.transform.position.y) + BaseLift;
+            pos.y = bounds.max.y + TopLift;
             barGo.transform.position = pos;
         }
 

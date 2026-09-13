@@ -1106,7 +1106,7 @@ namespace GameDevTV.RTS.Units
             atmosRate *= efficiency;
             waterRate *= efficiency;
 
-            // Adjacency climate combos fill 1/N budgets faster — caps unchanged.
+            // Adjacency climate combos fill the Act's 1/N need faster — per-sector share unchanged.
             float comboMult = ColonyActManager.GetClimateComboRateMultiplier(this);
             tempRate *= comboMult;
             atmosRate *= comboMult;

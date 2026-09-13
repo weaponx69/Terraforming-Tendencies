@@ -79,9 +79,30 @@ namespace GameDevTV.RTS.Player
         public float BaselineWater => baselineWater;
 
         /// <summary>Hard ceiling for planet meters this Act (baseline + required delta).</summary>
-        public float ActAtmosphereCeiling => baselineAtmosphere + GenerationManager.SectorAtmosphereDelta;
-        public float ActTemperatureCeiling => baselineTemperature + GenerationManager.SectorTemperatureDelta;
-        public float ActWaterCeiling => baselineWater + GenerationManager.SectorWaterDelta;
+        public float ActAtmosphereCeiling
+        {
+            get
+            {
+                GetActClimateRequirements(out _, out float needA, out _);
+                return baselineAtmosphere + needA;
+            }
+        }
+        public float ActTemperatureCeiling
+        {
+            get
+            {
+                GetActClimateRequirements(out float needT, out _, out _);
+                return baselineTemperature + needT;
+            }
+        }
+        public float ActWaterCeiling
+        {
+            get
+            {
+                GetActClimateRequirements(out _, out _, out float needW);
+                return baselineWater + needW;
+            }
+        }
 
         private string statusBanner = string.Empty;
         private float statusBannerUntil;
@@ -319,9 +340,8 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// How many sectors share the Act climate budget (at least 1).
-        /// Uses the full map sector count so each sector caps at 1/N of Act deltas —
-        /// one Air farm cannot clear multiple sectors' worth of climate.
+        /// How many sectors share the published climate reference deltas (at least 1).
+        /// Per-sector contribution cap = reference / N. Never replace this with claimed-only counts.
         /// </summary>
         public static int ClimateBudgetSectorCount
         {
@@ -332,7 +352,10 @@ namespace GameDevTV.RTS.Player
             }
         }
 
-        /// <summary>Max Temp/Atmos/Water one sector may contribute toward this Act's deltas.</summary>
+        /// <summary>
+        /// Max Temp/Atmos/Water one sector may contribute this Act (= reference Δ / N).
+        /// This per-sector share is the locked design — do not retune the 1/N split.
+        /// </summary>
         public void GetPerSectorClimateBudgets(out float maxTemp, out float maxAtmos, out float maxWater)
         {
             int n = ClimateBudgetSectorCount;
@@ -342,8 +365,17 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// Climate gains needed to clear this Act = one sector's share (Δ / N).
+        /// More sectors → smaller Act climate need; one filled sector can clear climate.
+        /// </summary>
+        public void GetActClimateRequirements(out float needTemp, out float needAtmos, out float needWater)
+        {
+            GetPerSectorClimateBudgets(out needTemp, out needAtmos, out needWater);
+        }
+
+        /// <summary>
         /// Clamp proposed climate adds to the building's sector remaining 1/N budget
-        /// and the Act ceilings. Returns false when nothing can be applied.
+        /// and the Act need (also 1/N). Returns false when nothing can be applied.
         /// </summary>
         public bool TryApplySectorClimateContribution(
             Vector3 worldPos,
@@ -362,11 +394,11 @@ namespace GameDevTV.RTS.Player
             if (!sectorClimateContributed.TryGetValue(sectorIndex, out Vector3 used))
                 used = Vector3.zero;
 
-            // Also respect Act-wide remaining need so meters stop at 100% of the Act delta.
+            GetActClimateRequirements(out float needT, out float needA, out float needW);
             GetClimateGains(out float tGain, out float aGain, out float wGain);
-            float actRemainT = Mathf.Max(0f, GenerationManager.SectorTemperatureDelta - tGain);
-            float actRemainA = Mathf.Max(0f, GenerationManager.SectorAtmosphereDelta - aGain);
-            float actRemainW = Mathf.Max(0f, GenerationManager.SectorWaterDelta - wGain);
+            float actRemainT = Mathf.Max(0f, needT - tGain);
+            float actRemainA = Mathf.Max(0f, needA - aGain);
+            float actRemainW = Mathf.Max(0f, needW - wGain);
 
             float remainT = Mathf.Min(Mathf.Max(0f, maxT - used.x), actRemainT);
             float remainA = Mathf.Min(Mathf.Max(0f, maxA - used.y), actRemainA);
@@ -426,15 +458,16 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// 0–1 bottleneck of Temp / Atmos / Water progress toward this Act's deltas
-        /// (+15°C / +0.25 atm / +5% from Act baselines). Each sector contributes at most 1/N.
+        /// 0–1 bottleneck of Temp / Atmos / Water toward this Act's need (Δ / N each).
+        /// One sector filling its 1/N share clears Act climate; more map sectors → smaller need.
         /// </summary>
         public float GetClimateProgress(out float tempProgress, out float atmosProgress, out float waterProgress)
         {
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
-            tempProgress = DeltaProgressFromGain(tempGain, GenerationManager.SectorTemperatureDelta);
-            atmosProgress = DeltaProgressFromGain(atmosGain, GenerationManager.SectorAtmosphereDelta);
-            waterProgress = DeltaProgressFromGain(waterGain, GenerationManager.SectorWaterDelta);
+            GetActClimateRequirements(out float needT, out float needA, out float needW);
+            tempProgress = DeltaProgressFromGain(tempGain, needT);
+            atmosProgress = DeltaProgressFromGain(atmosGain, needA);
+            waterProgress = DeltaProgressFromGain(waterGain, needW);
             return Mathf.Min(tempProgress, Mathf.Min(atmosProgress, waterProgress));
         }
 
@@ -1219,7 +1252,8 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
             sb.AppendLine($"<color=#A8B0B8>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
             sb.AppendLine($"<color=#A8B0B8>No Materials gate. Power = full climate rate (else 20%).</color>");
-            sb.AppendLine($"<color=#A8B0B8>Each sector ≤ 1/{ClimateBudgetSectorCount} of Act Temp/Atmos/Water.</color>");
+            sb.AppendLine($"<color=#A8B0B8>Act climate need = 1/{ClimateBudgetSectorCount} of +15°C / +0.25 atm / +5% (one sector share).</color>");
+            sb.AppendLine($"<color=#A8B0B8>Each sector contributes at most that same 1/{ClimateBudgetSectorCount} share.</color>");
             sb.AppendLine($"<color=#A8B0B8>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}).</color>");
             sb.AppendLine("<color=#A8B0B8>LOSE: weeks hit 0 first.</color>");
             sb.AppendLine();
@@ -1231,9 +1265,7 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color=#FFE08A>TERRA-COINS  {terraCoins}</color>  <color=#A8B0B8>(shop on Act clear; carries)</color>");
 
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
-            float tempCap = GenerationManager.SectorTemperatureDelta;
-            float atmosCap = GenerationManager.SectorAtmosphereDelta;
-            float waterCap = GenerationManager.SectorWaterDelta;
+            GetActClimateRequirements(out float tempCap, out float atmosCap, out float waterCap);
             tempGain = Mathf.Min(tempGain, tempCap);
             atmosGain = Mathf.Min(atmosGain, atmosCap);
             waterGain = Mathf.Min(waterGain, waterCap);
@@ -1260,7 +1292,7 @@ namespace GameDevTV.RTS.Player
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature)}>{absTemp:F1}°C</color>  " +
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Atmosphere)}>{absAtmos:F2} atm</color>  " +
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Water)}>{absWater:F1}%</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start (any sector ticks; each ≤ 1/{ClimateBudgetSectorCount}). Caps never change.</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start. Need and per-sector cap are both 1/{ClimateBudgetSectorCount} of the reference deltas.</color>");
             sb.AppendLine("  <color=#A8B0B8>Stack Heat/Air/Water (and Power) for climate rate combos.</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";

@@ -747,11 +747,12 @@ namespace GameDevTV.RTS.Player
             if (acts == null || !acts.IsRunActive) return;
 
             acts.GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
-            if (waterGain + 0.0005f < GenerationManager.SectorWaterDelta)
+            acts.GetActClimateRequirements(out float needT, out float needA, out float needW);
+            if (waterGain + 0.0005f < needW)
                 EnsureClimateGoalCardInHand("WATER");
-            if (atmosGain + 0.0005f < GenerationManager.SectorAtmosphereDelta)
+            if (atmosGain + 0.0005f < needA)
                 EnsureClimateGoalCardInHand("ATMOSPHERE");
-            if (tempGain + 0.0005f < GenerationManager.SectorTemperatureDelta)
+            if (tempGain + 0.0005f < needT)
                 EnsureClimateGoalCardInHand("TEMPERATURE");
         }
 
