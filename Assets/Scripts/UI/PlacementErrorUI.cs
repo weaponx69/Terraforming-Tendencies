@@ -20,6 +20,7 @@ namespace GameDevTV.RTS.UI
         private RectTransform panelRt;
         private TextMeshProUGUI label;
         private Image panelBg;
+        private Button closeButton;
         private float hideAt;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -53,9 +54,7 @@ namespace GameDevTV.RTS.UI
         {
             if (panelRt == null || !panelRt.gameObject.activeSelf) return;
             if (Time.unscaledTime >= hideAt)
-            {
-                panelRt.gameObject.SetActive(false);
-            }
+                Hide();
         }
 
         private void HandleFailed(string message) => Show(message, null);
@@ -84,6 +83,14 @@ namespace GameDevTV.RTS.UI
             PositionPanel();
 
             ColonyActManager.Instance?.ShowStatusBanner($"<color=#ffccaa>{message}</color>", 4.5f);
+        }
+
+        private void Hide()
+        {
+            if (panelRt != null)
+                panelRt.gameObject.SetActive(false);
+            hideAt = 0f;
+            ColonyActManager.Instance?.ClearStatusBanner();
         }
 
         private void PositionPanel()
@@ -126,7 +133,7 @@ namespace GameDevTV.RTS.UI
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;
             trt.offsetMin = new Vector2(16f, 12f);
-            trt.offsetMax = new Vector2(-16f, -12f);
+            trt.offsetMax = new Vector2(-48f, -12f);
 
             label = textGo.AddComponent<TextMeshProUGUI>();
             label.alignment = TextAlignmentOptions.Center;
@@ -137,7 +144,51 @@ namespace GameDevTV.RTS.UI
             if (TMP_Settings.defaultFontAsset != null)
                 label.font = TMP_Settings.defaultFontAsset;
 
+            CreateCloseButton(panelGo.transform);
+
             panelGo.SetActive(false);
+        }
+
+        private void CreateCloseButton(Transform parent)
+        {
+            var btnGo = new GameObject("CloseButton", typeof(RectTransform));
+            btnGo.transform.SetParent(parent, false);
+            var brt = btnGo.GetComponent<RectTransform>();
+            brt.anchorMin = brt.anchorMax = new Vector2(1f, 1f);
+            brt.pivot = new Vector2(1f, 1f);
+            brt.sizeDelta = new Vector2(36f, 36f);
+            brt.anchoredPosition = new Vector2(-6f, -6f);
+
+            var bg = btnGo.AddComponent<Image>();
+            bg.color = new Color(0.15f, 0.05f, 0.05f, 0.92f);
+            bg.raycastTarget = true;
+
+            closeButton = btnGo.AddComponent<Button>();
+            closeButton.targetGraphic = bg;
+            var colors = closeButton.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 0.85f, 0.8f, 1f);
+            colors.pressedColor = new Color(0.85f, 0.7f, 0.65f, 1f);
+            closeButton.colors = colors;
+            closeButton.onClick.AddListener(Hide);
+
+            var xGo = new GameObject("X", typeof(RectTransform));
+            xGo.transform.SetParent(btnGo.transform, false);
+            var xrt = xGo.GetComponent<RectTransform>();
+            xrt.anchorMin = Vector2.zero;
+            xrt.anchorMax = Vector2.one;
+            xrt.offsetMin = Vector2.zero;
+            xrt.offsetMax = Vector2.zero;
+
+            var xLabel = xGo.AddComponent<TextMeshProUGUI>();
+            xLabel.text = "×";
+            xLabel.alignment = TextAlignmentOptions.Center;
+            xLabel.fontSize = 28f;
+            xLabel.fontStyle = FontStyles.Bold;
+            xLabel.color = Color.white;
+            xLabel.raycastTarget = false;
+            if (TMP_Settings.defaultFontAsset != null)
+                xLabel.font = TMP_Settings.defaultFontAsset;
         }
     }
 }

@@ -518,14 +518,22 @@ namespace GameDevTV.RTS.Environment
                         float secH = (Config.MapHeight * CellSize) / Config.SectorsY;
                         Vector3 sectorMin = sector.Center - new Vector3(secW * 0.45f, 0, secH * 0.45f);
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.45f, 0, secH * 0.45f);
-                        // Keep deposits off the Command Post tile only (same cell / half-tile).
-                        float exclusionRadius = Mathf.Max(ColonyTileGrid.TileSize * 0.55f,
-                            SectorColonization.CommandPostKeepoutRadius);
+                        // Keep deposits off the Command Post colony tile (same cell as center / CP pad).
+                        Vector2Int cpCell = ColonyTileGrid.WorldToCell(sector.Center);
+                        float exclusionRadius = ColonyTileGrid.TileSize * 0.55f;
+
+                        System.Func<Vector3, bool> isClearOfCommandPost = candidate =>
+                        {
+                            if (ColonyTileGrid.WorldToCell(candidate) == cpCell) return false;
+                            if (Vector3.Distance(candidate, sector.Center) < exclusionRadius) return false;
+                            return true;
+                        };
+
                         bool isStartingSector = sectorIndex == 0;
                         float revealRadius = HexGridManager.Instance != null
                             ? HexGridManager.Instance.StartingAreaRevealRadius
                             : 15f;
-                        float bootstrapRadius = Mathf.Max(6f, revealRadius * 0.7f);
+                        float bootstrapRadius = Mathf.Max(ColonyTileGrid.TileSize, revealRadius * 0.7f);
 
                         System.Func<Vector3> randomPos = () =>
                         {
@@ -534,13 +542,13 @@ namespace GameDevTV.RTS.Environment
                                 float rx = Random.Range(sectorMin.x, sectorMax.x);
                                 float rz = Random.Range(sectorMin.z, sectorMax.z);
                                 var candidate = new Vector3(rx, 0, rz);
-                                if (Vector3.Distance(candidate, sector.Center) >= exclusionRadius)
+                                if (isClearOfCommandPost(candidate))
                                     return candidate;
                             }
-                            // Fallback: push outward from center.
+                            // Fallback: push outward from center onto a different tile.
                             Vector2 dir = Random.insideUnitCircle.normalized;
                             if (dir.sqrMagnitude < 0.01f) dir = Vector2.right;
-                            return sector.Center + new Vector3(dir.x, 0f, dir.y) * (exclusionRadius + 4f);
+                            return sector.Center + new Vector3(dir.x, 0f, dir.y) * (ColonyTileGrid.TileSize + 2f);
                         };
 
                         // 3 Minerals — keep outside Command Post keepout (center reserved).
@@ -550,13 +558,13 @@ namespace GameDevTV.RTS.Environment
                             if (isStartingSector && i == 0)
                             {
                                 pos = sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f);
-                                if (Vector3.Distance(pos, sector.Center) < exclusionRadius)
+                                if (!isClearOfCommandPost(pos))
                                     pos = randomPos();
                             }
                             else if (isStartingSector && i == 1)
                             {
                                 pos = sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f);
-                                if (Vector3.Distance(pos, sector.Center) < exclusionRadius)
+                                if (!isClearOfCommandPost(pos))
                                     pos = randomPos();
                             }
                             else

@@ -463,6 +463,13 @@ namespace GameDevTV.RTS.Player
             OnActStateChanged?.Invoke();
         }
 
+        public void ClearStatusBanner()
+        {
+            statusBanner = string.Empty;
+            statusBannerUntil = 0f;
+            OnActStateChanged?.Invoke();
+        }
+
         private void Update()
         {
             // Drone builds may finish (or be cancelled) after weeks hit 0 — resolve then.

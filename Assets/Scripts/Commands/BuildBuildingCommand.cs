@@ -107,7 +107,8 @@ namespace GameDevTV.RTS.Commands
                     if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         return false;
                 }
-                else if (DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
+                else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                 {
                     return false;
                 }
@@ -264,7 +265,8 @@ namespace GameDevTV.RTS.Commands
                             return;
                         }
                     }
-                    else if (DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
+                    else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                        && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
                             "Deposit tiles are reserved for mines — place elsewhere.",
@@ -519,8 +521,9 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
-            // Deposit tiles are mine-only; sector center / CP pad are Command Post–only.
+            // Deposit tiles are mine-only (Command Posts still claim their reserved pad).
             if (!BuildingSiteRegistry.IsMineBuilding(Building)
+                && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                 && DiscoverySystem.IsOnAnyMineableDeposit(point))
             {
                 return false;
@@ -608,7 +611,8 @@ namespace GameDevTV.RTS.Commands
                 if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
                     return "That tile is the Command Post pad — mine a deposit on another tile.";
             }
-            else if (DiscoverySystem.IsOnAnyMineableDeposit(point))
+            else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                && DiscoverySystem.IsOnAnyMineableDeposit(point))
             {
                 return "Deposit tiles are reserved for mines — place elsewhere.";
             }

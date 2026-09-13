@@ -117,7 +117,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 ## 0.3 Loop (how a play works)
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play.
-2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits; **Command Post tile only** (sector center / CP pad cell) is reserved — adjacent tiles are free.
+2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits (**Command Posts exempt** — CP pad wins over a deposit on the same tile). Adjacent tiles are free.
 3. **Score / climate** — adjacency + power score; climate/production at **20%** until grid-powered, then full.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.

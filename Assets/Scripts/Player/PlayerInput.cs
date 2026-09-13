@@ -791,6 +791,7 @@ namespace GameDevTV.RTS.Player
             }
             if (cardTilePlace && activeCommand is BuildBuildingCommand depositReserveBbc
                 && !BuildingSiteRegistry.IsMineBuilding(depositReserveBbc.Building)
+                && !BuildingSiteRegistry.IsCommandPostBuilding(depositReserveBbc.Building)
                 && DiscoverySystem.IsOnAnyMineableDeposit(snapTarget))
             {
                 allRestrictionsPass = false;
