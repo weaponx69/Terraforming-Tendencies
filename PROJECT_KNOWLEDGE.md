@@ -55,6 +55,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Strategic fog / hex shroud | **Retired** — full planet visible (Combolands) |
 | Mining / materials depletion as run loss | **Retired** (while Colony Acts are active) |
 | Minimap Camera / live RT | **Never shipped** — only empty Bottom Bar shell; schematic [`MinimapUI`](Assets/Scripts/UI/Containers/MinimapUI.cs) is the implementation |
+| Changing per-sector climate goals / 1/N budgets to make Acts easier | **Forbidden forever** — Act deltas stay +15°C / +0.25 atm / +5%; each sector ≤ **1/N** (N = map sector count). Meet goals only via placement **combos** (rate multipliers, score, card offers). Never switch to claimed-CP-only budgets or raise ceilings to soft-lock-fix |
 
 Climate tickers **do** count for Act clear (with Colony Score). They are not the *only* win meter.
 
@@ -72,7 +73,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (N = map sector count — one Air farm cannot clear multiple sectors' worth). Powered = full rate; unpowered = 20%.
+* **Act clear = Colony Score target AND Temp/Atmos/Water deltas** from Act baselines (+15°C / +0.25 atm / +5%). Each sector may contribute at most **1/N** of those deltas (N = map sector count — one Air farm cannot clear multiple sectors' worth). **These per-sector climate goals are permanent — never retune them;** help players with adjacency climate **rate combos** instead. Powered = full rate; unpowered = 20%; stacked Heat/Air/Water (+Power) multiply rate up to 2.5×.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
@@ -119,7 +120,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play. Hand strip filters to the sector you are viewing.
 2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on mineable deposits (**Command Posts exempt** — CP pad wins over a deposit on the same tile). Adjacent tiles are free.
-3. **Score / climate** — adjacency + power score; climate/production at **20%** until grid-powered, then full.
+3. **Score / climate** — low base score; adjacency/combos pay. Climate ticks at **20%** unpowered / full when powered, then × adjacency climate combo (pair / same-tag / trio / power neighbor). Combo **card offers** require edge adjacency.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
 
@@ -133,40 +134,57 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 | Tag | Examples | Base Score | Habitability |
 |-----|----------|------------|--------------|
-| Anchor | Command Post, housing | 12 / 10 | — |
-| Power | Solar | 4 | — |
-| Labor | Mining Drone (non-building card) | 3 | — |
-| Industry | Mines | 8 | — |
-| Heat | GHG / geothermal / heat buildings | 10 | +8 |
-| Air | Condenser / import | 10 | +8 |
-| Water | Aquifer / water buildings | 10 | +8 |
-| Life | Oxygen Processor | 6 | +3 |
-| Other | default | 5 | — |
+| Anchor | Command Post, housing | 6 / 5 | — |
+| Power | Solar | 2 | — |
+| Labor | Mining Drone (non-building card) | 2 | — |
+| Industry | Mines | 3 | — |
+| Heat | GHG / geothermal / heat buildings | 3 | +8 |
+| Air | Condenser / import | 3 | +8 |
+| Water | Aquifer / water buildings | 3 | +8 |
+| Life | Oxygen Processor | 2 | +3 |
+| Other | default | 2 | — |
 
-Non-building cards grant a small flat score on play (no adjacency).
+Non-building cards grant a small flat score on play (no adjacency). **Most score comes from stacking.**
 
 ---
 
 ## 0.5 Adjacency (stacking)
 
-**Grid:** card buildings snap to a **12 m square tile grid** ([`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs)). Only **orthogonal edge** neighbors count (N/E/S/W) — same cells the placement magnet snaps to.
+**Grid:** card buildings snap to a **24 m square tile grid** ([`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs)). Only **orthogonal edge** neighbors count (N/E/S/W) — same cells the placement magnet snaps to.
 
 ### Placement feedback (ghost)
 * Semi-transparent **tile footprint** under the ghost (locks to the snap cell immediately).
 * Ghost mesh stays a stable blue/red valid tint (no green strobe on fresnel).
 * **Green footprint + join lines** show adjacency; ghost is removed from `ActiveBuildings` so it cannot occupy its own cell.
 
-### Score bonuses (shipped — per edge neighbor, soft-capped +20)
+### Score bonuses (per edge neighbor, soft-capped +36)
 | Relationship | Bonus |
 |--------------|------:|
-| Any neighbor | +2 |
-| Same tag | +4 |
-| Power next to a consumer (upkeep &gt; 0) | +5 |
-| Anchor next to anything | +3 |
-| Climate pair Heat↔Air, Air↔Water, Water↔Heat | +4 **and** queues missing third climate card (also when both partners exist in focus sector) |
-| Life next to Water or Anchor | +4 |
+| Any neighbor | +3 |
+| Same tag | +6 |
+| Power next to a consumer (upkeep &gt; 0) | +7 |
+| Anchor next to anything | +5 |
+| Climate pair Heat↔Air, Air↔Water, Water↔Heat | +8 |
+| Life next to Water or Anchor | +6 |
 
-* HUD / tooltip should explain stacking; placement popcorn (`+Score`) is backlog.
+### Climate rate combos (1/N budgets unchanged)
+| Neighbor situation | Rate multiplier |
+|--------------------|----------------:|
+| Same climate tag | 1.35× |
+| Climate pair edge | 1.75× |
+| Mini-trio (Heat+Air+Water adjacent) | 2.25× |
+| + orthogonal Power | +0.25× |
+| Cap | 2.5× |
+
+First climate-pair join in a sector also pulses ~7% of remaining sector budget (still clamped by 1/N).
+
+### Combo card offers (edge adjacency only, once per Act per goal)
+| Pair | Offers |
+|------|--------|
+| Heat+Air / Air+Water / Water+Heat | Missing climate channel |
+| Power+Industry | Life (Oxygen) |
+| Anchor+Power | Industry (mine) if deposit in focus sector, else Heat |
+| Life+Water | Housing / population |
 
 ---
 
@@ -181,7 +199,7 @@ Non-building cards grant a small flat score on play (no adjacency).
 
 ## 0.7 Board, power, sectors
 
-* **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (12 m cells). **Acts** advance sector-by-sector.
+* **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (24 m cells). **Acts** advance sector-by-sector.
 * **Power:** only hard **placement** gate for cards (`PowerGridManager.CanPlayBuildingForPower`). Hand may hold cards the player cannot place yet. **Adjacent tiles auto-link** on the power graph when construction completes (`BaseBuilding.AutoConnectAdjacentPowerNodes`) — no manual Connect Power.
 * **Sectors:** map-gen count drives **Act count**. Each Act focuses terraforming on one sector (`SectorManager.BeginTerraformingOn`). No old unlock/pad lockdown.
 * Reserved pads / drones may still exist in the scene for legacy systems; **card plays ignore them**.
@@ -254,17 +272,17 @@ Non-building cards grant a small flat score on play (no adjacency).
 * Materials or drone as card placement requirements  
 * Hand power-budget trim that removes cards the player wanted to keep  
 * Act length tied to sector count  
+* Changing per-sector climate goals / 1/N budgets / claimed-only climate share to make Acts easier  
 
 ---
 
 ## 5. Backlog (after feel is right)
 
-1. Richer adjacency (§0.5 design target) + soft cap  
-2. Placement popcorn (+base / +adj floats)  
-3. Neighbor “echo” re-score (optional Combolands cascade lite)  
-4. Soft-fail / extra weeks  
-5. Guilds / heirlooms / councillors — **out of scope** until Acts + stacking feel good  
-6. Retarget `./tools/sector-win-cli.sh` → Colony Act bot  
+1. Placement popcorn (+base / +adj floats)  
+2. Neighbor “echo” re-score (optional Combolands cascade lite)  
+3. Soft-fail / extra weeks  
+4. Guilds / heirlooms / councillors — **out of scope** until Acts + stacking feel good  
+5. Retarget `./tools/sector-win-cli.sh` → Colony Act bot  
 
 ---
 
@@ -283,4 +301,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-13 — Act climate per-sector cap restored to 1/N map sectors; CP keepout is CP tile only.*
+*Last rewritten: 2026-09-13 — Combo-first score + climate rate multipliers; 24 m tiles; hard ban on changing per-sector climate goals.*

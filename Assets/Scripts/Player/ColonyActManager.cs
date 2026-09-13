@@ -36,15 +36,18 @@ namespace GameDevTV.RTS.Player
         /// <summary>Habitability points needed for full Living look (cumulative).</summary>
         private const float HabitabilityForLiving = 80f;
         private const float ScoreCarryFraction = 0.25f;
-        private const int AdjacentBonus = 2;
-        private const int SameTagBonus = 4;
-        private const int PowerConsumerBonus = 5;
-        private const int AnchorBonus = 3;
-        private const int ClimatePairBonus = 4;
-        private const int LifeSynergyBonus = 4;
-        private const int AdjacencySoftCap = 20;
+        private const int AdjacentBonus = 3;
+        private const int SameTagBonus = 6;
+        private const int PowerConsumerBonus = 7;
+        private const int AnchorBonus = 5;
+        private const int ClimatePairBonus = 8;
+        private const int LifeSynergyBonus = 6;
+        private const int AdjacencySoftCap = 36;
         private const int PowerGeneratorScoreBonus = 4;
         private const int GeologyMatchBonus = 8;
+
+        /// <summary>Once-per-Act climate-pair pulses (sectorIndex:tagA:tagB).</summary>
+        private readonly HashSet<string> climatePairPulseKeysThisAct = new(StringComparer.Ordinal);
 
         private int actIndex; // 0-based
         private int colonyScore;
@@ -312,6 +315,7 @@ namespace GameDevTV.RTS.Player
 
             sectorClimateContributed.Clear();
             sectorOxygenContributed.Clear();
+            climatePairPulseKeysThisAct.Clear();
         }
 
         /// <summary>
@@ -488,16 +492,16 @@ namespace GameDevTV.RTS.Player
             int spent = Mathf.Min(weeks, weeksRemaining);
             weeksRemaining -= spent;
             Debug.Log($"[ColonyActManager] Spent {spent} week(s) — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
-            TryOfferClimateComboCards(null, null);
             OnActStateChanged?.Invoke();
             TryResolveWeekExhaustion();
         }
 
-        /// <summary>Re-check Heat/Air/Water presence combos (e.g. after hand fill).</summary>
+        /// <summary>
+        /// Legacy hook after hand fill — combo offers now require edge adjacency on place only.
+        /// </summary>
         public void TryRefreshClimateComboFromPresence()
         {
-            if (!started || runEnded || IsBetweenActs) return;
-            TryOfferClimateComboCards(null, null);
+            // Intentionally empty: presence-based unlocks removed (stacking required).
         }
 
         /// <summary>Grant score when a building finishes (base + adjacency stacking).</summary>
@@ -521,7 +525,8 @@ namespace GameDevTV.RTS.Player
             {
                 adjBonus = CalculateAdjacencyBonus(placed, tag, out neighbors);
                 adjBonus += adjacencyBonusExtra * Mathf.Max(0, neighbors);
-                TryOfferClimateComboCards(placed, tag);
+                TryOfferComboCardsFromAdjacency(placed, tag);
+                TryClimatePairPulse(placed, tag);
                 geoBonus = TryApplyGeologyPlacementRewards(placed, building, tag);
                 if (tag == "Power")
                     powerBonus = PowerGeneratorScoreBonus + powerScoreBonusExtra;
@@ -649,42 +654,173 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Heat↔Air↔Water edge pairs queue the missing third channel as a hand offer (once per Act).
-        /// Also offers when both partner tags already exist in the focus sector (not only adjacent).
+        /// Climate generation multiplier from orthogonal neighbors.
+        /// Does not change 1/N sector budgets — only fills them faster.
         /// </summary>
-        private void TryOfferClimateComboCards(BaseBuilding placed, string tag)
+        public static float GetClimateComboRateMultiplier(BaseBuilding building)
         {
-            if (placed == null || CardDeckController.Instance == null) return;
+            if (building == null) return 1f;
+            GetTileValues(building.ResolvedBuildingSO, out _, out _, out string tag);
+            if (tag != "Heat" && tag != "Air" && tag != "Water") return 1f;
 
-            if (!string.IsNullOrEmpty(tag) && (tag == "Heat" || tag == "Air" || tag == "Water"))
+            var neighbors = new List<BaseBuilding>(4);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
+                ColonyTileGrid.WorldToCell(building.transform.position), building.Owner, neighbors);
+
+            bool sameTag = false;
+            bool climatePair = false;
+            bool hasHeat = tag == "Heat";
+            bool hasAir = tag == "Air";
+            bool hasWater = tag == "Water";
+            bool powerNeighbor = false;
+
+            foreach (var other in neighbors)
             {
-                var neighbors = new System.Collections.Generic.List<BaseBuilding>(4);
-                ColonyTileGrid.CollectOrthogonalNeighborBuildings(
-                    ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
-
-                foreach (var other in neighbors)
-                {
-                    if (other == null || other == placed) continue;
-                    if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
-                    GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
-                    string third = ThirdClimateTag(tag, otherTag);
-                    TryQueueClimateThird(third, tag, otherTag);
-                }
+                if (other == null || other == building) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                if (otherTag == tag) sameTag = true;
+                if (IsClimatePair(tag, otherTag)) climatePair = true;
+                if (otherTag == "Heat") hasHeat = true;
+                if (otherTag == "Air") hasAir = true;
+                if (otherTag == "Water") hasWater = true;
+                if (otherTag == "Power") powerNeighbor = true;
             }
 
-            // Presence unlock: both partners in this sector → offer the missing third.
-            GetFocusSectorClimatePresence(out bool hasHeat, out bool hasAir, out bool hasWater);
-            if (hasHeat && hasAir) TryQueueClimateThird("Water", "Heat", "Air");
-            if (hasAir && hasWater) TryQueueClimateThird("Heat", "Air", "Water");
-            if (hasWater && hasHeat) TryQueueClimateThird("Air", "Water", "Heat");
+            float mult = 1f;
+            bool miniTrio = hasHeat && hasAir && hasWater;
+            if (miniTrio) mult = 2.25f;
+            else if (climatePair) mult = 1.75f;
+            else if (sameTag) mult = 1.35f;
+
+            if (powerNeighbor) mult += 0.25f;
+            return Mathf.Min(mult, 2.5f);
         }
 
-        private void TryQueueClimateThird(string thirdTag, string a, string b)
+        /// <summary>
+        /// Edge-adjacency combo offers (once per Act per recipe). Presence unlocks removed.
+        /// </summary>
+        private void TryOfferComboCardsFromAdjacency(BaseBuilding placed, string tag)
         {
-            if (string.IsNullOrEmpty(thirdTag) || CardDeckController.Instance == null) return;
-            string goalKey = ClimateTagToGoalKey(thirdTag);
-            if (string.IsNullOrEmpty(goalKey)) return;
+            if (placed == null || CardDeckController.Instance == null) return;
+            if (string.IsNullOrEmpty(tag)) return;
 
+            var neighbors = new List<BaseBuilding>(4);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
+                ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
+
+            foreach (var other in neighbors)
+            {
+                if (other == null || other == placed) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                if (string.IsNullOrEmpty(otherTag)) continue;
+
+                // Climate trio: missing third.
+                string third = ThirdClimateTag(tag, otherTag);
+                if (!string.IsNullOrEmpty(third))
+                    TryQueueComboOffer(ClimateTagToGoalKey(third), tag, otherTag);
+
+                // Power + Industry → Life
+                if ((tag == "Power" && otherTag == "Industry") || (tag == "Industry" && otherTag == "Power"))
+                    TryQueueComboOffer("OXYGEN", "Power", "Industry");
+
+                // Anchor + Power → Industry if focused sector has a mine deposit, else Heat
+                if ((tag == "Anchor" && otherTag == "Power") || (tag == "Power" && otherTag == "Anchor"))
+                {
+                    string goal = FocusSectorHasMineableDeposit() ? "MATERIALS" : "TEMPERATURE";
+                    TryQueueComboOffer(goal, "Anchor", "Power");
+                }
+
+                // Life + Water → housing / population
+                if ((tag == "Life" && otherTag == "Water") || (tag == "Water" && otherTag == "Life"))
+                    TryQueueComboOffer("POPULATION", "Life", "Water");
+            }
+        }
+
+        private static bool FocusSectorHasMineableDeposit()
+        {
+            var focus = SectorManager.Instance?.ActiveSector;
+            if (focus == null) return false;
+            foreach (var hr in UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (!DiscoverySystem.IsMineableResourceType(hr.ResourceTypeName)) continue;
+                if (SectorManager.Instance.GetNearestSector(hr.transform.position) == focus)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// First climate-pair adjacency this Act/sector: pulse ~7% of remaining sector budget.
+        /// Still clamped by TryApplySectorClimateContribution (1/N unchanged).
+        /// </summary>
+        private void TryClimatePairPulse(BaseBuilding placed, string tag)
+        {
+            if (placed == null) return;
+            if (tag != "Heat" && tag != "Air" && tag != "Water") return;
+
+            var neighbors = new List<BaseBuilding>(4);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
+                ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
+
+            foreach (var other in neighbors)
+            {
+                if (other == null || other == placed) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                if (!IsClimatePair(tag, otherTag)) continue;
+
+                int sectorIndex = ResolveSectorIndex(placed.transform.position);
+                string keyA = string.CompareOrdinal(tag, otherTag) <= 0 ? tag : otherTag;
+                string keyB = string.CompareOrdinal(tag, otherTag) <= 0 ? otherTag : tag;
+                string pulseKey = $"{sectorIndex}:{keyA}:{keyB}";
+                if (!climatePairPulseKeysThisAct.Add(pulseKey)) continue;
+
+                GetPerSectorClimateBudgets(out float maxT, out float maxA, out float maxW);
+                if (!sectorClimateContributed.TryGetValue(sectorIndex, out Vector3 used))
+                    used = Vector3.zero;
+
+                float tempAdd = Mathf.Max(0f, maxT - used.x) * 0.07f;
+                float atmosAdd = Mathf.Max(0f, maxA - used.y) * 0.07f;
+                float waterAdd = Mathf.Max(0f, maxW - used.z) * 0.07f;
+
+                // Only pulse channels involved in this pair.
+                if (tag != "Heat" && otherTag != "Heat") tempAdd = 0f;
+                if (tag != "Air" && otherTag != "Air") atmosAdd = 0f;
+                if (tag != "Water" && otherTag != "Water") waterAdd = 0f;
+
+                Vector3 pos = placed.transform.position;
+                if (!TryApplySectorClimateContribution(pos, ref tempAdd, ref atmosAdd, ref waterAdd))
+                    continue;
+
+                if (tempAdd > 0f)
+                {
+                    float t = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float tv) ? tv : -60f;
+                    Supplies.UpdateTemperature(Owner.Player1, t + tempAdd);
+                }
+                if (atmosAdd > 0f)
+                {
+                    float a = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float av) ? av : 0.01f;
+                    Supplies.UpdateAtmosphere(Owner.Player1, a + atmosAdd);
+                }
+                if (waterAdd > 0f)
+                {
+                    float w = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wv) ? wv : 0f;
+                    Supplies.UpdateWater(Owner.Player1, w + waterAdd);
+                }
+
+                ShowStatusBanner(
+                    $"<color=#8FE7FF><b>CLIMATE COMBO</b></color> {tag}+{otherTag} — faster terraforming pulse",
+                    4f);
+                break;
+            }
+        }
+
+        private void TryQueueComboOffer(string goalKey, string a, string b)
+        {
+            if (string.IsNullOrEmpty(goalKey) || CardDeckController.Instance == null) return;
             string offeredName = CardDeckController.Instance.QueueClimateComboOffer(goalKey);
             if (string.IsNullOrEmpty(offeredName)) return;
 
@@ -701,7 +837,7 @@ namespace GameDevTV.RTS.Player
             neighborCount = 0;
             if (placed == null) return 0;
 
-            var neighbors = new System.Collections.Generic.List<BaseBuilding>(4);
+            var neighbors = new List<BaseBuilding>(4);
             ColonyTileGrid.CollectOrthogonalNeighborBuildings(
                 ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
 
@@ -964,7 +1100,7 @@ namespace GameDevTV.RTS.Player
 
         public static void GetTileValues(BuildingSO building, out int baseScore, out float habitabilityGain, out string tag)
         {
-            baseScore = 5;
+            baseScore = 2;
             habitabilityGain = 0f;
             tag = "Tile";
 
@@ -976,50 +1112,50 @@ namespace GameDevTV.RTS.Player
             switch (goal)
             {
                 case "COMMAND POST":
-                    baseScore = 12;
+                    baseScore = 6;
                     tag = "Anchor";
                     break;
                 case "POWER":
-                    baseScore = 4;
+                    baseScore = 2;
                     tag = "Power";
                     break;
                 case "MATERIALS":
-                    baseScore = 8;
+                    baseScore = 3;
                     tag = "Industry";
                     break;
                 case "POPULATION":
-                    baseScore = 10;
+                    baseScore = 5;
                     tag = "Anchor";
                     break;
                 case "TEMPERATURE":
-                    baseScore = 10;
+                    baseScore = 3;
                     habitabilityGain = 8f;
                     tag = "Heat";
                     break;
                 case "ATMOSPHERE":
-                    baseScore = 10;
+                    baseScore = 3;
                     habitabilityGain = 8f;
                     tag = "Air";
                     break;
                 case "WATER":
-                    baseScore = 10;
+                    baseScore = 3;
                     habitabilityGain = 8f;
                     tag = "Water";
                     break;
                 case "OXYGEN":
-                    baseScore = 6;
+                    baseScore = 2;
                     habitabilityGain = 3f;
                     tag = "Life";
                     break;
                 default:
                     if (name.IndexOf("drone", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        baseScore = 3;
+                        baseScore = 2;
                         tag = "Labor";
                     }
                     else
                     {
-                        baseScore = 5;
+                        baseScore = 2;
                         tag = "Tile";
                     }
                     break;
@@ -1124,7 +1260,8 @@ namespace GameDevTV.RTS.Player
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature)}>{absTemp:F1}°C</color>  " +
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Atmosphere)}>{absAtmos:F2} atm</color>  " +
                 $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Water)}>{absWater:F1}%</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start (any sector ticks; each ≤ 1/{ClimateBudgetSectorCount}).</color>");
+            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start (any sector ticks; each ≤ 1/{ClimateBudgetSectorCount}). Caps never change.</color>");
+            sb.AppendLine("  <color=#A8B0B8>Stack Heat/Air/Water (and Power) for climate rate combos.</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";
@@ -1134,18 +1271,16 @@ namespace GameDevTV.RTS.Player
             if (!hasWater)
             {
                 if (hasHeat && hasAir)
-                    sb.AppendLine("  <color=#8FE7FF>Water unlock: Heat+Air → Water Ice Aquifer card</color>");
+                    sb.AppendLine("  <color=#8FE7FF>Water unlock: edge-join Heat+Air → Water card offer</color>");
                 else if (!hasHeat && !hasAir)
-                    sb.AppendLine("  <color=#FFE08A>Need Heat (GHG) and Air (Condenser) tiles — together they unlock Water</color>");
+                    sb.AppendLine("  <color=#FFE08A>Need Heat (GHG) and Air (Condenser) tiles — join them for combos</color>");
                 else if (!hasHeat)
-                    sb.AppendLine("  <color=#FFE08A>Need a Heat tile (GHG Factory) — with Air it unlocks Water</color>");
+                    sb.AppendLine("  <color=#FFE08A>Need a Heat tile joined to Air for the Water combo</color>");
                 else
-                    sb.AppendLine("  <color=#FFE08A>Need an Air tile (Atmospheric Condenser) — with Heat it unlocks Water</color>");
+                    sb.AppendLine("  <color=#FFE08A>Need an Air tile joined to Heat for the Water combo</color>");
             }
-            else
-            {
-                sb.AppendLine("  <color=#A8B0B8>Trio combo: Heat+Air→Water · Air+Water→Heat · Water+Heat→Air</color>");
-            }
+
+            sb.AppendLine("  <color=#A8B0B8>Edge combos: Heat+Air→Water · Air+Water→Heat · Water+Heat→Air · Power+Industry→Life</color>");
 
             string weekColor = weeksRemaining <= 2 ? "#FF8A8A" : (weeksRemaining <= 4 ? "#FFE08A" : "#C8D0D8");
             sb.AppendLine($"<color={weekColor}>WEEKS LEFT  {weeksRemaining}</color>");

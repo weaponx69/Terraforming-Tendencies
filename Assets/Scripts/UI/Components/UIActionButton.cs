@@ -493,16 +493,18 @@ namespace GameDevTV.RTS.UI.Components
                     tooltipText += $"Needs <b>{upkeep:0.#} Power</b> upkeep to place.\n";
                 else
                     tooltipText += "No power upkeep (places freely).\n";
-                tooltipText += "Stack near other tiles for adjacency bonus.\n";
+                tooltipText += "Stack near other tiles — <b>combos</b> drive score and faster climate.\n";
                 tooltipText += "Right-click building → <b>Demolish</b> (Materials refund). Delete key also works.\n";
                 if (hab > 0f) tooltipText += $"Habitability +{hab:F0}\n";
 
-                if (tag == "Heat")
-                    tooltipText += "<b>Combo:</b> Place next to an <b>Atmosphere</b> tile in this sector → unlock a <b>Water</b> card.\n";
-                else if (tag == "Air")
-                    tooltipText += "<b>Combo:</b> Place next to a <b>Heat</b> tile in this sector → unlock a <b>Water</b> card.\n";
-                else if (tag == "Water")
-                    tooltipText += "<b>Combo:</b> Place next to Heat or Atmosphere to unlock the missing climate card.\n";
+                if (tag == "Heat" || tag == "Air" || tag == "Water")
+                    tooltipText += "<b>Climate combo:</b> Edge-join Heat/Air/Water for rate boosts + missing channel cards.\n";
+                else if (tag == "Power")
+                    tooltipText += "<b>Combo:</b> Next to Industry → Life card; next to Anchor → Mine or Heat card.\n";
+                else if (tag == "Industry")
+                    tooltipText += "<b>Combo:</b> Next to Power → Life (Oxygen) card.\n";
+                else if (tag == "Life")
+                    tooltipText += "<b>Combo:</b> Next to Water → housing card.\n";
                 else if (BuildingSiteRegistry.IsMineBuilding(building))
                     tooltipText += "Builds automatically on a matching discovered deposit.\n";
             }

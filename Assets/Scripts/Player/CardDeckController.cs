@@ -874,25 +874,25 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
-        /// Heat+Air / Air+Water / Water+Heat adjacency: queue the missing third climate card
-        /// into the hand once per Act per channel. Returns offered card name, or null if skipped.
+        /// Adjacency combo: queue a card for the given goal once per Act.
+        /// Goals: TEMPERATURE / ATMOSPHERE / WATER / OXYGEN / MATERIALS / POPULATION.
         /// </summary>
         public string QueueClimateComboOffer(string goalKey)
         {
             if (string.IsNullOrEmpty(goalKey)) return null;
 
             string goal = goalKey.Trim().ToUpperInvariant();
-            if (goal != "TEMPERATURE" && goal != "ATMOSPHERE" && goal != "WATER") return null;
+            if (goal != "TEMPERATURE" && goal != "ATMOSPHERE" && goal != "WATER"
+                && goal != "OXYGEN" && goal != "MATERIALS" && goal != "POPULATION")
+                return null;
 
             if (climateComboOffersThisAct.Contains(goal)) return null;
 
-            // Always grant the combo tile once per Act — even if a Water/Heat/Atmos
-            // card is already seated from need-based draw (that used to silently skip).
             BlueprintCardSO template = FindPreferredClimateComboTemplate(goal);
             if (template == null) return null;
 
             BlueprintCardSO offer = UnityEngine.Object.Instantiate(template);
-            offer.name = $"{template.name} (Climate Combo)";
+            offer.name = $"{template.name} (Combo)";
             if (!string.IsNullOrEmpty(template.cardName))
                 offer.cardName = template.cardName;
 
@@ -903,7 +903,7 @@ namespace GameDevTV.RTS.Player
                 FillHandInternal();
             OnHandChanged?.Invoke();
 
-            Debug.Log($"[CardDeckController] Climate combo offered '{offer.cardName}' for {goal}.");
+            Debug.Log($"[CardDeckController] Combo offered '{offer.cardName}' for {goal}.");
             return string.IsNullOrEmpty(offer.cardName) ? offer.name : offer.cardName;
         }
 
@@ -914,6 +914,9 @@ namespace GameDevTV.RTS.Player
                 "TEMPERATURE" => "GHG Factory",
                 "ATMOSPHERE" => "Atmospheric Condenser",
                 "WATER" => "Water Ice Aquifer",
+                "OXYGEN" => "Oxygen Processor",
+                "MATERIALS" => "Deep-Core Mining Laser",
+                "POPULATION" => "Subterranean Apartment",
                 _ => null
             };
 
@@ -923,8 +926,7 @@ namespace GameDevTV.RTS.Player
                 bool MatchName(BlueprintCardSO c) =>
                     c != null
                     && c.cardName != null
-                    && c.cardName.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0
-                    && string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase);
+                    && c.cardName.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0;
 
                 return masterDeck.FirstOrDefault(MatchName)
                     ?? drawPile.FirstOrDefault(MatchName)
@@ -935,7 +937,17 @@ namespace GameDevTV.RTS.Player
             BlueprintCardSO preferred = Prefer(preferredName);
             if (preferred != null) return preferred;
 
-            // Fallback: any card classified to this climate goal.
+            if (goal == "MATERIALS")
+            {
+                preferred = Prefer("Basalt Strip") ?? Prefer("Mining");
+                if (preferred != null) return preferred;
+            }
+            if (goal == "POPULATION")
+            {
+                preferred = Prefer("Apartment") ?? Prefer("Housing") ?? Prefer("Commons");
+                if (preferred != null) return preferred;
+            }
+
             bool MatchGoal(BlueprintCardSO c) =>
                 c != null
                 && string.Equals(TerraformingGoalColors.GetSectorGoalForCard(c), goal, StringComparison.OrdinalIgnoreCase);
