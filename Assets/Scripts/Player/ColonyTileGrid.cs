@@ -5,37 +5,53 @@ using UnityEngine;
 namespace GameDevTV.RTS.Player
 {
     /// <summary>
-    /// Combolands-style square tile grid for card placement.
-    /// Buildings occupy one cell; orthogonal neighbors = joined tiles.
+    /// Combolands-style flat-topped hex grid for card placement.
+    /// <see cref="TileSize"/> is center-to-vertex radius so one hex ≈ one building (~5 m across).
     /// </summary>
     public static class ColonyTileGrid
     {
-        public const float TileSize = 16f;
+        /// <summary>Hex outer radius (center → vertex). Flat-to-flat width = √3 × TileSize ≈ 4.3 m; vertex span = 2 × TileSize = 5 m.</summary>
+        public const float TileSize = 2.5f;
+
+        /// <summary>Horizontal span of a hex (vertex to vertex).</summary>
+        public static float HexWidth => TileSize * 2f;
+
+        /// <summary>Vertical span of a hex (flat to flat).</summary>
+        public static float HexHeight => TileSize * Sqrt3;
+
+        private const float Sqrt3 = 1.73205080757f;
 
         /// <summary>Stay on the current snap cell until the cursor clearly enters another.</summary>
-        public const float StickRadius = TileSize * 0.62f;
+        public const float StickRadius = TileSize * 0.85f;
 
         /// <summary>Extra distance the new cell must beat before we leave the sticky cell.</summary>
-        public const float StickHysteresis = TileSize * 0.28f;
+        public const float StickHysteresis = TileSize * 0.35f;
 
-        private static readonly Vector2Int[] Ortho =
+        /// <summary>Flat-topped axial neighbor offsets (edge-adjacent).</summary>
+        private static readonly Vector2Int[] HexNeighbors =
         {
-            new Vector2Int(1, 0),
-            new Vector2Int(-1, 0),
-            new Vector2Int(0, 1),
+            new Vector2Int(+1, 0),
+            new Vector2Int(+1, -1),
             new Vector2Int(0, -1),
+            new Vector2Int(-1, 0),
+            new Vector2Int(-1, +1),
+            new Vector2Int(0, +1),
         };
 
         public static Vector2Int WorldToCell(Vector3 world)
         {
-            return new Vector2Int(
-                Mathf.RoundToInt(world.x / TileSize),
-                Mathf.RoundToInt(world.z / TileSize));
+            float x = world.x;
+            float z = world.z;
+            float q = (2f / 3f * x) / TileSize;
+            float r = ((-1f / 3f) * x + (Sqrt3 / 3f) * z) / TileSize;
+            return AxialRound(q, r);
         }
 
         public static Vector3 CellToWorld(Vector2Int cell, float y)
         {
-            return new Vector3(cell.x * TileSize, y, cell.y * TileSize);
+            float x = TileSize * (1.5f * cell.x);
+            float z = TileSize * ((Sqrt3 / 2f) * cell.x + Sqrt3 * cell.y);
+            return new Vector3(x, y, z);
         }
 
         public static Vector3 SnapToTile(Vector3 world)
@@ -51,8 +67,15 @@ namespace GameDevTV.RTS.Player
             return dx * dx + dz * dz;
         }
 
+        public static int HexDistance(Vector2Int a, Vector2Int b)
+        {
+            int dq = a.x - b.x;
+            int dr = a.y - b.y;
+            return (Mathf.Abs(dq) + Mathf.Abs(dq + dr) + Mathf.Abs(dr)) / 2;
+        }
+
         /// <summary>
-        /// Snap to the cell under the cursor. Occupied cells resolve to the nearest empty
+        /// Snap to the hex under the cursor. Occupied cells resolve to the nearest empty
         /// edge. Optional sticky cell prevents flickering between neighbors.
         /// </summary>
         public static Vector3 SnapForPlacement(
@@ -89,7 +112,6 @@ namespace GameDevTV.RTS.Player
                         Vector3 desiredWorld = CellToWorld(desired, rawWorld.y);
                         float distDesiredSq = HorizontalDistSq(rawWorld, desiredWorld);
                         float hyst = StickHysteresis;
-                        // Only leave sticky when the cursor is clearly closer to desired.
                         if (distDesiredSq + hyst * hyst < distStickySq)
                             chosen = desired;
                         else
@@ -119,13 +141,12 @@ namespace GameDevTV.RTS.Player
             if (!occupied.Contains(rawCell))
                 return rawCell;
 
-            // Cursor is over an existing tile — pick the empty ortho edge closest to the cursor.
             Vector2Int best = rawCell;
             float bestDistSq = float.MaxValue;
             bool found = false;
-            for (int i = 0; i < Ortho.Length; i++)
+            for (int i = 0; i < HexNeighbors.Length; i++)
             {
-                Vector2Int candidate = rawCell + Ortho[i];
+                Vector2Int candidate = rawCell + HexNeighbors[i];
                 if (occupied.Contains(candidate)) continue;
 
                 Vector3 candWorld = CellToWorld(candidate, rawWorld.y);
@@ -140,24 +161,19 @@ namespace GameDevTV.RTS.Player
 
             if (found) return best;
 
-            // Completely boxed in — search a small ring for any empty cell.
-            for (int r = 1; r <= 3; r++)
+            // Boxed in — walk hex rings for any empty cell.
+            for (int ring = 1; ring <= 3; ring++)
             {
-                for (int dx = -r; dx <= r; dx++)
+                foreach (var candidate in CellsInRing(rawCell, ring))
                 {
-                    for (int dz = -r; dz <= r; dz++)
+                    if (occupied.Contains(candidate)) continue;
+                    Vector3 candWorld = CellToWorld(candidate, rawWorld.y);
+                    float distSq = HorizontalDistSq(rawWorld, candWorld);
+                    if (distSq < bestDistSq)
                     {
-                        if (Mathf.Abs(dx) != r && Mathf.Abs(dz) != r) continue;
-                        Vector2Int candidate = new Vector2Int(rawCell.x + dx, rawCell.y + dz);
-                        if (occupied.Contains(candidate)) continue;
-                        Vector3 candWorld = CellToWorld(candidate, rawWorld.y);
-                        float distSq = HorizontalDistSq(rawWorld, candWorld);
-                        if (distSq < bestDistSq)
-                        {
-                            bestDistSq = distSq;
-                            best = candidate;
-                            found = true;
-                        }
+                        bestDistSq = distSq;
+                        best = candidate;
+                        found = true;
                     }
                 }
                 if (found) return best;
@@ -166,13 +182,51 @@ namespace GameDevTV.RTS.Player
             return rawCell;
         }
 
+        private static IEnumerable<Vector2Int> CellsInRing(Vector2Int center, int radius)
+        {
+            if (radius <= 0)
+            {
+                yield return center;
+                yield break;
+            }
+
+            Vector2Int hex = center + HexNeighbors[4] * radius; // start west
+            for (int i = 0; i < 6; i++)
+            {
+                for (int j = 0; j < radius; j++)
+                {
+                    yield return hex;
+                    hex += HexNeighbors[i];
+                }
+            }
+        }
+
+        private static Vector2Int AxialRound(float q, float r)
+        {
+            float s = -q - r;
+            int qi = Mathf.RoundToInt(q);
+            int ri = Mathf.RoundToInt(r);
+            int si = Mathf.RoundToInt(s);
+
+            float qDiff = Mathf.Abs(qi - q);
+            float rDiff = Mathf.Abs(ri - r);
+            float sDiff = Mathf.Abs(si - s);
+
+            if (qDiff > rDiff && qDiff > sDiff)
+                qi = -ri - si;
+            else if (rDiff > sDiff)
+                ri = -qi - si;
+
+            return new Vector2Int(qi, ri);
+        }
+
         public static HashSet<Vector2Int> GetOccupiedCells(Owner owner)
         {
             var set = new HashSet<Vector2Int>();
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
                 if (b == null || b.Owner != owner) continue;
-                if (!b.enabled) continue; // placement ghosts are disabled
+                if (!b.enabled) continue;
                 if (b.name.StartsWith("Ghost_", System.StringComparison.Ordinal)
                     || b.name.StartsWith("GhostPreview_", System.StringComparison.Ordinal))
                     continue;
@@ -194,9 +248,9 @@ namespace GameDevTV.RTS.Player
         public static int CountOrthogonalNeighbors(Vector2Int cell, HashSet<Vector2Int> occupied)
         {
             int n = 0;
-            for (int i = 0; i < Ortho.Length; i++)
+            for (int i = 0; i < HexNeighbors.Length; i++)
             {
-                if (occupied.Contains(cell + Ortho[i])) n++;
+                if (occupied.Contains(cell + HexNeighbors[i])) n++;
             }
             return n;
         }
@@ -220,21 +274,17 @@ namespace GameDevTV.RTS.Player
                 occupiedBuildings[WorldToCell(b.transform.position)] = b;
             }
 
-            for (int i = 0; i < Ortho.Length; i++)
+            for (int i = 0; i < HexNeighbors.Length; i++)
             {
-                if (occupiedBuildings.TryGetValue(cell + Ortho[i], out var neighbor))
+                if (occupiedBuildings.TryGetValue(cell + HexNeighbors[i], out var neighbor))
                     results.Add(neighbor);
             }
         }
 
-        /// <summary>True when two world positions share an edge on the tile grid.</summary>
+        /// <summary>True when two world positions share an edge on the hex grid.</summary>
         public static bool AreOrthogonalNeighbors(Vector3 a, Vector3 b)
         {
-            Vector2Int ca = WorldToCell(a);
-            Vector2Int cb = WorldToCell(b);
-            int dx = Mathf.Abs(ca.x - cb.x);
-            int dz = Mathf.Abs(ca.y - cb.y);
-            return (dx + dz) == 1;
+            return HexDistance(WorldToCell(a), WorldToCell(b)) == 1;
         }
     }
 }

@@ -921,8 +921,8 @@ namespace GameDevTV.RTS.Player
             }
 
             tileFootprint.SetActive(true);
-            // Quad shows the snap cell; keep it readable without swallowing the camera.
-            float s = ColonyTileGrid.TileSize * 0.9f;
+            // Ghost footprint ≈ one hex (slightly under width so joins read clearly).
+            float s = ColonyTileGrid.HexWidth * 0.92f;
             tileFootprint.transform.position = center + Vector3.up * 0.12f;
             tileFootprint.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             tileFootprint.transform.localScale = new Vector3(s, s, 1f);

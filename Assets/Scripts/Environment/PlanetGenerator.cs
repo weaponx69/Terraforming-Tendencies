@@ -534,8 +534,8 @@ namespace GameDevTV.RTS.Environment
                             if (usedDepositCells.Contains(cell)) return false;
                             foreach (var used in usedDepositCells)
                             {
-                                // Leave at least one empty ring between deposits / CP.
-                                if (Mathf.Max(Mathf.Abs(used.x - cell.x), Mathf.Abs(used.y - cell.y)) < 2)
+                                // Leave at least one empty hex ring between deposits / CP.
+                                if (ColonyTileGrid.HexDistance(used, cell) < 2)
                                     return false;
                             }
                             usedDepositCells.Add(cell);
@@ -552,16 +552,16 @@ namespace GameDevTV.RTS.Environment
                                 if (tryClaimDepositCell(candidate))
                                     return candidate;
                             }
-                            // Fallback: walk outward from center onto a free snapped tile.
+                            // Fallback: walk hex rings from CP onto a free cell.
                             for (int ring = 2; ring <= 8; ring++)
                             {
-                                for (int dx = -ring; dx <= ring; dx++)
+                                for (int dq = -ring; dq <= ring; dq++)
                                 {
-                                    for (int dz = -ring; dz <= ring; dz++)
+                                    for (int dr = -ring; dr <= ring; dr++)
                                     {
-                                        if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz)) != ring) continue;
-                                        Vector3 candidate = ColonyTileGrid.CellToWorld(
-                                            new Vector2Int(cpCell.x + dx, cpCell.y + dz), 0f);
+                                        var cell = new Vector2Int(cpCell.x + dq, cpCell.y + dr);
+                                        if (ColonyTileGrid.HexDistance(cpCell, cell) != ring) continue;
+                                        Vector3 candidate = ColonyTileGrid.CellToWorld(cell, 0f);
                                         if (tryClaimDepositCell(candidate))
                                             return candidate;
                                     }

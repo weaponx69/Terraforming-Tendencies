@@ -150,7 +150,7 @@ Non-building cards grant a small flat score on play (no adjacency). **Most score
 
 ## 0.5 Adjacency (stacking)
 
-**Grid:** card buildings snap to a **16 m square tile grid** ([`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs)). Only **orthogonal edge** neighbors count (N/E/S/W) — same cells the placement magnet snaps to. Selection rings stay building-sized (~9–12 m); ghost footprints mark the snap cell without swallowing the view.
+**Grid:** card buildings snap to a **building-sized flat-top hex grid** ([`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) — outer radius 2.5 m ≈ **5 m across**). Edge-adjacent hexes count for joins/combos (6 neighbors). [`HexGridManager`](Assets/Scripts/Environment/HexGridManager.cs) uses the same spacing. Selection rings / ghost footprints match one hex.
 
 ### Placement feedback (ghost)
 * Semi-transparent **tile footprint** under the ghost (locks to the snap cell immediately).
@@ -173,7 +173,7 @@ Non-building cards grant a small flat score on play (no adjacency). **Most score
 | Same climate tag | 1.35× |
 | Climate pair edge | 1.75× |
 | Mini-trio (Heat+Air+Water adjacent) | 2.25× |
-| + orthogonal Power | +0.25× |
+| + hex-edge Power | +0.25× |
 | Cap | 2.5× |
 
 First climate-pair join in a sector also pulses ~7% of remaining sector budget (still clamped by 1/N).
@@ -199,7 +199,7 @@ First climate-pair join in a sector also pulses ~7% of remaining sector budget (
 
 ## 0.7 Board, power, sectors
 
-* **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (16 m cells). **Acts** advance sector-by-sector.
+* **Board:** whole planet open for tile placement; cards snap to [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) (building-sized hexes, ~5 m). **Acts** advance sector-by-sector.
 * **Power:** only hard **placement** gate for cards (`PowerGridManager.CanPlayBuildingForPower`). Hand may hold cards the player cannot place yet. **Adjacent tiles auto-link** on the power graph when construction completes (`BaseBuilding.AutoConnectAdjacentPowerNodes`) — no manual Connect Power.
 * **Sectors:** map-gen count drives **Act count**. Each Act focuses terraforming on one sector (`SectorManager.BeginTerraformingOn`). No old unlock/pad lockdown.
 * Reserved pads / drones may still exist in the scene for legacy systems; **card plays ignore them**.
@@ -301,4 +301,4 @@ Colonists/tubes as required systems, deep tech trees, combat, AI opponents, weat
 
 ---
 
-*Last rewritten: 2026-09-13 — Colony tiles 16 m; building-sized selection rings; sparse rich deposits (no node flood); discovered-only mine tile lock; combo climate rates; hard ban on changing per-sector climate goals.*
+*Last rewritten: 2026-09-13 — Colony placement is building-sized hexes (~5 m); HexGridManager synced to ColonyTileGrid; sparse rich deposits; discovered-only mine lock; combo climate rates; hard ban on changing per-sector climate goals.*

@@ -231,7 +231,7 @@ namespace GameDevTV.RTS.Units
                     indicatorGO.transform.localPosition = new Vector3(0f, 0.15f, 0f);
                     indicatorGO.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
-                    float scale = Mathf.Clamp(ColonyTileGrid.TileSize * 0.7f, 9f, 12f);
+                    float scale = ColonyTileGrid.HexWidth * 0.9f;
                     indicatorGO.transform.localScale = new Vector3(scale, scale, 1f);
                     indicatorGO.SetActive(false);
                     selectionIndicator = indicatorGO;
@@ -785,7 +785,7 @@ namespace GameDevTV.RTS.Units
                 if (myNode.ConnectedNodes.Contains(otherNode)) continue;
 
                 Vector2Int otherCell = ColonyTileGrid.WorldToCell(b.transform.position);
-                int dist = Mathf.Abs(myCell.x - otherCell.x) + Mathf.Abs(myCell.y - otherCell.y);
+                int dist = ColonyTileGrid.HexDistance(myCell, otherCell);
                 if (dist <= 0 || dist > maxManhattan) continue;
                 if (dist < bestDist)
                 {

@@ -15,7 +15,7 @@ namespace GameDevTV.RTS.Environment
         public static event System.Action OnStartingAreaRevealed;
 
         [Header("Grid Settings")]
-        [SerializeField] private float cellSize = 2.0f;
+        [SerializeField] private float cellSize = 2.5f;
         [SerializeField] private Vector2Int gridDimensions = new Vector2Int(50, 50);
         [SerializeField] private Transform gridRoot;
         
@@ -26,6 +26,9 @@ namespace GameDevTV.RTS.Environment
         [SerializeField] private float startingAreaRevealRadius = 15f;
 
         public float StartingAreaRevealRadius => startingAreaRevealRadius;
+
+        /// <summary>Outer radius — kept in sync with <see cref="GameDevTV.RTS.Player.ColonyTileGrid.TileSize"/>.</summary>
+        public float CellSize => GameDevTV.RTS.Player.ColonyTileGrid.TileSize;
 
         public static bool HighlightTrace { get; private set; }
 
@@ -39,9 +42,9 @@ namespace GameDevTV.RTS.Environment
         private Dictionary<Vector3, Vector2Int> worldToHexMap = new Dictionary<Vector3, Vector2Int>();
         private Vector3 gridOrigin;
         
-        // Configuration for pointy-topped hexagons
-        private const float HEX_HEIGHT = 1.732f; // sqrt(3) * cellSize
-        private const float HEX_WIDTH = 2.0f;   // 2 * cellSize
+        // Flat-topped hex geometry driven by ColonyTileGrid (building-sized cells).
+        private float HexWidth => GameDevTV.RTS.Player.ColonyTileGrid.HexWidth;
+        private float HexHeight => GameDevTV.RTS.Player.ColonyTileGrid.HexHeight;
 
         private void OnEnable()
         {
@@ -164,17 +167,7 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public Vector2Int WorldToHexCoordinates(Vector3 worldPosition)
         {
-            worldPosition -= gridOrigin;
-            // Convert world position to hex coordinates using pointy-topped formula
-            float q = (worldPosition.x / (HEX_WIDTH * 0.75f)) - (worldPosition.z / (HEX_HEIGHT * 0.5f));
-            float r = (worldPosition.z / (HEX_HEIGHT * 0.5f));
-            
-            // Round to nearest hex
-            int hexQ = Mathf.RoundToInt(q);
-            int hexR = Mathf.RoundToInt(r);
-            int hexS = -hexQ - hexR; // For axial coordinates, s = -q - r
-            
-            return new Vector2Int(hexQ, hexR);
+            return GameDevTV.RTS.Player.ColonyTileGrid.WorldToCell(worldPosition);
         }
         
         /// <summary>
@@ -182,16 +175,7 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public Vector3 HexToWorldPosition(Vector2Int hexCoords)
         {
-            float x = hexCoords.x * (HEX_WIDTH * 0.75f);
-            float z = hexCoords.y * HEX_HEIGHT;
-            // Stagger odd columns (pointy-topped) OR flat-topped? 
-            // HEX_WIDTH=2.0, HEX_HEIGHT=1.732 -> Flat-topped geometry
-            // Flat-topped means columns stagger by half height
-            if (hexCoords.x % 2 != 0)
-            {
-                z += HEX_HEIGHT * 0.5f;
-            }
-            return gridOrigin + new Vector3(x, 0f, z);
+            return GameDevTV.RTS.Player.ColonyTileGrid.CellToWorld(hexCoords, 0f);
         }
         
         /// <summary>
@@ -254,7 +238,7 @@ namespace GameDevTV.RTS.Environment
             Vector3 desiredDirection = new Vector3(direction.x, 0f, direction.y).normalized;
             HexTile nearest = null;
             float nearestDistance = float.MaxValue;
-            float maximumDistance = Mathf.Max(HEX_HEIGHT, HEX_WIDTH) * 1.25f;
+            float maximumDistance = Mathf.Max(HexHeight, HexWidth) * 1.25f;
 
             foreach (HexTile candidate in hexGrid.Values)
             {
@@ -318,54 +302,51 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public void GenerateHexGrid()
         {
+            float size = CellSize;
+            cellSize = size;
+            gridOrigin = Vector3.zero;
+
+            float mapW = 100f;
+            float mapH = 100f;
             if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
             {
-                gridDimensions = new Vector2Int(
-                    Mathf.CeilToInt(PlanetGenerator.Instance.Config.MapWidth / cellSize * 1.2f), 
-                    Mathf.CeilToInt(PlanetGenerator.Instance.Config.MapHeight / cellSize * 1.2f)
-                );
-
-                float gridWidth = (gridDimensions.x - 1) * (HEX_WIDTH * 0.75f);
-                float gridHeight = (gridDimensions.y - 1) * HEX_HEIGHT;
-                gridOrigin = new Vector3(
-                    PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize / 2f - gridWidth / 2f,
-                    0f,
-                    PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize / 2f - gridHeight / 2f);
+                mapW = PlanetGenerator.Instance.Config.MapWidth * PlanetGenerator.Instance.CellSize;
+                mapH = PlanetGenerator.Instance.Config.MapHeight * PlanetGenerator.Instance.CellSize;
             }
+
+            // Cover the map in axial hexes that share ColonyTileGrid spacing.
+            int qMin = Mathf.FloorToInt((-mapW * 0.1f) / (1.5f * size)) - 1;
+            int qMax = Mathf.CeilToInt((mapW * 1.1f) / (1.5f * size)) + 1;
+            int rMin = Mathf.FloorToInt((-mapH * 0.1f) / (Mathf.Sqrt(3f) * size)) - 1;
+            int rMax = Mathf.CeilToInt((mapH * 1.1f) / (Mathf.Sqrt(3f) * size)) + 1;
+            gridDimensions = new Vector2Int(qMax - qMin + 1, rMax - rMin + 1);
+
             if (gridRoot == null)
             {
                 GameObject rootGO = new GameObject("HexGridRoot");
                 gridRoot = rootGO.transform;
             }
             
-            // Clear existing grid
             ClearHexGrid();
             
-            // Generate hex tiles for the entire grid
-            for (int q = 0; q < gridDimensions.x; q++)
+            for (int q = qMin; q <= qMax; q++)
             {
-                for (int r = 0; r < gridDimensions.y; r++)
+                for (int r = rMin; r <= rMax; r++)
                 {
                     Vector2Int hexCoords = new Vector2Int(q, r);
                     Vector3 worldPos = HexToWorldPosition(hexCoords);
-                    
-                    // Create hex tile GameObject
+                    if (worldPos.x < -size * 2f || worldPos.z < -size * 2f
+                        || worldPos.x > mapW + size * 2f || worldPos.z > mapH + size * 2f)
+                        continue;
+
                     GameObject hexGO = CreateHexTile(worldPos, hexCoords);
-                    
-                    // Create and store hex tile data
                     HexTile hexTile = new HexTile(hexCoords, worldPos, hexGO);
-                    hexGrid.Add(hexCoords, hexTile);
-                    
-                    // Store mapping for quick lookup
+                    hexGrid[hexCoords] = hexTile;
                     worldToHexMap[worldPos] = hexCoords;
                 }
             }
             
-            Vector3 gridMin = HexToWorldPosition(Vector2Int.zero);
-            Vector3 gridMax = HexToWorldPosition(new Vector2Int(gridDimensions.x - 1, gridDimensions.y - 1));
-            Vector3 gridCenter = (gridMin + gridMax) * 0.5f;
-            Debug.Log($"[HexGridManager] World bounds min={gridMin}, max={gridMax}, center={gridCenter}, origin={gridOrigin}");
-            Debug.Log($"[HexGridManager] Generated hex grid with {hexGrid.Count} tiles");
+            Debug.Log($"[HexGridManager] Generated {hexGrid.Count} building-sized hexes (radius={size:F2}, width={HexWidth:F2}).");
         }
         
         /// <summary>
@@ -380,14 +361,16 @@ namespace GameDevTV.RTS.Environment
                 // Use the provided shroud tile prefab
                 hexGO = Instantiate(shroudTilePrefab, position, Quaternion.identity, gridRoot);
                 hexGO.layer = LayerMask.NameToLayer("TransparentFX");
-                hexGO.transform.localScale = new Vector3(cellSize * 0.95f, 0.1f, cellSize * 0.95f); // 5% gap to show honeycomb pattern
+                float meshScale = CellSize * 1.9f * 0.95f; // diameter ≈ hex width with small gap
+                hexGO.transform.localScale = new Vector3(meshScale, 0.1f, meshScale);
             }
             else
             {
                 // Create a simple hex cylinder as fallback
                 hexGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 hexGO.transform.position = position;
-                hexGO.transform.localScale = new Vector3(cellSize * 0.95f, 0.1f, cellSize * 0.95f); // 5% gap to show honeycomb pattern
+                float meshScale = CellSize * 1.9f * 0.95f;
+                hexGO.transform.localScale = new Vector3(meshScale, 0.1f, meshScale);
                 hexGO.layer = LayerMask.NameToLayer("TransparentFX"); // TransparentFX is ignored by PlanetGenerator NavMesh bake!
                 
                 // Make it semi-transparent
@@ -427,12 +410,11 @@ namespace GameDevTV.RTS.Environment
             
             // Draw a flat-topped hexagon (corners at 0, 60, 120, 180, 240, 300)
             Vector3[] points = new Vector3[6];
+            float radius = CellSize;
             for (int i = 0; i < 6; i++)
             {
                 float angle_deg = 60f * i; // Flat-topped
                 float angle_rad = Mathf.PI / 180f * angle_deg;
-                // Radius is cellSize = HEX_WIDTH / 2.0f
-                float radius = HEX_WIDTH * 0.5f;
                 points[i] = position + new Vector3(radius * Mathf.Cos(angle_rad), 0.75f, radius * Mathf.Sin(angle_rad));
             }
             lr.SetPositions(points);
