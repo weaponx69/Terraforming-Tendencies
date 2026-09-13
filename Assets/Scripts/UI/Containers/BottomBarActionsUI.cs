@@ -442,7 +442,7 @@ namespace GameDevTV.RTS.UI.Containers
             for (int i = 0; i < hand.Count; i++)
             {
                 var card = hand[i];
-                fingerprint = unchecked(fingerprint * 31 + (card != null ? card.GetInstanceID() : 0));
+                fingerprint = unchecked(fingerprint * 31 + (card != null ? (int)EntityId.ToULong(card.GetEntityId()) : 0));
             }
             var focus = SectorManager.Instance?.ActiveSector;
             fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
@@ -476,7 +476,7 @@ namespace GameDevTV.RTS.UI.Containers
             lastHandCount = hand.Count;
             int fingerprint = visible.Count * 397;
             for (int i = 0; i < visible.Count; i++)
-                fingerprint = unchecked(fingerprint * 31 + visible[i].card.GetInstanceID());
+                fingerprint = unchecked(fingerprint * 31 + (int)EntityId.ToULong(visible[i].card.GetEntityId()));
             var focus = SectorManager.Instance?.ActiveSector;
             fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
             lastHandFingerprint = fingerprint;

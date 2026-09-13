@@ -24,7 +24,6 @@ namespace GameDevTV.RTS.UI.Containers
         private Color32[] pixels;
         private float mapW;
         private float mapH;
-        private bool dirty = true;
 
         private static readonly Color32 Ground = new(28, 32, 38, 255);
         private static readonly Color32 GridLine = new(48, 54, 64, 255);
@@ -73,13 +72,13 @@ namespace GameDevTV.RTS.UI.Containers
         private void OnEnable()
         {
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
-            ColonyActManager.OnActStateChanged += MarkDirty;
+            ColonyActManager.OnActStateChanged += RefreshMapBounds;
         }
 
         private void OnDisable()
         {
             PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
-            ColonyActManager.OnActStateChanged -= MarkDirty;
+            ColonyActManager.OnActStateChanged -= RefreshMapBounds;
         }
 
         private void OnDestroy()
@@ -95,10 +94,7 @@ namespace GameDevTV.RTS.UI.Containers
         private void HandlePlanetGenerated()
         {
             RefreshMapBounds();
-            MarkDirty();
         }
-
-        private void MarkDirty() => dirty = true;
 
         private void EnsureUi()
         {
@@ -368,7 +364,6 @@ namespace GameDevTV.RTS.UI.Containers
             if (mapW <= 1f || mapH <= 1f) return;
 
             RebuildTexture();
-            dirty = false;
         }
 
         private void RebuildTexture()
@@ -546,7 +541,6 @@ namespace GameDevTV.RTS.UI.Containers
             var nearest = SectorManager.Instance?.GetNearestSector(world);
             if (nearest != null)
                 SectorManager.Instance.ActiveSector = nearest;
-            MarkDirty();
         }
 
         public void OnDrag(PointerEventData eventData)

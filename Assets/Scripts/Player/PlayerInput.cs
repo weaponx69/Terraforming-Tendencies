@@ -484,7 +484,7 @@ namespace GameDevTV.RTS.Player
                     // Kill leftover animation / VFX scripts that can strobe translucent mats.
                     foreach (var mb in ghostInstance.GetComponentsInChildren<MonoBehaviour>(true))
                     {
-                        if (mb == null || mb is Transform) continue;
+                        if (mb == null) continue;
                         mb.enabled = false;
                     }
                 }

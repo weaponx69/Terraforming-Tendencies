@@ -996,8 +996,8 @@ namespace GameDevTV.RTS.UI
             EnsureFixedMetricBox(biomassLabelText, biomassValueText, bioWidth);
             if (biomassValueText != null)
             {
-                biomassValueText.enableWordWrapping = false;
-                biomassValueText.overflowMode = TextOverflowModes.Ellipsis;
+                biomassValueText.textWrappingMode = TextWrappingModes.NoWrap;
+                biomassValueText.overflowMode = TextOverflowModes.Truncate;
                 biomassValueText.alignment = TextAlignmentOptions.MidlineLeft;
             }
 
@@ -1218,7 +1218,7 @@ namespace GameDevTV.RTS.UI
 
             if (value != null)
             {
-                value.enableWordWrapping = false;
+                value.textWrappingMode = TextWrappingModes.NoWrap;
                 value.overflowMode = TextOverflowModes.Overflow;
                 value.alignment = TextAlignmentOptions.MidlineRight;
                 var vCsf = value.GetComponent<ContentSizeFitter>();
@@ -1232,8 +1232,8 @@ namespace GameDevTV.RTS.UI
 
             if (label != null)
             {
-                label.enableWordWrapping = false;
-                label.overflowMode = TextOverflowModes.Ellipsis;
+                label.textWrappingMode = TextWrappingModes.NoWrap;
+                label.overflowMode = TextOverflowModes.Truncate;
             }
         }
 

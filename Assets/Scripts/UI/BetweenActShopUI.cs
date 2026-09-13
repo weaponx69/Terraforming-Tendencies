@@ -351,7 +351,7 @@ namespace GameDevTV.RTS.UI
                 new Vector2(0.04f, 0.80f), new Vector2(0.96f, 0.98f));
             titleText.alignment = TextAlignmentOptions.Center;
             titleText.richText = true;
-            titleText.enableWordWrapping = true;
+            titleText.textWrappingMode = TextWrappingModes.Normal;
             coinsText = CreateText(panel.transform, "Coins", 18f, FontStyles.Bold,
                 new Vector2(0.04f, 0.72f), new Vector2(0.50f, 0.80f));
             coinsText.color = new Color(1f, 0.88f, 0.35f);

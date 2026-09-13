@@ -221,7 +221,7 @@ namespace GameDevTV.RTS.UI.Components
             label.richText = true;
             label.raycastTarget = false;
             label.textWrappingMode = TextWrappingModes.Normal;
-            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.overflowMode = TextOverflowModes.Truncate;
             label.margin = new Vector4(6f, 2f, 6f, 2f);
 
             RectTransform labelRt = label.rectTransform;
@@ -453,7 +453,7 @@ namespace GameDevTV.RTS.UI.Components
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
             goalBadge.alignment = TextAlignmentOptions.TopRight;
-            goalBadge.enableWordWrapping = true;
+            goalBadge.textWrappingMode = TextWrappingModes.Normal;
             goalBadge.overflowMode = TextOverflowModes.Overflow;
         }
 

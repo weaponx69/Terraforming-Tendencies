@@ -139,7 +139,7 @@ namespace GameDevTV.RTS.UI
             label.alignment = TextAlignmentOptions.Center;
             label.fontSize = 24f;
             label.color = Color.white;
-            label.enableWordWrapping = true;
+            label.textWrappingMode = TextWrappingModes.Normal;
             label.raycastTarget = false;
             if (TMP_Settings.defaultFontAsset != null)
                 label.font = TMP_Settings.defaultFontAsset;
