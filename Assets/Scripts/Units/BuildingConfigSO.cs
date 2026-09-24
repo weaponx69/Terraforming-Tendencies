@@ -29,12 +29,12 @@ namespace GameDevTV.RTS.Units
         [SerializeField] private int biomassGeneration = 0;
         [SerializeField] private float powerGeneration = 0f;
 
-        [Header("Climate Generation (Per Second)")]
-        [Tooltip("Temperature added per second while operating (e.g., GHG Factory).")]
+        [Header("Climate Generation")]
+        [Tooltip("Temperature per week under Colony Acts (when weeks are spent). Outside Acts: per second.")]
         [SerializeField] private float temperatureGeneration = 0f;
-        [Tooltip("Atmosphere added per second while operating (e.g., Atmospheric Condenser).")]
+        [Tooltip("Atmosphere per week under Colony Acts (when weeks are spent). Outside Acts: per second.")]
         [SerializeField] private float atmosphereGeneration = 0f;
-        [Tooltip("Water added per second while operating (e.g., Water Ice Aquifer).")]
+        [Tooltip("Water per week under Colony Acts (when weeks are spent). Outside Acts: per second.")]
         [SerializeField] private float waterGeneration = 0f;
 
         [Header("Colony Housing")]

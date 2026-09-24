@@ -1030,12 +1030,15 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
-        /// Config climate rates are per-second. Scales by <see cref="ProductionEfficiency"/>
-        /// (unpowered crawl vs full when grid-powered).
+        /// Apply climate generation for <paramref name="units"/> of time.
+        /// Under Colony Acts, <paramref name="units"/> is <b>weeks</b> and config rates are per-week
+        /// (called from <see cref="ColonyActManager.SpendWeeks"/>). Outside Acts, units are seconds
+        /// (real-time ticker) and rates are per-second.
+        /// Scales by <see cref="ProductionEfficiency"/> (unpowered crawl vs full when grid-powered).
         /// </summary>
-        public void TickClimateGeneration(float dt)
+        public void TickClimateGeneration(float units)
         {
-            if (dt <= 0f) return;
+            if (units <= 0f) return;
             if (!gameObject.activeInHierarchy) return;
             if (Progress.State != BuildingProgress.BuildingState.Completed) return;
 
@@ -1083,7 +1086,7 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
-            // Soft caps so a single tile cannot clear an Act channel in seconds.
+            // Soft caps so a single tile cannot clear an Act channel in one week / few seconds.
             tempRate = Mathf.Min(tempRate, 0.3f);
             atmosRate = Mathf.Min(atmosRate, 0.015f);
             waterRate = Mathf.Min(waterRate, 0.12f);
@@ -1112,9 +1115,9 @@ namespace GameDevTV.RTS.Units
             atmosRate *= comboMult;
             waterRate *= comboMult;
 
-            float tempAdd = tempRate > 0f ? tempRate * dt : 0f;
-            float atmosAdd = atmosRate > 0f ? atmosRate * dt : 0f;
-            float waterAdd = waterRate > 0f ? waterRate * dt : 0f;
+            float tempAdd = tempRate > 0f ? tempRate * units : 0f;
+            float atmosAdd = atmosRate > 0f ? atmosRate * units : 0f;
+            float waterAdd = waterRate > 0f ? waterRate * units : 0f;
 
             var acts = ColonyActManager.Instance;
             if (acts != null && acts.IsRunActive)
@@ -1157,6 +1160,9 @@ namespace GameDevTV.RTS.Units
         private void Update()
         {
             // Prefer the global ticker when present; keep a local fallback for editor/tests.
+            // Colony Acts drive climate from week spend — never real-time here.
+            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                return;
             if (ClimateGenerationTicker.Instance == null)
             {
                 TickClimateGeneration(Time.deltaTime);

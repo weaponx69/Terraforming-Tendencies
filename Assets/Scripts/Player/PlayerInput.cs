@@ -5,6 +5,7 @@ using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Audio;
+using GameDevTV.RTS.UI.Components;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -14,6 +15,7 @@ using UnityEngine.InputSystem.LowLevel;
 using GameDevTV.RTS.Utilities;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.UI.Containers;
+using TMPro;
 
 namespace GameDevTV.RTS.Player
 {
@@ -50,6 +52,12 @@ namespace GameDevTV.RTS.Player
         private GameObject tileFootprint;
         private readonly List<LineRenderer> joinLines = new();
         private readonly List<BaseBuilding> joinNeighbors = new();
+        private readonly List<MeshRenderer> comboHaloQuads = new();
+        private readonly List<TextMeshPro> comboLinkLabels = new();
+        private readonly List<Vector2Int> comboNeighborCells = new();
+        private TextMeshPro comboSummaryLabel;
+        private Vector2Int? lastComboPreviewCell;
+        private BuildingSO lastComboPreviewBuilding;
         private Vector2Int? tileGhostStickyCell;
         private int lastJoinCount = -1;
         private bool lastGhostRestrictionsPass = true;
@@ -848,6 +856,12 @@ namespace GameDevTV.RTS.Player
                 UpdateJoinLines(snapTarget, snapTarget);
             else
                 ClearJoinLines();
+
+            if (cardTilePlace && activeCommand is BuildBuildingCommand haloBbc
+                && ColonyActManager.Instance != null)
+                UpdateComboHalo(haloBbc.Building, snapTarget, displayedRestrictionsPass);
+            else
+                ClearComboHalo();
         }
 
         private Vector3? RaycastGhostPoint()
@@ -985,6 +999,286 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        private void UpdateComboHalo(BuildingSO building, Vector3 snapPos, bool legal)
+        {
+            if (building == null || ColonyActManager.Instance == null)
+            {
+                ClearComboHalo();
+                return;
+            }
+
+            Vector2Int cell = ColonyTileGrid.WorldToCell(snapPos);
+            // Rebuild when cell or card changes — keep pose updates cheap.
+            bool same = lastComboPreviewCell.HasValue
+                && lastComboPreviewCell.Value == cell
+                && lastComboPreviewBuilding == building
+                && comboSummaryLabel != null
+                && comboSummaryLabel.gameObject.activeSelf;
+
+            PlacementComboPreview preview = ColonyActManager.Instance.PreviewPlacement(building, snapPos);
+
+            if (!same)
+            {
+                lastComboPreviewCell = cell;
+                lastComboPreviewBuilding = building;
+                RebuildComboHaloVisuals(preview, snapPos, legal);
+            }
+            else
+            {
+                // Refresh summary color/legal + hover positions.
+                ApplyComboSummary(preview, snapPos, legal);
+                Color ghostRing = legal
+                    ? new Color(0.95f, 0.92f, 0.35f, 0.45f)
+                    : new Color(1f, 0.35f, 0.25f, 0.5f);
+                // Last active halo quad is the ghost ring from last rebuild — refresh tint.
+                for (int i = comboHaloQuads.Count - 1; i >= 0; i--)
+                {
+                    if (comboHaloQuads[i] != null && comboHaloQuads[i].gameObject.activeSelf)
+                    {
+                        var mat = comboHaloQuads[i].material;
+                        // Only retint if this looks like the oversized ghost ring.
+                        if (comboHaloQuads[i].transform.localScale.x
+                            >= ColonyTileGrid.HexWidth * 1.1f)
+                        {
+                            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", ghostRing);
+                            else if (mat.HasProperty("_Color")) mat.SetColor("_Color", ghostRing);
+                            else mat.color = ghostRing;
+                            break;
+                        }
+                    }
+                }
+                for (int i = 0; i < comboLinkLabels.Count && i < preview.Links.Count; i++)
+                {
+                    var link = preview.Links[i];
+                    if (comboLinkLabels[i] == null) continue;
+                    Vector3 pos = link.Building != null
+                        ? link.Building.transform.position
+                        : snapPos;
+                    comboLinkLabels[i].transform.position = pos + Vector3.up * 5.2f;
+                }
+            }
+
+            // Color join lines by strongest combo role on that neighbor.
+            ColorJoinLinesFromPreview(preview);
+        }
+
+        private void RebuildComboHaloVisuals(PlacementComboPreview preview, Vector3 snapPos, bool legal)
+        {
+            EnsureComboHaloCapacity(6 + preview.Links.Count + 1);
+            HideAllComboHalos();
+
+            float y = snapPos.y;
+            ColonyTileGrid.CollectOrthogonalNeighborCells(preview.Cell, comboNeighborCells);
+            var occupied = new HashSet<Vector2Int>();
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null || b.Owner != Owner.Player1) continue;
+                if (b.name.StartsWith("Ghost_", System.StringComparison.Ordinal)) continue;
+                occupied.Add(ColonyTileGrid.WorldToCell(b.transform.position));
+            }
+
+            int haloIdx = 0;
+            // Blue adjacency ring on empty edge cells.
+            Color adjColor = new Color(0.35f, 0.75f, 1f, 0.32f);
+            for (int i = 0; i < comboNeighborCells.Count; i++)
+            {
+                Vector2Int n = comboNeighborCells[i];
+                if (occupied.Contains(n)) continue;
+                PlaceHaloQuad(haloIdx++, ColonyTileGrid.CellToWorld(n, y), adjColor, 0.88f);
+            }
+
+            // Role-colored partner discs under combo neighbors.
+            for (int i = 0; i < preview.Links.Count; i++)
+            {
+                var link = preview.Links[i];
+                if (link.Building == null) continue;
+                Color c = PlacementComboPreview.ColorFor(link.Kind);
+                PlaceHaloQuad(haloIdx++, link.Building.transform.position, c, 1.02f);
+            }
+
+            // Ghost outer ring.
+            Color ghostRing = legal
+                ? new Color(0.95f, 0.92f, 0.35f, 0.45f)
+                : new Color(1f, 0.35f, 0.25f, 0.5f);
+            PlaceHaloQuad(haloIdx++, snapPos, ghostRing, 1.18f);
+
+            // Floating link labels.
+            EnsureComboLabelCapacity(preview.Links.Count);
+            for (int i = 0; i < comboLinkLabels.Count; i++)
+            {
+                if (i >= preview.Links.Count || comboLinkLabels[i] == null)
+                {
+                    if (comboLinkLabels[i] != null)
+                        comboLinkLabels[i].gameObject.SetActive(false);
+                    continue;
+                }
+
+                var link = preview.Links[i];
+                Vector3 pos = link.Building != null
+                    ? link.Building.transform.position
+                    : snapPos;
+                var tmp = comboLinkLabels[i];
+                tmp.gameObject.SetActive(true);
+                tmp.text = link.Label;
+                Color lc = PlacementComboPreview.ColorFor(link.Kind);
+                lc.a = 1f;
+                tmp.color = Color.Lerp(lc, Color.white, 0.35f);
+                tmp.fontSize = 3.2f;
+                tmp.transform.position = pos + Vector3.up * 5.2f;
+            }
+
+            ApplyComboSummary(preview, snapPos, legal);
+        }
+
+        private void ApplyComboSummary(PlacementComboPreview preview, Vector3 snapPos, bool legal)
+        {
+            if (comboSummaryLabel == null)
+            {
+                var go = new GameObject("ComboPlacementSummary");
+                comboSummaryLabel = go.AddComponent<TextMeshPro>();
+                comboSummaryLabel.alignment = TextAlignmentOptions.Center;
+                comboSummaryLabel.fontStyle = FontStyles.Bold;
+                comboSummaryLabel.fontSize = 3.6f;
+                comboSummaryLabel.enableWordWrapping = true;
+                comboSummaryLabel.overflowMode = TextOverflowModes.Overflow;
+                comboSummaryLabel.raycastTarget = false;
+                comboSummaryLabel.sortingOrder = 200;
+                var rt = comboSummaryLabel.rectTransform;
+                rt.sizeDelta = new Vector2(18f, 6f);
+                go.AddComponent<FaceCamera>();
+                CopyTmpFont(comboSummaryLabel);
+            }
+
+            comboSummaryLabel.gameObject.SetActive(true);
+            comboSummaryLabel.transform.position = snapPos + Vector3.up * 7.6f;
+            if (!legal)
+            {
+                comboSummaryLabel.text = "Can't place here";
+                comboSummaryLabel.color = new Color(1f, 0.55f, 0.45f, 1f);
+                return;
+            }
+
+            string budget = preview.ClimateBudgetLine;
+            comboSummaryLabel.text = string.IsNullOrEmpty(budget)
+                ? preview.SummaryLine
+                : $"{preview.SummaryLine}\n{budget}";
+            comboSummaryLabel.color = preview.HasTerraformRates || preview.HasInstantTerraform
+                ? new Color(0.55f, 1f, 0.85f, 1f)
+                : new Color(1f, 0.95f, 0.55f, 1f);
+        }
+
+        private void ColorJoinLinesFromPreview(PlacementComboPreview preview)
+        {
+            if (preview == null) return;
+            for (int i = 0; i < joinLines.Count && i < joinNeighbors.Count; i++)
+            {
+                if (joinLines[i] == null || joinNeighbors[i] == null) continue;
+                PlacementLinkKind kind = PlacementLinkKind.Neighbor;
+                for (int j = 0; j < preview.Links.Count; j++)
+                {
+                    if (preview.Links[j].Building == joinNeighbors[i])
+                    {
+                        kind = preview.Links[j].Kind;
+                        break;
+                    }
+                }
+                Color c = PlacementComboPreview.ColorFor(kind);
+                c.a = 0.95f;
+                joinLines[i].startColor = c;
+                joinLines[i].endColor = c;
+            }
+        }
+
+        private void PlaceHaloQuad(int index, Vector3 worldPos, Color color, float scaleMul)
+        {
+            EnsureComboHaloCapacity(index + 1);
+            var mr = comboHaloQuads[index];
+            if (mr == null) return;
+            mr.gameObject.SetActive(true);
+            float s = ColonyTileGrid.HexWidth * scaleMul;
+            mr.transform.position = worldPos + Vector3.up * 0.08f;
+            mr.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            mr.transform.localScale = new Vector3(s, s, 1f);
+            var mat = mr.material;
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            else if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+            else mat.color = color;
+        }
+
+        private void EnsureComboHaloCapacity(int count)
+        {
+            while (comboHaloQuads.Count < count)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                go.name = "ComboHaloQuad";
+                Object.Destroy(go.GetComponent<Collider>());
+                var mr = go.GetComponent<MeshRenderer>();
+                var shader = Shader.Find("Universal Render Pipeline/Unlit")
+                    ?? Shader.Find("Unlit/Color")
+                    ?? Shader.Find("Sprites/Default");
+                var mat = new Material(shader);
+                mr.material = mat;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                mr.receiveShadows = false;
+                go.SetActive(false);
+                comboHaloQuads.Add(mr);
+            }
+        }
+
+        private void EnsureComboLabelCapacity(int count)
+        {
+            while (comboLinkLabels.Count < count)
+            {
+                var go = new GameObject("ComboLinkLabel");
+                var tmp = go.AddComponent<TextMeshPro>();
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.fontStyle = FontStyles.Bold;
+                tmp.fontSize = 3.2f;
+                tmp.raycastTarget = false;
+                tmp.sortingOrder = 180;
+                go.AddComponent<FaceCamera>();
+                CopyTmpFont(tmp);
+                go.SetActive(false);
+                comboLinkLabels.Add(tmp);
+            }
+        }
+
+        private static void CopyTmpFont(TMP_Text dest)
+        {
+            if (dest == null) return;
+            foreach (var tmp in Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include))
+            {
+                if (tmp != null && tmp.font != null)
+                {
+                    dest.font = tmp.font;
+                    return;
+                }
+            }
+        }
+
+        private void HideAllComboHalos()
+        {
+            for (int i = 0; i < comboHaloQuads.Count; i++)
+            {
+                if (comboHaloQuads[i] != null)
+                    comboHaloQuads[i].gameObject.SetActive(false);
+            }
+            for (int i = 0; i < comboLinkLabels.Count; i++)
+            {
+                if (comboLinkLabels[i] != null)
+                    comboLinkLabels[i].gameObject.SetActive(false);
+            }
+        }
+
+        private void ClearComboHalo()
+        {
+            HideAllComboHalos();
+            if (comboSummaryLabel != null)
+                comboSummaryLabel.gameObject.SetActive(false);
+            lastComboPreviewCell = null;
+            lastComboPreviewBuilding = null;
+        }
+
         private void ClearGhostVisuals()
         {
             if (ghostInstance != null)
@@ -995,6 +1289,7 @@ namespace GameDevTV.RTS.Player
             ghostRenderer = null;
             if (tileFootprint != null) tileFootprint.SetActive(false);
             ClearJoinLines();
+            ClearComboHalo();
             tileGhostStickyCell = null;
             lastJoinCount = -1;
             restrictionAgreeFrames = 0;

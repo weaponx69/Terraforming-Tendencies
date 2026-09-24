@@ -6,9 +6,8 @@ using UnityEngine;
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// Ticks climate generation for all completed buildings each frame.
-    /// Prefabs often ship with <see cref="BaseBuilding"/> disabled, and some subclasses
-    /// replace Update — this keeps atmosphere/temp/water progressing regardless.
+    /// Outside Colony Acts: ticks climate each frame (rates per-second).
+    /// During Colony Acts: idle — <see cref="ColonyActManager.SpendWeeks"/> applies per-week generation.
     /// </summary>
     public class ClimateGenerationTicker : MonoBehaviour
     {
@@ -44,6 +43,10 @@ namespace GameDevTV.RTS.Environment
 
         private void Update()
         {
+            // Colony Acts: climate advances on week spend only (see ColonyActManager.SpendWeeks).
+            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+                return;
+
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 

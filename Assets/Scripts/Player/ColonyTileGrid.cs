@@ -255,6 +255,13 @@ namespace GameDevTV.RTS.Player
             return n;
         }
 
+        public static void CollectOrthogonalNeighborCells(Vector2Int cell, List<Vector2Int> results)
+        {
+            results.Clear();
+            for (int i = 0; i < HexNeighbors.Length; i++)
+                results.Add(cell + HexNeighbors[i]);
+        }
+
         public static void CollectOrthogonalNeighborBuildings(
             Vector2Int cell, Owner owner, List<BaseBuilding> results)
         {

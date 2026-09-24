@@ -73,7 +73,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | 4 | Expand | 300 | 16 |
 | 5 | Thrive | 400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water gains** from Act baselines. Need per Act = **one sector share**: reference (+15°C / +0.25 atm / +5%) **÷ N**. Each sector may contribute at most that same **1/N** (one Air farm cannot dump multiple sectors' worth). More map sectors → smaller Act climate bars. Help fill via adjacency climate **rate combos**. Powered = full rate; unpowered = 20%; stacked Heat/Air/Water (+Power) multiply rate up to 2.5×.
+* **Act clear = Colony Score target AND Temp/Atmos/Water gains** from Act baselines. Need per Act = **one sector share**: reference (+15°C / +0.25 atm / +5%) **÷ N**. Each sector may contribute at most that same **1/N** (one Air farm cannot dump multiple sectors' worth). More map sectors → smaller Act climate bars. **Climate tiles produce on week spend** (not real-time): config Temp/Atmos/Water rates are **per week**, × power efficiency (20% unpowered / 100% powered) × adjacency climate combo (pair / same-tag / trio / power neighbor, cap 2.5×). Playing a card that costs W weeks applies W weeks of generation from every completed climate tile.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
@@ -120,7 +120,7 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 1. **Hand** — place tiles freely (no Materials). Weeks spend on play. Hand strip filters to the sector you are viewing.
 2. **Geology** — mines on deposit discs; Aquifer→WaterDeposit; Subglacial→Glacier; Geothermal→Volcano; Lava Tube/Subterranean→LavaTube; Magnetic Shield/Sector Command→FaultLine. Wrong place shows a toast + banner. Non-mines cannot place on **discovered** mineable deposits (**Command Posts exempt** — CP pad wins over a deposit on the same tile). Undiscovered Iron/Regolith do not reserve tiles. Deposits are sparse (~5/sector, snapped with spacing) so climate tiles have room.
-3. **Score / climate** — low base score; adjacency/combos pay. Climate ticks at **20%** unpowered / full when powered, then × adjacency climate combo (pair / same-tag / trio / power neighbor). Combo **card offers** require edge adjacency.
+3. **Score / climate** — low base score; adjacency/combos pay. Climate produces **on week spend** (config rates = per week) at **20%** unpowered / full when powered, then × adjacency climate combo (pair / same-tag / trio / power neighbor). Combo **card offers** require edge adjacency.
 4. **Act clear** → Terra-Coins awarded → upgrade shop → next Act (or win).
 5. **Q/E** between sectors; Command Posts expand the map.
 
@@ -156,6 +156,7 @@ Non-building cards grant a small flat score on play (no adjacency). **Most score
 * Semi-transparent **tile footprint** under the ghost (locks to the snap cell immediately).
 * Ghost mesh stays a stable blue/red valid tint (no green strobe on fresnel).
 * **Green footprint + join lines** show adjacency; ghost is removed from `ActiveBuildings` so it cannot occupy its own cell.
+* **Combo placement halo** ([`PlacementComboPreview`](Assets/Scripts/Player/PlacementComboPreview.cs) via `ColonyActManager.PreviewPlacement`): blue ring on empty edge hexes, role-colored discs/labels on combo partners (same-tag / climate / power / anchor / life / geology), yellow ghost ring, and a floating summary with **score**, **Temp/Atmos/Water per week** (`+°C/wk`, `+atm/wk`, `+%/wk` after power efficiency × adjacency combo), **on-place pulses**, and remaining sector climate headroom. Join lines tint to the link role.
 
 ### Score bonuses (per edge neighbor, soft-capped +36)
 | Relationship | Bonus |

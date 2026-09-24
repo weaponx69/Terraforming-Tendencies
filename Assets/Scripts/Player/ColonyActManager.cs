@@ -524,9 +524,34 @@ namespace GameDevTV.RTS.Player
 
             int spent = Mathf.Min(weeks, weeksRemaining);
             weeksRemaining -= spent;
+            // Climate tiles produce once per spent week (not real-time).
+            ApplyWeeklyClimateFromBoard(spent);
             Debug.Log($"[ColonyActManager] Spent {spent} week(s) — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
             OnActStateChanged?.Invoke();
             TryResolveWeekExhaustion();
+        }
+
+        /// <summary>
+        /// Under Colony Acts, terraforming buildings generate on week spend.
+        /// Config Temperature/Atmosphere/WaterGeneration are amounts <b>per week</b>
+        /// (× efficiency × adjacency combo), applied once per spent week.
+        /// </summary>
+        private static void ApplyWeeklyClimateFromBoard(int weeks)
+        {
+            if (weeks <= 0) return;
+            var buildings = BaseBuilding.ActiveBuildings;
+            if (buildings == null || buildings.Count == 0) return;
+
+            // One discrete week at a time so per-sector 1/N budgets share fairly across tiles.
+            for (int w = 0; w < weeks; w++)
+            {
+                for (int i = 0; i < buildings.Count; i++)
+                {
+                    BaseBuilding building = buildings[i];
+                    if (building == null) continue;
+                    building.TickClimateGeneration(1f);
+                }
+            }
         }
 
         /// <summary>
@@ -869,15 +894,32 @@ namespace GameDevTV.RTS.Player
         {
             neighborCount = 0;
             if (placed == null) return 0;
+            return CalculateAdjacencyBonusAt(
+                ColonyTileGrid.WorldToCell(placed.transform.position),
+                placed.ResolvedBuildingSO,
+                tag,
+                placed,
+                out neighborCount);
+        }
 
-            var neighbors = new List<BaseBuilding>(4);
-            ColonyTileGrid.CollectOrthogonalNeighborBuildings(
-                ColonyTileGrid.WorldToCell(placed.transform.position), Owner.Player1, neighbors);
+        private static int CalculateAdjacencyBonusAt(
+            Vector2Int cell,
+            BuildingSO placing,
+            string tag,
+            BaseBuilding ignoreSelf,
+            out int neighborCount)
+        {
+            neighborCount = 0;
+            var neighbors = new List<BaseBuilding>(6);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(cell, Owner.Player1, neighbors);
 
             int bonus = 0;
+            float placedUpkeep = PowerGridManager.GetBuildingPowerUpkeep(placing);
+            bool placedIsPower = tag == "Power";
+
             foreach (var other in neighbors)
             {
-                if (other == null || other == placed) continue;
+                if (other == null || other == ignoreSelf) continue;
                 if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
 
                 neighborCount++;
@@ -887,10 +929,8 @@ namespace GameDevTV.RTS.Player
                 if (!string.IsNullOrEmpty(tag) && tag == otherTag)
                     bonus += SameTagBonus;
 
-                bool placedIsPower = tag == "Power";
                 bool otherIsPower = otherTag == "Power";
                 float otherUpkeep = PowerGridManager.GetBuildingPowerUpkeep(other.ResolvedBuildingSO);
-                float placedUpkeep = PowerGridManager.GetBuildingPowerUpkeep(placed.ResolvedBuildingSO);
                 if ((placedIsPower && otherUpkeep > 0f) || (otherIsPower && placedUpkeep > 0f))
                     bonus += PowerConsumerBonus;
 
@@ -906,6 +946,409 @@ namespace GameDevTV.RTS.Player
             }
 
             return Mathf.Min(bonus, AdjacencySoftCap);
+        }
+
+        /// <summary>
+        /// Hover preview for card placement: estimated score, climate rate, and per-neighbor combo roles.
+        /// </summary>
+        public PlacementComboPreview PreviewPlacement(BuildingSO building, Vector3 worldPos)
+        {
+            var preview = new PlacementComboPreview
+            {
+                Building = building,
+                WorldPos = worldPos,
+                Cell = ColonyTileGrid.WorldToCell(worldPos)
+            };
+            if (building == null) return preview;
+
+            GetTileValues(building, out int baseScore, out _, out string tag);
+            preview.Tag = tag;
+            preview.BaseScore = baseScore;
+            preview.IsClimateTile = tag == "Heat" || tag == "Air" || tag == "Water";
+
+            int neighbors;
+            preview.AdjScore = CalculateAdjacencyBonusAt(
+                preview.Cell, building, tag, null, out neighbors);
+            Instance?.ApplyExtraAdjToPreview(preview, neighbors);
+
+            if (tag == "Power")
+                preview.PowerBonus = PowerGeneratorScoreBonus + (Instance != null ? Instance.powerScoreBonusExtra : 0);
+
+            // Geology match (mine on deposit / feature lock) — same rules as place rewards.
+            if (PreviewGeologyBonus(building, worldPos, out int geo))
+            {
+                preview.AdjScore += geo; // fold into displayed adj total for simplicity
+                preview.Links.Add(new PlacementLink(null, PlacementLinkKind.Geology, $"+{geo} geology", geo));
+            }
+
+            FillPreviewLinks(preview, building, tag);
+            preview.ClimateRateMult = PreviewClimateRateMult(preview.Cell, tag);
+            FillClimateNumbers(preview, building, tag, worldPos);
+            int raw = preview.BaseScore + preview.AdjScore + preview.PowerBonus;
+            float mult = Instance != null ? Instance.scoreMultiplier : 1f;
+            preview.EstimatedTotal = Mathf.Max(0, Mathf.RoundToInt(raw * mult));
+            return preview;
+        }
+
+        /// <summary>
+        /// Dry-run of weekly climate rates (applied on week spend) + on-place geology/pair pulses.
+        /// </summary>
+        private static void FillClimateNumbers(
+            PlacementComboPreview preview, BuildingSO building, string tag, Vector3 worldPos)
+        {
+            ResolveClimateBaseRates(building, out float tempRate, out float atmosRate, out float waterRate);
+            float efficiency = PreviewProductionEfficiency(building, preview.Cell);
+            preview.ProductionEfficiency = efficiency;
+            preview.WillBePowered = efficiency >= 0.99f;
+
+            float combo = preview.ClimateRateMult;
+            if (tag != "Heat" && tag != "Air" && tag != "Water")
+                combo = 1f;
+
+            // Config rates are per week under Colony Acts.
+            preview.TempRatePerSec = tempRate * efficiency * combo;
+            preview.AtmosRatePerSec = atmosRate * efficiency * combo;
+            preview.WaterRatePerSec = waterRate * efficiency * combo;
+
+            // Instant pulses (clamped to remaining budget, without committing).
+            float pulseT = 0f, pulseA = 0f, pulseW = 0f;
+            if (PreviewGeologyBonus(building, worldPos, out _))
+                PreviewGeologyClimatePulse(building, worldPos, ref pulseT, ref pulseA, ref pulseW);
+            PreviewClimatePairPulse(preview.Cell, tag, worldPos, ref pulseT, ref pulseA, ref pulseW);
+
+            GetRemainingClimateBudget(worldPos, out float remainT, out float remainA, out float remainW);
+            preview.RemainTemp = remainT;
+            preview.RemainAtmos = remainA;
+            preview.RemainWater = remainW;
+
+            preview.InstantTemp = Mathf.Min(pulseT, remainT);
+            preview.InstantAtmos = Mathf.Min(pulseA, remainA);
+            preview.InstantWater = Mathf.Min(pulseW, remainW);
+        }
+
+        private static void ResolveClimateBaseRates(
+            BuildingSO building, out float tempRate, out float atmosRate, out float waterRate)
+        {
+            tempRate = atmosRate = waterRate = 0f;
+            if (building?.BuildingConfig == null) return;
+
+            var config = building.BuildingConfig;
+            tempRate = config.TemperatureGeneration;
+            atmosRate = config.AtmosphereGeneration;
+            waterRate = config.WaterGeneration;
+
+            // Same name fallbacks / soft caps as BaseBuilding.TickClimateGeneration (per-week under Acts).
+            string n = building.Name;
+            if (!string.IsNullOrEmpty(n))
+            {
+                if (atmosRate <= 0f
+                    && (n.IndexOf("Atmospheric Condenser", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Carbon Dioxide Import", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("GHG", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                    atmosRate = 0.012f;
+                if (tempRate <= 0f
+                    && (n.IndexOf("GHG", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Methanogenic", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                    tempRate = 0.2f;
+                if (waterRate <= 0f
+                    && (n.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || (n.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0
+                            && n.IndexOf("Processor", System.StringComparison.OrdinalIgnoreCase) < 0)))
+                    waterRate = 0.1f;
+            }
+
+            tempRate = Mathf.Min(tempRate, 0.3f);
+            atmosRate = Mathf.Min(atmosRate, 0.015f);
+            waterRate = Mathf.Min(waterRate, 0.12f);
+        }
+
+        private static float PreviewProductionEfficiency(BuildingSO building, Vector2Int cell)
+        {
+            if (building == null) return 0f;
+            if (BuildingSiteRegistry.IsPowerGeneratorBuilding(building))
+                return 1f;
+            float upkeep = PowerGridManager.GetBuildingPowerUpkeep(building);
+            if (upkeep <= 0.0001f) return 1f;
+
+            // Adjacent completed power nodes auto-link on place → treat as powered.
+            var neighbors = new List<BaseBuilding>(6);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(cell, Owner.Player1, neighbors);
+            foreach (var other in neighbors)
+            {
+                if (other == null) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                var node = other.GetComponent<PowerNode>();
+                if (node != null && node.IsPowered) return 1f;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                if (otherTag == "Power") return 1f;
+            }
+
+            return BaseBuilding.UnpoweredProductionEfficiency;
+        }
+
+        private static void GetRemainingClimateBudget(
+            Vector3 worldPos, out float remainT, out float remainA, out float remainW)
+        {
+            remainT = remainA = remainW = 0f;
+            var acts = Instance;
+            if (acts == null || !acts.started || acts.runEnded || acts.IsBetweenActs) return;
+
+            acts.GetPerSectorClimateBudgets(out float maxT, out float maxA, out float maxW);
+            int sectorIndex = ResolveSectorIndex(worldPos);
+            if (!acts.sectorClimateContributed.TryGetValue(sectorIndex, out Vector3 used))
+                used = Vector3.zero;
+
+            acts.GetActClimateRequirements(out float needT, out float needA, out float needW);
+            acts.GetClimateGains(out float tGain, out float aGain, out float wGain);
+            float actRemainT = Mathf.Max(0f, needT - tGain);
+            float actRemainA = Mathf.Max(0f, needA - aGain);
+            float actRemainW = Mathf.Max(0f, needW - wGain);
+
+            remainT = Mathf.Min(Mathf.Max(0f, maxT - used.x), actRemainT);
+            remainA = Mathf.Min(Mathf.Max(0f, maxA - used.y), actRemainA);
+            remainW = Mathf.Min(Mathf.Max(0f, maxW - used.z), actRemainW);
+        }
+
+        private static void PreviewGeologyClimatePulse(
+            BuildingSO building, Vector3 worldPos, ref float tempAdd, ref float atmosAdd, ref float waterAdd)
+        {
+            if (building == null) return;
+            string resourceType = null;
+
+            if (BuildingSiteRegistry.IsMineBuilding(building)
+                && DiscoverySystem.IsOnDiscoveredMineDeposit(building, worldPos)
+                && DiscoverySystem.TryGetMineResourceType(building, out string mineType))
+            {
+                resourceType = mineType;
+            }
+            else
+            {
+                string name = building.Name ?? string.Empty;
+                var nearest = SectorManager.Instance?.GetNearestSector(worldPos);
+                if (nearest != null && nearest.Feature != SectorManager.SectorFeature.None)
+                {
+                    bool isAquifer = name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool isSubglacial = name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool isGeo = name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool isLavaTubeBld = name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool isFaultBld = name.IndexOf("Magnetic Shield", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("Sector Command", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    if ((isAquifer && nearest.Feature == SectorManager.SectorFeature.WaterDeposit)
+                        || (isSubglacial && nearest.Feature == SectorManager.SectorFeature.Glacier))
+                        resourceType = "Water";
+                    else if ((isGeo && nearest.Feature == SectorManager.SectorFeature.Volcano)
+                        || (isLavaTubeBld && nearest.Feature == SectorManager.SectorFeature.LavaTube)
+                        || (isFaultBld && nearest.Feature == SectorManager.SectorFeature.FaultLine))
+                        resourceType = "Heat";
+                }
+            }
+
+            if (string.IsNullOrEmpty(resourceType)) return;
+
+            if (resourceType.IndexOf("Mineral", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || resourceType.IndexOf("Iron", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || resourceType.IndexOf("Regolith", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                tempAdd += 1.5f;
+            else if (resourceType.IndexOf("Gas", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                atmosAdd += 0.03f;
+            else if (resourceType.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                waterAdd += 1.5f;
+            else if (resourceType.IndexOf("Heat", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                tempAdd += 2f;
+        }
+
+        private static void PreviewClimatePairPulse(
+            Vector2Int cell, string tag, Vector3 worldPos,
+            ref float tempAdd, ref float atmosAdd, ref float waterAdd)
+        {
+            if (tag != "Heat" && tag != "Air" && tag != "Water") return;
+            var acts = Instance;
+            if (acts == null || !acts.started || acts.runEnded || acts.IsBetweenActs) return;
+
+            var neighbors = new List<BaseBuilding>(6);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(cell, Owner.Player1, neighbors);
+
+            int sectorIndex = ResolveSectorIndex(worldPos);
+            acts.GetPerSectorClimateBudgets(out float maxT, out float maxA, out float maxW);
+            if (!acts.sectorClimateContributed.TryGetValue(sectorIndex, out Vector3 used))
+                used = Vector3.zero;
+
+            foreach (var other in neighbors)
+            {
+                if (other == null) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                if (!IsClimatePair(tag, otherTag)) continue;
+
+                string key = $"{sectorIndex}:{ClimatePairKey(tag, otherTag)}";
+                if (acts.climatePairPulseKeysThisAct.Contains(key)) continue;
+
+                float t = Mathf.Max(0f, maxT - used.x) * 0.07f;
+                float a = Mathf.Max(0f, maxA - used.y) * 0.07f;
+                float w = Mathf.Max(0f, maxW - used.z) * 0.07f;
+                if (tag != "Heat" && otherTag != "Heat") t = 0f;
+                if (tag != "Air" && otherTag != "Air") a = 0f;
+                if (tag != "Water" && otherTag != "Water") w = 0f;
+
+                tempAdd += t;
+                atmosAdd += a;
+                waterAdd += w;
+                break; // first pair only, matching TryClimatePairPulse
+            }
+        }
+
+        private static string ClimatePairKey(string a, string b)
+        {
+            if (string.CompareOrdinal(a, b) <= 0) return $"{a}:{b}";
+            return $"{b}:{a}";
+        }
+
+        private void ApplyExtraAdjToPreview(PlacementComboPreview preview, int neighbors)
+        {
+            preview.AdjScore += adjacencyBonusExtra * Mathf.Max(0, neighbors);
+        }
+
+        private static bool PreviewGeologyBonus(BuildingSO building, Vector3 worldPos, out int bonus)
+        {
+            bonus = 0;
+            if (building == null) return false;
+            int extra = Instance != null ? Instance.geologyBonusExtra : 0;
+            int match = GeologyMatchBonus + extra;
+
+            if (BuildingSiteRegistry.IsMineBuilding(building)
+                && DiscoverySystem.IsOnDiscoveredMineDeposit(building, worldPos))
+            {
+                bonus = match;
+                return true;
+            }
+
+            string name = building.Name ?? string.Empty;
+            var nearest = SectorManager.Instance?.GetNearestSector(worldPos);
+            if (nearest == null || nearest.Feature == SectorManager.SectorFeature.None) return false;
+
+            bool isAquifer = name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isSubglacial = name.IndexOf("Subglacial", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isGeo = name.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isLavaTubeBld = name.IndexOf("Lava Tube", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isFaultBld = name.IndexOf("Magnetic Shield", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Sector Command", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if ((isAquifer && nearest.Feature == SectorManager.SectorFeature.WaterDeposit)
+                || (isSubglacial && nearest.Feature == SectorManager.SectorFeature.Glacier)
+                || (isGeo && nearest.Feature == SectorManager.SectorFeature.Volcano)
+                || (isLavaTubeBld && nearest.Feature == SectorManager.SectorFeature.LavaTube)
+                || (isFaultBld && nearest.Feature == SectorManager.SectorFeature.FaultLine))
+            {
+                bonus = match;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void FillPreviewLinks(PlacementComboPreview preview, BuildingSO placing, string tag)
+        {
+            var neighbors = new List<BaseBuilding>(6);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(preview.Cell, Owner.Player1, neighbors);
+            float placedUpkeep = PowerGridManager.GetBuildingPowerUpkeep(placing);
+            bool placedIsPower = tag == "Power";
+
+            foreach (var other in neighbors)
+            {
+                if (other == null) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+
+                PlacementLinkKind kind = PlacementLinkKind.Neighbor;
+                int pts = AdjacentBonus;
+                string label = $"+{AdjacentBonus}";
+
+                if (!string.IsNullOrEmpty(tag) && tag == otherTag)
+                {
+                    kind = PlacementLinkKind.SameTag;
+                    pts += SameTagBonus;
+                    label = $"same {tag} +{pts}";
+                }
+
+                bool otherIsPower = otherTag == "Power";
+                float otherUpkeep = PowerGridManager.GetBuildingPowerUpkeep(other.ResolvedBuildingSO);
+                if ((placedIsPower && otherUpkeep > 0f) || (otherIsPower && placedUpkeep > 0f))
+                {
+                    kind = PlacementLinkKind.Power;
+                    pts += PowerConsumerBonus;
+                    label = $"power +{pts}";
+                }
+
+                if (IsClimatePair(tag, otherTag))
+                {
+                    kind = PlacementLinkKind.ClimatePair;
+                    pts += ClimatePairBonus;
+                    label = $"{tag}↔{otherTag} +{pts}";
+                }
+
+                if (tag == "Anchor" || otherTag == "Anchor")
+                {
+                    if (kind == PlacementLinkKind.Neighbor || kind == PlacementLinkKind.SameTag)
+                    {
+                        kind = PlacementLinkKind.Anchor;
+                        pts += AnchorBonus;
+                        label = $"anchor +{pts}";
+                    }
+                    else
+                    {
+                        pts += AnchorBonus;
+                        label += $" · anchor";
+                    }
+                }
+
+                if ((tag == "Life" && (otherTag == "Water" || otherTag == "Anchor"))
+                    || (otherTag == "Life" && (tag == "Water" || tag == "Anchor")))
+                {
+                    kind = PlacementLinkKind.Life;
+                    pts += LifeSynergyBonus;
+                    label = $"life +{pts}";
+                }
+
+                preview.Links.Add(new PlacementLink(other, kind, label, pts));
+            }
+        }
+
+        private static float PreviewClimateRateMult(Vector2Int cell, string tag)
+        {
+            if (tag != "Heat" && tag != "Air" && tag != "Water") return 1f;
+
+            var neighbors = new List<BaseBuilding>(6);
+            ColonyTileGrid.CollectOrthogonalNeighborBuildings(cell, Owner.Player1, neighbors);
+
+            bool sameTag = false;
+            bool climatePair = false;
+            bool hasHeat = tag == "Heat";
+            bool hasAir = tag == "Air";
+            bool hasWater = tag == "Water";
+            bool powerNeighbor = false;
+
+            foreach (var other in neighbors)
+            {
+                if (other == null) continue;
+                if (other.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                GetTileValues(other.ResolvedBuildingSO, out _, out _, out string otherTag);
+                if (otherTag == tag) sameTag = true;
+                if (IsClimatePair(tag, otherTag)) climatePair = true;
+                if (otherTag == "Heat") hasHeat = true;
+                if (otherTag == "Air") hasAir = true;
+                if (otherTag == "Water") hasWater = true;
+                if (otherTag == "Power") powerNeighbor = true;
+            }
+
+            float mult = 1f;
+            if (hasHeat && hasAir && hasWater) mult = 2.25f;
+            else if (climatePair) mult = 1.75f;
+            else if (sameTag) mult = 1.35f;
+            if (powerNeighbor) mult += 0.25f;
+            return Mathf.Min(mult, 2.5f);
         }
 
         private static bool IsClimatePair(string a, string b)
