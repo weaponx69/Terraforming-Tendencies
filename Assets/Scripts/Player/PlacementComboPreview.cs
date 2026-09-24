@@ -123,9 +123,12 @@ namespace GameDevTV.RTS.Player
         {
             var bits = new List<string>(3);
             string suffix = perWeek ? "/wk" : "";
-            if (temp > 0.0001f) bits.Add($"+{temp:0.##}C{suffix}");
-            if (atmos > 0.0001f) bits.Add($"+{atmos:0.###}atm{suffix}");
-            if (water > 0.0001f) bits.Add($"+{water:0.##}%{suffix}");
+            if (temp >= 0.05f) bits.Add($"+{temp:0.#}C{suffix}");
+            else if (temp > 0.0001f) bits.Add($"+{temp:0.##}C{suffix}");
+            if (atmos >= 0.01f) bits.Add($"+{atmos:0.##}a{suffix}");
+            else if (atmos > 0.0001f) bits.Add($"+{atmos:0.###}a{suffix}");
+            if (water >= 0.05f) bits.Add($"+{water:0.#}%{suffix}");
+            else if (water > 0.0001f) bits.Add($"+{water:0.##}%{suffix}");
             return bits.Count == 0 ? null : string.Join(" ", bits);
         }
 

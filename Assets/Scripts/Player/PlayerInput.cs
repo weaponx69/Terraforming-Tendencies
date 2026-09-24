@@ -1015,7 +1015,7 @@ namespace GameDevTV.RTS.Player
                 && lastComboPreviewCell.Value == cell
                 && lastComboPreviewBuilding == building
                 && comboSummaryLabel != null
-                && comboSummaryLabel.gameObject.activeSelf;
+                && comboSummaryLabel.gameObject.activeInHierarchy;
 
             PlacementComboPreview preview = ColonyActManager.Instance.PreviewPlacement(building, snapPos);
 
@@ -1054,7 +1054,12 @@ namespace GameDevTV.RTS.Player
                         ? link.Building.transform.position
                         : snapPos;
                     if (i < comboLinkWorldPos.Count)
-                        comboLinkWorldPos[i] = pos + Vector3.up * 4.5f;
+                        comboLinkWorldPos[i] = pos + Vector3.up * 3.2f;
+                    if (comboLinkLabels[i] != null)
+                    {
+                        StyleComboLinkLabel(comboLinkLabels[i]);
+                        comboLinkLabels[i].text = ShortenComboLabel(link.Label);
+                    }
                 }
                 UpdateComboLabelScreens();
             }
@@ -1103,7 +1108,7 @@ namespace GameDevTV.RTS.Player
                 : new Color(1f, 0.35f, 0.25f, 0.5f);
             PlaceHaloQuad(haloIdx++, snapPos, ghostRing, 1.18f);
 
-            // Floating link labels (screen-space — readable from RTS camera height).
+            // Floating link labels (screen-space — compact so they don't crowd the ghost).
             EnsureComboLabelCapacity(preview.Links.Count);
             comboLinkWorldPos.Clear();
             for (int i = 0; i < comboLinkLabels.Count; i++)
@@ -1121,11 +1126,13 @@ namespace GameDevTV.RTS.Player
                     : snapPos;
                 var tmp = comboLinkLabels[i];
                 tmp.gameObject.SetActive(true);
-                tmp.text = link.Label;
+                StyleComboLinkLabel(tmp);
+                tmp.text = ShortenComboLabel(link.Label);
                 Color lc = PlacementComboPreview.ColorFor(link.Kind);
-                lc.a = 1f;
-                tmp.color = Color.Lerp(lc, Color.white, 0.35f);
-                comboLinkWorldPos.Add(pos + Vector3.up * 4.5f);
+                lc.a = 0.92f;
+                tmp.color = Color.Lerp(lc, Color.white, 0.45f);
+                // Slightly lower than summary so summary owns the ghost space.
+                comboLinkWorldPos.Add(pos + Vector3.up * 3.2f);
             }
 
             ApplyComboSummary(preview, snapPos, legal);
@@ -1140,9 +1147,51 @@ namespace GameDevTV.RTS.Player
             comboOverlayCanvas = go.AddComponent<Canvas>();
             comboOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
             comboOverlayCanvas.sortingOrder = 4600;
-            go.AddComponent<UnityEngine.UI.CanvasScaler>().uiScaleMode =
-                UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            var scaler = go.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
             go.AddComponent<UnityEngine.UI.GraphicRaycaster>().enabled = false;
+        }
+
+        private static void StyleComboSummaryLabel(TextMeshProUGUI tmp)
+        {
+            if (tmp == null) return;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontStyle = FontStyles.Normal;
+            tmp.fontSize = 12f;
+            tmp.fontWeight = FontWeight.Regular;
+            tmp.enableWordWrapping = true;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.lineSpacing = 2f;
+            tmp.characterSpacing = 0f;
+            tmp.raycastTarget = false;
+            tmp.outlineWidth = 0f;
+            tmp.outlineColor = new Color(0f, 0f, 0f, 0f);
+        }
+
+        private static void StyleComboLinkLabel(TextMeshProUGUI tmp)
+        {
+            if (tmp == null) return;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontStyle = FontStyles.Normal;
+            tmp.fontSize = 10f;
+            tmp.fontWeight = FontWeight.Regular;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Ellipsis;
+            tmp.raycastTarget = false;
+            tmp.outlineWidth = 0f;
+            tmp.outlineColor = new Color(0f, 0f, 0f, 0f);
+        }
+
+        private static string ShortenComboLabel(string label)
+        {
+            if (string.IsNullOrEmpty(label)) return label;
+            // Keep the score/role token; drop long partner prose.
+            if (label.Length <= 18) return label;
+            int plus = label.LastIndexOf('+');
+            if (plus > 0 && plus < label.Length - 1)
+                return label.Substring(plus).Trim();
+            return label.Length > 16 ? label.Substring(0, 14) + "…" : label;
         }
 
         private void ApplyComboSummary(PlacementComboPreview preview, Vector3 snapPos, bool legal)
@@ -1150,77 +1199,75 @@ namespace GameDevTV.RTS.Player
             EnsureComboOverlayCanvas();
             if (comboSummaryLabel == null)
             {
+                var chipGo = new GameObject("ComboPlacementSummaryChip");
+                chipGo.transform.SetParent(comboOverlayCanvas.transform, false);
+                var chipRt = chipGo.AddComponent<RectTransform>();
+                chipRt.sizeDelta = new Vector2(210f, 36f);
+                var img = chipGo.AddComponent<UnityEngine.UI.Image>();
+                img.color = new Color(0.02f, 0.05f, 0.08f, 0.75f);
+                img.raycastTarget = false;
+
                 var textGo = new GameObject("ComboPlacementSummary");
-                textGo.transform.SetParent(comboOverlayCanvas.transform, false);
+                textGo.transform.SetParent(chipGo.transform, false);
                 var rt = textGo.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(520f, 96f);
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(6f, 2f);
+                rt.offsetMax = new Vector2(-6f, -2f);
                 comboSummaryLabel = textGo.AddComponent<TextMeshProUGUI>();
-                comboSummaryLabel.alignment = TextAlignmentOptions.Center;
-                comboSummaryLabel.fontStyle = FontStyles.Bold;
-                comboSummaryLabel.fontSize = 26f;
-                comboSummaryLabel.enableWordWrapping = true;
-                comboSummaryLabel.overflowMode = TextOverflowModes.Overflow;
-                comboSummaryLabel.raycastTarget = false;
                 CopyTmpFont(comboSummaryLabel);
             }
+            // Recreate chip if an older play session left a bare label without parent chip.
+            if (comboSummaryLabel.transform.parent == comboOverlayCanvas.transform)
+            {
+                Destroy(comboSummaryLabel.gameObject);
+                comboSummaryLabel = null;
+                ApplyComboSummary(preview, snapPos, legal);
+                return;
+            }
+            StyleComboSummaryLabel(comboSummaryLabel);
+            comboSummaryLabel.transform.parent.gameObject.SetActive(true);
 
             comboSummaryLabel.gameObject.SetActive(true);
-            comboSummaryWorldPos = snapPos + Vector3.up * 6.5f;
+            // Sit above the ghost; link chips sit lower on neighbors.
+            comboSummaryWorldPos = snapPos + Vector3.up * 5.5f;
             if (!legal)
             {
-                comboSummaryLabel.text = "Can't place here";
+                comboSummaryLabel.text = "Can't place";
                 comboSummaryLabel.color = new Color(1f, 0.55f, 0.45f, 1f);
                 UpdateComboLabelScreens();
                 return;
             }
 
-            // Put terraforming numbers first so they read above the score line.
             string climate = PlacementComboPreview.FormatClimateTriplet(
                 preview.TempRatePerSec, preview.AtmosRatePerSec, preview.WaterRatePerSec, perWeek: true);
             string pulse = PlacementComboPreview.FormatClimateTriplet(
                 preview.InstantTemp, preview.InstantAtmos, preview.InstantWater, perWeek: false);
-            string budget = preview.ClimateBudgetLine;
 
-            var lines = new List<string>();
+            var main = new List<string>(3);
             if (!string.IsNullOrEmpty(climate))
             {
-                string powerNote = preview.WillBePowered ? "" : " @20%";
+                string powerNote = preview.WillBePowered ? "" : " 20%";
                 string mult = preview.ClimateRateMult > 1.01f
-                    ? $" x{preview.ClimateRateMult:0.00}"
+                    ? $" ×{preview.ClimateRateMult:0.#}"
                     : "";
-                lines.Add($"{climate}{mult}{powerNote}");
+                main.Add($"{climate}{mult}{powerNote}");
             }
-            else if (preview.IsClimateTile)
-            {
-                lines.Add(preview.ClimateRateMult > 1.01f
-                    ? $"climate x{preview.ClimateRateMult:0.00}"
-                    : "climate x1.00");
-            }
+            if (preview.EstimatedTotal > 0) main.Add($"+{preview.EstimatedTotal}");
+            if (!string.IsNullOrEmpty(pulse)) main.Add($"place {pulse}");
 
-            if (!string.IsNullOrEmpty(pulse))
-                lines.Add($"on place {pulse}");
-            if (!string.IsNullOrEmpty(budget))
-                lines.Add(budget);
+            string line1 = main.Count > 0 ? string.Join(" · ", main) : "no combo";
+            string budget = preview.ClimateBudgetLine;
+            string line2 = null;
+            if (!string.IsNullOrEmpty(budget) && budget != "sector climate full")
+                line2 = budget;
+            else if (budget == "sector climate full")
+                line2 = "climate full";
 
-            string scoreBit = preview.EstimatedTotal > 0 ? $"+{preview.EstimatedTotal} score" : null;
-            if (!string.IsNullOrEmpty(scoreBit))
-            {
-                if (preview.Links.Count > 0)
-                    scoreBit += $" · {preview.Links.Count} combo";
-                lines.Add(scoreBit);
-            }
-            else if (preview.Links.Count > 0)
-            {
-                lines.Add($"{preview.Links.Count} combo link{(preview.Links.Count == 1 ? "" : "s")}");
-            }
-
-            if (lines.Count == 0)
-                lines.Add("No edge combo yet");
-
-            comboSummaryLabel.text = string.Join("\n", lines);
+            comboSummaryLabel.text = string.IsNullOrEmpty(line2) ? line1 : $"{line1}\n{line2}";
             comboSummaryLabel.color = preview.HasTerraformRates || preview.HasInstantTerraform
-                ? new Color(0.45f, 1f, 0.8f, 1f)
-                : new Color(1f, 0.95f, 0.55f, 1f);
+                ? new Color(0.88f, 1f, 0.94f, 1f)
+                : new Color(1f, 0.96f, 0.82f, 1f);
             UpdateComboLabelScreens();
         }
 
@@ -1229,13 +1276,25 @@ namespace GameDevTV.RTS.Player
             Camera cam = playerCamera != null ? playerCamera : Camera.main;
             if (cam == null) return;
 
+            var screens = new List<Vector2>(comboLinkLabels.Count + 1);
+            var active = new List<RectTransform>(comboLinkLabels.Count + 1);
+            RectTransform summaryRt = null;
+
             if (comboSummaryLabel != null && comboSummaryLabel.gameObject.activeSelf)
             {
+                summaryRt = comboSummaryLabel.transform.parent as RectTransform;
+                if (summaryRt == null) summaryRt = comboSummaryLabel.rectTransform;
                 Vector3 screen = cam.WorldToScreenPoint(comboSummaryWorldPos);
                 if (screen.z > 0f)
-                    comboSummaryLabel.rectTransform.position = screen;
+                {
+                    screens.Add(new Vector2(screen.x, screen.y + 20f));
+                    active.Add(summaryRt);
+                    summaryRt.gameObject.SetActive(true);
+                }
                 else
-                    comboSummaryLabel.gameObject.SetActive(false);
+                {
+                    summaryRt.gameObject.SetActive(false);
+                }
             }
 
             for (int i = 0; i < comboLinkLabels.Count; i++)
@@ -1245,10 +1304,47 @@ namespace GameDevTV.RTS.Player
                 if (i >= comboLinkWorldPos.Count) continue;
                 Vector3 screen = cam.WorldToScreenPoint(comboLinkWorldPos[i]);
                 if (screen.z > 0f)
-                    tmp.rectTransform.position = screen;
+                {
+                    screens.Add(new Vector2(screen.x, screen.y));
+                    active.Add(tmp.rectTransform);
+                }
                 else
+                {
                     tmp.gameObject.SetActive(false);
+                }
             }
+
+            const float minDist = 38f;
+            for (int pass = 0; pass < 5; pass++)
+            {
+                for (int i = 0; i < screens.Count; i++)
+                {
+                    for (int j = i + 1; j < screens.Count; j++)
+                    {
+                        Vector2 delta = screens[j] - screens[i];
+                        float dist = delta.magnitude;
+                        if (dist < 0.01f)
+                        {
+                            screens[j] = screens[i] + new Vector2(0f, minDist * (j - i));
+                            continue;
+                        }
+                        if (dist >= minDist) continue;
+                        Vector2 push = delta.normalized * ((minDist - dist) * 0.5f);
+                        bool iIsSummary = summaryRt != null && active[i] == summaryRt;
+                        bool jIsSummary = summaryRt != null && active[j] == summaryRt;
+                        if (iIsSummary) screens[j] += push * 2f;
+                        else if (jIsSummary) screens[i] -= push * 2f;
+                        else
+                        {
+                            screens[i] -= push;
+                            screens[j] += push;
+                        }
+                    }
+                }
+            }
+
+            for (int i = 0; i < active.Count; i++)
+                active[i].position = screens[i];
         }
 
         private void ColorJoinLinesFromPreview(PlacementComboPreview preview)
@@ -1317,12 +1413,9 @@ namespace GameDevTV.RTS.Player
                 var textGo = new GameObject("ComboLinkLabel");
                 textGo.transform.SetParent(comboOverlayCanvas.transform, false);
                 var rt = textGo.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(180f, 36f);
+                rt.sizeDelta = new Vector2(110f, 22f);
                 var tmp = textGo.AddComponent<TextMeshProUGUI>();
-                tmp.alignment = TextAlignmentOptions.Center;
-                tmp.fontStyle = FontStyles.Bold;
-                tmp.fontSize = 18f;
-                tmp.raycastTarget = false;
+                StyleComboLinkLabel(tmp);
                 CopyTmpFont(tmp);
                 textGo.SetActive(false);
                 comboLinkLabels.Add(tmp);
@@ -1360,7 +1453,13 @@ namespace GameDevTV.RTS.Player
         {
             HideAllComboHalos();
             if (comboSummaryLabel != null)
-                comboSummaryLabel.gameObject.SetActive(false);
+            {
+                var parent = comboSummaryLabel.transform.parent;
+                if (parent != null && parent != transform && parent.name.Contains("Chip"))
+                    parent.gameObject.SetActive(false);
+                else
+                    comboSummaryLabel.gameObject.SetActive(false);
+            }
             comboLinkWorldPos.Clear();
             lastComboPreviewCell = null;
             lastComboPreviewBuilding = null;
