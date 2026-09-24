@@ -996,7 +996,7 @@ namespace GameDevTV.RTS.Player
         private static void FillClimateNumbers(
             PlacementComboPreview preview, BuildingSO building, string tag, Vector3 worldPos)
         {
-            ResolveClimateBaseRates(building, out float tempRate, out float atmosRate, out float waterRate);
+            ResolveClimateBaseRates(building, tag, out float tempRate, out float atmosRate, out float waterRate);
             float efficiency = PreviewProductionEfficiency(building, preview.Cell);
             preview.ProductionEfficiency = efficiency;
             preview.WillBePowered = efficiency >= 0.99f;
@@ -1027,18 +1027,21 @@ namespace GameDevTV.RTS.Player
         }
 
         private static void ResolveClimateBaseRates(
-            BuildingSO building, out float tempRate, out float atmosRate, out float waterRate)
+            BuildingSO building, string tag, out float tempRate, out float atmosRate, out float waterRate)
         {
             tempRate = atmosRate = waterRate = 0f;
-            if (building?.BuildingConfig == null) return;
+            if (building?.BuildingConfig == null && string.IsNullOrEmpty(tag)) return;
 
-            var config = building.BuildingConfig;
-            tempRate = config.TemperatureGeneration;
-            atmosRate = config.AtmosphereGeneration;
-            waterRate = config.WaterGeneration;
+            var config = building?.BuildingConfig;
+            if (config != null)
+            {
+                tempRate = config.TemperatureGeneration;
+                atmosRate = config.AtmosphereGeneration;
+                waterRate = config.WaterGeneration;
+            }
 
             // Same name fallbacks / soft caps as BaseBuilding.TickClimateGeneration (per-week under Acts).
-            string n = building.Name;
+            string n = building != null ? building.Name : null;
             if (!string.IsNullOrEmpty(n))
             {
                 if (atmosRate <= 0f
@@ -1058,6 +1061,11 @@ namespace GameDevTV.RTS.Player
                             && n.IndexOf("Processor", System.StringComparison.OrdinalIgnoreCase) < 0)))
                     waterRate = 0.1f;
             }
+
+            // Tag defaults so Heat/Air/Water cards always preview a number even with zeroed configs.
+            if (tempRate <= 0f && tag == "Heat") tempRate = 0.2f;
+            if (atmosRate <= 0f && tag == "Air") atmosRate = 0.012f;
+            if (waterRate <= 0f && tag == "Water") waterRate = 0.1f;
 
             tempRate = Mathf.Min(tempRate, 0.3f);
             atmosRate = Mathf.Min(atmosRate, 0.015f);
