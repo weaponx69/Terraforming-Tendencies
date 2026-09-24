@@ -443,6 +443,7 @@ namespace GameDevTV.RTS.Utilities
                 pos = sm.Sectors[sectorIndex].Center;
             }
             PlayerInput.FocusCameraOnWorldPosition(pos);
+            GameDevTV.RTS.UI.Containers.SectorTravelUI.Instance?.NotifySectorFocused(sectorIndex);
         }
 
         public static void RevealSectorBuildSites(SectorManager.Sector sector)

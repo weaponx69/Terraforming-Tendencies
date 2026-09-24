@@ -10,23 +10,32 @@ namespace GameDevTV.RTS.UI.Containers
 {
     /// <summary>
     /// On-screen sector names (clickable) + Q/E prev/next + current sector readout.
+    /// Focused sector name shows briefly then fades so it does not block the view.
     /// </summary>
     public class SectorTravelUI : MonoBehaviour
     {
         public static SectorTravelUI Instance { get; private set; }
 
+        private const float FocusHoldSeconds = 2f;
+        private const float FocusFadeSeconds = 0.75f;
+
         private readonly List<SectorLabel> labels = new();
         private TextMeshProUGUI currentSectorText;
+        private CanvasGroup currentSectorGroup;
         private Canvas overlayCanvas;
         private Camera cam;
         private int lastSectorCount = -1;
+        private int displayedFocusIndex = -1;
+        private float focusShownAt = -999f;
 
         private struct SectorLabel
         {
             public int Index;
             public RectTransform Rect;
+            public CanvasGroup Group;
             public TextMeshProUGUI Text;
             public Button Button;
+            public Image Background;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -77,7 +86,7 @@ namespace GameDevTV.RTS.UI.Containers
                 }
             }
 
-            // Current sector HUD (top-center).
+            // Current sector HUD (top-center) — fades after focus change.
             var hudGo = new GameObject("CurrentSector");
             hudGo.transform.SetParent(canvasGo.transform, false);
             var hudRt = hudGo.AddComponent<RectTransform>();
@@ -86,6 +95,8 @@ namespace GameDevTV.RTS.UI.Containers
             hudRt.pivot = new Vector2(0.5f, 1f);
             hudRt.sizeDelta = new Vector2(420f, 36f);
             hudRt.anchoredPosition = new Vector2(0f, -86f);
+            currentSectorGroup = hudGo.AddComponent<CanvasGroup>();
+            currentSectorGroup.blocksRaycasts = false;
             currentSectorText = hudGo.AddComponent<TextMeshProUGUI>();
             if (font != null) currentSectorText.font = font;
             currentSectorText.fontSize = 18f;
@@ -141,6 +152,7 @@ namespace GameDevTV.RTS.UI.Containers
             EnsureUi();
             if (cam == null) cam = Camera.main;
             RebuildLabelsIfNeeded();
+            UpdateFocusFade();
             UpdateLabelPositions();
             UpdateCurrentSectorReadout();
         }
@@ -167,6 +179,7 @@ namespace GameDevTV.RTS.UI.Containers
                 go.transform.SetParent(overlayCanvas.transform, false);
                 var rt = go.AddComponent<RectTransform>();
                 rt.sizeDelta = new Vector2(180f, 28f);
+                var group = go.AddComponent<CanvasGroup>();
                 var img = go.AddComponent<Image>();
                 img.color = new Color(0.04f, 0.06f, 0.1f, 0.72f);
                 var btn = go.AddComponent<Button>();
@@ -188,8 +201,69 @@ namespace GameDevTV.RTS.UI.Containers
                 tmp.raycastTarget = false;
                 tmp.text = SectorColonization.GetSectorDisplayName(index);
 
-                labels.Add(new SectorLabel { Index = index, Rect = rt, Text = tmp, Button = btn });
+                labels.Add(new SectorLabel
+                {
+                    Index = index,
+                    Rect = rt,
+                    Group = group,
+                    Text = tmp,
+                    Button = btn,
+                    Background = img
+                });
             }
+        }
+
+        private void UpdateFocusFade()
+        {
+            int focus = ResolveFocusSectorIndex();
+            if (focus != displayedFocusIndex)
+            {
+                displayedFocusIndex = focus;
+                focusShownAt = Time.unscaledTime;
+            }
+
+            float age = Time.unscaledTime - focusShownAt;
+            float alpha;
+            if (age <= FocusHoldSeconds)
+                alpha = 1f;
+            else if (age >= FocusHoldSeconds + FocusFadeSeconds)
+                alpha = 0f;
+            else
+                alpha = 1f - ((age - FocusHoldSeconds) / FocusFadeSeconds);
+
+            if (currentSectorGroup != null)
+                currentSectorGroup.alpha = alpha;
+
+            for (int i = 0; i < labels.Count; i++)
+            {
+                var label = labels[i];
+                if (label.Group == null) continue;
+                bool isFocus = label.Index == displayedFocusIndex;
+                // Only the focused (usually mid-screen) label fades away; others stay soft.
+                float a = isFocus ? alpha : 0.55f;
+                label.Group.alpha = a;
+                label.Group.blocksRaycasts = a > 0.05f;
+                label.Group.interactable = a > 0.05f;
+            }
+        }
+
+        /// <summary>Call when Q/E or minimap jumps to a sector so the name shows then fades.</summary>
+        public void NotifySectorFocused(int sectorIndex)
+        {
+            if (sectorIndex < 0) return;
+            displayedFocusIndex = sectorIndex;
+            focusShownAt = Time.unscaledTime;
+            if (currentSectorGroup != null) currentSectorGroup.alpha = 1f;
+        }
+
+        private static int ResolveFocusSectorIndex()
+        {
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null || sm.Sectors.Count == 0) return -1;
+
+            var nearest = sm.GetNearestSector(PlayerInput.GetCameraFocusPosition());
+            if (nearest == null) return 0;
+            return Mathf.Max(0, sm.Sectors.IndexOf(nearest));
         }
 
         private void UpdateLabelPositions()
@@ -232,10 +306,8 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            var nearest = sm.GetNearestSector(PlayerInput.GetCameraFocusPosition());
-            int idx = nearest != null ? sm.Sectors.IndexOf(nearest) : 0;
-            currentSectorText.text = SectorColonization.GetSectorDisplayName(Mathf.Max(0, idx)) + "   <size=70%>(Q / E)</size>";
+            int idx = displayedFocusIndex >= 0 ? displayedFocusIndex : 0;
+            currentSectorText.text = SectorColonization.GetSectorDisplayName(idx) + "   <size=70%>(Q / E)</size>";
         }
     }
 }
-

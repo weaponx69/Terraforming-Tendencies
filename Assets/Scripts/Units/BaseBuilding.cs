@@ -1051,12 +1051,12 @@ namespace GameDevTV.RTS.Units
             }
 
             BuildingSO def = ResolvedBuildingSO;
-            if (def?.BuildingConfig == null) return;
+            if (def == null) return;
 
             var config = def.BuildingConfig;
-            float atmosRate = config.AtmosphereGeneration;
-            float tempRate = config.TemperatureGeneration;
-            float waterRate = config.WaterGeneration;
+            float atmosRate = config != null ? config.AtmosphereGeneration : 0f;
+            float tempRate = config != null ? config.TemperatureGeneration : 0f;
+            float waterRate = config != null ? config.WaterGeneration : 0f;
 
             // Name-based fallbacks for stale/zeroed configs (apply per-channel).
             if (def.Name != null)
@@ -1086,19 +1086,23 @@ namespace GameDevTV.RTS.Units
                 }
             }
 
+            // Goal-tag defaults so Heat/Air/Water tiles always produce under Colony Acts
+            // even when BuildingConfig rates were left at 0.
+            ColonyActManager.GetTileValues(def, out _, out _, out string climateTag);
+            if (tempRate <= 0f && climateTag == "Heat") tempRate = 0.2f;
+            if (atmosRate <= 0f && climateTag == "Air") atmosRate = 0.012f;
+            if (waterRate <= 0f && climateTag == "Water") waterRate = 0.1f;
+
             // Soft caps so a single tile cannot clear an Act channel in one week / few seconds.
             tempRate = Mathf.Min(tempRate, 0.3f);
             atmosRate = Mathf.Min(atmosRate, 0.015f);
             waterRate = Mathf.Min(waterRate, 0.12f);
 
             if (tempRate <= 0f && atmosRate <= 0f && waterRate <= 0f)
-            {
                 return;
-            }
 
             // Keep trying to link solar neighbors so efficiency can rise to full.
-            BuildingSO defForPower = def;
-            float powerNeed = defForPower.BuildingConfig != null ? defForPower.BuildingConfig.PowerUpkeep : 0f;
+            float powerNeed = config != null ? config.PowerUpkeep : 0f;
             if (powerNeed > 0f && !IsOperating)
                 TryRepairClusterPowerLink();
 
