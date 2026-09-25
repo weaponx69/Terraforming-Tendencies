@@ -282,28 +282,28 @@ namespace GameDevTV.RTS.UI
                 {
                     Id = ColonyActManager.ShopUpgradeId.ScorePercent,
                     Title = "+10% Score",
-                    Description = "All placement scores this run gain +10% (stacks).",
+                    Description = "All placement Materials this run gain +10% (stacks).",
                     Cost = 25
                 },
                 new UpgradeOffer
                 {
                     Id = ColonyActManager.ShopUpgradeId.GeologyBonus,
                     Title = "Geology Expert",
-                    Description = "+5 score when placing on matching deposits / features.",
+                    Description = "+5 Materials when placing on matching deposits / features.",
                     Cost = 20
                 },
                 new UpgradeOffer
                 {
                     Id = ColonyActManager.ShopUpgradeId.AdjacencyBump,
                     Title = "Tight Colony",
-                    Description = "+1 adjacency score per neighboring tile (stacks).",
+                    Description = "+1 adjacency Materials per neighboring tile (stacks).",
                     Cost = 25
                 },
                 new UpgradeOffer
                 {
                     Id = ColonyActManager.ShopUpgradeId.PowerScoreBoost,
                     Title = "Power Prestige",
-                    Description = "Power tiles grant +3 extra placement score (stacks).",
+                    Description = "Power tiles grant +3 extra placement Materials (stacks).",
                     Cost = 18
                 },
                 new UpgradeOffer

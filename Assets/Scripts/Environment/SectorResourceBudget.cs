@@ -60,6 +60,6 @@ namespace GameDevTV.RTS.Environment
         /// Materials the player should have access to in a sector: starting stock plus local deposits.
         /// </summary>
         public static int TotalSectorMaterialsBudget =>
-            MinGatherableMaterialsPerSector + Supplies.StartingMaterials;
+            MinGatherableMaterialsPerSector; // Acts start at 0 Materials; deposits only.
     }
 }

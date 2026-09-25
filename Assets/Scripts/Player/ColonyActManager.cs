@@ -10,7 +10,8 @@ namespace GameDevTV.RTS.Player
 {
     /// <summary>
     /// Combolands-style run spine: fixed named Acts (independent of sectors).
-    /// Act clear = Colony Score + planet climate gains. Geography expands via Command Posts.
+    /// Act clear = Corp Materials quota (earned this Act) + planet climate gains.
+    /// Placement and week-based mining fill the quota; pay Corp on clear.
     /// Run win = all Acts cleared AND every sector terraformed.
     /// </summary>
     public class ColonyActManager : MonoBehaviour
@@ -27,6 +28,7 @@ namespace GameDevTV.RTS.Player
         public struct ActDef
         {
             public string Name;
+            /// <summary>Corp Materials quota for this Act (TargetScore kept for save/API compat).</summary>
             public int TargetScore;
             public int WeekBudget;
         }
@@ -45,12 +47,17 @@ namespace GameDevTV.RTS.Player
         private const int AdjacencySoftCap = 36;
         private const int PowerGeneratorScoreBonus = 4;
         private const int GeologyMatchBonus = 8;
+        /// <summary>Materials produced per spent week per active mine building or Mining Drone.</summary>
+        private const int MatsPerWeekPerSource = 25;
+        private const float MineDepositSearchRadius = 18f;
 
         /// <summary>Once-per-Act climate-pair pulses (sectorIndex:tagA:tagB).</summary>
         private readonly HashSet<string> climatePairPulseKeysThisAct = new(StringComparer.Ordinal);
 
         private int actIndex; // 0-based
         private int colonyScore;
+        /// <summary>Materials earned toward the Corp quota this Act (placement + week mining).</summary>
+        private int materialsEarnedThisAct;
         private int weeksRemaining;
         private float habitability;
         private bool runEnded;
@@ -61,6 +68,8 @@ namespace GameDevTV.RTS.Player
         private int geologyBonusExtra;
         private int pendingWeekBonus;
         private int powerScoreBonusExtra;
+        /// <summary>Mats to seed next Act meter after Corp tax (25% of gross + excess).</summary>
+        private int pendingCarryMaterials;
 
         private float baselineTemperature = -60f;
         private float baselineAtmosphere = 0.01f;
@@ -123,8 +132,11 @@ namespace GameDevTV.RTS.Player
             }
         }
         public int UpcomingActNumber => actIndex + 2;
-        public int ColonyScore => colonyScore;
+        public int ColonyScore => materialsEarnedThisAct;
+        /// <summary>Corp Materials quota for the current Act.</summary>
         public int TargetScore => CurrentActDef.TargetScore;
+        public int CorpQuota => TargetScore;
+        public int MaterialsEarnedThisAct => materialsEarnedThisAct;
         public int WeeksRemaining => weeksRemaining;
         public int TerraCoins => terraCoins;
         /// <summary>Deprecated Act↔sector coupling — camera/sector focus is player-driven (Q/E).</summary>
@@ -135,17 +147,27 @@ namespace GameDevTV.RTS.Player
         /// <summary>True while Colony Acts are the active win/lose spine (ignore mining depletion).</summary>
         public bool IsRunActive => started && !runEnded;
         public bool IsBetweenActs { get; private set; }
-        public bool IsScoreMet => colonyScore >= TargetScore;
+        public bool IsScoreMet => PlayerMaterialsBank >= TargetScore;
+        public bool IsQuotaMet => IsScoreMet;
         public bool IsClimateMet => GetClimateProgress(out _, out _, out _) >= 0.999f;
         public bool IsActComplete => IsScoreMet && IsClimateMet
-            && (actIndex < acts.Count - 1 || AreAllSectorsTerraformed());
+            && (actIndex < acts.Count - 1 || AreAllSectorsTerraformed()
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                || DevIgnoreSectorTerraformGate
+#endif
+                );
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>Dev demo only: skip all-sectors-terraformed gate on final Act.</summary>
+        public static bool DevIgnoreSectorTerraformGate;
+#endif
 
         private ActDef CurrentActDef
         {
             get
             {
                 if (acts.Count == 0)
-                    return new ActDef { Name = "Establish", TargetScore = 30, WeekBudget = 18 };
+                    return new ActDef { Name = "Establish", TargetScore = 500, WeekBudget = 18 };
                 return acts[Mathf.Clamp(actIndex, 0, acts.Count - 1)];
             }
         }
@@ -209,6 +231,7 @@ namespace GameDevTV.RTS.Player
             BuildFixedActLadder();
             actIndex = 0;
             colonyScore = 0;
+            materialsEarnedThisAct = 0;
             habitability = 0f;
             runEnded = false;
             IsBetweenActs = false;
@@ -217,29 +240,31 @@ namespace GameDevTV.RTS.Player
             adjacencyBonusExtra = 0;
             geologyBonusExtra = 0;
             pendingWeekBonus = 0;
+            pendingCarryMaterials = 0;
             powerScoreBonusExtra = 0;
             weeksRemaining = CurrentActDef.WeekBudget;
             started = true;
+            Supplies.UpdateMaterials(Owner.Player1, 0);
             RecordClimateBaselines();
             RevealAllSectorFeatures();
             CardDeckController.Instance?.NotifyActClimateComboReset();
             GameDevTV.RTS.Utilities.SectorMiningDroneBootstrap.ResetForNewRun();
             CardDeckController.Instance?.RefreshHand();
-            Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: score 0/{TargetScore}, weeks {weeksRemaining} (Acts ≠ sectors)");
+            Debug.Log($"[ColonyActManager] Act 1/{TotalActs} {CurrentActName}: quota 0/{TargetScore}, weeks {weeksRemaining} (Acts ≠ sectors)");
             OnActStateChanged?.Invoke();
             OnTerraCoinsChanged?.Invoke(terraCoins);
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
         }
 
-        /// <summary>Fixed Combolands-style Act ladder — independent of map sector count.</summary>
+        /// <summary>Fixed Combolands-style Act ladder — Corp Materials quotas, independent of sectors.</summary>
         private void BuildFixedActLadder()
         {
             acts.Clear();
-            acts.Add(new ActDef { Name = "Establish", TargetScore = 30, WeekBudget = 18 });
-            acts.Add(new ActDef { Name = "Survive", TargetScore = 140, WeekBudget = 16 });
-            acts.Add(new ActDef { Name = "Settle", TargetScore = 220, WeekBudget = 16 });
-            acts.Add(new ActDef { Name = "Expand", TargetScore = 300, WeekBudget = 16 });
-            acts.Add(new ActDef { Name = "Thrive", TargetScore = 400, WeekBudget = 18 });
+            acts.Add(new ActDef { Name = "Establish", TargetScore = 500, WeekBudget = 18 });
+            acts.Add(new ActDef { Name = "Survive", TargetScore = 700, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Settle", TargetScore = 900, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Expand", TargetScore = 1150, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Thrive", TargetScore = 1400, WeekBudget = 18 });
         }
 
         private static void RevealAllSectorFeatures()
@@ -524,9 +549,10 @@ namespace GameDevTV.RTS.Player
 
             int spent = Mathf.Min(weeks, weeksRemaining);
             weeksRemaining -= spent;
-            // Climate tiles produce once per spent week (not real-time).
+            // Climate + mining produce once per spent week (not real-time).
             ApplyWeeklyClimateFromBoard(spent);
-            Debug.Log($"[ColonyActManager] Spent {spent} week(s) — {weeksRemaining} left (score {colonyScore}/{TargetScore})");
+            ApplyWeeklyMiningFromBoard(spent);
+            Debug.Log($"[ColonyActManager] Spent {spent} week(s) — {weeksRemaining} left (quota {materialsEarnedThisAct}/{TargetScore})");
             OnActStateChanged?.Invoke();
             TryResolveWeekExhaustion();
         }
@@ -555,6 +581,99 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// Mine buildings and Mining Drones yield Materials per spent week, depleting deposits.
+        /// </summary>
+        private void ApplyWeeklyMiningFromBoard(int weeks)
+        {
+            if (weeks <= 0) return;
+
+            for (int w = 0; w < weeks; w++)
+            {
+                var buildings = BaseBuilding.ActiveBuildings;
+                if (buildings != null)
+                {
+                    for (int i = 0; i < buildings.Count; i++)
+                    {
+                        BaseBuilding building = buildings[i];
+                        if (building == null || building.Owner != Owner.Player1) continue;
+                        if (building.Progress.State != BuildingProgress.BuildingState.Completed) continue;
+                        if (!BuildingSiteRegistry.IsMineBuilding(building.ResolvedBuildingSO)) continue;
+                        CreditMaterialsFromDeposit(building.transform.position, MatsPerWeekPerSource);
+                    }
+                }
+
+                var drones = UnityEngine.Object.FindObjectsByType<MiningDrone>(FindObjectsInactive.Exclude);
+                for (int i = 0; i < drones.Length; i++)
+                {
+                    MiningDrone drone = drones[i];
+                    if (drone == null) continue;
+                    var unit = drone.GetComponent<AbstractCommandable>();
+                    if (unit != null && unit.Owner != Owner.Player1) continue;
+                    CreditMaterialsFromDeposit(drone.transform.position, MatsPerWeekPerSource);
+                }
+
+                // Free sector drones are Workers (MiningDrone component is often a stub).
+                var workers = UnityEngine.Object.FindObjectsByType<Worker>(FindObjectsInactive.Exclude);
+                for (int i = 0; i < workers.Length; i++)
+                {
+                    Worker worker = workers[i];
+                    if (worker == null || worker.Owner != Owner.Player1) continue;
+                    string n = worker.gameObject.name ?? string.Empty;
+                    bool isMiner = worker.GetComponent<MiningDrone>() != null
+                        || n.IndexOf("Mining", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!isMiner) continue;
+                    // Skip if already counted via MiningDrone loop above.
+                    if (worker.GetComponent<MiningDrone>() != null) continue;
+                    CreditMaterialsFromDeposit(worker.transform.position, MatsPerWeekPerSource);
+                }
+            }
+        }
+
+        private void CreditMaterialsFromDeposit(Vector3 worldPos, int want)
+        {
+            if (want <= 0) return;
+            GatherableSupply best = null;
+            float bestDist = MineDepositSearchRadius * MineDepositSearchRadius;
+            var supplies = GatherableSupply.ActiveSupplies;
+            for (int i = 0; i < supplies.Count; i++)
+            {
+                GatherableSupply gs = supplies[i];
+                if (gs == null || gs.Amount <= 0) continue;
+                float d = (gs.transform.position - worldPos).sqrMagnitude;
+                if (d > bestDist) continue;
+                bestDist = d;
+                best = gs;
+            }
+
+            int gained;
+            if (best != null)
+            {
+                gained = Mathf.Min(want, best.Amount);
+                best.Amount -= gained;
+            }
+            else
+            {
+                // No nearby deposit — still a small trickle so early drones aren't dead.
+                gained = Mathf.Max(1, want / 5);
+            }
+
+            CreditMaterials(gained, spawnPopupAt: null);
+        }
+
+        /// <summary>Add Materials to the bank and the Act Corp-quota meter.</summary>
+        public void CreditMaterials(int amount, Vector3? spawnPopupAt)
+        {
+            if (amount <= 0 || !started || runEnded || IsBetweenActs) return;
+            materialsEarnedThisAct += amount;
+            colonyScore = materialsEarnedThisAct;
+            int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
+            Supplies.UpdateMaterials(Owner.Player1, have + amount);
+            if (spawnPopupAt.HasValue)
+                GameDevTV.RTS.UI.PlacementScorePopup.Spawn(spawnPopupAt.Value, amount);
+            OnActStateChanged?.Invoke();
+        }
+
+        /// <summary>
         /// Legacy hook after hand fill — combo offers now require edge adjacency on place only.
         /// </summary>
         public void TryRefreshClimateComboFromPresence()
@@ -562,7 +681,7 @@ namespace GameDevTV.RTS.Player
             // Intentionally empty: presence-based unlocks removed (stacking required).
         }
 
-        /// <summary>Grant score when a building finishes (base + adjacency stacking).</summary>
+        /// <summary>Grant Materials when a building finishes (base + adjacency stacking).</summary>
         public void GrantTileScore(BuildingSO building) => GrantTileScore(building, null);
 
         public void GrantTileScore(BaseBuilding placed)
@@ -594,13 +713,14 @@ namespace GameDevTV.RTS.Player
             int total = Mathf.Max(0, Mathf.RoundToInt(raw * scoreMultiplier));
             if (total <= 0 && hab <= 0f) return;
 
-            colonyScore += total;
             habitability += hab;
-            if (placed != null)
-                GameDevTV.RTS.UI.PlacementScorePopup.Spawn(placed.transform.position, total);
+            if (total > 0)
+            {
+                Vector3? popupAt = placed != null ? placed.transform.position : (Vector3?)null;
+                CreditMaterials(total, popupAt);
+            }
 
-            Debug.Log($"[ColonyActManager] +{total} score (base {score} adj {adjBonus} geo {geoBonus} power {powerBonus} ×{scoreMultiplier:F2}) → {colonyScore}/{TargetScore}");
-            OnActStateChanged?.Invoke();
+            Debug.Log($"[ColonyActManager] +{total} Mats (base {score} adj {adjBonus} geo {geoBonus} power {powerBonus} ×{scoreMultiplier:F2}) → quota {materialsEarnedThisAct}/{TargetScore}");
             ClimateVisualStages.Instance?.NotifyHabitabilityChanged();
             TryResolveWeekExhaustion();
         }
@@ -1398,15 +1518,14 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            // Non-building cards: small survival score.
+            // Non-building cards: small Materials drip.
             if (!started || runEnded || IsBetweenActs) return;
-            colonyScore += 2;
-            OnActStateChanged?.Invoke();
+            CreditMaterials(2, spawnPopupAt: null);
             TryResolveWeekExhaustion();
         }
 
         /// <summary>
-        /// Clear Act when score + climate deltas are met; fail when weeks are exhausted
+        /// Clear Act when Corp quota + climate deltas are met; fail when weeks are exhausted
         /// and nothing pending can still change the outcome.
         /// </summary>
         private void TryResolveWeekExhaustion()
@@ -1423,7 +1542,7 @@ namespace GameDevTV.RTS.Player
                 FailCurrentAct();
         }
 
-        /// <summary>True while a Player1 pad build can still grant Colony Score.</summary>
+        /// <summary>True while a Player1 pad build can still grant Materials.</summary>
         private static bool HasPendingPlayerConstructionScores()
         {
             if (BaseBuilding.HasPendingDeferredColonyActScores())
@@ -1447,8 +1566,15 @@ namespace GameDevTV.RTS.Player
             IsBetweenActs = true;
 
             int cleared = CurrentAct;
-            int earned = AwardTerraCoinsForClearedAct();
-            Debug.Log($"[ColonyActManager] Act {cleared} ({CurrentActName}) cleared! +{earned} Terra-Coins (bank {terraCoins}).");
+            int gross = Mathf.Max(materialsEarnedThisAct, PlayerMaterialsBank);
+            int quota = TargetScore;
+            int excess = Mathf.Max(0, gross - quota);
+            // Combolands-style: excess stays, plus ~25% of gross as carry seed for next Act.
+            pendingCarryMaterials = excess + Mathf.RoundToInt(gross * ScoreCarryFraction);
+
+            int paid = PayCorpQuota();
+            int earned = AwardTerraCoinsForClearedAct(gross, quota);
+            Debug.Log($"[ColonyActManager] Act {cleared} ({CurrentActName}) cleared! Paid Corp {paid}/{quota} Mats, +{earned} Terra-Coins (bank {terraCoins}). Carry seed {pendingCarryMaterials}.");
             OnActCleared?.Invoke(cleared);
 
             if (actIndex >= acts.Count - 1)
@@ -1466,7 +1592,8 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            statusBanner = $"<color=#7CFF9A><b>ACT CLEARED!</b></color>  +{earned} Terra-Coins — upgrade at the Depot before {acts[actIndex + 1].Name}.";
+            statusBanner =
+                $"<color=#7CFF9A><b>ACT CLEARED!</b></color>  Paid Corp {paid} Mats · +{earned} Terra-Coins — Depot before {acts[actIndex + 1].Name}.";
             statusBannerUntil = Time.unscaledTime + 8f;
             OnActStateChanged?.Invoke();
             OnBetweenActShopRequested?.Invoke();
@@ -1474,11 +1601,40 @@ namespace GameDevTV.RTS.Player
                 GameDevTV.RTS.UI.BetweenActShopUI.Instance?.Open();
         }
 
-        /// <summary>15 + floor(score/10) + floor(excess/5); coins carry across Acts.</summary>
-        private int AwardTerraCoinsForClearedAct()
+        private static int PlayerMaterialsBank
         {
-            int excess = Mathf.Max(0, colonyScore - TargetScore);
-            int earned = 15 + (colonyScore / 10) + (excess / 5);
+            get
+            {
+                if (Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int m))
+                    return Mathf.Max(0, m);
+                return 0;
+            }
+        }
+
+        /// <summary>Deduct full Corp quota from the Materials bank (Combolands tax). Returns amount paid.</summary>
+        private int PayCorpQuota()
+        {
+            int quota = TargetScore;
+            int have = PlayerMaterialsBank;
+            int paid = Mathf.Min(quota, have);
+            int remaining = have - paid;
+            Supplies.UpdateMaterials(Owner.Player1, remaining);
+            // Meter tracks bank after tax so HUD / next-Act seed stay honest.
+            materialsEarnedThisAct = remaining;
+            colonyScore = materialsEarnedThisAct;
+            ShowStatusBanner(
+                $"<color=#FFE08A><b>PAID CORP</b></color>  {paid} Materials" +
+                (paid < quota ? $"  <color=#FF8A8A>(short {quota - paid})</color>" : string.Empty),
+                4f);
+            OnActStateChanged?.Invoke();
+            return paid;
+        }
+
+        /// <summary>15 + floor(gross/10) + floor(excess/5); coins carry across Acts.</summary>
+        private int AwardTerraCoinsForClearedAct(int grossEarned, int quota)
+        {
+            int excess = Mathf.Max(0, grossEarned - quota);
+            int earned = 15 + (grossEarned / 10) + (excess / 5);
             terraCoins += Mathf.Max(0, earned);
             OnTerraCoinsChanged?.Invoke(terraCoins);
             return earned;
@@ -1541,19 +1697,28 @@ namespace GameDevTV.RTS.Player
 
             CardDeckController.Instance?.GrantSectorTransitionBootstrap();
 
-            int excess = Mathf.Max(0, colonyScore - TargetScore);
-            int carried = Mathf.RoundToInt(colonyScore * ScoreCarryFraction) + excess;
+            // After Corp tax, bank holds leftover; seed next Act with carry (top up bank if needed).
+            int carried = Mathf.Max(0, pendingCarryMaterials);
+            pendingCarryMaterials = 0;
+            int bank = PlayerMaterialsBank;
+            if (carried > bank)
+                Supplies.UpdateMaterials(Owner.Player1, carried);
+            else if (carried < bank)
+                Supplies.UpdateMaterials(Owner.Player1, carried);
+
             actIndex++;
+            materialsEarnedThisAct = carried;
             colonyScore = carried;
             weeksRemaining = CurrentActDef.WeekBudget + pendingWeekBonus;
             pendingWeekBonus = 0;
             RecordClimateBaselines();
             IsBetweenActs = false;
             CardDeckController.Instance?.NotifyActClimateComboReset();
-            statusBanner = $"<color=#7CFF9A><b>NEXT ACT</b></color>  {CurrentActName} — score + climate. Terra-Coins banked: {terraCoins}.";
+            statusBanner =
+                $"<color=#7CFF9A><b>NEXT ACT</b></color>  {CurrentActName} — Corp quota + climate. Terra-Coins: {terraCoins}.";
             statusBannerUntil = Time.unscaledTime + 6f;
 
-            Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start score {colonyScore}/{TargetScore}, weeks {weeksRemaining}, coins {terraCoins}");
+            Debug.Log($"[ColonyActManager] Act {CurrentAct}/{TotalActs} {CurrentActName}: start quota {materialsEarnedThisAct}/{TargetScore}, weeks {weeksRemaining}, coins {terraCoins}");
             OnActStateChanged?.Invoke();
 
             if (IsActComplete)
@@ -1564,20 +1729,20 @@ namespace GameDevTV.RTS.Player
         {
             if (runEnded) return;
             runEnded = true;
-            Debug.Log($"[ColonyActManager] Act {CurrentAct} failed — weeks exhausted (score {colonyScore}/{TargetScore}, climate {(IsClimateMet ? "met" : "short")}).");
+            Debug.Log($"[ColonyActManager] Act {CurrentAct} failed — weeks exhausted (quota {materialsEarnedThisAct}/{TargetScore}, climate {(IsClimateMet ? "met" : "short")}).");
             OnActFailed?.Invoke();
             OnActStateChanged?.Invoke();
             if (GameOverManager.Instance != null)
             {
                 string missing = "";
-                if (!IsScoreMet) missing += $"Score {colonyScore}/{TargetScore}";
+                if (!IsScoreMet) missing += $"Corp quota {PlayerMaterialsBank}/{TargetScore}";
                 if (!IsClimateMet)
                 {
                     if (missing.Length > 0) missing += " · ";
                     missing += "climate short of Temp/Atmos/Water";
                 }
                 GameOverManager.LastOutcomeDetail =
-                    $"Act {CurrentAct} ({CurrentActName}) failed — weeks ran out.\nNeeded: score target AND climate deltas.\nStill missing: {missing}.";
+                    $"Act {CurrentAct} ({CurrentActName}) failed — weeks ran out.\nNeeded: Corp Materials quota AND climate deltas.\nStill missing: {missing}.";
                 GameOverManager.Instance.TriggerGameOver(GameOverManager.GameOverReason.ColonyActFailed);
             }
         }
@@ -1657,7 +1822,7 @@ namespace GameDevTV.RTS.Player
                 return $"<color=#7CFF9A><b>YOU WIN</b></color>\nAll Acts cleared · {terraDone}/{terraTotal} sectors terraformed.";
 
             if (runEnded)
-                return "<color=#FF8A8A><b>YOU LOSE</b></color>\nWeeks ran out before score + climate goals.";
+                return "<color=#FF8A8A><b>YOU LOSE</b></color>\nWeeks ran out before Corp quota + climate goals.";
 
             float climate = GetClimateProgress(out _, out _, out _);
             GetFocusSectorClimatePresence(out bool hasHeat, out bool hasAir, out bool hasWater);
@@ -1690,12 +1855,12 @@ namespace GameDevTV.RTS.Player
             }
             else if (!IsScoreMet && IsClimateMet)
             {
-                verdict = "Need more Colony Score";
+                verdict = "Need Corp Materials quota";
                 verdictColor = "#FFE08A";
             }
             else
             {
-                verdict = "Score + climate to clear Act";
+                verdict = "Corp quota + climate to clear Act";
                 verdictColor = "#8FE7FF";
             }
 
@@ -1703,12 +1868,13 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
             sb.AppendLine();
 
-            // Score + climate lead the panel (larger type) so goals read at a glance.
             string scoreMark = IsScoreMet ? "✓" : "○";
             string scoreColor = IsScoreMet ? "#7CFF9A" : "#FFE08A";
+            int bank = PlayerMaterialsBank;
             sb.AppendLine(
-                $"<size=130%><color={scoreColor}><b>{scoreMark}  SCORE  {colonyScore} / {TargetScore}</b></color></size>");
-            sb.AppendLine($"  <color=#FFE08A><size=110%>{ProgressBar(colonyScore, TargetScore, 14)}</size></color>");
+                $"<size=130%><color={scoreColor}><b>{scoreMark}  CORP QUOTA  {bank} / {TargetScore}</b></color></size>");
+            sb.AppendLine($"  <color=#FFE08A><size=110%>{ProgressBar(bank, TargetScore, 14)}</size></color>");
+            sb.AppendLine($"  <color=#A8B0B8>Pay {TargetScore} Mats to Corp on clear (deducted from bank)</color>");
 
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
             GetActClimateRequirements(out float tempCap, out float atmosCap, out float waterCap);
@@ -1766,8 +1932,10 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine();
             sb.AppendLine("<color=#7A8490>── Tips ──</color>");
             sb.AppendLine($"<color=#7A8490>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}). LOSE: weeks hit 0.</color>");
+            sb.AppendLine("<color=#7A8490>Corp quota = Materials earned this Act (placement + week mining). Pay on clear.</color>");
+            sb.AppendLine("<color=#7A8490>Mines and Mining Drones yield Mats when you spend weeks (not realtime).</color>");
             sb.AppendLine("<color=#7A8490>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
-            sb.AppendLine("<color=#7A8490>Power = full climate rate (else 20%). No Materials gate on cards.</color>");
+            sb.AppendLine("<color=#7A8490>Power = full climate rate (else 20%). Cards place free.</color>");
             sb.AppendLine(
                 $"<color=#7A8490>Act climate need = 1/{ClimateBudgetSectorCount} of +15°C / +0.25 atm / +5% (per-sector share/cap).</color>");
             sb.AppendLine("<color=#7A8490>Stack Heat/Air/Water (+ Power) for climate rate combos.</color>");

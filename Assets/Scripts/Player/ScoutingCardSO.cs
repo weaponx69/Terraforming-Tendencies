@@ -101,7 +101,9 @@ namespace GameDevTV.RTS.Player
                         break;
     
                     case ScoutingType.EmergencyCaches:
-                        if (materialsAmount > 0)
+                        // Emergency Caches excluded during Colony Acts — earn via placement + week mining.
+                        if (materialsAmount > 0
+                            && (ColonyActManager.Instance == null || !ColonyActManager.Instance.IsRunActive))
                         {
                             int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
                             Supplies.Materials[Owner.Player1] = cur + materialsAmount;

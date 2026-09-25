@@ -67,8 +67,9 @@ namespace GameDevTV.RTS.Player
                     Debug.Log($"[Blueprint] Discovery: {typeName} deposits now visible in explored sectors!");
                 }
     
-                // Grant any bonus materials
-                if (bonusMaterials > 0)
+                // Grant any bonus materials (disabled during Colony Acts — earn via mining/placement).
+                if (bonusMaterials > 0
+                    && (ColonyActManager.Instance == null || !ColonyActManager.Instance.IsRunActive))
                 {
                     int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
                     Supplies.Materials[Owner.Player1] = cur + bonusMaterials;

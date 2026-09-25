@@ -108,13 +108,13 @@ namespace GameDevTV.RTS.UI.Containers
             currentSectorRt.anchorMin = new Vector2(0.5f, 1f);
             currentSectorRt.anchorMax = new Vector2(0.5f, 1f);
             currentSectorRt.pivot = new Vector2(0.5f, 1f);
-            currentSectorRt.sizeDelta = new Vector2(320f, 36f);
+            currentSectorRt.sizeDelta = new Vector2(360f, 42f);
             currentSectorRt.anchoredPosition = new Vector2(0f, -86f);
             currentSectorGroup = hudGo.AddComponent<CanvasGroup>();
             currentSectorGroup.blocksRaycasts = false;
             currentSectorText = hudGo.AddComponent<TextMeshProUGUI>();
             if (font != null) currentSectorText.font = font;
-            currentSectorText.fontSize = 18f;
+            currentSectorText.fontSize = 20f;
             currentSectorText.alignment = TextAlignmentOptions.Center;
             currentSectorText.color = new Color(0.75f, 0.9f, 1f, 0.95f);
             currentSectorText.raycastTarget = false;
@@ -124,7 +124,7 @@ namespace GameDevTV.RTS.UI.Containers
             {
                 PlayerInput.Instance?.PageSectors(-1);
             });
-            navNextRt = CreateLeftNavButton(canvasGo.transform, font, "E ▶", 98f, () =>
+            navNextRt = CreateLeftNavButton(canvasGo.transform, font, "E ▶", 114f, () =>
             {
                 PlayerInput.Instance?.PageSectors(1);
             });
@@ -144,7 +144,7 @@ namespace GameDevTV.RTS.UI.Containers
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(0f, 1f);
             rt.pivot = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(72f, 32f);
+            rt.sizeDelta = new Vector2(88f, 40f);
             rt.anchoredPosition = new Vector2(x, -230f);
             var img = go.AddComponent<Image>();
             img.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
@@ -162,7 +162,7 @@ namespace GameDevTV.RTS.UI.Containers
             var tmp = textGo.AddComponent<TextMeshProUGUI>();
             if (font != null) tmp.font = font;
             tmp.text = label;
-            tmp.fontSize = 14f;
+            tmp.fontSize = 18f;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
             tmp.raycastTarget = false;
@@ -186,7 +186,7 @@ namespace GameDevTV.RTS.UI.Containers
                 navNextRt.anchorMin = new Vector2(0f, 1f);
                 navNextRt.anchorMax = new Vector2(0f, 1f);
                 navNextRt.pivot = new Vector2(0f, 1f);
-                navNextRt.anchoredPosition = new Vector2(98f, -230f);
+                navNextRt.anchoredPosition = new Vector2(114f, -230f);
             }
         }
 
@@ -223,7 +223,7 @@ namespace GameDevTV.RTS.UI.Containers
                 var go = new GameObject($"SectorLabel_{i}");
                 go.transform.SetParent(overlayCanvas.transform, false);
                 var rt = go.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(180f, 28f);
+                rt.sizeDelta = new Vector2(220f, 36f);
                 var group = go.AddComponent<CanvasGroup>();
                 var img = go.AddComponent<Image>();
                 img.color = new Color(0.04f, 0.06f, 0.1f, 0.72f);
@@ -240,7 +240,7 @@ namespace GameDevTV.RTS.UI.Containers
                 textRt.offsetMax = new Vector2(-6f, -2f);
                 var tmp = textGo.AddComponent<TextMeshProUGUI>();
                 if (font != null) tmp.font = font;
-                tmp.fontSize = 13f;
+                tmp.fontSize = 18f;
                 tmp.alignment = TextAlignmentOptions.Center;
                 tmp.color = new Color(0.85f, 0.92f, 1f, 1f);
                 tmp.raycastTarget = false;

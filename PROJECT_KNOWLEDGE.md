@@ -12,9 +12,9 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 ## 0. Authoritative Run Model — Combolands Colony Acts
 
-**One-sentence game:** Draw building **tiles** → place on procedural geology for **Colony Score** (map `+N` popups) and **terraforming resources** → spend **weeks** → clear a fixed Act ladder → spend **Terra-Coins** on between-Act upgrades → expand with **Command Posts** → terraform **every** sector to win.
+**One-sentence game:** Draw building **tiles** → place on procedural geology for **Materials** (placement `+N` + week mining) and **terraforming resources** → spend **weeks** → clear a fixed Act ladder by paying a **Corp Materials quota** + climate → spend **Terra-Coins** on between-Act upgrades → expand with **Command Posts** → terraform **every** sector to win.
 
-**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) — place tiles for score under a turn budget; position and stacking matter. **Acts are independent of sectors.** Geography expands when you place Command Posts.
+**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) — place tiles under a turn budget; meet a tax (here: Corp Materials quota). **Acts are independent of sectors.** Geography expands when you place Command Posts.
 
 ### Owner scripts
 | Role | Script |
@@ -27,9 +27,10 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Power efficiency | [`BaseBuilding.ProductionEfficiency`](Assets/Scripts/Units/BaseBuilding.cs) — unpowered **20%**, powered **100%** |
 | Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — **Terra-Coin upgrades** (carry) |
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
-| Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable; score/terraform lead |
+| Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable; Corp quota + terraform lead |
+| Dev full-run demo | [`ColonyActsDevDemo`](Assets/Scripts/Player/ColonyActsDevDemo.cs) — Editor / DEVELOPMENT only |
 | Building nameplates | [`BuildingNameHoverLabel`](Assets/Scripts/UI/Components/BuildingNameHoverLabel.cs) — 14pt, hover only |
-| Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
+| Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) (~18pt labels + Q/E) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
 | Tile snap / place SFX | [`AudioManager`](Assets/Scripts/Audio/AudioManager.cs) (`PlayTileSnapSound` / `PlayPlaceClickSound`) |
 | Pause Music / SFX sliders | [`PauseMenuUI`](Assets/Scripts/UI/PauseMenuUI.cs) (runtime under `Menu Panel`; prefs `tt_music_volume` / `tt_sfx_volume`) |
 
@@ -45,6 +46,9 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Act count = sector count | **Retired** — fixed 5-Act ladder |
 | Sector build lock / active-sector-only pads | **Retired** |
 | Card play gated by Materials | **Retired** under Colony Acts — placement is free; **Terra-Coins** are shop-only |
+| Free Materials shipments / Emergency Caches in Acts deck | **Excluded** — earn Mats via placement + week mining only |
+| Starting Materials seed pile | **0** under Colony Acts |
+| Realtime drone gather → Materials during Acts | **Retired** — mining ticks on **SpendWeeks** |
 | Combat / hazard HP damage | **Retired** — [`DamageRules.Enabled`](Assets/Scripts/Units/DamageRules.cs) is false; TakeDamage is a no-op |
 | Power required to place / hard-gate climate | **Retired** — unpowered still crawls at 20%; power restores full rate + score boost |
 | Materials between-Act tile shop | **Retired** — shop is Terra-Coin **roguelike upgrades** |
@@ -67,20 +71,21 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 **Five Acts** regardless of map size:
 
-| Act | Name | Score | Weeks |
-|-----|------|------:|------:|
-| 1 | Establish | 30 | 18 |
-| 2 | Survive | 140 | 16 |
-| 3 | Settle | 220 | 16 |
-| 4 | Expand | 300 | 16 |
-| 5 | Thrive | 400 | 18 |
+| Act | Name | Corp Quota (Mats) | Weeks |
+|-----|------|------------------:|------:|
+| 1 | Establish | 500 | 18 |
+| 2 | Survive | 700 | 16 |
+| 3 | Settle | 900 | 16 |
+| 4 | Expand | 1150 | 16 |
+| 5 | Thrive | 1400 | 18 |
 
-* **Act clear = Colony Score target AND Temp/Atmos/Water gains** from Act baselines. Need per Act = **one sector share**: reference (+15°C / +0.25 atm / +5%) **÷ N**. Each sector may contribute at most that same **1/N** (one Air farm cannot dump multiple sectors' worth). More map sectors → smaller Act climate bars. **Climate tiles produce on week spend** (not real-time): config Temp/Atmos/Water rates are **per week**, × power efficiency (20% unpowered / 100% powered) × adjacency climate combo (pair / same-tag / trio / power neighbor, cap 2.5×). Playing a card that costs W weeks applies W weeks of generation from every completed climate tile.
+* **Act clear = Corp Materials quota (Materials bank) AND Temp/Atmos/Water gains** from Act baselines. On clear, **pay Corp** — deduct the full quota from the Materials bank (Combolands tax); leftover + ~25% of gross seeds the next Act. Need per Act climate = **one sector share**: reference (+15°C / +0.25 atm / +5%) **÷ N**. Each sector may contribute at most that same **1/N**. **Climate and mining produce on week spend** (not real-time): mines / Mining Drones yield ~25 Mats/week (deplete deposits); climate rates are **per week**, × power efficiency × adjacency combo.
+* **Starting Materials = 0.** No shipment / Emergency Caches / Discovery bonus Mats during Acts.
+* **Placement `+N`** awards **Materials** (bank + Act earned meter), not abstract score.
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
-* **Terra-Coins** earn on Act clear: `15 + floor(score/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
-* **Placement score** shows as world `+N` popups. Geology matches (mine on deposit, aquifer on WaterDeposit, Subglacial on Glacier, Geothermal on Volcano, Lava Tube on LavaTube, Magnetic Shield / Sector Command on FaultLine) add bonus score + climate resource pulses.
+* **Terra-Coins** earn on Act clear: `15 + floor(earnedMats/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
 * **Geology hard locks** (red ghost + toast outside the feature):
 
 | Card / building | Required feature |

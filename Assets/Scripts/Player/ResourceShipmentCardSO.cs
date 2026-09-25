@@ -52,7 +52,9 @@ namespace GameDevTV.RTS.Player
                         ClimateManager.Instance.SetWaterTarget(target);
                     Debug.Log($"[Blueprint] Water deposit: +{waterAmount}% (target {target}%, ticking up)");
                 }
-                if (materialsAmount > 0)
+                // Free Materials shipments excluded during Colony Acts — earn via placement + week mining.
+                if (materialsAmount > 0
+                    && (ColonyActManager.Instance == null || !ColonyActManager.Instance.IsRunActive))
                 {
                     int cur = Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
                     Supplies.Materials[Owner.Player1] = cur + materialsAmount;

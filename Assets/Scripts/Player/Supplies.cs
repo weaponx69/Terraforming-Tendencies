@@ -10,8 +10,8 @@ namespace GameDevTV.RTS.Player
 {
     public class Supplies : MonoBehaviour
     {
-        /// <summary>Colony Acts lean start — keep in sync with PROJECT_KNOWLEDGE.</summary>
-        public const int DefaultStartingMaterials = 300;
+        /// <summary>Colony Acts: start with no Materials — earn via placement + week mining.</summary>
+        public const int DefaultStartingMaterials = 0;
 
         [SerializeField] private float mineralsToMaterialsRate = 1f;
         [SerializeField] private float gasToMaterialsRate = 1f;
@@ -24,8 +24,8 @@ namespace GameDevTV.RTS.Player
             {
                 if (Instance != null)
                 {
-                    // Migrate stale scene-serialized 1000 from the old RTS default.
-                    if (Instance.startingMaterials >= 1000)
+                    // Migrate stale scene-serialized seed piles from older builds.
+                    if (Instance.startingMaterials > 0)
                         Instance.startingMaterials = DefaultStartingMaterials;
                     return Instance.startingMaterials;
                 }
@@ -335,7 +335,7 @@ namespace GameDevTV.RTS.Player
             ColonyIntegrityActive = false;
 
             // Stale Inspector / scene values from the old 1000 RTS start.
-            if (startingMaterials >= 1000)
+            if (startingMaterials > 0)
                 startingMaterials = DefaultStartingMaterials;
 
             // Re-initialize to ensure instance settings (startingMaterials) are applied
@@ -640,6 +640,18 @@ namespace GameDevTV.RTS.Player
 
         private void HandleSupplyEvent(SupplyEvent evt)
         {
+            // Colony Acts: Materials come from week mining + placement, not realtime gather.
+            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
+            {
+                if (evt.Supply == null) return;
+                string skipName = evt.Supply.name.ToLower();
+                bool isMatLike = skipName.Contains("minerals") || skipName.Contains("iron")
+                    || skipName.Contains("regolith") || skipName.Contains("gas")
+                    || (mineralsSO != null && evt.Supply == mineralsSO)
+                    || (gasSO != null && evt.Supply == gasSO);
+                if (isMatLike) return;
+            }
+
             if (evt.Supply == null) 
             {
                 Debug.LogWarning($"[Supplies] HandleSupplyEvent received null supply! Amount: {evt.Amount}");
