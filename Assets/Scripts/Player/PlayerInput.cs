@@ -1158,7 +1158,7 @@ namespace GameDevTV.RTS.Player
             if (tmp == null) return;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Normal;
-            tmp.fontSize = 12f;
+            tmp.fontSize = 14f;
             tmp.fontWeight = FontWeight.Regular;
             tmp.enableWordWrapping = true;
             tmp.overflowMode = TextOverflowModes.Overflow;
@@ -1174,7 +1174,7 @@ namespace GameDevTV.RTS.Player
             if (tmp == null) return;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Normal;
-            tmp.fontSize = 10f;
+            tmp.fontSize = 14f;
             tmp.fontWeight = FontWeight.Regular;
             tmp.enableWordWrapping = false;
             tmp.overflowMode = TextOverflowModes.Ellipsis;
@@ -1202,7 +1202,7 @@ namespace GameDevTV.RTS.Player
                 var chipGo = new GameObject("ComboPlacementSummaryChip");
                 chipGo.transform.SetParent(comboOverlayCanvas.transform, false);
                 var chipRt = chipGo.AddComponent<RectTransform>();
-                chipRt.sizeDelta = new Vector2(210f, 36f);
+                chipRt.sizeDelta = new Vector2(240f, 44f);
                 var img = chipGo.AddComponent<UnityEngine.UI.Image>();
                 img.color = new Color(0.02f, 0.05f, 0.08f, 0.75f);
                 img.raycastTarget = false;
@@ -1413,7 +1413,7 @@ namespace GameDevTV.RTS.Player
                 var textGo = new GameObject("ComboLinkLabel");
                 textGo.transform.SetParent(comboOverlayCanvas.transform, false);
                 var rt = textGo.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(110f, 22f);
+                rt.sizeDelta = new Vector2(140f, 28f);
                 var tmp = textGo.AddComponent<TextMeshProUGUI>();
                 StyleComboLinkLabel(tmp);
                 CopyTmpFont(tmp);

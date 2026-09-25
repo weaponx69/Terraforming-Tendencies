@@ -383,6 +383,12 @@ namespace GameDevTV.RTS.Units
                 gameObject.AddComponent<GameDevTV.RTS.UI.Components.UnpoweredIndicator>();
             }
 
+            // Prefab nameplates stay hidden until the player hovers the building.
+            if (gameObject.GetComponent<GameDevTV.RTS.UI.Components.BuildingNameHoverLabel>() == null)
+            {
+                gameObject.AddComponent<GameDevTV.RTS.UI.Components.BuildingNameHoverLabel>();
+            }
+
             bool isCommandPost = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
             
             // If this is a Command Post, automatically reveal the entire sector immediately (even as a ghost)

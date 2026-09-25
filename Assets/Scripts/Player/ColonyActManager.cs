@@ -1701,19 +1701,14 @@ namespace GameDevTV.RTS.Player
 
             sb.AppendLine($"<color={verdictColor}><b>{verdict}</b></color>");
             sb.AppendLine($"<color=#8FE7FF><b>Act {CurrentAct}/{TotalActs} — {CurrentActName}</b></color>");
-            sb.AppendLine($"<color=#A8B0B8>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
-            sb.AppendLine($"<color=#A8B0B8>No Materials gate. Power = full climate rate (else 20%).</color>");
-            sb.AppendLine($"<color=#A8B0B8>Act climate need = 1/{ClimateBudgetSectorCount} of +15°C / +0.25 atm / +5% (one sector share).</color>");
-            sb.AppendLine($"<color=#A8B0B8>Each sector contributes at most that same 1/{ClimateBudgetSectorCount} share.</color>");
-            sb.AppendLine($"<color=#A8B0B8>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}).</color>");
-            sb.AppendLine("<color=#A8B0B8>LOSE: weeks hit 0 first.</color>");
             sb.AppendLine();
 
+            // Score + climate lead the panel (larger type) so goals read at a glance.
             string scoreMark = IsScoreMet ? "✓" : "○";
             string scoreColor = IsScoreMet ? "#7CFF9A" : "#FFE08A";
-            sb.AppendLine($"<color={scoreColor}>{scoreMark} SCORE  {colonyScore} / {TargetScore}</color>");
-            sb.AppendLine($"  <color=#A8B0B8>{ProgressBar(colonyScore, TargetScore)}</color>");
-            sb.AppendLine($"<color=#FFE08A>TERRA-COINS  {terraCoins}</color>  <color=#A8B0B8>(shop on Act clear; carries)</color>");
+            sb.AppendLine(
+                $"<size=130%><color={scoreColor}><b>{scoreMark}  SCORE  {colonyScore} / {TargetScore}</b></color></size>");
+            sb.AppendLine($"  <color=#FFE08A><size=110%>{ProgressBar(colonyScore, TargetScore, 14)}</size></color>");
 
             GetClimateGains(out float tempGain, out float atmosGain, out float waterGain);
             GetActClimateRequirements(out float tempCap, out float atmosCap, out float waterCap);
@@ -1722,8 +1717,10 @@ namespace GameDevTV.RTS.Player
             waterGain = Mathf.Min(waterGain, waterCap);
             string climateMark = IsClimateMet ? "✓" : "○";
             string climateColor = IsClimateMet ? "#7CFF9A" : "#FFE08A";
-            sb.AppendLine($"<color={climateColor}><b>{climateMark} CLIMATE GAINS  {climate:P0}</b></color>");
-            sb.AppendLine($"  <color=#C8D0D8>{ProgressBar(Mathf.RoundToInt(climate * 100f), 100)}</color>");
+            sb.AppendLine(
+                $"<size=130%><color={climateColor}><b>{climateMark}  TERRAFORM  {climate:P0}</b></color></size>");
+            sb.AppendLine(
+                $"  <color=#8FE7FF><size=110%>{ProgressBar(Mathf.RoundToInt(climate * 100f), 100, 14)}</size></color>");
             sb.AppendLine(FormatClimateChannelLine(
                 "TEMP", "TEMPERATURE", tempGain, tempCap, "°C", 1));
             sb.AppendLine(FormatClimateChannelLine(
@@ -1731,20 +1728,23 @@ namespace GameDevTV.RTS.Player
             sb.AppendLine(FormatClimateChannelLine(
                 "WATER", "WATER", waterGain, waterCap, "%", 1));
 
-            float oxy = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
-            string oxyHex = TerraformingGoalColors.ToHex(TerraformingGoalColors.Oxygen);
-            sb.AppendLine($"  <color={oxyHex}><b>OXYGEN</b>  {oxy:F1}%</color>  <color=#A8B0B8>(planet total)</color>");
-
             float absTemp = Supplies.Temperature != null && Supplies.Temperature.TryGetValue(Owner.Player1, out float t) ? t : -60f;
             float absAtmos = Supplies.Atmosphere != null && Supplies.Atmosphere.TryGetValue(Owner.Player1, out float at) ? at : 0.01f;
             float absWater = Supplies.Water != null && Supplies.Water.TryGetValue(Owner.Player1, out float wt) ? wt : 0f;
             sb.AppendLine(
-                $"  <color=#A8B0B8>Now:</color> " +
-                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature)}>{absTemp:F1}°C</color>  " +
-                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Atmosphere)}>{absAtmos:F2} atm</color>  " +
-                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Water)}>{absWater:F1}%</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Gains are from Act start. Need and per-sector cap are both 1/{ClimateBudgetSectorCount} of the reference deltas.</color>");
-            sb.AppendLine("  <color=#A8B0B8>Stack Heat/Air/Water (and Power) for climate rate combos.</color>");
+                $"  <color=#A8B0B8>Planet now:</color> " +
+                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Temperature)}><b>{absTemp:F1}°C</b></color>  " +
+                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Atmosphere)}><b>{absAtmos:F2} atm</b></color>  " +
+                $"<color={TerraformingGoalColors.ToHex(TerraformingGoalColors.Water)}><b>{absWater:F1}%</b></color>");
+
+            float oxy = Supplies.Oxygen != null && Supplies.Oxygen.TryGetValue(Owner.Player1, out float o) ? o : 0f;
+            string oxyHex = TerraformingGoalColors.ToHex(TerraformingGoalColors.Oxygen);
+            sb.AppendLine($"  <color={oxyHex}><b>OXYGEN</b>  {oxy:F1}%</color>  <color=#A8B0B8>(flavor)</color>");
+
+            string weekColor = weeksRemaining <= 2 ? "#FF8A8A" : (weeksRemaining <= 4 ? "#FFE08A" : "#C8D0D8");
+            sb.AppendLine(
+                $"<size=115%><color={weekColor}><b>WEEKS LEFT  {weeksRemaining}</b></color></size>");
+            sb.AppendLine($"<color=#FFE08A>TERRA-COINS  {terraCoins}</color>  <color=#A8B0B8>(shop on Act clear)</color>");
 
             string h = hasHeat ? "<color=#7CFF9A>Heat✓</color>" : "<color=#FF8A8A>Heat○</color>";
             string a = hasAir ? "<color=#7CFF9A>Air✓</color>" : "<color=#FF8A8A>Air○</color>";
@@ -1763,11 +1763,16 @@ namespace GameDevTV.RTS.Player
                     sb.AppendLine("  <color=#FFE08A>Need an Air tile joined to Heat for the Water combo</color>");
             }
 
-            sb.AppendLine("  <color=#A8B0B8>Edge combos: Heat+Air→Water · Air+Water→Heat · Water+Heat→Air · Power+Industry→Life</color>");
-
-            string weekColor = weeksRemaining <= 2 ? "#FF8A8A" : (weeksRemaining <= 4 ? "#FFE08A" : "#C8D0D8");
-            sb.AppendLine($"<color={weekColor}>WEEKS LEFT  {weeksRemaining}</color>");
-            sb.AppendLine($"  <color=#A8B0B8>Card week costs vary (0–2). Check the card chip.</color>");
+            sb.AppendLine();
+            sb.AppendLine("<color=#7A8490>── Tips ──</color>");
+            sb.AppendLine($"<color=#7A8490>WIN: all Acts + terraform every sector ({terraDone}/{terraTotal}). LOSE: weeks hit 0.</color>");
+            sb.AppendLine("<color=#7A8490>Acts ≠ sectors. Q/E jump sectors. CP expands map.</color>");
+            sb.AppendLine("<color=#7A8490>Power = full climate rate (else 20%). No Materials gate on cards.</color>");
+            sb.AppendLine(
+                $"<color=#7A8490>Act climate need = 1/{ClimateBudgetSectorCount} of +15°C / +0.25 atm / +5% (per-sector share/cap).</color>");
+            sb.AppendLine("<color=#7A8490>Stack Heat/Air/Water (+ Power) for climate rate combos.</color>");
+            sb.AppendLine("<color=#7A8490>Edge: Heat+Air→Water · Air+Water→Heat · Water+Heat→Air · Power+Industry→Life</color>");
+            sb.AppendLine("<color=#7A8490>Card week costs vary (0–2). Check the card chip.</color>");
             return sb.ToString();
         }
 
