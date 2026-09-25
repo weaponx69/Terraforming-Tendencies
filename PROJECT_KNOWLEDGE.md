@@ -27,7 +27,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Power efficiency | [`BaseBuilding.ProductionEfficiency`](Assets/Scripts/Units/BaseBuilding.cs) — unpowered **20%**, powered **100%** |
 | Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — **Terra-Coin upgrades** (carry) |
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
-| Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable; Corp quota + terraform lead |
+| Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable (wheel while hovered; camera zoom yields); Corp quota + terraform lead |
 | Dev full-run demo | [`ColonyActsDevDemo`](Assets/Scripts/Player/ColonyActsDevDemo.cs) — Editor / DEVELOPMENT only |
 | Building nameplates | [`BuildingNameHoverLabel`](Assets/Scripts/UI/Components/BuildingNameHoverLabel.cs) — 14pt, hover only |
 | Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) (~18pt labels + Q/E) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
@@ -73,11 +73,11 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 
 | Act | Name | Corp Quota (Mats) | Weeks |
 |-----|------|------------------:|------:|
-| 1 | Establish | 500 | 18 |
-| 2 | Survive | 700 | 16 |
-| 3 | Settle | 900 | 16 |
-| 4 | Expand | 1150 | 16 |
-| 5 | Thrive | 1400 | 18 |
+| 1 | Establish | 700 | 18 |
+| 2 | Survive | 900 | 16 |
+| 3 | Settle | 1100 | 16 |
+| 4 | Expand | 1350 | 16 |
+| 5 | Thrive | 1600 | 18 |
 
 * **Act clear = Corp Materials quota (Materials bank) AND Temp/Atmos/Water gains** from Act baselines. On clear, **pay Corp** — deduct the full quota from the Materials bank (Combolands tax); leftover + ~25% of gross seeds the next Act. Need per Act climate = **one sector share**: reference (+15°C / +0.25 atm / +5%) **÷ N**. Each sector may contribute at most that same **1/N**. **Climate and mining produce on week spend** (not real-time): mines / Mining Drones yield ~25 Mats/week (deplete deposits); climate rates are **per week**, × power efficiency × adjacency combo.
 * **Starting Materials = 0.** No shipment / Emergency Caches / Discovery bonus Mats during Acts.

@@ -167,7 +167,7 @@ namespace GameDevTV.RTS.Player
             get
             {
                 if (acts.Count == 0)
-                    return new ActDef { Name = "Establish", TargetScore = 500, WeekBudget = 18 };
+                    return new ActDef { Name = "Establish", TargetScore = 700, WeekBudget = 18 };
                 return acts[Mathf.Clamp(actIndex, 0, acts.Count - 1)];
             }
         }
@@ -260,11 +260,11 @@ namespace GameDevTV.RTS.Player
         private void BuildFixedActLadder()
         {
             acts.Clear();
-            acts.Add(new ActDef { Name = "Establish", TargetScore = 500, WeekBudget = 18 });
-            acts.Add(new ActDef { Name = "Survive", TargetScore = 700, WeekBudget = 16 });
-            acts.Add(new ActDef { Name = "Settle", TargetScore = 900, WeekBudget = 16 });
-            acts.Add(new ActDef { Name = "Expand", TargetScore = 1150, WeekBudget = 16 });
-            acts.Add(new ActDef { Name = "Thrive", TargetScore = 1400, WeekBudget = 18 });
+            acts.Add(new ActDef { Name = "Establish", TargetScore = 700, WeekBudget = 18 });
+            acts.Add(new ActDef { Name = "Survive", TargetScore = 900, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Settle", TargetScore = 1100, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Expand", TargetScore = 1350, WeekBudget = 16 });
+            acts.Add(new ActDef { Name = "Thrive", TargetScore = 1600, WeekBudget = 18 });
         }
 
         private static void RevealAllSectorFeatures()

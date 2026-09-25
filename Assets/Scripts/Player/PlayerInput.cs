@@ -2056,12 +2056,13 @@ namespace GameDevTV.RTS.Player
         {
             if (cinemachineFollow == null) return;
 
-            // Hand strip owns the wheel while hovered — don't zoom the camera.
-            bool handOwnsWheel = BottomBarActionsUI.IsPointerOverHandStrip;
+            // Hand strip / Colony Acts own the wheel while hovered — don't zoom the camera.
+            bool uiOwnsWheel = BottomBarActionsUI.IsPointerOverHandStrip
+                || ActiveObjectivesUI.IsPointerOverActsPanel;
 
             // Mouse scroll zoom
             float scroll = Mouse.current.scroll.y.ReadValue();
-            if (!handOwnsWheel && Mathf.Abs(scroll) > 0.01f)
+            if (!uiOwnsWheel && Mathf.Abs(scroll) > 0.01f)
             {
                 // Normalize scroll to get consistent zoom speeds across all operating systems and mice
                 float scrollSign = Mathf.Sign(scroll);

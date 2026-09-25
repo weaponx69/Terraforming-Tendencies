@@ -1,4 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using TMPro;
 using UnityEngine.UI;
 using GameDevTV.RTS.Player;
@@ -13,6 +16,19 @@ namespace GameDevTV.RTS.UI.Containers
         private ScrollRect scrollRect;
         private RectTransform contentRt;
         private bool layoutReady;
+        private static ActiveObjectivesUI instance;
+        private readonly List<RaycastResult> raycastHits = new();
+
+        /// <summary>True while the pointer is over the Colony Acts panel (camera zoom should yield the wheel).</summary>
+        public static bool IsPointerOverActsPanel =>
+            instance != null && instance.layoutReady && instance.IsPointerOverPanel();
+
+        private void OnEnable() => instance = this;
+
+        private void OnDisable()
+        {
+            if (instance == this) instance = null;
+        }
 
         private void Start()
         {
@@ -99,7 +115,7 @@ namespace GameDevTV.RTS.UI.Containers
             scrollRect.horizontal = false;
             scrollRect.vertical = true;
             scrollRect.movementType = ScrollRect.MovementType.Clamped;
-            scrollRect.scrollSensitivity = 32f;
+            scrollRect.scrollSensitivity = 40f;
             scrollRect.inertia = true;
             scrollRect.decelerationRate = 0.135f;
 
@@ -174,6 +190,52 @@ namespace GameDevTV.RTS.UI.Containers
                     rect.anchoredPosition = new Vector2(-12f, -topPad);
             }
             UpdateObjectivesText();
+            HandleWheelScroll();
+        }
+
+        private void HandleWheelScroll()
+        {
+            if (scrollRect == null || Mouse.current == null) return;
+            if (!IsPointerOverPanel()) return;
+
+            float scroll = Mouse.current.scroll.y.ReadValue();
+            if (Mathf.Abs(scroll) < 0.01f) return;
+
+            // Same ownership model as the hand strip: drive ScrollRect directly so
+            // Input System wheel events always move the Acts text (not the camera).
+            float contentH = contentRt != null ? contentRt.rect.height : 0f;
+            float viewH = scrollRect.viewport != null ? scrollRect.viewport.rect.height : 0f;
+            float overflow = contentH - viewH;
+            if (overflow <= 1f) return;
+
+            float step = (scrollRect.scrollSensitivity / overflow) * Mathf.Sign(scroll);
+            // Scroll up → show earlier lines (toward normalized 1).
+            scrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+                scrollRect.verticalNormalizedPosition + step);
+        }
+
+        private bool IsPointerOverPanel()
+        {
+            var rect = transform as RectTransform;
+            if (rect == null || Mouse.current == null) return false;
+
+            Vector2 screen = Mouse.current.position.ReadValue();
+            if (RectTransformUtility.RectangleContainsScreenPoint(rect, screen, null))
+                return true;
+
+            // Fallback: UI raycast hit on this panel or a child (nested Canvas).
+            if (EventSystem.current == null) return false;
+            var ped = new PointerEventData(EventSystem.current) { position = screen };
+            raycastHits.Clear();
+            EventSystem.current.RaycastAll(ped, raycastHits);
+            for (int i = 0; i < raycastHits.Count; i++)
+            {
+                var go = raycastHits[i].gameObject;
+                if (go == null) continue;
+                if (go == gameObject || go.transform.IsChildOf(transform))
+                    return true;
+            }
+            return false;
         }
 
         private void UpdateObjectivesText()
