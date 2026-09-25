@@ -28,7 +28,8 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — **Terra-Coin upgrades** (carry) |
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
 | Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable (wheel while hovered; camera zoom yields); Corp quota + terraform lead |
-| Dev full-run demo | [`ColonyActsDevDemo`](Assets/Scripts/Player/ColonyActsDevDemo.cs) — Editor / DEVELOPMENT only |
+| Dev full-run demo | [`ColonyActsDevDemo`](Assets/Scripts/Player/ColonyActsDevDemo.cs) — Editor / DEVELOPMENT **cheat** smoke (grants quota/climate) |
+| Dev player bot | [`ColonyActsPlayerBot`](Assets/Scripts/Player/ColonyActsPlayerBot.cs) — real hand place / weeks / shop; CLI [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) |
 | Building nameplates | [`BuildingNameHoverLabel`](Assets/Scripts/UI/Components/BuildingNameHoverLabel.cs) — 14pt, hover only |
 | Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) (~18pt labels + Q/E) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
 | Tile snap / place SFX | [`AudioManager`](Assets/Scripts/Audio/AudioManager.cs) (`PlayTileSnapSound` / `PlayPlaceClickSound`) |
@@ -290,7 +291,7 @@ First climate-pair join in a sector also pulses ~7% of remaining sector budget (
 2. Neighbor “echo” re-score (optional Combolands cascade lite)  
 3. Soft-fail / extra weeks  
 4. Guilds / heirlooms / councillors — **out of scope** until Acts + stacking feel good  
-5. Retarget `./tools/sector-win-cli.sh` → Colony Act bot  
+5. Retarget `./tools/sector-win-cli.sh` → Colony Act bot — **started**: [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) + [`ColonyActsPlayerBot`](Assets/Scripts/Player/ColonyActsPlayerBot.cs) (improve heuristics over time)  
 
 ---
 
