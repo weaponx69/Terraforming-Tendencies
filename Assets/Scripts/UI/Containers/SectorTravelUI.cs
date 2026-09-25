@@ -11,6 +11,7 @@ namespace GameDevTV.RTS.UI.Containers
     /// <summary>
     /// On-screen sector names (clickable) + Q/E prev/next + current sector readout.
     /// Focused sector name shows briefly then fades so it does not block the view.
+    /// Q/E buttons dock on the left under Weeks Left so they never cover Colony Acts.
     /// </summary>
     public class SectorTravelUI : MonoBehaviour
     {
@@ -19,9 +20,15 @@ namespace GameDevTV.RTS.UI.Containers
         private const float FocusHoldSeconds = 2f;
         private const float FocusFadeSeconds = 0.75f;
 
+        /// <summary>Right HUD (Colony Acts) width + pad — world chips stay left of this.</summary>
+        private const float RightHudReservePx = 500f;
+
         private readonly List<SectorLabel> labels = new();
         private TextMeshProUGUI currentSectorText;
         private CanvasGroup currentSectorGroup;
+        private RectTransform currentSectorRt;
+        private RectTransform navPrevRt;
+        private RectTransform navNextRt;
         private Canvas overlayCanvas;
         private Camera cam;
         private int lastSectorCount = -1;
@@ -66,14 +73,22 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void EnsureUi()
         {
-            if (overlayCanvas != null) return;
+            if (overlayCanvas != null)
+            {
+                LayoutTopSectorChrome();
+                return;
+            }
 
             var canvasGo = new GameObject("SectorTravelCanvas");
             canvasGo.transform.SetParent(transform, false);
             overlayCanvas = canvasGo.AddComponent<Canvas>();
             overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            overlayCanvas.sortingOrder = 40;
-            canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            // Below Acts/hand so sector chrome never paints over Colony Acts text.
+            overlayCanvas.sortingOrder = 20;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
             canvasGo.AddComponent<GraphicRaycaster>();
 
             TMP_FontAsset font = null;
@@ -89,12 +104,12 @@ namespace GameDevTV.RTS.UI.Containers
             // Current sector HUD (top-center) — fades after focus change.
             var hudGo = new GameObject("CurrentSector");
             hudGo.transform.SetParent(canvasGo.transform, false);
-            var hudRt = hudGo.AddComponent<RectTransform>();
-            hudRt.anchorMin = new Vector2(0.5f, 1f);
-            hudRt.anchorMax = new Vector2(0.5f, 1f);
-            hudRt.pivot = new Vector2(0.5f, 1f);
-            hudRt.sizeDelta = new Vector2(420f, 36f);
-            hudRt.anchoredPosition = new Vector2(0f, -86f);
+            currentSectorRt = hudGo.AddComponent<RectTransform>();
+            currentSectorRt.anchorMin = new Vector2(0.5f, 1f);
+            currentSectorRt.anchorMax = new Vector2(0.5f, 1f);
+            currentSectorRt.pivot = new Vector2(0.5f, 1f);
+            currentSectorRt.sizeDelta = new Vector2(320f, 36f);
+            currentSectorRt.anchoredPosition = new Vector2(0f, -86f);
             currentSectorGroup = hudGo.AddComponent<CanvasGroup>();
             currentSectorGroup.blocksRaycasts = false;
             currentSectorText = hudGo.AddComponent<TextMeshProUGUI>();
@@ -104,27 +119,33 @@ namespace GameDevTV.RTS.UI.Containers
             currentSectorText.color = new Color(0.75f, 0.9f, 1f, 0.95f);
             currentSectorText.raycastTarget = false;
 
-            // Prev / Next buttons.
-            CreateNavButton(canvasGo.transform, font, "◀ Q", new Vector2(-230f, -86f), () =>
+            // Q/E dock left under Weeks Left — never beside Colony Acts.
+            navPrevRt = CreateLeftNavButton(canvasGo.transform, font, "◀ Q", 18f, () =>
             {
                 PlayerInput.Instance?.PageSectors(-1);
             });
-            CreateNavButton(canvasGo.transform, font, "E ▶", new Vector2(230f, -86f), () =>
+            navNextRt = CreateLeftNavButton(canvasGo.transform, font, "E ▶", 98f, () =>
             {
                 PlayerInput.Instance?.PageSectors(1);
             });
+            LayoutTopSectorChrome();
         }
 
-        private static void CreateNavButton(Transform parent, TMP_FontAsset font, string label, Vector2 anchored, UnityEngine.Events.UnityAction onClick)
+        private static RectTransform CreateLeftNavButton(
+            Transform parent,
+            TMP_FontAsset font,
+            string label,
+            float x,
+            UnityEngine.Events.UnityAction onClick)
         {
             var go = new GameObject($"Nav_{label}");
             go.transform.SetParent(parent, false);
             var rt = go.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 1f);
-            rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
             rt.sizeDelta = new Vector2(72f, 32f);
-            rt.anchoredPosition = anchored;
+            rt.anchoredPosition = new Vector2(x, -230f);
             var img = go.AddComponent<Image>();
             img.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
             var btn = go.AddComponent<Button>();
@@ -145,16 +166,40 @@ namespace GameDevTV.RTS.UI.Containers
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
             tmp.raycastTarget = false;
+            return rt;
+        }
+
+        private void LayoutTopSectorChrome()
+        {
+            if (currentSectorRt != null)
+                currentSectorRt.anchoredPosition = new Vector2(0f, -86f);
+
+            if (navPrevRt != null)
+            {
+                navPrevRt.anchorMin = new Vector2(0f, 1f);
+                navPrevRt.anchorMax = new Vector2(0f, 1f);
+                navPrevRt.pivot = new Vector2(0f, 1f);
+                navPrevRt.anchoredPosition = new Vector2(18f, -230f);
+            }
+            if (navNextRt != null)
+            {
+                navNextRt.anchorMin = new Vector2(0f, 1f);
+                navNextRt.anchorMax = new Vector2(0f, 1f);
+                navNextRt.pivot = new Vector2(0f, 1f);
+                navNextRt.anchoredPosition = new Vector2(98f, -230f);
+            }
         }
 
         private void LateUpdate()
         {
             EnsureUi();
             if (cam == null) cam = Camera.main;
+            LayoutTopSectorChrome();
             RebuildLabelsIfNeeded();
             UpdateFocusFade();
             UpdateLabelPositions();
             UpdateCurrentSectorReadout();
+            CullWorldLabelsOverActs();
         }
 
         private void RebuildLabelsIfNeeded()
@@ -239,7 +284,6 @@ namespace GameDevTV.RTS.UI.Containers
                 var label = labels[i];
                 if (label.Group == null) continue;
                 bool isFocus = label.Index == displayedFocusIndex;
-                // Only the focused (usually mid-screen) label fades away; others stay soft.
                 float a = isFocus ? alpha : 0.55f;
                 label.Group.alpha = a;
                 label.Group.blocksRaycasts = a > 0.05f;
@@ -284,9 +328,11 @@ namespace GameDevTV.RTS.UI.Containers
                     world = focus + Vector3.up * 8f;
 
                 Vector3 screen = cam.WorldToScreenPoint(world);
+                bool inActsColumn = IsInActsColumn(screen);
                 bool visible = screen.z > 0f
                     && screen.x > -40f && screen.x < Screen.width + 40f
-                    && screen.y > -40f && screen.y < Screen.height + 40f;
+                    && screen.y > -40f && screen.y < Screen.height + 40f
+                    && !inActsColumn;
                 label.Rect.gameObject.SetActive(visible);
                 if (!visible) continue;
 
@@ -294,6 +340,53 @@ namespace GameDevTV.RTS.UI.Containers
                 if (label.Text != null)
                     label.Text.text = SectorColonization.GetSectorDisplayName(label.Index);
             }
+        }
+
+        private readonly HashSet<TextMeshPro> mutedWorldLabels = new();
+
+        /// <summary>
+        /// Hide floating world TMP (nexus / feature names) when they project over Colony Acts.
+        /// </summary>
+        private void CullWorldLabelsOverActs()
+        {
+            if (cam == null) return;
+
+            var stillMuted = new HashSet<TextMeshPro>();
+            foreach (var tmp in Object.FindObjectsByType<TextMeshPro>(FindObjectsInactive.Exclude))
+            {
+                if (tmp == null) continue;
+                Transform root = tmp.transform;
+                while (root.parent != null
+                       && !root.name.StartsWith("QuestionMark_", System.StringComparison.Ordinal))
+                    root = root.parent;
+                if (!root.name.StartsWith("QuestionMark_", System.StringComparison.Ordinal))
+                    continue;
+
+                Vector3 screen = cam.WorldToScreenPoint(root.position);
+                bool overActs = screen.z > 0f && IsInActsColumn(screen);
+                if (overActs)
+                {
+                    if (tmp.enabled)
+                        tmp.enabled = false;
+                    mutedWorldLabels.Add(tmp);
+                    stillMuted.Add(tmp);
+                }
+            }
+
+            // Restore labels that moved clear of the Acts column.
+            mutedWorldLabels.RemoveWhere(tmp =>
+            {
+                if (tmp == null) return true;
+                if (stillMuted.Contains(tmp)) return false;
+                tmp.enabled = true;
+                return true;
+            });
+        }
+
+        private static bool IsInActsColumn(Vector3 screen)
+        {
+            return screen.x >= Screen.width - RightHudReservePx
+                && screen.y >= Screen.height * 0.25f;
         }
 
         private void UpdateCurrentSectorReadout()

@@ -26,9 +26,12 @@ namespace GameDevTV.RTS.UI.Containers
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            // Tall right info column; body scrolls when Acts text exceeds the viewport.
-            rect.sizeDelta = new Vector2(500f, 680f);
-            rect.anchoredPosition = new Vector2(-16f, -128f);
+            // Right column, below top chrome; height fits the game view so text stays on-screen.
+            float topPad = 110f;
+            float bottomPad = 96f;
+            float height = Mathf.Clamp(Screen.height - topPad - bottomPad, 280f, 640f);
+            rect.sizeDelta = new Vector2(460f, height);
+            rect.anchoredPosition = new Vector2(-12f, -topPad);
 
             if (layoutReady) return;
             layoutReady = true;
@@ -38,6 +41,14 @@ namespace GameDevTV.RTS.UI.Containers
             background.color = new Color(0.03f, 0.04f, 0.07f, 0.92f);
             // Need raycasts so the mouse wheel can scroll while hovering the panel.
             background.raycastTarget = true;
+
+            // Own overlay so sector Q/E / world labels never draw on top of Acts text.
+            var overlay = gameObject.GetComponent<Canvas>();
+            if (overlay == null) overlay = gameObject.AddComponent<Canvas>();
+            overlay.overrideSorting = true;
+            overlay.sortingOrder = 200;
+            if (gameObject.GetComponent<GraphicRaycaster>() == null)
+                gameObject.AddComponent<GraphicRaycaster>();
 
             TMP_FontAsset projectFont = null;
             var allTmp = Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include);
@@ -150,6 +161,18 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void Update()
         {
+            // Keep panel height matched to the current Game view.
+            var rect = transform as RectTransform;
+            if (rect != null)
+            {
+                float topPad = 110f;
+                float bottomPad = 96f;
+                float height = Mathf.Clamp(Screen.height - topPad - bottomPad, 280f, 640f);
+                if (!Mathf.Approximately(rect.sizeDelta.y, height))
+                    rect.sizeDelta = new Vector2(460f, height);
+                if (!Mathf.Approximately(rect.anchoredPosition.y, -topPad))
+                    rect.anchoredPosition = new Vector2(-12f, -topPad);
+            }
             UpdateObjectivesText();
         }
 
