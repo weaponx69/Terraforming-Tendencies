@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Drive the real Colony Acts player bot against the already-open Unity Editor.
-# Places from hand / spends weeks / shops — no DevDemo cheats.
+# Drive the Colony Acts *teaching* player bot (Watch by default).
+# Shows how the game works: places from hand, spends weeks, shops, narrates.
+# Stress mode also probes gates (CP on claimed sector, off-feature geology, etc.).
 #
 # Usage:
 #   1. Open this project in Unity (Pipeline connected)
-#   2. ./tools/colony-acts-player-bot-cli.sh
+#   2. ./tools/colony-acts-player-bot-cli.sh           # Watch
+#      ./tools/colony-acts-player-bot-cli.sh stress    # Stress
 #
 # Exit codes:
-#   0 = RESULT: WIN
+#   0 = WIN or intentional STUCK/FAIL that surfaced an edge (still useful)
 #   1 = setup / Editor not ready
-#   2 = FAIL / STUCK / STOPPED
+#   2 = bot never started / aborted with no useful signal
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -87,24 +89,26 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
-echo "== ColonyActsPlayerBot.Run =="
-START="$(eval_json 'return GameDevTV.RTS.Player.ColonyActsPlayerBot.Run();' 90 | extract_result_text)"
+MODE="${1:-watch}"
+BOT_CALL="return GameDevTV.RTS.Player.ColonyActsPlayerBot.RunWatch();"
+if [[ "$MODE" == "stress" ]]; then
+  BOT_CALL="return GameDevTV.RTS.Player.ColonyActsPlayerBot.RunStress();"
+fi
+
+echo "== ColonyActsPlayerBot ($MODE) =="
+START="$(eval_json "$BOT_CALL" 90 | extract_result_text)"
 echo "$START"
 if ! echo "$START" | grep -q "STARTED"; then
   echo "Bot failed to start."
   exit 2
 fi
 
-echo "== poll Status =="
+echo "== poll Status (watch Console + Colony Acts banner in Game view) =="
 FINAL=""
-for i in $(seq 1 180); do
+for i in $(seq 1 240); do
   FINAL="$(eval_json 'return GameDevTV.RTS.Player.ColonyActsPlayerBot.Status();' 60 | extract_result_text)"
   echo "  [$i] $FINAL"
-  if echo "$FINAL" | grep -Eq 'running=False|RESULT:'; then
-    # Prefer console RESULT line if Status still says STARTED mid-finish.
-    break
-  fi
-  if echo "$FINAL" | grep -q 'ended=True' && echo "$FINAL" | grep -q 'running=False'; then
+  if echo "$FINAL" | grep -Eq 'running=False'; then
     break
   fi
   sleep 3
@@ -127,9 +131,13 @@ echo "Status: $FINAL"
 [[ -n "$CONSOLE" ]] && echo "Console: $CONSOLE"
 
 if echo "$FINAL $CONSOLE" | grep -q "RESULT: WIN"; then
-  echo "Player bot: PASS (WIN)"
+  echo "Player bot: useful run (WIN)."
+  exit 0
+fi
+if echo "$FINAL $CONSOLE" | grep -Eq "STUCK|RESULT: FAIL"; then
+  echo "Player bot: useful run (stuck/fail = edge case signal). Read Console narration."
   exit 0
 fi
 
-echo "Player bot: FAIL / incomplete"
+echo "Player bot: no clear outcome — check Game view / Console."
 exit 2

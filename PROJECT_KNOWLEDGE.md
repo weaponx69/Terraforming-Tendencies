@@ -29,7 +29,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
 | Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable (wheel while hovered; camera zoom yields); Corp quota + terraform lead |
 | Dev full-run demo | [`ColonyActsDevDemo`](Assets/Scripts/Player/ColonyActsDevDemo.cs) — Editor / DEVELOPMENT **cheat** smoke (grants quota/climate) |
-| Dev player bot | [`ColonyActsPlayerBot`](Assets/Scripts/Player/ColonyActsPlayerBot.cs) — real hand place / weeks / shop; CLI [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) |
+| Dev player bot | [`ColonyActsPlayerBot`](Assets/Scripts/Player/ColonyActsPlayerBot.cs) — **teach + edge-case** bot (Watch / Stress); narrates plays to Console + Acts banner; CLI [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) |
 | Building nameplates | [`BuildingNameHoverLabel`](Assets/Scripts/UI/Components/BuildingNameHoverLabel.cs) — 14pt, hover only |
 | Sector travel / names | [`SectorTravelUI`](Assets/Scripts/UI/Containers/SectorTravelUI.cs) (~18pt labels + Q/E) + **Q/E** in [`PlayerInput`](Assets/Scripts/Player/PlayerInput.cs) |
 | Tile snap / place SFX | [`AudioManager`](Assets/Scripts/Audio/AudioManager.cs) (`PlayTileSnapSound` / `PlayPlaceClickSound`) |
