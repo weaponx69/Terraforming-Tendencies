@@ -25,7 +25,8 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Free ground place (cards) | [`BuildBuildingCommand`](Assets/Scripts/Commands/BuildBuildingCommand.cs) + [`BottomBarActionsUI`](Assets/Scripts/UI/Containers/BottomBarActionsUI.cs) |
 | Power place-gate | **Retired** — place freely; power raises production to full rate |
 | Power efficiency | [`BaseBuilding.ProductionEfficiency`](Assets/Scripts/Units/BaseBuilding.cs) — unpowered **20%**, powered **100%** |
-| Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — **Terra-Coin upgrades** (carry) |
+| Between-Act shop | [`BetweenActShopUI`](Assets/Scripts/UI/BetweenActShopUI.cs) — congratulatory Terra-Coin depot (exact large fonts) |
+| Card disasters | [`ColonyActDisaster`](Assets/Scripts/Player/ColonyActDisaster.cs) + [`NaturalEventManager.TriggerStrike`](Assets/Scripts/Environment/NaturalEventManager.cs) — stronger plays roll for meteors; `DamageRules` on during Acts |
 | Weeks left (left HUD) | [`WeeksLeftUI`](Assets/Scripts/UI/Containers/WeeksLeftUI.cs) |
 | Colony Acts panel (right) | [`ActiveObjectivesUI`](Assets/Scripts/UI/Containers/ActiveObjectivesUI.cs) — scrollable (wheel while hovered; camera zoom yields); Corp quota + terraform lead |
 | Dev full-run demo | [`ColonyActsDevDemo`](Assets/Scripts/Player/ColonyActsDevDemo.cs) — Editor / DEVELOPMENT **cheat** smoke (grants quota/climate) |
@@ -50,7 +51,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Free Materials shipments / Emergency Caches in Acts deck | **Excluded** — earn Mats via placement + week mining only |
 | Starting Materials seed pile | **0** under Colony Acts |
 | Realtime drone gather → Materials during Acts | **Retired** — mining ticks on **SpendWeeks** |
-| Combat / hazard HP damage | **Retired** — [`DamageRules.Enabled`](Assets/Scripts/Units/DamageRules.cs) is false; TakeDamage is a no-op |
+| Combat / hazard HP damage | **Active during Colony Acts** — card-tied disasters via [`ColonyActDisaster`](Assets/Scripts/Player/ColonyActDisaster.cs); wall-clock waves quiet while Acts run |
 | Power required to place / hard-gate climate | **Retired** — unpowered still crawls at 20%; power restores full rate + score boost |
 | Materials between-Act tile shop | **Retired** — shop is Terra-Coin **roguelike upgrades** |
 | Card play gated by drones / reserved pads | **Retired** (cards self-construct) |
@@ -86,6 +87,8 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 * **Oxygen** (flavor HUD) also capped at **100/N %** per sector.
 * **Run win** = all Acts cleared **and** every planet sector terraformed (player CP + Heat/Air/Water trio in that sector).
 * **Command Posts** claim the **sector you are viewing** (Q/E or minimap) — not the first free sector on the map. Ghost snaps to that sector's CP pad; already-claimed sectors toast an error.
+* **Card disasters:** Playing cards during Acts rolls a strike chance (week cost / mines / climate / rarity). Prefer card `HazardEventPrefabs`, else fallback meteor. HP damage is **on** during Acts. Wall-clock NaturalEvent waves stay quiet while Acts run.
+* **Card rarity (light hook):** reuses [`CardRarity`](Assets/Scripts/TechTree/CardRarity.cs) on [`BlueprintCardSO`](Assets/Scripts/Player/BlueprintCardSO.cs) — Common / Uncommon / Rare / Epic; multiplies disaster chance. Full weighted rare decks are follow-up.
 * **Terra-Coins** earn on Act clear: `15 + floor(earnedMats/10) + floor(excess/5)` and **carry** for the run. Shop sells upgrades (+weeks, +score %, geology bonus, adjacency, power score, climate pack).
 * **Geology hard locks** (red ghost + toast outside the feature):
 

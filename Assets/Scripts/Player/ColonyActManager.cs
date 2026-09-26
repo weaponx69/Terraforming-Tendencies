@@ -244,6 +244,8 @@ namespace GameDevTV.RTS.Player
             powerScoreBonusExtra = 0;
             weeksRemaining = CurrentActDef.WeekBudget;
             started = true;
+            GameDevTV.RTS.Units.DamageRules.Enabled = true;
+            NaturalEventManager.StopAssaultIfAny();
             Supplies.UpdateMaterials(Owner.Player1, 0);
             RecordClimateBaselines();
             RevealAllSectorFeatures();
@@ -1580,6 +1582,7 @@ namespace GameDevTV.RTS.Player
             if (actIndex >= acts.Count - 1)
             {
                 runEnded = true;
+                GameDevTV.RTS.Units.DamageRules.Enabled = false;
                 OnRunVictory?.Invoke();
                 int terraDone = CountTerraformedSectors(out int terraTotal);
                 GameOverManager.LastOutcomeDetail =
@@ -1729,6 +1732,7 @@ namespace GameDevTV.RTS.Player
         {
             if (runEnded) return;
             runEnded = true;
+            GameDevTV.RTS.Units.DamageRules.Enabled = false;
             Debug.Log($"[ColonyActManager] Act {CurrentAct} failed — weeks exhausted (quota {materialsEarnedThisAct}/{TargetScore}, climate {(IsClimateMet ? "met" : "short")}).");
             OnActFailed?.Invoke();
             OnActStateChanged?.Invoke();

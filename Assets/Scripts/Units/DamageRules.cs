@@ -1,8 +1,7 @@
 namespace GameDevTV.RTS.Units
 {
     /// <summary>
-    /// Colony Acts is placement-first — combat/hazard damage is retired.
-    /// Flip <see cref="Enabled"/> only if a mode needs hit points again.
+    /// When true, TakeDamage applies. Colony Acts enables this for card-tied disasters.
     /// </summary>
     public static class DamageRules
     {

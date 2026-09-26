@@ -107,25 +107,25 @@ namespace GameDevTV.RTS.UI.Components
                     if (tag == "Heat")
                     {
                         goalBadge.SetText($"+{score}\nPlay w/ Atmos\n→ Water card");
-                        goalBadge.fontSize = 10f;
+                        goalBadge.fontSize = 12f;
                         StretchGoalBadgeForCombo();
                     }
                     else if (tag == "Air")
                     {
                         goalBadge.SetText($"+{score}\nPlay w/ Heat\n→ Water card");
-                        goalBadge.fontSize = 10f;
+                        goalBadge.fontSize = 12f;
                         StretchGoalBadgeForCombo();
                     }
                     else if (!string.IsNullOrEmpty(goalKey))
                     {
                         goalBadge.SetText($"+{score}\n{TerraformingGoalColors.ShortLabel(goalKey)}");
-                        goalBadge.fontSize = 12f;
+                        goalBadge.fontSize = 14f;
                         ResetGoalBadgeLayout();
                     }
                     else
                     {
                         goalBadge.SetText($"+{score}");
-                        goalBadge.fontSize = 12f;
+                        goalBadge.fontSize = 14f;
                         EnsureReadableBlackText(goalBadge);
                         ResetGoalBadgeLayout();
                     }
@@ -211,10 +211,10 @@ namespace GameDevTV.RTS.UI.Components
                 label = labelGO.GetComponent<TextMeshProUGUI>();
             }
 
-            label.fontSize = 15f;
-            label.fontSizeMin = 11f;
-            label.fontSizeMax = 16f;
-            label.enableAutoSizing = true;
+            label.fontSize = 18f;
+            label.fontSizeMin = 18f;
+            label.fontSizeMax = 18f;
+            label.enableAutoSizing = false;
             label.alignment = TextAlignmentOptions.Bottom;
             label.color = Color.black;
             label.fontStyle = FontStyles.Bold;
@@ -225,8 +225,8 @@ namespace GameDevTV.RTS.UI.Components
             label.margin = new Vector4(6f, 2f, 6f, 2f);
 
             RectTransform labelRt = label.rectTransform;
-            labelRt.anchorMin = new Vector2(0.06f, 0.12f);
-            labelRt.anchorMax = new Vector2(0.94f, 0.30f);
+            labelRt.anchorMin = new Vector2(0.06f, 0.10f);
+            labelRt.anchorMax = new Vector2(0.94f, 0.32f);
             labelRt.offsetMin = Vector2.zero;
             labelRt.offsetMax = Vector2.zero;
             labelRt.pivot = new Vector2(0.5f, 0f);
@@ -240,13 +240,13 @@ namespace GameDevTV.RTS.UI.Components
             }
 
             // Top-left cost chip — always above the icon, hard to miss.
-            costLabel.fontSize = 16f;
+            costLabel.fontSize = 18f;
             costLabel.fontStyle = FontStyles.Bold;
             costLabel.alignment = TextAlignmentOptions.TopLeft;
             costLabel.color = Color.black;
             costLabel.richText = true;
             costLabel.raycastTarget = false;
-            costLabel.margin = new Vector4(8f, 6f, 4f, 2f);
+            costLabel.margin = new Vector4(10f, 8f, 4f, 2f);
             if (label != null && label.font != null) costLabel.font = label.font;
             EnsureReadableBlackText(costLabel);
 
@@ -423,7 +423,7 @@ namespace GameDevTV.RTS.UI.Components
             GameObject badgeGO = new GameObject("Goal Badge", typeof(TextMeshProUGUI));
             badgeGO.transform.SetParent(transform, false);
             goalBadge = badgeGO.GetComponent<TextMeshProUGUI>();
-            goalBadge.fontSize = 12f;
+            goalBadge.fontSize = 14f;
             goalBadge.fontStyle = FontStyles.Bold;
             goalBadge.alignment = TextAlignmentOptions.TopRight;
             goalBadge.richText = true;

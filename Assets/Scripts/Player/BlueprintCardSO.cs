@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.TechTree;
 
 namespace GameDevTV.RTS.Player
 {
@@ -21,6 +22,14 @@ namespace GameDevTV.RTS.Player
         [Tooltip("The negative hazard/disaster prefabs that this card can register to the NaturalEventManager's pool when played.")]
         [SerializeField] private List<GameObject> hazardEventPrefabs = new List<GameObject>();
         public List<GameObject> HazardEventPrefabs => hazardEventPrefabs;
+
+        [Tooltip("0 = use default chance from week cost / tag. >0 overrides base chance before rarity multiplier.")]
+        [SerializeField, Range(0f, 1f)] private float disasterChance;
+        public float DisasterChance => disasterChance;
+
+        [Header("Rarity")]
+        [SerializeField] private CardRarity rarity = CardRarity.Common;
+        public CardRarity Rarity => rarity;
 
         public abstract void Apply();
 

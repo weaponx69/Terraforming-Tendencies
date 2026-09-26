@@ -80,14 +80,14 @@ namespace GameDevTV.RTS.UI.Components
             return $"<b>{card.CardName}</b>\n{card.Description}";
         }
 
-        private Color GetRarityColor(CardRarity rarity)
+        private Color GetRarityColor(GameDevTV.RTS.TechTree.CardRarity rarity)
         {
             return rarity switch
             {
-                CardRarity.Common => ColorCommon,
-                CardRarity.Uncommon => ColorUncommon,
-                CardRarity.Rare => ColorRare,
-                CardRarity.Epic => ColorEpic,
+                GameDevTV.RTS.TechTree.CardRarity.Common => ColorCommon,
+                GameDevTV.RTS.TechTree.CardRarity.Uncommon => ColorUncommon,
+                GameDevTV.RTS.TechTree.CardRarity.Rare => ColorRare,
+                GameDevTV.RTS.TechTree.CardRarity.Epic => ColorEpic,
                 _ => ColorCommon
             };
         }

@@ -28,6 +28,7 @@ namespace GameDevTV.RTS.UI
         private Button continueButton;
         private Button rerollButton;
         private float savedTimeScale = 1f;
+        private readonly List<TMPro.TextMeshPro> mutedDepositLabels = new();
 
         private struct UpgradeOffer
         {
@@ -83,6 +84,7 @@ namespace GameDevTV.RTS.UI
 
             RefreshOffers(forceNew: true);
             UpdateHeader();
+            MuteWorldMapLabels();
             root.SetActive(true);
             Debug.Log("[BetweenActShop] Opened Terra-Coin upgrade depot.");
         }
@@ -90,7 +92,39 @@ namespace GameDevTV.RTS.UI
         public void Hide()
         {
             IsOpen = false;
+            RestoreWorldMapLabels();
             if (root != null) root.SetActive(false);
+        }
+
+        /// <summary>
+        /// World-space TMP (deposit / feature names) draws through Screen Space Overlay
+        /// and can sit on shop buttons — mute while the depot is open.
+        /// </summary>
+        private void MuteWorldMapLabels()
+        {
+            RestoreWorldMapLabels();
+            var labels = Object.FindObjectsByType<TMPro.TextMeshPro>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var tmp = labels[i];
+                if (tmp == null || !tmp.enabled) continue;
+                string name = tmp.gameObject.name;
+                if (name != "DepositLabel" && !name.StartsWith("QuestionMark_", System.StringComparison.Ordinal))
+                    continue;
+                tmp.enabled = false;
+                mutedDepositLabels.Add(tmp);
+            }
+        }
+
+        private void RestoreWorldMapLabels()
+        {
+            for (int i = 0; i < mutedDepositLabels.Count; i++)
+            {
+                var tmp = mutedDepositLabels[i];
+                if (tmp != null)
+                    tmp.enabled = true;
+            }
+            mutedDepositLabels.Clear();
         }
 
         private void RebuildUi()
@@ -127,25 +161,29 @@ namespace GameDevTV.RTS.UI
 
             if (titleText != null)
             {
-                if (!string.IsNullOrEmpty(nextName))
-                {
-                    titleText.text =
-                        $"UPGRADE DEPOT\n" +
-                        $"<size=90%>Act {cleared} — {clearedName} cleared</size>\n" +
-                        $"<color=#8FE7FF>Preparing Act {nextNum} — {nextName}</color>";
-                }
-                else
-                {
-                    titleText.text = $"UPGRADE DEPOT\nAct {cleared} — {clearedName} cleared";
-                }
+                titleText.text =
+                    $"<color=#7CFF9A>ACT CLEARED!</color>\n" +
+                    $"<size=22>Act {cleared} — {clearedName}</size>\n" +
+                    $"<size=22><color=#FFE08A>Corp paid. Small victory.</color></size>";
             }
             if (coinsText != null)
                 coinsText.text = $"Terra-Coins: {coins}";
             if (hintText != null)
             {
                 hintText.text = !string.IsNullOrEmpty(nextName)
-                    ? $"Spend Terra-Coins for run upgrades before <b>{nextName}</b>. Coins carry. Solar seats when you continue."
-                    : "Spend Terra-Coins on run upgrades. Coins carry between Acts. Solar seats when you continue.";
+                    ? $"Outfit the colony for <b>Act {nextNum} — {nextName}</b>. Terra-Coins carry."
+                    : "Outfit the colony for what's next. Terra-Coins carry between Acts.";
+            }
+
+            if (continueButton != null)
+            {
+                var label = continueButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (label != null)
+                {
+                    label.text = !string.IsNullOrEmpty(nextName)
+                        ? $"Continue to Act {nextNum} — {nextName}"
+                        : "CONTINUE →";
+                }
             }
         }
 
@@ -341,22 +379,32 @@ namespace GameDevTV.RTS.UI
             var panel = new GameObject("Panel", typeof(RectTransform));
             panel.transform.SetParent(root.transform, false);
             var panelRt = panel.GetComponent<RectTransform>();
-            panelRt.anchorMin = new Vector2(0.22f, 0.28f);
-            panelRt.anchorMax = new Vector2(0.78f, 0.72f);
+            panelRt.anchorMin = new Vector2(0.14f, 0.18f);
+            panelRt.anchorMax = new Vector2(0.86f, 0.86f);
             panelRt.offsetMin = Vector2.zero;
             panelRt.offsetMax = Vector2.zero;
             panel.AddComponent<Image>().color = new Color(0.10f, 0.14f, 0.20f, 0.98f);
 
-            titleText = CreateText(panel.transform, "Title", 20f, FontStyles.Bold,
-                new Vector2(0.04f, 0.80f), new Vector2(0.96f, 0.98f));
+            titleText = CreateText(panel.transform, "Title", 36f, FontStyles.Bold,
+                new Vector2(0.04f, 0.78f), new Vector2(0.96f, 0.98f));
             titleText.alignment = TextAlignmentOptions.Center;
             titleText.richText = true;
+            titleText.enableAutoSizing = false;
             titleText.textWrappingMode = TextWrappingModes.Normal;
-            coinsText = CreateText(panel.transform, "Coins", 18f, FontStyles.Bold,
-                new Vector2(0.04f, 0.72f), new Vector2(0.50f, 0.80f));
+            titleText.color = new Color(0.49f, 1f, 0.60f);
+            ApplyReadableOutline(titleText, new Color(0f, 0f, 0f, 0.80f));
+
+            coinsText = CreateText(panel.transform, "Coins", 26f, FontStyles.Bold,
+                new Vector2(0.04f, 0.70f), new Vector2(0.96f, 0.78f));
+            coinsText.alignment = TextAlignmentOptions.Center;
+            coinsText.enableAutoSizing = false;
             coinsText.color = new Color(1f, 0.88f, 0.35f);
-            hintText = CreateText(panel.transform, "Hint", 13f, FontStyles.Normal,
-                new Vector2(0.04f, 0.64f), new Vector2(0.96f, 0.72f));
+            ApplyReadableOutline(coinsText, new Color(0f, 0f, 0f, 0.80f));
+
+            hintText = CreateText(panel.transform, "Hint", 18f, FontStyles.Normal,
+                new Vector2(0.04f, 0.62f), new Vector2(0.96f, 0.70f));
+            hintText.alignment = TextAlignmentOptions.Center;
+            hintText.enableAutoSizing = false;
             hintText.color = new Color(0.75f, 0.82f, 0.90f);
             hintText.richText = true;
 
@@ -370,25 +418,35 @@ namespace GameDevTV.RTS.UI
                 var slotGo = new GameObject($"Offer{i}", typeof(RectTransform));
                 slotGo.transform.SetParent(panel.transform, false);
                 var srt = slotGo.GetComponent<RectTransform>();
-                srt.anchorMin = new Vector2(x0, 0.22f);
-                srt.anchorMax = new Vector2(x1, 0.66f);
+                srt.anchorMin = new Vector2(x0, 0.20f);
+                srt.anchorMax = new Vector2(x1, 0.60f);
                 srt.offsetMin = Vector2.zero;
                 srt.offsetMax = Vector2.zero;
                 slotGo.AddComponent<Image>().color = new Color(0.16f, 0.22f, 0.30f, 1f);
 
-                var title = CreateText(slotGo.transform, "CardTitle", 15f, FontStyles.Bold,
-                    new Vector2(0.06f, 0.72f), new Vector2(0.94f, 0.96f));
-                var price = CreateText(slotGo.transform, "Price", 14f, FontStyles.Bold,
-                    new Vector2(0.06f, 0.58f), new Vector2(0.94f, 0.72f));
+                var title = CreateText(slotGo.transform, "CardTitle", 22f, FontStyles.Bold,
+                    new Vector2(0.06f, 0.70f), new Vector2(0.94f, 0.96f));
+                title.enableAutoSizing = false;
+                title.alignment = TextAlignmentOptions.Center;
+                ApplyReadableOutline(title, new Color(0f, 0f, 0f, 0.75f));
+
+                var price = CreateText(slotGo.transform, "Price", 20f, FontStyles.Bold,
+                    new Vector2(0.06f, 0.54f), new Vector2(0.94f, 0.70f));
+                price.enableAutoSizing = false;
+                price.alignment = TextAlignmentOptions.Center;
                 price.color = new Color(1f, 0.85f, 0.35f);
-                var desc = CreateText(slotGo.transform, "Desc", 12f, FontStyles.Normal,
-                    new Vector2(0.06f, 0.28f), new Vector2(0.94f, 0.58f));
+                ApplyReadableOutline(price, new Color(0f, 0f, 0f, 0.75f));
+
+                var desc = CreateText(slotGo.transform, "Desc", 16f, FontStyles.Normal,
+                    new Vector2(0.06f, 0.26f), new Vector2(0.94f, 0.54f));
+                desc.enableAutoSizing = false;
+                desc.alignment = TextAlignmentOptions.Top;
                 desc.color = new Color(0.8f, 0.86f, 0.92f);
 
                 var buyGo = new GameObject("Buy", typeof(RectTransform));
                 buyGo.transform.SetParent(slotGo.transform, false);
                 var brt = buyGo.GetComponent<RectTransform>();
-                brt.anchorMin = new Vector2(0.12f, 0.06f);
+                brt.anchorMin = new Vector2(0.12f, 0.05f);
                 brt.anchorMax = new Vector2(0.88f, 0.24f);
                 brt.offsetMin = Vector2.zero;
                 brt.offsetMax = Vector2.zero;
@@ -396,9 +454,10 @@ namespace GameDevTV.RTS.UI
                 buyImg.color = new Color(0.20f, 0.55f, 0.35f, 1f);
                 var buyBtn = buyGo.AddComponent<Button>();
                 buyBtn.targetGraphic = buyImg;
-                var buyLabel = CreateText(buyGo.transform, "BuyLabel", 14f, FontStyles.Bold,
+                var buyLabel = CreateText(buyGo.transform, "BuyLabel", 18f, FontStyles.Bold,
                     Vector2.zero, Vector2.one);
                 buyLabel.text = "BUY";
+                buyLabel.enableAutoSizing = false;
                 buyLabel.alignment = TextAlignmentOptions.Center;
 
                 slots.Add(new OfferSlot
@@ -412,15 +471,16 @@ namespace GameDevTV.RTS.UI
             }
 
             continueButton = CreateBottomButton(panel.transform, "Continue", "CONTINUE →",
-                new Vector2(0.55f, 0.04f), new Vector2(0.96f, 0.16f),
-                new Color(0.15f, 0.55f, 0.75f, 1f), ContinueToNextAct);
+                new Vector2(0.52f, 0.03f), new Vector2(0.96f, 0.16f),
+                new Color(0.15f, 0.55f, 0.75f, 1f), ContinueToNextAct, 20f);
             rerollButton = CreateBottomButton(panel.transform, "Reroll", $"REROLL ({RerollCost})",
-                new Vector2(0.04f, 0.04f), new Vector2(0.45f, 0.16f),
-                new Color(0.45f, 0.35f, 0.15f, 1f), TryReroll);
+                new Vector2(0.04f, 0.03f), new Vector2(0.48f, 0.16f),
+                new Color(0.45f, 0.35f, 0.15f, 1f), TryReroll, 20f);
         }
 
         private static Button CreateBottomButton(Transform parent, string name, string label,
-            Vector2 anchorMin, Vector2 anchorMax, Color color, UnityEngine.Events.UnityAction onClick)
+            Vector2 anchorMin, Vector2 anchorMax, Color color, UnityEngine.Events.UnityAction onClick,
+            float fontSize = 20f)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -434,8 +494,9 @@ namespace GameDevTV.RTS.UI
             var btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
             btn.onClick.AddListener(onClick);
-            var text = CreateText(go.transform, "Label", 15f, FontStyles.Bold, Vector2.zero, Vector2.one);
+            var text = CreateText(go.transform, "Label", fontSize, FontStyles.Bold, Vector2.zero, Vector2.one);
             text.text = label;
+            text.enableAutoSizing = false;
             text.alignment = TextAlignmentOptions.Center;
             return btn;
         }
@@ -452,11 +513,24 @@ namespace GameDevTV.RTS.UI
             rt.offsetMax = Vector2.zero;
             var tmp = go.AddComponent<TextMeshProUGUI>();
             tmp.fontSize = size;
+            tmp.fontSizeMin = size;
+            tmp.fontSizeMax = size;
+            tmp.enableAutoSizing = false;
             tmp.fontStyle = style;
             tmp.color = Color.white;
             tmp.textWrappingMode = TextWrappingModes.Normal;
             tmp.raycastTarget = false;
             return tmp;
+        }
+
+        private static void ApplyReadableOutline(TextMeshProUGUI tmp, Color color)
+        {
+            if (tmp == null) return;
+            var outline = tmp.GetComponent<Outline>();
+            if (outline == null) outline = tmp.gameObject.AddComponent<Outline>();
+            outline.effectColor = color;
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            outline.enabled = true;
         }
 
         private static void StretchFull(RectTransform rt)

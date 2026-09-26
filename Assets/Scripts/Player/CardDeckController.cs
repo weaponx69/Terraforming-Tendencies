@@ -681,6 +681,7 @@ namespace GameDevTV.RTS.Player
                 ColonyActManager.Instance?.SpendWeeks(weekCost);
             BaseBuilding.FlushAllDeferredColonyActScores();
             ColonyActManager.Instance?.GrantCardScore(played);
+            ColonyActDisaster.TryProc(played);
 
             GameFlowManager.Instance?.PlayerActed();
 
@@ -1324,6 +1325,7 @@ namespace GameDevTV.RTS.Player
             if (weekCost > 0)
                 ColonyActManager.Instance?.SpendWeeks(weekCost);
             ColonyActManager.Instance?.GrantCardScore(played);
+            ColonyActDisaster.TryProc(played);
 
             // Notify GameFlowManager that an action was taken
             if (GameFlowManager.Instance != null)
