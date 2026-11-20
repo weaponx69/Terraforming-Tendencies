@@ -94,7 +94,7 @@ namespace GameDevTV.RTS.Prologue
             string want = PrologueResourceIdUtil.ToTypeName(type);
             GatherableSupply best = null;
             float bestDist = float.MaxValue;
-            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            foreach (var hr in UnityEngine.Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {
                 if (hr == null || !hr.IsDiscovered) continue;
                 if (!string.Equals(hr.ResourceTypeName, want, System.StringComparison.OrdinalIgnoreCase))
