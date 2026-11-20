@@ -154,5 +154,41 @@ namespace GameDevTV.RTS.Tests
             Assert.IsTrue(c.Unlocked.Contains(PrologueBuildingId.Oxygen));
             Assert.IsTrue(c.Unlocked.Contains(PrologueBuildingId.Solar));
         }
+
+        [Test]
+        public void EndWeek_MineSource_CreditsMineralsAndDepletesDeposit()
+        {
+            var c = PrologueColony.CreateLanding();
+            int deposit = 100;
+            c.RegisterMineSource(PrologueResourceId.Minerals, want =>
+            {
+                int g = System.Math.Min(want, deposit);
+                deposit -= g;
+                return g;
+            });
+            c.EndWeek();
+            Assert.AreEqual(PrologueData.MineHarvestPerWeek, c.GetStock(PrologueResourceId.Minerals));
+            Assert.AreEqual(100 - PrologueData.MineHarvestPerWeek, deposit);
+        }
+
+        [Test]
+        public void MarkResourceKnown_TracksTypedDeposits()
+        {
+            var c = PrologueColony.CreateLanding();
+            Assert.IsFalse(c.KnowsResource(PrologueResourceId.Iron));
+            c.MarkResourceKnown(PrologueResourceId.Iron);
+            Assert.IsTrue(c.KnowsResource(PrologueResourceId.Iron));
+            Assert.IsTrue(c.KnownResources.Contains(PrologueResourceId.Iron));
+        }
+
+        [Test]
+        public void ResourceIdUtil_ParsesDepositTypeNames()
+        {
+            Assert.IsTrue(PrologueResourceIdUtil.TryParse("Minerals", out var m));
+            Assert.AreEqual(PrologueResourceId.Minerals, m);
+            Assert.IsTrue(PrologueResourceIdUtil.TryParse("gas", out var g));
+            Assert.AreEqual(PrologueResourceId.Gas, g);
+            Assert.IsFalse(PrologueResourceIdUtil.TryParse("Ice", out _));
+        }
     }
 }

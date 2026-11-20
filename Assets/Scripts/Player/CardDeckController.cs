@@ -708,11 +708,51 @@ namespace GameDevTV.RTS.Player
                     hand.Add(match);
             }
 
+            // Typed mines for Survey-uncovered deposits (individual resources).
+            if (colony != null)
+            {
+                foreach (var res in colony.KnownResources)
+                {
+                    BlueprintCardSO mine = FindPrologueMineCard(res);
+                    if (mine != null && !hand.Contains(mine))
+                        hand.Add(mine);
+                }
+            }
+
             Debug.Log($"[CardDeckController] Prologue hand ({hand.Count}): " +
                       string.Join(", ", hand.ConvertAll(c => c != null ? c.cardName : "?")));
 
             OnHandChanged?.Invoke();
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        BlueprintCardSO FindPrologueMineCard(PrologueResourceId resource)
+        {
+            string want = PrologueResourceIdUtil.ToTypeName(resource);
+            foreach (var c in masterDeck)
+            {
+                if (c is not UnlockBuildingCardSO unlock || unlock.buildingToUnlock == null) continue;
+                if (!DiscoverySystem.TryGetMineResourceType(unlock.buildingToUnlock, out string type)) continue;
+                if (string.Equals(type, want, StringComparison.OrdinalIgnoreCase))
+                    return c;
+            }
+
+            return resource switch
+            {
+                PrologueResourceId.Minerals => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/DeepCoreMiningLaserCard"),
+                PrologueResourceId.Regolith => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/BasaltStripMineCard"),
+                _ => null
+            };
+        }
+
+        T EnsureStarterCardSafe<T>(string resourcePath) where T : BlueprintCardSO
+        {
+            try { return EnsureStarterCard<T>(resourcePath); }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[CardDeckController] Prologue mine card missing at {resourcePath}: {ex.Message}");
+                return null;
+            }
         }
 
         BlueprintCardSO FindPrologueCard(PrologueBuildingId id)
@@ -786,6 +826,14 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void RefreshHand()
         {
+            if (PrologueController.IsActive)
+            {
+                RebuildPrologueHand(PrologueController.Instance != null
+                    ? PrologueController.Instance.Colony
+                    : null);
+                return;
+            }
+
             var before = hand.ToArray();
             DiscardUnplayableFromHand();
             EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
@@ -809,6 +857,14 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void FillHand()
         {
+            if (PrologueController.IsActive)
+            {
+                RebuildPrologueHand(PrologueController.Instance != null
+                    ? PrologueController.Instance.Colony
+                    : null);
+                return;
+            }
+
             StripUndiscoveredGeologicalCardsFromHand();
             StripExcludedColonyCardsFromHand();
             EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)

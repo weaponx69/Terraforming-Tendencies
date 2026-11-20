@@ -18,7 +18,49 @@ namespace GameDevTV.RTS.Prologue
         public int StormLandWeek { get; private set; } = -1;
         public HashSet<PrologueBuildingId> Unlocked { get; } = new();
 
+        /// <summary>Deposit types uncovered by Survey (seats matching mine cards).</summary>
+        public HashSet<PrologueResourceId> KnownResources { get; } = new();
+
+        readonly Dictionary<PrologueResourceId, int> stocks = new()
+        {
+            { PrologueResourceId.Minerals, 0 },
+            { PrologueResourceId.Gas, 0 },
+            { PrologueResourceId.Iron, 0 },
+            { PrologueResourceId.Regolith, 0 }
+        };
+
+        /// <summary>
+        /// Test/runtime mine sources: take up to <c>want</c> from the linked deposit, return gained.
+        /// </summary>
+        readonly List<(PrologueResourceId type, Func<int, int> take)> mineSources = new();
+
         Func<int, int, int> _dist = (a, b) => a == b ? 0 : 99;
+
+        public int GetStock(PrologueResourceId id) =>
+            stocks.TryGetValue(id, out int v) ? v : 0;
+
+        public void AddStock(PrologueResourceId id, int amount)
+        {
+            if (amount <= 0) return;
+            stocks[id] = GetStock(id) + amount;
+        }
+
+        public void MarkResourceKnown(PrologueResourceId id) => KnownResources.Add(id);
+
+        public bool KnowsResource(PrologueResourceId id) => KnownResources.Contains(id);
+
+        public void RegisterMineSource(PrologueResourceId type, Func<int, int> takeFromDeposit)
+        {
+            if (takeFromDeposit == null) return;
+            mineSources.Add((type, takeFromDeposit));
+        }
+
+        public void UnregisterMineSource(Func<int, int> takeFromDeposit)
+        {
+            mineSources.RemoveAll(m => ReferenceEquals(m.take, takeFromDeposit));
+        }
+
+        public void ClearMineSources() => mineSources.Clear();
 
         public static PrologueColony CreateLanding()
         {
@@ -49,6 +91,10 @@ namespace GameDevTV.RTS.Prologue
         {
             PrologueStep = 0;
             Unlocked.Clear();
+            KnownResources.Clear();
+            ClearMineSources();
+            foreach (var id in PrologueResourceIdUtil.All)
+                stocks[id] = 0;
             ShuttleLandWeek = -1;
             ShuttleLanded = false;
             StormLandWeek = -1;
@@ -313,6 +359,16 @@ namespace GameDevTV.RTS.Prologue
                     if (gained >= cap) break;
                 }
                 IceStock += gained;
+            }
+
+            // 2b) Typed mines on uncovered deposits (individual stocks, not Materials).
+            foreach (var (type, take) in mineSources)
+            {
+                if (take == null) continue;
+                int gained = take(PrologueData.MineHarvestPerWeek);
+                if (gained <= 0) continue;
+                AddStock(type, gained);
+                log.Add($"+{gained} {PrologueResourceIdUtil.ToTypeName(type)} from mine");
             }
 
             // 3) Oxygen processors

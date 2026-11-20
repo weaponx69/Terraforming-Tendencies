@@ -248,6 +248,18 @@ namespace GameDevTV.RTS.Environment
             }
         }
 
+        /// <summary>
+        /// Prologue Survey: mark a type as known for mine-card gating without mass-revealing every pad.
+        /// Individual pads still use <see cref="HiddenResource.ForceDiscover"/>.
+        /// </summary>
+        public static void MarkTypeKnownWithoutMassReveal(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName)) return;
+            if (!discoveredTypes.Add(typeName)) return;
+            Debug.Log($"[DiscoverySystem] Resource type '{typeName}' known (no mass reveal).");
+            OnDiscoveryChanged?.Invoke();
+        }
+
         /// <summary>Reveal a sector geological feature (WaterDeposit, LavaTube, FaultLine, …).</summary>
         public static void RevealSectorFeature(SectorManager.SectorFeature feature)
         {

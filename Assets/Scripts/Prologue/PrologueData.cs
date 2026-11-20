@@ -42,6 +42,8 @@ namespace GameDevTV.RTS.Prologue
         public const int PrologueShuttleSize = 6;
         public const int PrologueStormWeeks = 2;
         public const int OxygenStoreTargetMult = 3; // step 5: store 3 * O2Need
+        /// <summary>Typed mine harvest per week (matches aquifer ice scale).</summary>
+        public const int MineHarvestPerWeek = 8;
 
         public static PrologueBuildingInfo Get(PrologueBuildingId id) => id switch
         {

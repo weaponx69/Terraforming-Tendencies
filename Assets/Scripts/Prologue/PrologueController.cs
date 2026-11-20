@@ -85,7 +85,7 @@ namespace GameDevTV.RTS.Prologue
 
             Colony.ObjectiveText(out _, out bool wantSurvey);
             bool hasSurvey = false;
-            int maxAllowed = Colony.Unlocked.Count + 2; // unlocked buildings + optional scan
+            int maxAllowed = Colony.Unlocked.Count + Colony.KnownResources.Count + 2;
             if (deck.Hand.Count > maxAllowed) return true;
             if (deck.Hand.Count == 0 && wantSurvey) return true;
 
@@ -102,6 +102,13 @@ namespace GameDevTV.RTS.Prologue
                 if (PrologueCardMap.IsPrologueScanCard(card)) return true;
                 if (PrologueCardMap.TryGetPrologueId(card, out var id)
                     && (Colony.Unlocked.Contains(id) || id == PrologueBuildingId.CommandPost))
+                    continue;
+                // Mine cards for Survey-uncovered typed deposits.
+                if (card is UnlockBuildingCardSO unlock
+                    && unlock.buildingToUnlock != null
+                    && DiscoverySystem.TryGetMineResourceType(unlock.buildingToUnlock, out string mineType)
+                    && PrologueResourceIdUtil.TryParse(mineType, out var resId)
+                    && Colony.KnowsResource(resId))
                     continue;
                 return true; // foreign Acts card
             }

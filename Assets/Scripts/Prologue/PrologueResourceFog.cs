@@ -76,7 +76,10 @@ namespace GameDevTV.RTS.Prologue
                 float dx = p.x - world.x;
                 float dz = p.z - world.z;
                 if (dx * dx + dz * dz <= r2)
+                {
                     hr.ForceDiscover();
+                    NotifyPrologueDepositUncovered(hr);
+                }
             }
 
             var sm = SectorManager.Instance;
@@ -142,11 +145,24 @@ namespace GameDevTV.RTS.Prologue
             }
 
             if (node.visualGO != null
-                && node.visualGO.TryGetComponent(out HiddenResource hr)
-                && !hr.IsDiscovered)
+                && node.visualGO.TryGetComponent(out HiddenResource hr))
             {
-                hr.ForceDiscover();
+                if (!hr.IsDiscovered)
+                    hr.ForceDiscover();
+                NotifyPrologueDepositUncovered(hr);
             }
+        }
+
+        static void NotifyPrologueDepositUncovered(HiddenResource hr)
+        {
+            if (hr == null || !PrologueController.IsActive) return;
+            if (!PrologueResourceIdUtil.TryParse(hr.ResourceTypeName, out var id)) return;
+
+            DiscoverySystem.MarkTypeKnownWithoutMassReveal(hr.ResourceTypeName);
+            var colony = PrologueController.Instance?.Colony;
+            if (colony == null) return;
+            colony.MarkResourceKnown(id);
+            PrologueController.Instance.RefreshHandUnlocks();
         }
 
         static void ApplyUnknownVisual(SectorNode node)

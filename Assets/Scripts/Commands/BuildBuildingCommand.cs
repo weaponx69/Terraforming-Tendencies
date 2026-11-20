@@ -80,15 +80,16 @@ namespace GameDevTV.RTS.Commands
                     targetPos = navHit.position;
             }
 
-            // Card plays: Materials waived under Colony Acts; power is optional (not a place gate).
+            // Card plays: Materials waived under Colony Acts / Prologue; power is optional (not a place gate).
             if (HandIndex >= 0)
             {
+                bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
                 bool colonyActs = ColonyActManager.Instance != null;
-                if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
-                if (!HasEnoughMaterialsForCard(context.Owner))
+                if (!prologue && !HasEnoughMaterialsForCard(context.Owner))
                     return false;
-                if (!HasEnoughWeeksForCard())
+                if (!prologue && !HasEnoughWeeksForCard())
                     return false;
                 if (BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && !GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
@@ -243,8 +244,11 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!prologue && BuildingSiteRegistry.IsMineBuilding(Building))
+                    // Mines always require a matching discovered deposit (Prologue + Acts).
+                    if (BuildingSiteRegistry.IsMineBuilding(Building))
                     {
+                        if (DiscoverySystem.TrySnapToMineDeposit(Building, targetPos, out Vector3 mineSnap, out _))
+                            targetPos = mineSnap;
                         if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
                         {
                             DiscoverySystem.TryGetMineResourceType(Building, out string type);
@@ -320,6 +324,8 @@ namespace GameDevTV.RTS.Commands
                     {
                         // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
                         cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
+                        if (prologue)
+                            GameDevTV.RTS.Prologue.PrologueMineExtractor.TryAttachToBuilding(cardBuilding, Building);
                         // Command Posts must stay replayable across sectors — do not draft-lock them.
                         if (!isCommandPost)
                             BlueprintDraftManager.LockBuilding(Building.Name);
@@ -575,15 +581,16 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null) return "No building on this card.";
 
+            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
             bool colonyActs = ColonyActManager.Instance != null;
-            if (colonyActs && !HasEnoughWeeksForCard())
+            if (!prologue && colonyActs && !HasEnoughWeeksForCard())
             {
                 int need = CardDeckController.GetWeekCost(Building);
                 int have = ColonyActManager.Instance != null ? ColonyActManager.Instance.WeeksRemaining : 0;
                 return $"Need {need} week{(need == 1 ? "" : "s")} to play {Building.Name} (have {have}).";
             }
 
-            if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
+            if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
                 float used = PowerGridManager.GetBoardPowerUpkeep(owner);
@@ -594,10 +601,13 @@ namespace GameDevTV.RTS.Commands
                        "Build more Solar or demolish consumers.";
             }
 
-            int matCost = ReservedSiteBuildUtility.GetMaterialsCost(Building);
-            int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
-            if (matCost > 0 && haveMats < matCost)
-                return $"Need {matCost} Materials (have {haveMats}).";
+            if (!prologue)
+            {
+                int matCost = ReservedSiteBuildUtility.GetMaterialsCost(Building);
+                int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
+                if (matCost > 0 && haveMats < matCost)
+                    return $"Need {matCost} Materials (have {haveMats}).";
+            }
 
             if (BuildingSiteRegistry.IsCommandPostBuilding(Building))
             {

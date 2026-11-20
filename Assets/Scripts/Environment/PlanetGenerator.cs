@@ -574,33 +574,45 @@ namespace GameDevTV.RTS.Environment
                         };
 
                         // Sparse deposits (richer yield applied at spawn) — board stays placeable.
-                        for (int i = 0; i < 2; i++)
+                        // PlanetConfig allowlist gates which gatherable types spawn (planet mix); select UI is future.
+                        bool allowMinerals = Config == null || Config.AllowMinerals;
+                        bool allowGas = Config == null || Config.AllowGas;
+                        bool allowIron = Config == null || Config.AllowIron;
+                        bool allowRegolith = Config == null || Config.AllowRegolith;
+
+                        if (allowMinerals)
                         {
-                            Vector3 pos;
-                            if (isStartingSector && i == 0)
+                            for (int i = 0; i < 2; i++)
                             {
-                                pos = ColonyTileGrid.SnapToTile(
-                                    sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f));
-                                if (!tryClaimDepositCell(pos))
+                                Vector3 pos;
+                                if (isStartingSector && i == 0)
+                                {
+                                    pos = ColonyTileGrid.SnapToTile(
+                                        sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f));
+                                    if (!tryClaimDepositCell(pos))
+                                        pos = randomPos();
+                                }
+                                else if (isStartingSector && i == 1)
+                                {
+                                    pos = ColonyTileGrid.SnapToTile(
+                                        sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f));
+                                    if (!tryClaimDepositCell(pos))
+                                        pos = randomPos();
+                                }
+                                else
+                                {
                                     pos = randomPos();
+                                }
+                                sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                             }
-                            else if (isStartingSector && i == 1)
-                            {
-                                pos = ColonyTileGrid.SnapToTile(
-                                    sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f));
-                                if (!tryClaimDepositCell(pos))
-                                    pos = randomPos();
-                            }
-                            else
-                            {
-                                pos = randomPos();
-                            }
-                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                         }
 
-                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, randomPos(), "Vaporous gases seep from fissures in the ground.", "Gas"));
-                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, randomPos(), "A rich iron ore deposit, suitable for smelting.", "Iron"));
-                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, randomPos(), "Loose regolith, useful for construction.", "Regolith"));
+                        if (allowGas)
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, randomPos(), "Vaporous gases seep from fissures in the ground.", "Gas"));
+                        if (allowIron)
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, randomPos(), "A rich iron ore deposit, suitable for smelting.", "Iron"));
+                        if (allowRegolith)
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, randomPos(), "Loose regolith, useful for construction.", "Regolith"));
 
                         // Feature node (based on sector's assigned feature)
                         string featureLabel = "";

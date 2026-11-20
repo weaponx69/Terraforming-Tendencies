@@ -1,7 +1,7 @@
 # Design: Individual resources (not Materials collapse)
 
 **Date:** 2026-11-20  
-**Status:** Approved (design intent)  
+**Status:** Implementing (Phase 1)  
 **Engine:** Unity Prologue first; Acts Materials bank is archived for the Prologue run
 
 ## Summary

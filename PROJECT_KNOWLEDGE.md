@@ -27,6 +27,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Card ↔ building map | [`PrologueCardMap`](Assets/Scripts/Prologue/PrologueCardMap.cs) |
 | Survey paint trail | [`PrologueDroneScan`](Assets/Scripts/Prologue/PrologueDroneScan.cs) |
 | Survey Team day job + anim | [`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs) |
+| Typed resource stocks + mine harvest | [`PrologueResourceId`](Assets/Scripts/Prologue/PrologueResourceId.cs), [`PrologueMineExtractor`](Assets/Scripts/Prologue/PrologueMineExtractor.cs), [`PrologueHarvestDrones`](Assets/Scripts/Prologue/PrologueHarvestDrones.cs) |
 | Objective / AIR / End Week HUD | [`PrologueHUD`](Assets/Scripts/UI/PrologueHUD.cs) |
 | Hex snap (shared) | [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) |
 | Prologue-gated hand | [`CardDeckController.RebuildPrologueHand`](Assets/Scripts/Player/CardDeckController.cs) |
@@ -37,7 +38,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 **Time-lapse:** [`PrologueTimeLapse`](Assets/Scripts/Prologue/PrologueTimeLapse.cs) drives `Time.timeScale` (default **paused** = 0; 1× ≈ 20s/week) so anims/builds/weeks share one clock. Banner `II 0.5x 1x 2x 4x`; **Space** toggles pause. **Survey Team** card: play → paint up to **5** tiles → green ✓ → **3 colony days** tick while drones/crew wander the path, then reveal ([`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs); spec [`.summer/specs/2026-11-19-prologue-survey-team-design.md`](.summer/specs/2026-11-19-prologue-survey-team-design.md)). Card stays in hand until ✓. Searched hexes get a light tint ([`PrologueSearchedTiles`](Assets/Scripts/Prologue/PrologueSearchedTiles.cs)). Deposits stay **?** until searched ([`PrologueResourceFog`](Assets/Scripts/Prologue/PrologueResourceFog.cs)); Command Post does **not** auto-spawn a gather drone. Aquifer places by ice range (not Acts WaterDeposit geology).
 
-**Design intent (2026-11-20):** Not casual — Frostpunk 2 tone. Survey Team ground capsules = **spacesuit people** (placeholder art). Survey = puzzle routing (Blue Prince–like). Resources stay **individual stocks**; **planet type** chooses which exist; **future** pre-run planet select. Mine-on-deposit + Survey-style drone VFX. Specs: [`.summer/specs/2026-11-20-individual-resources-design.md`](.summer/specs/2026-11-20-individual-resources-design.md), [`GDD.md`](GDD.md) § Current design decisions.
+**Design intent (2026-11-20):** Not casual — Frostpunk 2 tone. Survey Team ground capsules = **spacesuit people** (placeholder art). Survey = puzzle routing (Blue Prince–like). Resources stay **individual stocks**; **planet type** chooses which exist via `PlanetConfig` allowlist (`AllowMinerals` / `AllowGas` / `AllowIron` / `AllowRegolith`); **future** pre-run planet select. Mine-on-deposit (`PrologueMineExtractor`) credits typed stocks on End Week (8/wk) + Survey-style harvest drones. Specs: [`.summer/specs/2026-11-20-individual-resources-design.md`](.summer/specs/2026-11-20-individual-resources-design.md), [`GDD.md`](GDD.md) § Current design decisions.
 
 ### Archived — Colony Acts (do not treat as run model)
 | Role | Script |

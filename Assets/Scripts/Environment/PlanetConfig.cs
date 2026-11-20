@@ -36,5 +36,31 @@ namespace GameDevTV.RTS.Environment
 
         [Header("Resources")]
         public GameObject[] ResourcePrefabs;
+
+        [Header("Allowed gatherable deposits")]
+        [Tooltip("When false, PlanetGenerator skips placing that deposit type. Easy / default = all on. Planet select UI is future work.")]
+        public bool AllowMinerals = true;
+        public bool AllowGas = true;
+        public bool AllowIron = true;
+        public bool AllowRegolith = true;
+
+        public bool IsGatherableTypeAllowed(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName)) return false;
+            if (typeName.Equals("Minerals", System.StringComparison.OrdinalIgnoreCase)) return AllowMinerals;
+            if (typeName.Equals("Gas", System.StringComparison.OrdinalIgnoreCase)) return AllowGas;
+            if (typeName.Equals("Iron", System.StringComparison.OrdinalIgnoreCase)) return AllowIron;
+            if (typeName.Equals("Regolith", System.StringComparison.OrdinalIgnoreCase)) return AllowRegolith;
+            return true;
+        }
+
+        public bool IsGatherableTypeAllowed(SectorNode.NodeType nodeType) => nodeType switch
+        {
+            SectorNode.NodeType.Minerals => AllowMinerals,
+            SectorNode.NodeType.Gas => AllowGas,
+            SectorNode.NodeType.Iron => AllowIron,
+            SectorNode.NodeType.Regolith => AllowRegolith,
+            _ => true
+        };
     }
 }

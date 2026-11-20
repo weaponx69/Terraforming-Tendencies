@@ -97,7 +97,8 @@ namespace GameDevTV.RTS.UI
             double runway = colony.O2Runway();
             string runwayStr = runway > 1000 ? "∞" : runway.ToString("0.0");
             airText.text =
-                $"AIR {colony.Oxygen}  ·  need {need}/wk  ·  {runwayStr} wk left  ·  ice {colony.IceStock}  ·  beds {colony.TotalBeds()}/{colony.Colonists}";
+                $"AIR {colony.Oxygen}  ·  need {need}/wk  ·  {runwayStr} wk left  ·  ice {colony.IceStock}  ·  beds {colony.TotalBeds()}/{colony.Colonists}"
+                + FormatTypedStocks(colony);
 
             if (scanButton != null)
                 scanButton.gameObject.SetActive(false);
@@ -174,6 +175,22 @@ namespace GameDevTV.RTS.UI
             var mission = PrologueSurveyMission.Instance
                           ?? new GameObject("PrologueSurveyMission").AddComponent<PrologueSurveyMission>();
             mission.BeginFromCard(PrologueSurveyMission.DefaultTileBudget, PrologueSurveyMission.DefaultDays);
+        }
+
+        static string FormatTypedStocks(PrologueColony colony)
+        {
+            if (colony == null) return "";
+            var sb = new StringBuilder();
+            foreach (var id in PrologueResourceIdUtil.All)
+            {
+                int n = colony.GetStock(id);
+                if (n <= 0 && !colony.KnowsResource(id)) continue;
+                sb.Append("  ·  ");
+                sb.Append(PrologueResourceIdUtil.ToTypeName(id).ToLowerInvariant());
+                sb.Append(' ');
+                sb.Append(n);
+            }
+            return sb.ToString();
         }
 
         static string BuildPlaceHint(PrologueColony colony)
