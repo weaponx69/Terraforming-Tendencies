@@ -116,7 +116,9 @@ namespace GameDevTV.RTS.Commands
                 if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     return false;
-                if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
+                // Prologue uses ice-range / deposit rules, not Acts sector-feature geology.
+                if (!prologue
+                    && DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
                     return false;
                 return AllRestrictionsPass(targetPos, context.Owner, requireWorker: false);

@@ -714,6 +714,8 @@ namespace GameDevTV.RTS.Player
                 foreach (var res in colony.KnownResources)
                 {
                     BlueprintCardSO mine = FindPrologueMineCard(res);
+                    if (mine is UnlockBuildingCardSO unlockMine && unlockMine.buildingToUnlock != null)
+                        BlueprintDraftManager.RegisterBuildingSO(unlockMine.buildingToUnlock);
                     if (mine != null && !hand.Contains(mine))
                         hand.Add(mine);
                 }
@@ -741,6 +743,8 @@ namespace GameDevTV.RTS.Player
             {
                 PrologueResourceId.Minerals => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/DeepCoreMiningLaserCard"),
                 PrologueResourceId.Regolith => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/BasaltStripMineCard"),
+                PrologueResourceId.Gas => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/GasWellCard"),
+                PrologueResourceId.Iron => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/IronOreExtractorCard"),
                 _ => null
             };
         }

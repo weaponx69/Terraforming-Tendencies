@@ -16,8 +16,8 @@ Possible deposit / stock types (not every planet has all of them):
 |-----------------|------------------------------------------|--------|
 | Ice             | Water Ice Aquifer                        | Life support (Ice Stock → Oxygen) when the planet supports ice |
 | Minerals        | Deep-Core Mining Laser                   | Separate stock |
-| Gas             | Gas mine card / stand-in                 | Separate stock |
-| Iron            | Iron mine card / stand-in                | Separate stock |
+| Gas             | Gas Well (O₂ Processor mesh stand-in)    | Separate stock; place on Gas pad |
+| Iron            | Iron Ore Extractor (Foundry mesh)        | Separate stock; place on Iron pad |
 | Regolith        | Basalt Strip-Mine                        | Separate stock |
 
 **Retired for Prologue:** collapsing mine output into one **Materials** bank (Acts-era).

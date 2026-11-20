@@ -1948,6 +1948,26 @@ namespace GameDevTV.RTS.Player
             // Colony Acts: no UCC hub. Owner-scoped commands (card place, etc.) run without a selected unit.
             if (abstractCommandables.Count == 0)
             {
+                CommandContext ownerContext = new(Owner.Player1, null, hit);
+                // Validate before committing Prologue sim occupancy (avoids stuck pads).
+                if (!activeCommand.CanHandle(ownerContext))
+                {
+                    if (activeCommand is BuildBuildingCommand failedPlace)
+                    {
+                        string reason = failedPlace.ExplainCardPlacementFailure(hit.point, Owner.Player1)
+                            ?? $"Can't place {failedPlace.Building?.Name ?? "this tile"} here.";
+                        ExplorationManager.NotifyPlacementFailed(reason, hit.point);
+                    }
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"[PlayerInput] Command '{activeCommand.name}' cannot run (no unit selected / invalid target).");
+                    }
+                    activeCommand = null;
+                    commandTargetUnits.Clear();
+                    return;
+                }
+
                 // Prologue sim registration before the Unity building spawn.
                 if (PrologueController.IsActive
                     && activeCommand is BuildBuildingCommand prologuePlace
@@ -1970,22 +1990,7 @@ namespace GameDevTV.RTS.Player
                     PrologueController.Instance.RefreshHandUnlocks();
                 }
 
-                CommandContext ownerContext = new(Owner.Player1, null, hit);
-                if (activeCommand.CanHandle(ownerContext))
-                {
-                    activeCommand.Handle(ownerContext);
-                }
-                else if (activeCommand is BuildBuildingCommand failedPlace)
-                {
-                    string reason = failedPlace.ExplainCardPlacementFailure(hit.point, Owner.Player1)
-                        ?? $"Can't place {failedPlace.Building?.Name ?? "this tile"} here.";
-                    ExplorationManager.NotifyPlacementFailed(reason, hit.point);
-                }
-                else
-                {
-                    Debug.LogWarning(
-                        $"[PlayerInput] Command '{activeCommand.name}' cannot run (no unit selected / invalid target).");
-                }
+                activeCommand.Handle(ownerContext);
 
                 activeCommand = null;
                 commandTargetUnits.Clear();

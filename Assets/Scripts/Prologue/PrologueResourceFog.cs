@@ -20,6 +20,9 @@ namespace GameDevTV.RTS.Prologue
             if (!PrologueController.IsActive) return;
 
             DiscoverySystem.Reset();
+            // Reset clears type knowledge; restore from pads / colony so reapply during boot
+            // does not refuse mine cards after Survey already uncovered a deposit.
+            RestoreKnownTypesAfterFogReset();
 
             foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include))
             {
@@ -151,6 +154,21 @@ namespace GameDevTV.RTS.Prologue
                     hr.ForceDiscover();
                 NotifyPrologueDepositUncovered(hr);
             }
+        }
+
+        static void RestoreKnownTypesAfterFogReset()
+        {
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include))
+            {
+                if (hr == null || !hr.IsDiscovered) continue;
+                if (string.IsNullOrEmpty(hr.ResourceTypeName)) continue;
+                DiscoverySystem.MarkTypeKnownWithoutMassReveal(hr.ResourceTypeName);
+            }
+
+            var colony = PrologueController.Instance?.Colony;
+            if (colony == null) return;
+            foreach (var id in colony.KnownResources)
+                DiscoverySystem.MarkTypeKnownWithoutMassReveal(PrologueResourceIdUtil.ToTypeName(id));
         }
 
         static void NotifyPrologueDepositUncovered(HiddenResource hr)

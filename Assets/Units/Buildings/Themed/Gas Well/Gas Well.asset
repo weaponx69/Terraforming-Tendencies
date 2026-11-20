@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f185a45e660fa34bb6472929a4cdd40, type: 3}
+  m_Name: Gas Well
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.BuildingSO
+  <Name>k__BackingField: Gas Well
+  <IsOneTimeUnlock>k__BackingField: 0
+  <BuildTime>k__BackingField: 10
+  <Icon>k__BackingField: {fileID: 21300000, guid: ebfa259b882e2eff59c102b590905b88, type: 3}
+  <Cost>k__BackingField: {fileID: 11400000, guid: 9d5813cc9271469a8c2e42013a6c5a21, type: 2}
+  <TechTree>k__BackingField: {fileID: 0}
+  <unlockRequirements>k__BackingField: []
+  health: 100
+  prefab: {fileID: 1773036561045915792, guid: 3a7a69ccea524f538c98440e164efabc, type: 3}
+  upgrades: []
+  sightConfig: {fileID: 0}
+  movementConfig: {fileID: 0}
+  gatherConfig: {fileID: 0}
+  builderConfig: {fileID: 0}
+  probeConfig: {fileID: 0}
+  buildingConfig: {fileID: 11400000, guid: 80057616e6b44b0eb82c3532f2c6de4a, type: 2}
+  <PlacementMaterial>k__BackingField: {fileID: 0}
+  <IsLifeSupport>k__BackingField: 0
+  <LifeSupportRadius>k__BackingField: 25

@@ -37,12 +37,17 @@ namespace GameDevTV.RTS.Environment
         [Header("Resources")]
         public GameObject[] ResourcePrefabs;
 
-        [Header("Allowed gatherable deposits")]
-        [Tooltip("When false, PlanetGenerator skips placing that deposit type. Easy / default = all on. Planet select UI is future work.")]
-        public bool AllowMinerals = true;
-        public bool AllowGas = true;
-        public bool AllowIron = true;
-        public bool AllowRegolith = true;
+        [Header("Gatherable deposit deny-list")]
+        [Tooltip("When true, PlanetGenerator skips that deposit type. Missing fields deserialize false → all types allowed (Easy default). Planet select UI is future work.")]
+        public bool DenyMinerals;
+        public bool DenyGas;
+        public bool DenyIron;
+        public bool DenyRegolith;
+
+        public bool AllowMinerals => !DenyMinerals;
+        public bool AllowGas => !DenyGas;
+        public bool AllowIron => !DenyIron;
+        public bool AllowRegolith => !DenyRegolith;
 
         public bool IsGatherableTypeAllowed(string typeName)
         {
