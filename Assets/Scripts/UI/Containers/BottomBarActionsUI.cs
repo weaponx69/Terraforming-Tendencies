@@ -168,7 +168,7 @@ namespace GameDevTV.RTS.UI.Containers
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
-            containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+            containerRt.anchoredPosition = new Vector2(leftMargin, EffectiveBottomMargin());
             containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, viewportWidth);
             containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
             containerRt.SetAsLastSibling();
@@ -291,7 +291,7 @@ namespace GameDevTV.RTS.UI.Containers
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
-            containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+            containerRt.anchoredPosition = new Vector2(leftMargin, EffectiveBottomMargin());
 
             cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
             cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
@@ -301,6 +301,14 @@ namespace GameDevTV.RTS.UI.Containers
             LayoutRebuilder.ForceRebuildLayoutImmediate(cardsRt);
             // Layout rebuild can clobber the strip position — re-apply after.
             ApplyScrollOffset();
+        }
+
+        float EffectiveBottomMargin()
+        {
+            // Lift the hand in Prologue so full card faces clear the screen edge.
+            if (GameDevTV.RTS.Prologue.PrologueController.Instance != null)
+                return Mathf.Max(bottomMargin, 48f);
+            return bottomMargin;
         }
 
         private void ClampScroll()
@@ -463,6 +471,10 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
+            // Prologue hands are tiny — never leave the strip scrolled off-screen.
+            if (GameDevTV.RTS.Prologue.PrologueController.IsActive && hand.Count <= 6)
+                scrollOffset = 0f;
+
             // Visible subset for the focused sector — real hand indices stay on the commands.
             var visible = new List<(BlueprintCardSO card, int handIndex)>(hand.Count);
             for (int i = 0; i < hand.Count; i++)
@@ -525,8 +537,19 @@ namespace GameDevTV.RTS.UI.Containers
                         playCmd.HandIndex = cardIndex;
                         playCmd.MaterialsCost = card.GetMaterialsPlayCost();
 
+                        int capturedIndex = cardIndex;
+                        var capturedCard = card;
                         actionButtons[i].EnableFor(playCmd, null, () =>
                         {
+                            // Prologue Survey Team: play immediately even while time is paused.
+                            // PlayerInput.ActivateAction used to swallow PlayCard at timeScale=0.
+                            if (GameDevTV.RTS.Prologue.PrologueController.IsActive
+                                && capturedCard is ScoutingCardSO
+                                && CardDeckController.Instance != null)
+                            {
+                                CardDeckController.Instance.PlayCard(capturedIndex);
+                                return;
+                            }
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
                         }, sectorGoal, playCmd.MaterialsCost);
                     }

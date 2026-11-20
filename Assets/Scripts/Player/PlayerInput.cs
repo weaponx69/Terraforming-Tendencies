@@ -14,6 +14,7 @@ using UnityEngine.InputSystem.LowLevel;
 using GameDevTV.RTS.Utilities;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.UI.Containers;
+using GameDevTV.RTS.Prologue;
 using TMPro;
 
 namespace GameDevTV.RTS.Player
@@ -98,7 +99,9 @@ namespace GameDevTV.RTS.Player
             Instance.cameraTarget.position = worldPosition;
             Instance.currentHex?.SetHighlighted(false);
             Instance.currentHex = HexGridManager.Instance?.GetNearestHex(worldPosition);
-            Instance.currentHex?.SetHighlighted(true);
+            // Keep the cyan grid off unless the mouse is over a tile (keyboard nav still highlights).
+            if (!GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                Instance.currentHex?.SetHighlighted(true);
         }
 
         /// <summary>Current camera follow target on the map (XZ focus point).</summary>
@@ -329,7 +332,8 @@ namespace GameDevTV.RTS.Player
             cameraTarget.position = targetPosition;
             currentHex?.SetHighlighted(false);
             currentHex = HexGridManager.Instance?.GetNearestHex(cameraTarget.position);
-            currentHex?.SetHighlighted(true);
+            if (!GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                currentHex?.SetHighlighted(true);
         }
 
         private void OnDestroy()
@@ -728,7 +732,9 @@ namespace GameDevTV.RTS.Player
                     joinCount = ColonyTileGrid.CountOrthogonalNeighbors(mineCell, Owner.Player1);
                 }
                 // Aquifers / feature tiles: soft-snap toward their geology sector when nearby.
-                else if (activeCommand is BuildBuildingCommand featureBbc
+                // Prologue places by ice range instead — do not yank the ghost to a WaterDeposit sector.
+                else if (!PrologueController.IsActive
+                    && activeCommand is BuildBuildingCommand featureBbc
                     && DiscoverySystem.TryGetRequiredSectorFeature(featureBbc.Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(featureBbc.Building, hitPos.Value)
                     && DiscoverySystem.TryGetAutoFeaturePlacement(
@@ -825,6 +831,19 @@ namespace GameDevTV.RTS.Player
                 int have = Supplies.Materials != null && Supplies.Materials.TryGetValue(Owner.Player1, out int m) ? m : 0;
                 if (need > 0 && have < need)
                     allRestrictionsPass = false;
+            }
+
+            // Prologue: Unreal placement rules replace Acts geology / materials gates.
+            if (PrologueController.IsActive
+                && cardTilePlace
+                && activeCommand is BuildBuildingCommand prologueBbc
+                && PrologueCardMap.TryGetPrologueId(prologueBbc.Building, out var prologueId)
+                && prologueId != PrologueBuildingId.CommandPost
+                && PrologueController.Instance != null
+                && PrologueController.Instance.TryGetTileIndex(snapTarget, out int prologueTile))
+            {
+                allRestrictionsPass = PrologueController.Instance.Colony.Preview(
+                    prologueTile, prologueId, out _);
             }
 
             // Hysteresis so NavMesh / overlap edge cases don't strobe red/blue every frame.
@@ -1826,17 +1845,22 @@ namespace GameDevTV.RTS.Player
 
         private void ActivateAction(RaycastHit hit)
         {
-            if (Time.timeScale <= 0.01f)
+            // Prologue boots paused (timeScale=0). Instant hand cards like Survey Team must
+            // still fire — only ghost/placement clicks need a running clock.
+            bool allowWhilePaused = activeCommand is PlayCardCommand
+                                    || (activeCommand != null && !activeCommand.RequiresClickToActivate
+                                        && activeCommand is not BuildBuildingCommand);
+            if (Time.timeScale <= 0.01f && !allowWhilePaused)
             {
                 if (activeCommand is BuildBuildingCommand pausedBbc && pausedBbc.HandIndex >= 0)
                 {
                     ExplorationManager.NotifyPlacementFailed(
-                        "Game is paused — dismiss the overlay before placing tiles.",
+                        "Game is paused — hit 1x (or Space) before placing tiles.",
                         hit.point);
                 }
                 else
                 {
-                    Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Dismiss any draft/summary overlay first.");
+                    Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Hit 1x or Space first.");
                 }
                 return;
             }
@@ -1924,6 +1948,28 @@ namespace GameDevTV.RTS.Player
             // Colony Acts: no UCC hub. Owner-scoped commands (card place, etc.) run without a selected unit.
             if (abstractCommandables.Count == 0)
             {
+                // Prologue sim registration before the Unity building spawn.
+                if (PrologueController.IsActive
+                    && activeCommand is BuildBuildingCommand prologuePlace
+                    && PrologueCardMap.TryGetPrologueId(prologuePlace.Building, out var placeId)
+                    && placeId != PrologueBuildingId.CommandPost
+                    && PrologueController.Instance != null
+                    && PrologueController.Instance.TryGetTileIndex(hit.point, out int placeTile))
+                {
+                    if (!PrologueController.Instance.Colony.TryPlaceImmediate(placeTile, placeId, out string prologueReason))
+                    {
+                        ExplorationManager.NotifyPlacementFailed(
+                            string.IsNullOrEmpty(prologueReason)
+                                ? "Prologue: can't place here."
+                                : prologueReason,
+                            hit.point);
+                        activeCommand = null;
+                        commandTargetUnits.Clear();
+                        return;
+                    }
+                    PrologueController.Instance.RefreshHandUnlocks();
+                }
+
                 CommandContext ownerContext = new(Owner.Player1, null, hit);
                 if (activeCommand.CanHandle(ownerContext))
                 {
@@ -2150,12 +2196,13 @@ namespace GameDevTV.RTS.Player
             Ray ray = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
             if (Physics.Raycast(ray, out RaycastHit hit, float.MaxValue, floorLayers, QueryTriggerInteraction.Ignore))
             {
-                nextHoveredHex = HexGridManager.Instance.GetNearestRevealedHex(hit.point);
+                // Any hex under the cursor (not only revealed) so the outline still appears while surveying.
+                nextHoveredHex = HexGridManager.Instance.GetNearestHex(hit.point);
                 if (highlightTrace) Debug.Log($"[HexHighlight] Hover floor hit: point={hit.point}, collider={hit.collider.name}, mask={floorLayers.value}");
             }
             else if (Physics.Raycast(ray, out hit, float.MaxValue, ~0, QueryTriggerInteraction.Ignore))
             {
-                nextHoveredHex = HexGridManager.Instance.GetNearestRevealedHex(hit.point);
+                nextHoveredHex = HexGridManager.Instance.GetNearestHex(hit.point);
                 if (highlightTrace) Debug.Log($"[HexHighlight] Hover fallback hit: point={hit.point}, collider={hit.collider.name}");
             }
             else if (highlightTrace)
@@ -2177,6 +2224,13 @@ namespace GameDevTV.RTS.Player
 
             currentHex = HexGridManager.Instance.GetNearestHex(cameraTarget.position);
             if (highlightTrace) Debug.Log($"[HexHighlight] Current tile initialized at camera {cameraTarget.position}: {currentHex?.HexCoordinates.ToString() ?? "NULL"}");
+            // Prologue: hex outlines only appear under the cursor — don't pin a permanent selection ring.
+            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            {
+                currentHex?.SetHighlighted(false);
+                HexGridManager.Instance.RefreshAllOutlineVisibility();
+                return;
+            }
             currentHex?.SetHighlighted(true);
         }
 

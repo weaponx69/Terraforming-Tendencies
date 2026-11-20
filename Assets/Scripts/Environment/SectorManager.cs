@@ -233,15 +233,21 @@ namespace GameDevTV.RTS.Environment
             {
                 BeginTerraformingOn(Sectors[0]);
 
-                // Force-discover Minerals and Gas types so the player can bootstrap.
-                DiscoverySystem.RevealResourceType("Minerals");
-                DiscoverySystem.RevealResourceType("Gas");
+                // Prologue: deposits stay "?" until Survey Team uncovers them.
+                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null
+                                   || GameDevTV.RTS.Prologue.PrologueController.IsActive;
+                if (!prologueRun)
+                {
+                    // Force-discover Minerals and Gas types so the player can bootstrap (Acts).
+                    DiscoverySystem.RevealResourceType("Minerals");
+                    DiscoverySystem.RevealResourceType("Gas");
 
-                // FoW retired — geology features are known so Aquifers lock to WaterDeposit and Subglacial to Glacier.
-                foreach (var sector in Sectors)
-                    DiscoverySystem.RevealFeaturesForSector(sector);
+                    // FoW retired — geology features are known so Aquifers lock to WaterDeposit and Subglacial to Glacier.
+                    foreach (var sector in Sectors)
+                        DiscoverySystem.RevealFeaturesForSector(sector);
 
-                DiscoverStartingSectorResources();
+                    DiscoverStartingSectorResources();
+                }
                 UpdateSectorBorders();
                 OnSectorUnlocked?.Invoke();
             }
@@ -392,8 +398,13 @@ namespace GameDevTV.RTS.Environment
             if (!hasDoneStartingDiscovery && Sectors.Count > 0 && Time.timeSinceLevelLoad > 0.1f)
             {
                 hasDoneStartingDiscovery = true;
-                DiscoverResourcesInUnlockedSectors();
-                Debug.Log("[SectorManager] Completed deferred starting resource discovery (Sector 0).");
+                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null
+                                   || GameDevTV.RTS.Prologue.PrologueController.IsActive;
+                if (!prologueRun)
+                {
+                    DiscoverResourcesInUnlockedSectors();
+                    Debug.Log("[SectorManager] Completed deferred starting resource discovery (Sector 0).");
+                }
             }
         }
 

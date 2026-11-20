@@ -205,8 +205,10 @@ namespace GameDevTV.RTS.Commands
 
                 if (HandIndex >= 0)
                 {
+                    // Prologue owns placement gates (Preview / TryPlaceImmediate in PlayerInput).
+                    bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
                     bool colonyActs = ColonyActManager.Instance != null;
-                    if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                    if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Not enough spare power to place this card.";
@@ -214,7 +216,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!HasEnoughMaterialsForCard(context.Owner))
+                    if (!prologue && !HasEnoughMaterialsForCard(context.Owner))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? $"Need materials to place {Building.Name}.";
@@ -222,7 +224,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!HasEnoughWeeksForCard())
+                    if (!prologue && !HasEnoughWeeksForCard())
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Not enough weeks left to play this card.";
@@ -230,7 +232,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    if (!prologue
+                        && BuildingSiteRegistry.IsCommandPostBuilding(Building)
                         && !GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
                             context.Hit.point, out _, out string cpGateFail))
                     {
@@ -240,7 +243,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (BuildingSiteRegistry.IsMineBuilding(Building))
+                    if (!prologue && BuildingSiteRegistry.IsMineBuilding(Building))
                     {
                         if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
                         {
@@ -265,7 +268,8 @@ namespace GameDevTV.RTS.Commands
                             return;
                         }
                     }
-                    else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    else if (!prologue
+                        && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                         && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
@@ -274,7 +278,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    if (!prologue
+                        && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                         && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
@@ -283,7 +288,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature)
+                    if (!prologue
+                        && DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature)
                         && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
@@ -292,7 +298,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
+                    if (!prologue && !AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Can't place here.";
@@ -300,7 +306,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!ReservedSiteBuildUtility.TrySpendMaterials(Building, context.Owner))
+                    if (!prologue && !ReservedSiteBuildUtility.TrySpendMaterials(Building, context.Owner))
                     {
                         int need = ReservedSiteBuildUtility.GetMaterialsCost(Building);
                         ExplorationManager.NotifyPlacementFailed(
@@ -521,6 +527,10 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
+            // Prologue: Unreal ice-range rules live in PrologueColony.Preview — not Acts geology.
+            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                return true;
+
             // Deposit tiles are mine-only (Command Posts still claim their reserved pad).
             if (!BuildingSiteRegistry.IsMineBuilding(Building)
                 && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
@@ -623,7 +633,8 @@ namespace GameDevTV.RTS.Commands
                 return "That tile is reserved for the Command Post — place on an adjacent tile.";
             }
 
-            if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
+            if (!GameDevTV.RTS.Prologue.PrologueController.IsActive
+                && DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
             {
                 string featureName = DiscoverySystem.DescribeSectorFeature(feature);
                 if (!DiscoverySystem.IsSectorFeatureDiscovered(feature))

@@ -10,6 +10,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.Prologue;
 
 namespace GameDevTV.RTS.Player
 {
@@ -47,6 +48,9 @@ namespace GameDevTV.RTS.Player
         public static bool IsCardRelevantInFocusedSector(BlueprintCardSO card)
         {
             if (card == null) return false;
+            // Prologue hand is already filtered to the guided unlocks — never hide those cards.
+            if (PrologueController.IsActive) return true;
+
             var sector = SectorManager.Instance?.ActiveSector;
             if (sector == null) return true;
 
@@ -523,6 +527,8 @@ namespace GameDevTV.RTS.Player
 
         private void EnsureBootstrapUnlockInHand(string nameContains)
         {
+            if (PrologueController.IsActive) return;
+
             bool Match(BlueprintCardSO c) => MatchesBootstrapUnlock(c, nameContains);
 
             if (hand.Any(Match)) return;
@@ -592,6 +598,14 @@ namespace GameDevTV.RTS.Player
 
             InitializeDrawPile();
 
+            if (PrologueController.IsActive)
+            {
+                RebuildPrologueHand(PrologueController.Instance != null
+                    ? PrologueController.Instance.Colony
+                    : null);
+                return;
+            }
+
             // 1. Clear the hand
             hand.Clear();
 
@@ -647,6 +661,78 @@ namespace GameDevTV.RTS.Player
 
             // Force the bottom bar to refresh so the cards appear immediately
             Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        /// <summary>
+        /// Prologue hand = scan card (when needed) + unlocked Unreal-mapped buildings only.
+        /// </summary>
+        public void RebuildPrologueHand(PrologueColony colony)
+        {
+            hand.Clear();
+            if (masterDeck.Count == 0)
+                InitializeDrawPile();
+
+            bool wantDrone = true;
+            HashSet<PrologueBuildingId> unlocked = colony != null
+                ? colony.Unlocked
+                : new HashSet<PrologueBuildingId>();
+            if (colony != null)
+                colony.ObjectiveText(out _, out wantDrone);
+
+            if (wantDrone || (colony != null && colony.PrologueStep <= 0))
+            {
+                // Always seat Survey Team — never Orbital Scan (masterDeck order used to pick Orbital first).
+                BlueprintCardSO scan = null;
+                foreach (var c in masterDeck)
+                {
+                    if (c is ScoutingCardSO scout
+                        && scout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone)
+                    {
+                        scan = c;
+                        break;
+                    }
+                }
+                if (scan == null)
+                {
+                    try { scan = EnsureStarterCard<ScoutingCardSO>("Cards/SurveyDroneCard"); }
+                    catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Survey Team card missing: {ex.Message}"); }
+                }
+                if (scan != null) hand.Add(scan);
+            }
+
+            foreach (PrologueBuildingId id in unlocked)
+            {
+                if (id == PrologueBuildingId.None || id == PrologueBuildingId.CommandPost) continue;
+                BlueprintCardSO match = FindPrologueCard(id);
+                if (match != null && !hand.Contains(match))
+                    hand.Add(match);
+            }
+
+            Debug.Log($"[CardDeckController] Prologue hand ({hand.Count}): " +
+                      string.Join(", ", hand.ConvertAll(c => c != null ? c.cardName : "?")));
+
+            OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+        }
+
+        BlueprintCardSO FindPrologueCard(PrologueBuildingId id)
+        {
+            foreach (var c in masterDeck)
+            {
+                if (PrologueCardMap.TryGetPrologueId(c, out var mapped) && mapped == id)
+                    return c;
+            }
+
+            // Resource fallbacks by known asset paths
+            return id switch
+            {
+                PrologueBuildingId.Aquifer => EnsureStarterCard<UnlockBuildingCardSO>("Cards/WaterIceAquiferCard"),
+                PrologueBuildingId.Oxygen => EnsureStarterCard<UnlockBuildingCardSO>("Cards/OxygenProcessorCard"),
+                PrologueBuildingId.Solar => EnsureStarterCard<UnlockBuildingCardSO>("Cards/SolarPanelCard"),
+                PrologueBuildingId.Habitat => EnsureStarterCard<UnlockBuildingCardSO>("Cards/HabitatCard"),
+                PrologueBuildingId.WindTurbine => EnsureStarterCard<UnlockBuildingCardSO>("Cards/GeothermalGeneratorCard"),
+                _ => null
+            };
         }
 
         /// <summary>
@@ -834,6 +920,9 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         private void EnsureSolarPrereqInHand()
         {
+            // Prologue owns the hand — never inject Acts bootstrap cards into it.
+            if (PrologueController.IsActive) return;
+
             if (IsPowerGeneratorUnlockCardInHand()) return;
             EnsureBootstrapUnlockInHand("Solar");
             if (IsPowerGeneratorUnlockCardInHand()) return;
@@ -1248,6 +1337,19 @@ namespace GameDevTV.RTS.Player
             if (hand[handIndex] == null) return;
 
             BlueprintCardSO played = hand[handIndex];
+
+            // Prologue Survey Team first — bypass sector unlock gates (all sectors may already be open).
+            if (PrologueController.IsActive
+                && played is ScoutingCardSO prologueScout
+                && (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan
+                    || prologueScout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone))
+            {
+                played.Apply();
+                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+                OnHandChanged?.Invoke();
+                return;
+            }
+
             if (!played.IsGateMet())
             {
                 string reason = $"Cannot play '{played.cardName}' yet — requirements not met.";
@@ -1407,6 +1509,27 @@ namespace GameDevTV.RTS.Player
             }
 
             return -1;
+        }
+
+        /// <summary>
+        /// Prologue Survey Team: discard the survey card when paint ✓ confirms the search job.
+        /// </summary>
+        public bool ConsumePrologueSurveyCard()
+        {
+            if (!PrologueController.IsActive) return false;
+            int idx = FindExplorationScoutingCardIndex();
+            if (idx < 0) return false;
+
+            BlueprintCardSO played = hand[idx];
+            hand.RemoveAt(idx);
+            discardPile.Add(played);
+            // Rebuild guided hand — never FillHand (that pulls Acts clutter).
+            if (PrologueController.Instance != null)
+                RebuildPrologueHand(PrologueController.Instance.Colony);
+            else
+                OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return true;
         }
 
         // ── Draft UI (disabled) ──────────────────────────────────────────────

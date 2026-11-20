@@ -653,21 +653,30 @@ namespace GameDevTV.RTS.Environment
                     // Spawn visual markers (colored discs + labels)
                     SpawnNodeVisuals();
 
-                    // Resource types for Sector 0 are discovered before node visuals exist.
-                    // Re-apply so Minerals/Gas discs light up planet-wide (FoW retired).
-                    DiscoverySystem.RefreshDiscoveredResourceNodes();
-                    SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
-
-                    // Set Sector 0's first node as explored (entry point from UCC)
-                    if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
+                    bool prologueRun = Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null;
+                    if (prologueRun)
                     {
-                        var firstNode = SectorManager.Instance.Sectors[0].Nodes[0];
-                        Debug.Log($"[PlanetGenerator] First node has {firstNode.connections.Count} connections before OnExplored()");
-                        string connInfo = firstNode.connections.Count > 0
-                            ? $"explored={firstNode.connections[0].isExplored} discovered={firstNode.connections[0].isDiscovered}"
-                            : "NONE";
-                        firstNode.OnExplored();
-                        Debug.Log($"[PlanetGenerator] After OnExplored: {firstNode.connections.Count} connections. First connection: {connInfo}");
+                        // Prologue: leave every deposit as "?" — PrologueResourceFog owns reveal.
+                        Debug.Log("[PlanetGenerator] Prologue active — skipping auto-discover / first-node explore.");
+                    }
+                    else
+                    {
+                        // Resource types for Sector 0 are discovered before node visuals exist.
+                        // Re-apply so Minerals/Gas discs light up planet-wide (FoW retired).
+                        DiscoverySystem.RefreshDiscoveredResourceNodes();
+                        SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
+
+                        // Set Sector 0's first node as explored (entry point from UCC)
+                        if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
+                        {
+                            var firstNode = SectorManager.Instance.Sectors[0].Nodes[0];
+                            Debug.Log($"[PlanetGenerator] First node has {firstNode.connections.Count} connections before OnExplored()");
+                            string connInfo = firstNode.connections.Count > 0
+                                ? $"explored={firstNode.connections[0].isExplored} discovered={firstNode.connections[0].isDiscovered}"
+                                : "NONE";
+                            firstNode.OnExplored();
+                            Debug.Log($"[PlanetGenerator] After OnExplored: {firstNode.connections.Count} connections. First connection: {connInfo}");
+                        }
                     }
 
                     // Update visibility based on node states
@@ -1071,15 +1080,21 @@ namespace GameDevTV.RTS.Environment
                                                          qmGo.transform.position = spawnPos + Vector3.up * 3.2f;
                                                          qmGo.transform.parent = questionMarkRoot.transform;
                                                          var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
-                                                         string label = !string.IsNullOrEmpty(node.labelOverride)
-                                                             ? node.labelOverride
-                                                             : "?";
+                                                         bool prologueRun = Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null;
+                                                         // Prologue: every deposit/feature is a mystery "?" until Survey Team uncovers it.
+                                                         string label = prologueRun
+                                                             ? "?"
+                                                             : (!string.IsNullOrEmpty(node.labelOverride)
+                                                                 ? node.labelOverride
+                                                                 : "?");
                                                          qmText.text = label;
                                                          qmText.fontSize = node.type == SectorNode.NodeType.Feature ? 6f : 5f;
                                                          qmText.alignment = TMPro.TextAlignmentOptions.Center;
-                                                         qmText.color = node.type == SectorNode.NodeType.Feature
-                                                             ? new Color(0.55f, 0.95f, 1f)
-                                                             : Color.yellow;
+                                                         qmText.color = prologueRun
+                                                             ? new Color(1f, 0.92f, 0.2f, 1f)
+                                                             : (node.type == SectorNode.NodeType.Feature
+                                                                 ? new Color(0.55f, 0.95f, 1f)
+                                                                 : Color.yellow);
                                                          qmText.fontStyle = TMPro.FontStyles.Bold;
                                                          qmText.transform.localScale = Vector3.one * 0.9f;
                                                          node.questionMarkGO = qmGo;
@@ -1131,10 +1146,40 @@ namespace GameDevTV.RTS.Environment
                 /// </summary>
                 private void UpdateAllNodeVisibility()
                 {
+                    bool prologueRun = Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null;
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
                         foreach (var node in sector.Nodes)
                         {
+                            if (prologueRun)
+                            {
+                                // Keep GO alive for fog/reveal, but hide colored pucks — only "?" until survey.
+                                node.SetVisualVisible(true);
+                                if (node.visualGO != null)
+                                {
+                                    foreach (var r in node.visualGO.GetComponentsInChildren<Renderer>(true))
+                                        if (r != null) r.enabled = false;
+                                    if (node.visualGO.TryGetComponent(out GatherableSupply gs))
+                                    {
+                                        gs.SetVisible(false);
+                                        gs.ToggleColliders(false);
+                                    }
+                                }
+                                if (node.questionMarkGO != null)
+                                {
+                                    node.questionMarkGO.SetActive(true);
+                                    var tmp = node.questionMarkGO.GetComponent<TMPro.TextMeshPro>();
+                                    if (tmp != null)
+                                    {
+                                        tmp.text = "?";
+                                        tmp.color = new Color(1f, 0.92f, 0.2f, 1f);
+                                    }
+                                }
+                                node.isExplored = false;
+                                node.isDiscovered = true;
+                                continue;
+                            }
+
                             node.SetVisualVisible(true);
                             // Feature / nexus keep name labels; hide legacy "?" on resources
                             // (HiddenResource beacons carry the deposit name instead).

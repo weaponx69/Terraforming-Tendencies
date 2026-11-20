@@ -1,5 +1,7 @@
 using UnityEngine;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.UI;
 
 namespace GameDevTV.RTS.Player
 {
@@ -15,6 +17,11 @@ namespace GameDevTV.RTS.Player
     
             public ScoutingType scoutingType;
             public int materialsAmount = 0;
+
+            [Tooltip("Prologue Survey Team: max tiles you can paint before ✓.")]
+            public int surveyTileBudget = PrologueSurveyMission.DefaultTileBudget;
+            [Tooltip("Prologue Survey Team: colony days the search takes after ✓.")]
+            public int surveyDays = PrologueSurveyMission.DefaultDays;
     
             public override string GetCardGoal()
             {
@@ -30,6 +37,11 @@ namespace GameDevTV.RTS.Player
     
             public override bool CanApply()
             {
+                // Prologue: Orbital Scan / Survey Drone open paint-path ice discovery.
+                if (PrologueController.IsActive
+                    && (scoutingType == ScoutingType.OrbitalScan || scoutingType == ScoutingType.SurveyDrone))
+                    return true;
+
                 if (!IsGateMet()) return false;
                 if (!CanAffordMaterials()) return false;
 
@@ -53,6 +65,10 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
+                if (PrologueController.IsActive
+                    && (scoutingType == ScoutingType.OrbitalScan || scoutingType == ScoutingType.SurveyDrone))
+                    return 0;
+
                 if (MaterialsCost > 0) return MaterialsCost;
                 return scoutingType switch
                 {
@@ -66,6 +82,18 @@ namespace GameDevTV.RTS.Player
 
             public override void Apply()
             {
+                if (PrologueController.IsActive
+                    && (scoutingType == ScoutingType.OrbitalScan || scoutingType == ScoutingType.SurveyDrone))
+                {
+                    int tiles = surveyTileBudget > 0 ? surveyTileBudget : PrologueSurveyMission.DefaultTileBudget;
+                    int days = surveyDays > 0 ? surveyDays : PrologueSurveyMission.DefaultDays;
+                    var mission = PrologueSurveyMission.Instance
+                                  ?? new GameObject("PrologueSurveyMission").AddComponent<PrologueSurveyMission>();
+                    mission.BeginFromCard(tiles, days);
+                    Debug.Log($"[Prologue] Survey Team card → paint up to {tiles} tiles / {days} days.");
+                    return;
+                }
+
                 var explorationMgr = Environment.ExplorationManager.Instance;
     
                 switch (scoutingType)
@@ -118,6 +146,11 @@ namespace GameDevTV.RTS.Player
             {
                 if (scoutingType == ScoutingType.EmergencyCaches) return true;
                 if (scoutingType == ScoutingType.PipelineBoost) return true;
+
+                // Prologue Survey Team / Orbital Scan do not use sector unlock gates.
+                if (PrologueController.IsActive
+                    && (scoutingType == ScoutingType.OrbitalScan || scoutingType == ScoutingType.SurveyDrone))
+                    return true;
 
                 var sectorMgr = Environment.SectorManager.Instance;
                 if (sectorMgr == null) return false;
