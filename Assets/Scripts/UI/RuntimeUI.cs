@@ -8,6 +8,7 @@ using GameDevTV.RTS.Units;
 using UnityEngine;
 using TMPro;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Prologue;
 using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI
@@ -230,8 +231,8 @@ namespace GameDevTV.RTS.UI
                     Destroy(actionsContainer.gameObject);
                 }
 
-                // Debug/layout: make Center Container bounds obvious over the world.
-                EnsureOpaqueBoxAround(FindChildRecursive(bottomBar, "Center Container"));
+                // Do NOT paint an opaque debug plate over Center Container — it covers the
+                // map and reads as "UI scrolled off screen" during Prologue playtests.
 
                 // Leave the lower-left corner for the card hand — shove selection info right.
                 ShiftBuildingSelectedPanelRight(bottomBar);
@@ -724,6 +725,15 @@ namespace GameDevTV.RTS.UI
         private void Update()
         {
             if (!Application.isPlaying) return;
+
+            // Prologue owns the top of the screen — hide Acts resource chrome so it
+            // cannot overlap / scroll the Prologue objective off-screen.
+            if (PrologueController.IsActive)
+            {
+                HideActsResourceChrome();
+                return;
+            }
+
             UpdateSectorsUI();
             if (!layoutRebuilt)
             {
@@ -731,6 +741,34 @@ namespace GameDevTV.RTS.UI
                 RebuildLayouts();
                 ApplyHudReadability();
             }
+        }
+
+        void HideActsResourceChrome()
+        {
+            Transform root = transform;
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas != null) root = canvas.transform;
+
+            // Whole chrome strips — not just metric leaves (Supplies Bar holds Materials/O2/…).
+            string[] panels =
+            {
+                "Top Resource Bar", "Supplies Bar", "Active Objectives Panel", "Weeks Left Panel",
+                "Generation Summary UI Controller", "Foundry Starvation UI", "Expansion Proposal UI"
+            };
+            foreach (string name in panels)
+            {
+                Transform t = root.Find(name) ?? FindChildRecursive(root, name);
+                if (t != null && t.gameObject.activeSelf)
+                    t.gameObject.SetActive(false);
+            }
+
+            // Kill leftover debug opaque plates under Bottom Bar / Center Container.
+            Transform debugBox = FindChildRecursive(root, "Center Container Debug Box");
+            if (debugBox != null)
+                UnityEngine.Object.Destroy(debugBox.gameObject);
+
+            if (populationText != null && populationText.gameObject.activeSelf)
+                populationText.gameObject.SetActive(false);
         }
 
         private void RebuildLayouts()
@@ -758,6 +796,12 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void ApplyHudReadability()
         {
+            if (PrologueController.IsActive)
+            {
+                HideActsResourceChrome();
+                return;
+            }
+
             EnsureTopResourceBar();
 
             StyleMetric(materialsLabelText, materialsValueText, null, "Materials");
@@ -904,6 +948,8 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void EnsureMaterialsMetricVisible()
         {
+            if (PrologueController.IsActive) return;
+
             if (materialsLabelText == null || materialsValueText == null)
             {
                 FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText,

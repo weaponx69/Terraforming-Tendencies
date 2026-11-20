@@ -669,7 +669,8 @@ namespace GameDevTV.RTS.Units
                 // Trigger grid recalculation on construction completed
                 GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
             }
-            if (isCommandPost && Owner == Owner.Player1)
+            if (isCommandPost && Owner == Owner.Player1
+                && !GameDevTV.RTS.Prologue.PrologueController.IsActive)
             {
                 var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Include);
                 int count = 0;

@@ -10,16 +10,40 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 ---
 
-## 0. Authoritative Run Model — Combolands Colony Acts
+## 0. Authoritative Run Model — Unreal Prologue clone (Frostpunk 2 + cards)
 
-**One-sentence game:** Draw building **tiles** → place on procedural geology for **Materials** (placement `+N` + week mining) and **terraforming resources** → spend **weeks** → clear a fixed Act ladder by paying a **Corp Materials quota** + climate → spend **Terra-Coins** on between-Act upgrades → expand with **Command Posts** → terraform **every** sector to win.
+**One-sentence game:** Frostpunk 2–like guided Prologue on a flat hex board — find ice, drill it, power an Oxygen Processor, house the shuttle, survive the dust storm — via **cards** and **End Week** (O2 / beds / power pressure). Survey exploration should play as a **spatial puzzle** (Blue Prince–like), not casual fog-clear. **Future:** player picks planet type before the run.
 
-**Inspiration:** [Combolands](https://store.steampowered.com/app/4075620/Combolands/) — place tiles under a turn budget; meet a tax (here: Corp Materials quota). **Acts are independent of sectors.** Geography expands when you place Command Posts.
+**Source of truth:** Unreal `TerraformTendencies` Prologue (`TTStory` / `TTColony`). Spec: [`.summer/specs/2026-11-18-unity-unreal-prologue-clone-design.md`](.summer/specs/2026-11-18-unity-unreal-prologue-clone-design.md). Plan: [`.summer/plans/2026-11-18-unity-unreal-prologue-clone.md`](.summer/plans/2026-11-18-unity-unreal-prologue-clone.md).
 
-### Owner scripts
+**Colony Acts (Combolands Materials quotas / adjacency combos / Terra-Coins) is ARCHIVED** — code may remain but must not `BeginRun` when [`PrologueController`](Assets/Scripts/Prologue/PrologueController.cs) is active.
+
+### Owner scripts (Prologue)
 | Role | Script |
 |------|--------|
-| Acts, weeks, score, win/fail | [`ColonyActManager`](Assets/Scripts/Player/ColonyActManager.cs) |
+| Prologue sim (week, O2, steps) | [`PrologueColony`](Assets/Scripts/Prologue/PrologueColony.cs) |
+| Scene boot / board sync | [`PrologueController`](Assets/Scripts/Prologue/PrologueController.cs) |
+| Constants / buildings | [`PrologueData`](Assets/Scripts/Prologue/PrologueData.cs) |
+| Card ↔ building map | [`PrologueCardMap`](Assets/Scripts/Prologue/PrologueCardMap.cs) |
+| Survey paint trail | [`PrologueDroneScan`](Assets/Scripts/Prologue/PrologueDroneScan.cs) |
+| Survey Team day job + anim | [`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs) |
+| Typed resource stocks + mine harvest | [`PrologueResourceId`](Assets/Scripts/Prologue/PrologueResourceId.cs), [`PrologueMineExtractor`](Assets/Scripts/Prologue/PrologueMineExtractor.cs), [`PrologueHarvestDrones`](Assets/Scripts/Prologue/PrologueHarvestDrones.cs); extractors: Deep-Core / Basalt / **Gas Well** / **Iron Ore Extractor** |
+| Objective / AIR / End Week HUD | [`PrologueHUD`](Assets/Scripts/UI/PrologueHUD.cs) |
+| Hex snap (shared) | [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) |
+| Prologue-gated hand | [`CardDeckController.RebuildPrologueHand`](Assets/Scripts/Player/CardDeckController.cs) |
+
+**v1 delta vs Unreal:** construction is immediate (`TryPlaceImmediate`); Steel/Concrete/builder pool not ported yet. Wind Turbine card uses Geothermal Generator asset as stand-in.
+
+**Playability (2026-11-18 blind playtest):** Prologue completes step 0→6 with End Week. HUD owns the top of the screen (Acts Supplies Bar / debug Center Container plate hidden). Board seeds ≥2 ice pads; step-4 aquifer must reach the *new* ice. Free card play costs in Prologue. Screenshots under `Assets/.summer/playtest/`.
+
+**Time-lapse:** [`PrologueTimeLapse`](Assets/Scripts/Prologue/PrologueTimeLapse.cs) drives `Time.timeScale` (default **paused** = 0; 1× ≈ 20s/week) so anims/builds/weeks share one clock. Banner `II 0.5x 1x 2x 4x`; **Space** toggles pause. **Survey Team** card: play → paint up to **5** tiles → green ✓ → **3 colony days** tick while drones/crew wander the path, then reveal ([`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs); spec [`.summer/specs/2026-11-19-prologue-survey-team-design.md`](.summer/specs/2026-11-19-prologue-survey-team-design.md)). Card stays in hand until ✓. Searched hexes get a light tint ([`PrologueSearchedTiles`](Assets/Scripts/Prologue/PrologueSearchedTiles.cs)). Deposits stay **?** until searched ([`PrologueResourceFog`](Assets/Scripts/Prologue/PrologueResourceFog.cs)); Command Post does **not** auto-spawn a gather drone. Aquifer places by ice range (not Acts WaterDeposit geology).
+
+**Design intent (2026-11-20):** Not casual — Frostpunk 2 tone. Survey Team ground capsules = **spacesuit people** (placeholder art). Survey = puzzle routing (Blue Prince–like). Resources stay **individual stocks**; **planet type** chooses which exist via `PlanetConfig` deny-list (`DenyMinerals` / `DenyGas` / `DenyIron` / `DenyRegolith`; missing = allow all); **future** pre-run planet select. Mine-on-deposit (`PrologueMineExtractor`) credits typed stocks on End Week (8/wk) + Survey-style harvest drones. Specs: [`.summer/specs/2026-11-20-individual-resources-design.md`](.summer/specs/2026-11-20-individual-resources-design.md), [`GDD.md`](GDD.md) § Current design decisions.
+
+### Archived — Colony Acts (do not treat as run model)
+| Role | Script |
+|------|--------|
+| Acts, weeks, score, win/fail | [`ColonyActManager`](Assets/Scripts/Player/ColonyActManager.cs) — **archived** |
 | Tile grid / join snap | [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) |
 | Hand draw / consume card | [`CardDeckController`](Assets/Scripts/Player/CardDeckController.cs) |
 | Free ground place (cards) | [`BuildBuildingCommand`](Assets/Scripts/Commands/BuildBuildingCommand.cs) + [`BottomBarActionsUI`](Assets/Scripts/UI/Containers/BottomBarActionsUI.cs) |
@@ -100,6 +124,8 @@ Climate tickers **do** count for Act clear (with Colony Score). They are not the
 | Lava Tube Outpost / Subterranean Apartment | `LavaTube` |
 | Magnetic Shield / Sector Command Center | `FaultLine` |
 | Deep-Core Mining Laser | Minerals deposit tile |
+| Gas Well | Gas deposit tile |
+| Iron Ore Extractor | Iron deposit tile |
 | Basalt Strip-Mine | Regolith deposit tile |
 
 * **Mine deposits** show large colored discs + type labels once discovered (Minerals/Gas from start). Old node-shroud no longer hides them.

@@ -145,11 +145,14 @@ namespace GameDevTV.RTS.Environment
                     return;
                 }
 
-                outline.enabled = IsRevealed;
-                if (!IsRevealed) return;
+                // Only draw a hex when the cursor (or keyboard selection) is on it —
+                // never leave a permanent cyan/dark grid over the whole map.
+                bool show = isHovered || isHighlighted;
+                outline.enabled = show;
+                if (!show) return;
 
-                Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : isHovered ? Color.white : Color.cyan;
-                float width = isHighlighted ? 0.32f : isHovered ? 0.22f : 0.1f;
+                Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : Color.white;
+                float width = isHighlighted ? 0.32f : 0.22f;
                 outline.startColor = color;
                 outline.endColor = color;
                 outline.startWidth = width;
@@ -160,6 +163,27 @@ namespace GameDevTV.RTS.Environment
                     if (outlineMaterial.HasProperty("_Color")) outlineMaterial.SetColor("_Color", color);
                 }
             }
+
+            /// <summary>Re-apply outline visibility (e.g. after the hover-only policy lands).</summary>
+            public void RefreshOutlineVisibility()
+            {
+                if (GameObject != null)
+                {
+                    foreach (var rend in GameObject.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (rend is LineRenderer) continue;
+                        rend.enabled = false;
+                    }
+                }
+                UpdateOutline();
+            }
+        }
+
+        /// <summary>Force every hex outline to re-evaluate (hides the permanent grid).</summary>
+        public void RefreshAllOutlineVisibility()
+        {
+            foreach (var tile in hexGrid.Values)
+                tile.RefreshOutlineVisibility();
         }
         
         /// <summary>
@@ -391,7 +415,14 @@ namespace GameDevTV.RTS.Environment
                 modifier.ignoreFromBuild = true;
             }
 
-            // ADD PERMANENT OUTLINE
+            // Hide shroud cylinder / mesh — hexes should not paint the map; outline is hover-only.
+            foreach (var rend in hexGO.GetComponentsInChildren<Renderer>(true))
+            {
+                if (rend is LineRenderer) continue;
+                rend.enabled = false;
+            }
+
+            // Hover / selection outline only (starts disabled).
             LineRenderer lr = hexGO.AddComponent<LineRenderer>();
             lr.useWorldSpace = true; // Use world space so the prefab's scale doesn't warp the lines!
             lr.loop = true;
@@ -405,7 +436,7 @@ namespace GameDevTV.RTS.Environment
             lr.numCapVertices = 2;
             lr.sortingOrder = 100;
             lr.enabled = false;
-            lr.startColor = Color.cyan; // Solid cyan!
+            lr.startColor = Color.cyan;
             lr.endColor = Color.cyan;
             
             // Draw a flat-topped hexagon (corners at 0, 60, 120, 180, 240, 300)

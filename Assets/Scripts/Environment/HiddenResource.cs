@@ -74,6 +74,32 @@ namespace GameDevTV.RTS.Environment
             Bus<ResourceDiscoveredEvent>.Raise(Owner.Unowned, new ResourceDiscoveredEvent(this));
         }
 
+        /// <summary>
+        /// Prologue fog: put the deposit back under a "?" (even if Acts auto-discover already ran).
+        /// </summary>
+        public void ConcealForPrologue()
+        {
+            IsDiscovered = false;
+            if (TryGetComponent<GatherableSupply>(out var supply))
+            {
+                supply.ToggleColliders(false);
+                supply.SetVisible(false);
+            }
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+            {
+                if (r != null) r.enabled = false;
+            }
+            foreach (var ps in GetComponentsInChildren<ParticleSystem>(true))
+            {
+                if (ps == null) continue;
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                ps.gameObject.SetActive(false);
+            }
+            var label = transform.Find("DepositLabel");
+            if (label != null)
+                Object.Destroy(label.gameObject);
+        }
+
         /// <summary>Larger emissive pad + floating type label so mine spots read from camera height.</summary>
         private void EnhanceDepositBeacon()
         {

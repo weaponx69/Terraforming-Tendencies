@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85eb7fe236bb438cb8a8d47685a60f67, type: 3}
+  m_Name: IronOreExtractorCard
+  m_EditorClassIdentifier: 
+  cardName: Iron Ore Extractor
+  cardDescription: Extracts Iron from a discovered iron deposit. Place on the matching pad.
+  buildingToUnlock: {fileID: 11400000, guid: e32e94cff76147498734388132f841a8, type: 2}
+  minTemperature: -9999.0
+  maxTemperature: 9999.0
+  minOxygen: -9999.0
+  maxOxygen: 9999.0
+  minAtmosphere: -9999.0
+  maxAtmosphere: 9999.0
+  minWater: -9999.0
+  maxWater: 9999.0
+  requiredSectorFeature: 0
