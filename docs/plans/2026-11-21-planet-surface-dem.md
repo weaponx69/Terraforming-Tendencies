@@ -33,7 +33,7 @@
 **Files:**
 - Modify: `Assets/Scripts/Environment/PlanetConfig.cs`
 
-- [ ] **Step 1: Add DEM / photo fields**
+- [x] **Step 1: Add DEM / photo fields**
 
 Under `[Header("Terrain Generation")]`, after `LandingFlatRadius`, add:
 
@@ -51,7 +51,7 @@ public Texture2D NormalMap;
 
 Keep existing `NoiseScale`, `HeightMultiplier`, `TerrainSeed`, `LandingFlatRadius` for fallback / flatten.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add Assets/Scripts/Environment/PlanetConfig.cs
