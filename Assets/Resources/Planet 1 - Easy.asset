@@ -17,9 +17,9 @@ MonoBehaviour:
   NoiseScale: 28
   HeightMultiplier: 24
   TerrainSeed: 1042
-  LandingFlatRadius: 16
+  LandingFlatRadius: 18
   Heightmap: {fileID: 2800000, guid: 5f6e3f7f7ef71362aabb69450cd6d204, type: 3}
-  HeightAmplitude: 12
+  HeightAmplitude: 36
   AlbedoMap: {fileID: 2800000, guid: 66699c6387450b35e95e9fdbb8b23fd8, type: 3}
   NormalMap: {fileID: 0}
   ResourceCount: 40
