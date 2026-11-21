@@ -1710,14 +1710,9 @@ namespace GameDevTV.RTS.Environment
                     MeshRenderer renderer = GetComponent<MeshRenderer>();
                     if (renderer == null) return;
 
-                    // Photo albedo planets keep DEM surface texture; only tint if needed.
+                    // Photo albedo planets keep the authored surface exact — no climate tint washout.
                     if (Config != null && Config.AlbedoMap != null)
-                    {
-                        Material photoMat = renderer.material;
-                        if (photoMat != null && photoMat.HasProperty("_BaseColor"))
-                            photoMat.SetColor("_BaseColor", baseTint);
                         return;
-                    }
 
                     Material mat = renderer.material; // instance so we don't mutate a shared asset
                     if (mat == null) return;
