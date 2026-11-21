@@ -8,8 +8,24 @@ namespace GameDevTV.RTS.Environment
         [Header("Terrain Generation")]
         public int MapWidth = 100;
         public int MapHeight = 100;
+        [Tooltip("Horizontal scale for Perlin hills (larger = broader features).")]
         public float NoiseScale = 10f;
+        [Tooltip("World-unit peak amplitude for hills/valleys.")]
         public float HeightMultiplier = 5f;
+        [Tooltip("0 = hash from asset name. Same seed → same mountains for this planet type.")]
+        public int TerrainSeed;
+        [Tooltip("World radius around landing kept nearly flat for CP / early Survey.")]
+        public float LandingFlatRadius = 28f;
+
+        [Header("Surface maps (Easy: curated DEM + photo)")]
+        [Tooltip("Grayscale DEM. Bright = high. Null → Perlin fallback.")]
+        public Texture2D Heightmap;
+        [Tooltip("World-unit vertical span from black (0) to white (1) on Heightmap.")]
+        public float HeightAmplitude = 12f;
+        [Tooltip("Photo albedo for the planet mesh.")]
+        public Texture2D AlbedoMap;
+        [Tooltip("Optional normal map; may be null in v1.")]
+        public Texture2D NormalMap;
 
         [Header("Difficulty Modifiers")]
         public int ResourceCount = 10;
