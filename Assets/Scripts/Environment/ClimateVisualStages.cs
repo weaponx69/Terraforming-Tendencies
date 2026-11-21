@@ -196,7 +196,13 @@ namespace GameDevTV.RTS.Environment
             Color high = Color.Lerp(highA, highB, blend);
             Color tint = Color.Lerp(tintA, tintB, blend);
 
-            if (PlanetGenerator.Instance != null)
+            if (PlanetGenerator.Instance != null
+                && PlanetGenerator.Instance.Config != null
+                && PlanetGenerator.Instance.Config.AlbedoMap != null)
+            {
+                // Photo / DEM surface planets keep authored albedo; skip climate gradient swap.
+            }
+            else if (PlanetGenerator.Instance != null)
             {
                 PlanetGenerator.Instance.ApplyClimateGroundPalette(low, mid, high, tint);
             }

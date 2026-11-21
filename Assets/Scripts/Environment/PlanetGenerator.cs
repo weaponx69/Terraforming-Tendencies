@@ -185,9 +185,12 @@ namespace GameDevTV.RTS.Environment
                     surface.agentTypeID = settings.agentTypeID;
 
                     // Use Children for Air Units to only bake the FlyZone elevated mesh
-                    // Use All for ground units to catch ghosts and expansion features
+                    // Use All for ground units to catch Terrain collider + ghosts
                     surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
-                    surface.useGeometry = NavMeshCollectGeometry.RenderMeshes; 
+                    // PhysicsColliders so Unity Terrain (hills) is walkable; air still uses RenderMeshes children.
+                    surface.useGeometry = isAirAgent
+                        ? NavMeshCollectGeometry.RenderMeshes
+                        : NavMeshCollectGeometry.PhysicsColliders; 
                 
                     int mask = ~0;
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
@@ -356,14 +359,24 @@ namespace GameDevTV.RTS.Environment
                 float minHeight = 0f;
                 float maxHeight = 0.1f; // Avoid divide by zero in UV mapping
 
+                // Seeded hills on the visible mesh (same function as PlanetTerrainBuilder collider).
+                Vector3 landingLocal = transform.InverseTransformPoint(StartingAreaCenter);
+                var heightParams = PlanetTerrainBuilder.MakeParams(Config, CellSize, landingLocal);
+
                 for (int i = 0, y = 0; y <= height; y++)
                 {
                 for (int x = 0; x <= width; x++, i++)
                 {
-                    // Flat terrain
-                    float yPos = 0f;
+                    float wx = x * CellSize;
+                    float wz = y * CellSize;
+                    float yPos = PlanetTerrainBuilder.SampleWorldY(wx, wz, in heightParams);
 
-                    vertices[i] = new Vector3(x * CellSize, yPos, y * CellSize);
+                    vertices[i] = new Vector3(wx, yPos, wz);
+                    float u = width > 0 ? x / (float)width : 0f;
+                    float v = height > 0 ? y / (float)height : 0f;
+                    uvs[i] = new Vector2(u, v);
+                    if (yPos < minHeight) minHeight = yPos;
+                    if (yPos > maxHeight) maxHeight = yPos;
                 }
                 }
 
@@ -376,13 +389,6 @@ namespace GameDevTV.RTS.Environment
                     triangles[ti + 4] = triangles[ti + 1] = vi + width + 1;
                     triangles[ti + 5] = vi + width + 2;
                 }
-                }
-
-                // Assign UVs strictly based on normalized height for the gradient mapping
-                for (int i = 0; i < vertices.Length; i++)
-                {
-                float normHeight = Mathf.InverseLerp(minHeight, maxHeight, vertices[i].y);
-                uvs[i] = new Vector2(0, normHeight);
                 }
 
                 mesh.vertices = vertices;
@@ -434,16 +440,7 @@ namespace GameDevTV.RTS.Environment
                     : Vector3.zero;
                 Debug.Log($"[PlanetGenerator] World bounds min={mapMin}, max={mapMax}, center={mapCenter}; Sector 0 center={sectorCenter}; offset={sectorCenter - mapCenter}");
 
-                MeshRenderer renderer = GetComponent<MeshRenderer>();
-                Shader shader = Shader.Find("Custom/URP_CurvedWorld");
-                if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-                if (shader != null)
-                {
-                Material mat = new Material(shader);
-                mat.mainTexture = GenerateHeightGradient();
-                mat.SetFloat("_Smoothness", 0.1f); // Smooth but not shiny
-                renderer.sharedMaterial = mat;
-                }
+                ApplyAuthoredOrGradientSurface();
 
                 // Create 8 visual ghosts for seamless wrapping
                 float mapWidthWorld = width * CellSize;
@@ -468,7 +465,8 @@ namespace GameDevTV.RTS.Environment
                         mf.sharedMesh = mesh;
                         
                         MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
-                        mr.sharedMaterial = renderer.sharedMaterial;
+                        if (TryGetComponent<MeshRenderer>(out var mainMr))
+                            mr.sharedMaterial = mainMr.sharedMaterial;
 
                         MeshCollider mc = ghost.AddComponent<MeshCollider>();
                         mc.sharedMesh = mesh;
@@ -484,19 +482,143 @@ namespace GameDevTV.RTS.Environment
                     SectorManager.Instance.InitializeSectors();
                 }
 
+                // Terrain collider / SampleHeight (visual hills are already on the mesh above).
+                Vector3 landing = StartingAreaCenter;
+                try
+                {
+                    var built = PlanetTerrainBuilder.BuildOrUpdate(transform, Config, CellSize, landing);
+                    if (built == null)
+                        Debug.LogWarning("[PlanetGenerator] PlanetTerrainBuilder returned null — using mesh heights only.");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PlanetGenerator] Terrain build failed: {ex.Message}\n{ex.StackTrace}");
+                }
+                // Keep MeshRenderer on — mesh carries visible relief. Hide wrap ghosts' flat duplicates
+                // only if they were never rebuilt with height (ghosts share the same mesh → OK to show).
+                Debug.Log($"[PlanetGenerator] Mesh relief span Y=[{minHeight:0.#}..{maxHeight:0.#}] wavelength={heightParams.Wavelength:0.#} amp={heightParams.HeightAmp:0.#}");
+
                 // Place resource nodes per sector (replaces old random scatter)
                 PlaceSectorResourceNodes();
 
                 BakeAllNavMeshes();
-                // Curved world shader disabled — flat terrain looks better for node-based exploration
+                // Curved world shader disabled — Terrain provides relief instead.
                 // ApplyCurvedWorldShader(gameObject);
                 // GameObject updater = new GameObject("CurvedWorldUpdater");
                 // updater.transform.parent = transform;
                 // updater.AddComponent<CurvedWorldUpdater>();
 
+                GroundExistingWorldObjects();
+
                 HasGenerated = true;
                 OnPlanetGenerated?.Invoke();
+                // ClimateVisualStages may swap gradients on the same frame — reassert photo albedo.
+                ApplyAuthoredOrGradientSurface();
+                if (Application.isPlaying && Config != null && Config.AlbedoMap != null)
+                    StartCoroutine(CoReassertPhotoSurface());
                 }
+
+        System.Collections.IEnumerator CoReassertPhotoSurface()
+        {
+            yield return null;
+            ApplyAuthoredOrGradientSurface();
+        }
+
+        /// <summary>URP Lit with AlbedoMap when authored; otherwise height-band gradient.</summary>
+        public void ApplyAuthoredOrGradientSurface()
+        {
+            if (Config == null) return;
+            if (!TryGetComponent<MeshRenderer>(out var renderer)) return;
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit")
+                            ?? Shader.Find("Universal Render Pipeline/Simple Lit")
+                            ?? Shader.Find("Custom/URP_CurvedWorld");
+            if (shader == null) return;
+
+            Material mat = new Material(shader);
+            if (Config.AlbedoMap != null)
+            {
+                mat.mainTexture = Config.AlbedoMap;
+                if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", Config.AlbedoMap);
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", Color.white);
+                if (Config.NormalMap != null && mat.HasProperty("_BumpMap"))
+                {
+                    mat.SetTexture("_BumpMap", Config.NormalMap);
+                    mat.EnableKeyword("_NORMALMAP");
+                }
+                if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.05f);
+            }
+            else
+            {
+                var grad = GenerateHeightGradient();
+                grad.name = "ClimateGroundGrad";
+                mat.mainTexture = grad;
+                if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", grad);
+                if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.1f);
+            }
+
+            renderer.sharedMaterial = mat;
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child == null || !child.name.StartsWith("Terrain Ghost", System.StringComparison.Ordinal))
+                    continue;
+                if (child.TryGetComponent<MeshRenderer>(out var gmr))
+                    gmr.sharedMaterial = mat;
+            }
+
+            Debug.Log(Config.AlbedoMap != null
+                ? $"[PlanetGenerator] Surface material = photo albedo '{Config.AlbedoMap.name}'"
+                : "[PlanetGenerator] Surface material = ClimateGroundGrad fallback");
+        }
+
+        /// <summary>Pin buildings / deposits / gatherables to the mesh height after relief is baked.</summary>
+        void GroundExistingWorldObjects()
+        {
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null) continue;
+                Vector3 p = b.transform.position;
+                p.y = SampleGroundY(p);
+                b.transform.position = p;
+            }
+
+            foreach (var gs in Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude))
+            {
+                if (gs == null) continue;
+                Vector3 p = gs.transform.position;
+                p.y = SampleGroundY(p);
+                gs.transform.position = p;
+            }
+
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null) continue;
+                Vector3 p = hr.transform.position;
+                p.y = SampleGroundY(p);
+                hr.transform.position = p;
+            }
+        }
+
+        /// <summary>World Y from the same seeded height field as the visible mesh.</summary>
+        public float SampleGroundY(Vector3 worldPos)
+        {
+            if (Config != null)
+            {
+                Vector3 local = transform.InverseTransformPoint(worldPos);
+                Vector3 landingLocal = transform.InverseTransformPoint(StartingAreaCenter);
+                var p = PlanetTerrainBuilder.MakeParams(Config, CellSize, landingLocal);
+                float yLocal = PlanetTerrainBuilder.SampleWorldY(local.x, local.z, in p);
+                return transform.TransformPoint(new Vector3(local.x, yLocal, local.z)).y;
+            }
+
+            int mask = LayerMask.GetMask("Default", "Terrain");
+            if (mask == 0) mask = Physics.DefaultRaycastLayers;
+            if (Physics.Raycast(worldPos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f, mask,
+                    QueryTriggerInteraction.Ignore))
+                return hit.point.y;
+            return 0f;
+        }
 
                 /// <summary>
                 /// Place resource, feature, and nexus nodes in each sector.
@@ -561,7 +683,7 @@ namespace GameDevTV.RTS.Environment
                                     {
                                         var cell = new Vector2Int(cpCell.x + dq, cpCell.y + dr);
                                         if (ColonyTileGrid.HexDistance(cpCell, cell) != ring) continue;
-                                        Vector3 candidate = ColonyTileGrid.CellToWorld(cell, 0f);
+                                        Vector3 candidate = ColonyTileGrid.CellToWorldOnGround(cell);
                                         if (tryClaimDepositCell(candidate))
                                             return candidate;
                                     }
@@ -857,20 +979,7 @@ namespace GameDevTV.RTS.Environment
 
                 private Vector3 SnapSitePosition(Vector3 approximate)
                 {
-                    Vector3 pos = approximate;
-                    int mask = LayerMask.GetMask("Default", "Terrain");
-                    if (mask == 0) mask = Physics.DefaultRaycastLayers;
-
-                    if (Physics.Raycast(pos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f, mask,
-                            QueryTriggerInteraction.Ignore))
-                    {
-                        // Skip hits on buildings / pad ghosts so clusters don't stack on air meshes.
-                        if (hit.collider.GetComponentInParent<BaseBuilding>() == null
-                            && hit.collider.GetComponentInParent<BuildingSiteMarker>() == null)
-                        {
-                            pos = hit.point;
-                        }
-                    }
+                    Vector3 pos = ColonyTileGrid.ApplyGroundY(approximate);
 
                     UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
                     {
@@ -879,8 +988,8 @@ namespace GameDevTV.RTS.Environment
                     };
                     if (UnityEngine.AI.NavMesh.SamplePosition(pos, out UnityEngine.AI.NavMeshHit navHit, 8f, filter))
                     {
-                        // Keep terrain Y so pads never sit on elevated / air bake samples.
-                        pos = new Vector3(navHit.position.x, pos.y, navHit.position.z);
+                        // Keep XZ from NavMesh if available, but height always from the mesh field.
+                        pos = ColonyTileGrid.ApplyGroundY(new Vector3(navHit.position.x, 0f, navHit.position.z));
                     }
 
                     return pos;
@@ -995,13 +1104,9 @@ namespace GameDevTV.RTS.Environment
                         {
                             if (node.visualGO != null) continue;
 
-                            // Snap position to ground — float well above terrain
-                            Vector3 spawnPos = node.position;
-                            spawnPos.y = 1.5f; // Default above terrain
-                            if (Physics.Raycast(spawnPos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
-                            {
-                                spawnPos.y = hit.point.y + 0.5f; // Float above ground
-                            }
+                            // Snap deposit pad to the visible mesh height field.
+                            Vector3 spawnPos = ColonyTileGrid.ApplyGroundY(node.position);
+                            node.position = spawnPos;
 
                             // --- Dot marker (small flat circle) ---
                             Color dotColor;
@@ -1605,6 +1710,15 @@ namespace GameDevTV.RTS.Environment
                     MeshRenderer renderer = GetComponent<MeshRenderer>();
                     if (renderer == null) return;
 
+                    // Photo albedo planets keep DEM surface texture; only tint if needed.
+                    if (Config != null && Config.AlbedoMap != null)
+                    {
+                        Material photoMat = renderer.material;
+                        if (photoMat != null && photoMat.HasProperty("_BaseColor"))
+                            photoMat.SetColor("_BaseColor", baseTint);
+                        return;
+                    }
+
                     Material mat = renderer.material; // instance so we don't mutate a shared asset
                     if (mat == null) return;
 
@@ -1617,6 +1731,7 @@ namespace GameDevTV.RTS.Environment
                     Texture2D gradient = GenerateHeightGradient(colorLow, colorMid, colorHigh);
                     gradient.name = "ClimateGroundGrad";
                     mat.mainTexture = gradient;
+                    if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", gradient);
                     if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", baseTint);
                     else if (mat.HasProperty("_Color")) mat.SetColor("_Color", baseTint);
 

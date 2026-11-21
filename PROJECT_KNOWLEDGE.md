@@ -34,7 +34,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 **v1 delta vs Unreal:** Steel/Concrete/builder pool not ported — builds spend **Minerals** (`PrologueData.MineralCost` / `MineMineralCost`) and take **BuildWeeks** via sites (`TryPlace` + End Week). Landing seeds `StartingMinerals`. Wind Turbine card uses Geothermal Generator asset as stand-in. **No Solar card** in Prologue — camp power runs Oxygen until the dust storm (then Wind). Mines are **ghost-placed** on deposits (never auto-build).
 
-**Planet surface (2026-11-21):** Easy target = curated Mars **DEM + photo albedo**, colony flats (not Perlin blobs). Spec: [`docs/specs/2026-11-21-planet-surface-dem-design.md`](docs/specs/2026-11-21-planet-surface-dem-design.md). Interim mesh grounding: `ColonyTileGrid.SampleGroundY` / `ApplyGroundY` / `CellToWorldOnGround`.
+**Planet surface (2026-11-21):** Easy uses `PlanetConfig.Heightmap` + `AlbedoMap` (`Assets/Art/Planets/Easy/`) — DEM heights + photo albedo, landing flatten, Perlin only if Heightmap null. Spec: [`docs/specs/2026-11-21-planet-surface-dem-design.md`](docs/specs/2026-11-21-planet-surface-dem-design.md). Plan: [`docs/plans/2026-11-21-planet-surface-dem.md`](docs/plans/2026-11-21-planet-surface-dem.md). Grounding: `ColonyTileGrid.SampleGroundY` / `ApplyGroundY` / `CellToWorldOnGround`.
 
 **Playability (2026-11-18 blind playtest):** Prologue completes step 0→6 with End Week. HUD owns the top of the screen (Acts Supplies Bar / debug Center Container plate hidden). Board seeds ≥2 ice pads; step-4 aquifer must reach the *new* ice. Screenshots under `Assets/.summer/playtest/`.
 
