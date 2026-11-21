@@ -1,6 +1,6 @@
 # Planet Surface DEM + Photo Albedo Implementation Plan
 
-> **For agentic workers:** implement this plan task-by-task, in order, checking off each step as it lands. Steps use checkbox (`- [ ]`) syntax for tracking. Dispatch a fresh subagent per task where the tasks are independent (see dispatching-parallel-agents), otherwise execute inline with a review checkpoint after each task.
+> **For agentic workers:** implement this plan task-by-task, in order, checking off each step as it lands. Steps use checkbox (`- [x]`) syntax for tracking. Dispatch a fresh subagent per task where the tasks are independent (see dispatching-parallel-agents), otherwise execute inline with a review checkpoint after each task.
 
 **Goal:** Make Easy/Prologue ground look like the **After** reference — curated Mars DEM heights + photo albedo, colony flats — while keeping `SampleGroundY` / placement grounding.
 
@@ -66,7 +66,7 @@ git commit -m "feat(planet): add DEM heightmap and albedo fields to PlanetConfig
 - Modify: `Assets/Scripts/Environment/PlanetTerrainBuilder.cs`
 - Create: `Assets/Scripts/Tests/PlanetHeightFieldTests.cs`
 
-- [ ] **Step 1: Write failing EditMode tests**
+- [x] **Step 1: Write failing EditMode tests**
 
 Create `Assets/Scripts/Tests/PlanetHeightFieldTests.cs`:
 
@@ -139,7 +139,7 @@ public class PlanetHeightFieldTests
 }
 ```
 
-- [ ] **Step 2: Run tests — expect FAIL** (MakeParams / SampleWorldY do not read Heightmap yet)
+- [x] **Step 2: Run tests — expect FAIL** (MakeParams / SampleWorldY do not read Heightmap yet)
 
 ```bash
 export UNITY_PROJECT_PATH="/home/brian/UnityProjects/Terraforming Tendencies"
@@ -150,7 +150,7 @@ unity command --help 2>/dev/null | head -5
 
 If CLI test invocation is unavailable without spawning a second Editor, compile-check via `unity command eval` after implementation instead; still write the tests first and run them when the connected Editor can execute EditMode tests safely per `.zoo/rules/UnityCLI-Automation.md` (no `unity test` / second Editor).
 
-- [ ] **Step 3: Extend `HeightParams` and `MakeParams` / `SampleWorldY`**
+- [x] **Step 3: Extend `HeightParams` and `MakeParams` / `SampleWorldY`**
 
 In `PlanetTerrainBuilder.cs`, extend `HeightParams`:
 
@@ -219,9 +219,9 @@ public static float SampleWorldY(float wx, float wz, in HeightParams p)
 
 Update the file header comment to point at `docs/specs/2026-11-21-planet-surface-dem-design.md`.
 
-- [ ] **Step 4: Re-run tests — expect PASS** (or compile + eval smoke if EditMode runner blocked)
+- [x] **Step 4: Re-run tests — expect PASS** (or compile + eval smoke if EditMode runner blocked)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Assets/Scripts/Environment/PlanetTerrainBuilder.cs Assets/Scripts/Tests/PlanetHeightFieldTests.cs
@@ -235,7 +235,7 @@ git commit -m "feat(planet): sample mesh height from DEM heightmap with Perlin f
 **Files:**
 - Modify: `Assets/Scripts/Environment/PlanetGenerator.cs` (vertex UV loop ~391–396 and material setup ~448–456)
 
-- [ ] **Step 1: World-space UVs for photo mapping**
+- [x] **Step 1: World-space UVs for photo mapping**
 
 When building vertices, also set UVs from map normalized XZ (not height gradient):
 
@@ -247,7 +247,7 @@ uvs[i] = new Vector2(u, v);
 
 Remove the later loop that overwrites UVs from `InverseLerp(minHeight, maxHeight, …)` (or change that loop to only compute min/max for logging).
 
-- [ ] **Step 2: Apply albedo material when `Config.AlbedoMap` is set**
+- [x] **Step 2: Apply albedo material when `Config.AlbedoMap` is set**
 
 Replace / extend the material block after mesh assign:
 
@@ -281,11 +281,11 @@ if (shader != null)
 
 Ensure Terrain Ghost children still receive `renderer.sharedMaterial`.
 
-- [ ] **Step 3: Keep SampleGroundY on shared sampler**
+- [x] **Step 3: Keep SampleGroundY on shared sampler**
 
 Confirm `SampleGroundY` still builds `MakeParams` + `SampleWorldY` (already present). No NavMesh Y for placement.
 
-- [ ] **Step 4: Play/compile smoke via connected Editor**
+- [x] **Step 4: Play/compile smoke via connected Editor**
 
 ```bash
 export UNITY_PROJECT_PATH="/home/brian/UnityProjects/Terraforming Tendencies"
@@ -294,7 +294,7 @@ unity command eval --json 'return UnityEditor.EditorApplication.isCompiling;'
 
 Expected: not compiling / no CS errors in new code.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Assets/Scripts/Environment/PlanetGenerator.cs
@@ -313,7 +313,7 @@ git commit -m "feat(planet): world UVs and photo albedo material on planet mesh"
 - Modify: `Assets/Resources/Planet 1 - Easy.asset`
 - Modify: `Assets/Settings/Planet 1 - Easy.asset`
 
-- [ ] **Step 1: Create folder + SOURCES.md**
+- [x] **Step 1: Create folder + SOURCES.md**
 
 ```markdown
 # Easy planet surface sources
@@ -325,7 +325,7 @@ git commit -m "feat(planet): world UVs and photo albedo material on planet mesh"
 Record exact download URLs and retrieval date here when importing.
 ```
 
-- [ ] **Step 2: Obtain / place textures**
+- [x] **Step 2: Obtain / place textures**
 
 Preferred: download a real Mars DEM crop + albedo (agent or human). If network/license tooling blocks, generate **temporary stand-ins** that still beat Perlin blobs:
 
@@ -334,13 +334,13 @@ Preferred: download a real Mars DEM crop + albedo (agent or human). If network/l
 
 Do **not** store these under `Assets/.summer/` or `.summer/`.
 
-- [ ] **Step 3: Heightmap import settings (Readable)**
+- [x] **Step 3: Heightmap import settings (Readable)**
 
 In Unity (or by editing `.meta`): Texture Type Default, **Read/Write Enabled**, no mip streaming issues, sRGB **off** for heightmap, Filter Mode Bilinear, Wrap Clamp.
 
 Albedo: sRGB on, Read/Write optional off.
 
-- [ ] **Step 4: Assign on Easy planet assets**
+- [x] **Step 4: Assign on Easy planet assets**
 
 On both `Assets/Resources/Planet 1 - Easy.asset` and `Assets/Settings/Planet 1 - Easy.asset`:
 
@@ -352,7 +352,7 @@ On both `Assets/Resources/Planet 1 - Easy.asset` and `Assets/Settings/Planet 1 -
 
 YAML/object refs: assign via Unity Editor Inspector (recommended) so fileIDs are correct — do not hand-write broken GUIDs.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Assets/Art/Planets/Easy/ "Assets/Resources/Planet 1 - Easy.asset" "Assets/Settings/Planet 1 - Easy.asset"
@@ -367,11 +367,11 @@ git commit -m "art(planet): Easy DEM heightmap and photo albedo wired on PlanetC
 - Modify: `Assets/Scripts/Environment/PlanetTerrainBuilder.cs` (`BuildOrUpdate` height fill)
 - Modify: `PROJECT_KNOWLEDGE.md`
 
-- [ ] **Step 1: BuildOrUpdate uses same SampleWorldY**
+- [x] **Step 1: BuildOrUpdate uses same SampleWorldY**
 
 Ensure Terrain heightmap loop already calls `SampleWorldY` (it should). If it still bakes Perlin-only paths, switch to `MakeParams` + `SampleWorldY` only. Keep `drawHeightmap = false` and TerrainCollider disabled if MeshCollider is authoritative.
 
-- [ ] **Step 2: Play Mode verify (connected Editor only)**
+- [x] **Step 2: Play Mode verify (connected Editor only)**
 
 ```bash
 export UNITY_PROJECT_PATH="/home/brian/UnityProjects/Terraforming Tendencies"
@@ -398,11 +398,11 @@ Expected: `hasAlbedo=true`, `floating=0`, `|yFar|` can differ from near-zero `y0
 
 Visual: compare Play view to After reference — photo dust, flats, natural ridges.
 
-- [ ] **Step 3: Update PROJECT_KNOWLEDGE**
+- [x] **Step 3: Update PROJECT_KNOWLEDGE**
 
 State that Easy uses DEM + photo albedo per `docs/specs/2026-11-21-planet-surface-dem-design.md`, grounding via `SampleGroundY`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Assets/Scripts/Environment/PlanetTerrainBuilder.cs PROJECT_KNOWLEDGE.md
