@@ -45,6 +45,12 @@ namespace GameDevTV.RTS.Prologue
         /// <summary>Typed mine harvest per week (matches aquifer ice scale).</summary>
         public const int MineHarvestPerWeek = 8;
 
+        /// <summary>Camp grid fill per End Week while storm has not darkened camp.</summary>
+        public const int CampEnergyGeneration = 8;
+        /// <summary>Orbital Scan spend from the energy pool (not minerals).</summary>
+        public const int OrbitalScanEnergyCost = 5;
+        // Task 2 removes legacy Orbital mineral cost from play path; keep any mineral alias there.
+
         public static PrologueBuildingInfo Get(PrologueBuildingId id) => id switch
         {
             PrologueBuildingId.Aquifer => new(id, "Ice Aquifer", 2, 0, 0, false, 8, 0, 0),

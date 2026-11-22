@@ -13,6 +13,7 @@ namespace GameDevTV.RTS.Prologue
         public int PrologueStep { get; private set; }
         public bool DustStormActive { get; private set; }
         public bool SolarDarkened => DustStormActive;
+        public int Energy { get; private set; }
         public int ShuttleLandWeek { get; private set; } = -1;
         public bool ShuttleLanded { get; private set; }
         public int StormLandWeek { get; private set; } = -1;
@@ -72,6 +73,7 @@ namespace GameDevTV.RTS.Prologue
             c.Board.At(0).Revealed = true;
             c.Oxygen = PrologueData.LandingOxygen;
             c.Colonists = PrologueData.StartColonists;
+            c.RefillEnergy();
             return c;
         }
 
@@ -100,6 +102,36 @@ namespace GameDevTV.RTS.Prologue
             StormLandWeek = -1;
             DustStormActive = false;
             Board.FirstIceTiles.Clear();
+            RefillEnergy();
+        }
+
+        public int EnergyGeneration()
+        {
+            int gen = SolarDarkened ? 0 : PrologueData.CampEnergyGeneration;
+            foreach (var t in Board.Tiles)
+            {
+                if (t.Building == PrologueBuildingId.None || t.Broken) continue;
+                // Sites still building do not generate.
+                bool underConstruction = false;
+                foreach (var s in Board.Sites)
+                    if (s.Tile == t.Index) { underConstruction = true; break; }
+                if (underConstruction) continue;
+                gen += PrologueData.Get(t.Building).PowerOutput;
+            }
+            return gen;
+        }
+
+        public bool TrySpendEnergy(int amount)
+        {
+            if (amount <= 0) return true;
+            if (Energy < amount) return false;
+            Energy -= amount;
+            return true;
+        }
+
+        void RefillEnergy()
+        {
+            Energy = EnergyGeneration();
         }
 
         public bool Preview(int tile, PrologueBuildingId id, out string reason)
@@ -399,6 +431,9 @@ namespace GameDevTV.RTS.Prologue
             // 6) Storm start
             if (StormLandWeek >= 0 && Week + 1 >= StormLandWeek)
                 DustStormActive = true;
+
+            // Camp→grid energy pool refills after storm flags (storm darkens camp gen).
+            RefillEnergy();
 
             // 7) Advance week
             Week++;

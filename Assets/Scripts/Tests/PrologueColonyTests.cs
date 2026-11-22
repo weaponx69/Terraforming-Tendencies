@@ -27,6 +27,33 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void Energy_CampFillsPool_OrbitalSpends()
+        {
+            var c = PrologueColony.CreateLanding();
+            c.StartPrologue();
+            Assert.GreaterOrEqual(c.Energy, PrologueData.OrbitalScanEnergyCost);
+            Assert.IsTrue(c.TrySpendEnergy(PrologueData.OrbitalScanEnergyCost));
+            int after = c.Energy;
+            Assert.IsFalse(c.TrySpendEnergy(c.Energy + 1));
+            Assert.AreEqual(after, c.Energy);
+        }
+
+        [Test]
+        public void Energy_RefillsFromCampOnEndWeek_StormCutsCamp()
+        {
+            var c = PrologueColony.CreateLanding();
+            c.StartPrologue();
+            while (c.TrySpendEnergy(1)) { }
+            Assert.AreEqual(0, c.Energy);
+            c.EndWeek();
+            Assert.AreEqual(PrologueData.CampEnergyGeneration, c.Energy);
+            c.DebugForceStorm(true);
+            while (c.TrySpendEnergy(1)) { }
+            c.EndWeek();
+            Assert.AreEqual(0, c.Energy); // camp dark, no generators
+        }
+
+        [Test]
         public void EndWeek_PoweredOxygen_AddsNetOxygen()
         {
             var c = PrologueColony.CreateLanding();
