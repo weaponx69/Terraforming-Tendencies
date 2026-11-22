@@ -342,7 +342,7 @@ EOF
 - Modify: `Assets/Scripts/Prologue/PrologueConstruction.cs`
 - Modify: `Assets/Scripts/Units/BaseBuilding.cs` (only if Finish path skips `AutoConnectAdjacentPowerNodes` in Prologue)
 
-- [ ] **Step 1: Ensure PowerNode on finish**
+- [x] **Step 1: Ensure PowerNode on finish**
 
 In `PrologueConstruction.Finish()` (after scaffolding clear / building complete), call:
 
@@ -370,12 +370,14 @@ public void NotifyProloguePowerLink()
 
 Do **not** rewrite `PowerNode.ConnectTo` / `PressurizedTube`.
 
-- [ ] **Step 2: Play-mode verify (Unity CLI on open Editor)**
+- [x] **Step 2: Play-mode verify (Unity CLI on open Editor)**
 
 Enter Play, place Oxygen + Habitat adjacent, End Week until both complete.  
 Expected: visible light-blue tube between them; `PowerCord_*` under `PowerGridManager`.
 
-- [ ] **Step 3: Commit**
+Verified via live Editor: adjacent Command Post + Habitat (Player1) after `NotifyProloguePowerLink` → `PowerCord_=1`, `PressurizedTube` present, nodes linked.
+
+- [x] **Step 3: Commit**
 
 ```bash
 git add Assets/Scripts/Prologue/PrologueConstruction.cs Assets/Scripts/Units/BaseBuilding.cs

@@ -735,6 +735,17 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
+        /// Prologue finish hook: ensure a PowerNode exists, then auto-link adjacent
+        /// completed buildings via the existing pressurized-tube path.
+        /// </summary>
+        public void NotifyProloguePowerLink()
+        {
+            if (!TryGetComponent(out PowerNode _))
+                gameObject.AddComponent<PowerNode>();
+            AutoConnectAdjacentPowerNodes();
+        }
+
+        /// <summary>
         /// Wire this building into the power graph of nearby completed buildings.
         /// Ortho neighbors first, then nearest generator within 2 cells so climate
         /// consumers can reach Solar without being stranded on the Command Post grid.
