@@ -61,5 +61,14 @@ namespace GameDevTV.RTS.Prologue
             PrologueBuildingId.CommandPost => new(id, "Command Post", 0, 0, 0, false, 0, 0, 0),
             _ => new(PrologueBuildingId.None, "", 0, 0, 0, false, 0, 0, 0)
         };
+
+        /// <summary>Colony weeks to complete a Prologue research project.</summary>
+        public static int ResearchWeeks(PrologueResearchId id) => id switch
+        {
+            PrologueResearchId.FasterBuild => 2,
+            PrologueResearchId.LongerPowerReach => 3,
+            PrologueResearchId.ExtraScanType => 2,
+            _ => 1
+        };
     }
 }

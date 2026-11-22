@@ -398,7 +398,7 @@ EOF
 - Modify: `Assets/Scripts/Prologue/PrologueColony.cs`
 - Modify: `Assets/Scripts/Tests/PrologueColonyTests.cs`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```csharp
 [Test]
@@ -410,15 +410,15 @@ public void Research_CostsWeeks_ThenUnlocksTier()
     Assert.IsFalse(c.Research.IsUnlocked(PrologueResearchId.FasterBuild));
     Assert.IsTrue(c.Research.TryBegin(PrologueResearchId.FasterBuild, out _));
     Assert.AreEqual(PrologueData.ResearchWeeks(PrologueResearchId.FasterBuild), c.Research.WeeksRemaining);
-    var log = new System.Collections.Generic.List<string>();
+    // EndWeek() builds its own log; TickWeek is called inside.
     int need = c.Research.WeeksRemaining;
-    for (int i = 0; i < need; i++) c.EndWeek(log);
+    for (int i = 0; i < need; i++) c.EndWeek();
     Assert.IsTrue(c.Research.IsUnlocked(PrologueResearchId.FasterBuild));
     Assert.AreEqual(0, c.Research.WeeksRemaining);
 }
 ```
 
-- [ ] **Step 2: Implement `PrologueResearch.cs`**
+- [x] **Step 2: Implement `PrologueResearch.cs`**
 
 ```csharp
 namespace GameDevTV.RTS.Prologue
@@ -486,7 +486,7 @@ Expose `public PrologueResearch Research { get; }` on colony; construct in `Crea
 
 **Tier‑1 seating:** all current cards remain unlocked (no flag checks yet).
 
-- [ ] **Step 3: Tests PASS + commit**
+- [x] **Step 3: Tests PASS + commit**
 
 ```bash
 git add Assets/Scripts/Prologue/PrologueResearch.cs Assets/Scripts/Prologue/PrologueData.cs Assets/Scripts/Prologue/PrologueColony.cs Assets/Scripts/Tests/PrologueColonyTests.cs

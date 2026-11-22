@@ -18,6 +18,7 @@ namespace GameDevTV.RTS.Prologue
         public bool ShuttleLanded { get; private set; }
         public int StormLandWeek { get; private set; } = -1;
         public HashSet<PrologueBuildingId> Unlocked { get; } = new();
+        public PrologueResearch Research { get; private set; }
 
         /// <summary>Deposit types uncovered by Survey (seats matching mine cards).</summary>
         public HashSet<PrologueResourceId> KnownResources { get; } = new();
@@ -73,6 +74,7 @@ namespace GameDevTV.RTS.Prologue
             c.Board.At(0).Revealed = true;
             c.Oxygen = PrologueData.LandingOxygen;
             c.Colonists = PrologueData.StartColonists;
+            c.Research = new PrologueResearch();
             c.RefillEnergy();
             return c;
         }
@@ -463,10 +465,13 @@ namespace GameDevTV.RTS.Prologue
             // Camp→grid energy pool refills after storm flags (storm darkens camp gen).
             RefillEnergy();
 
-            // 7) Advance week
+            // 7) Research progresses each End Week.
+            Research?.TickWeek(log);
+
+            // 8) Advance week
             Week++;
 
-            // 8) Story
+            // 9) Story
             StoryCheck(log);
             return log;
         }

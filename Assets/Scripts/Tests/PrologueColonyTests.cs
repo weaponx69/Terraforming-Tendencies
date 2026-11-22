@@ -255,5 +255,20 @@ namespace GameDevTV.RTS.Tests
             Assert.AreEqual(PrologueResourceId.Gas, g);
             Assert.IsFalse(PrologueResourceIdUtil.TryParse("Ice", out _));
         }
+
+        [Test]
+        public void Research_CostsWeeks_ThenUnlocksTier()
+        {
+            var c = PrologueColony.CreateLanding();
+            c.StartPrologue();
+            Assert.IsTrue(c.Research.IsTierUnlocked(PrologueResearchTier.Tier1));
+            Assert.IsFalse(c.Research.IsUnlocked(PrologueResearchId.FasterBuild));
+            Assert.IsTrue(c.Research.TryBegin(PrologueResearchId.FasterBuild, out _));
+            Assert.AreEqual(PrologueData.ResearchWeeks(PrologueResearchId.FasterBuild), c.Research.WeeksRemaining);
+            int need = c.Research.WeeksRemaining;
+            for (int i = 0; i < need; i++) c.EndWeek();
+            Assert.IsTrue(c.Research.IsUnlocked(PrologueResearchId.FasterBuild));
+            Assert.AreEqual(0, c.Research.WeeksRemaining);
+        }
     }
 }
