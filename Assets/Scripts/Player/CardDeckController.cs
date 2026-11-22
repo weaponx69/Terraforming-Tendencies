@@ -672,16 +672,16 @@ namespace GameDevTV.RTS.Player
             if (masterDeck.Count == 0)
                 InitializeDrawPile();
 
-            bool wantDrone = true;
             HashSet<PrologueBuildingId> unlocked = colony != null
                 ? colony.Unlocked
                 : new HashSet<PrologueBuildingId>();
-            if (colony != null)
-                colony.ObjectiveText(out _, out wantDrone);
+            bool cancelled = colony != null && colony.ContractCancelled;
+            bool surveying = PrologueSurveyMission.Instance != null && PrologueSurveyMission.Instance.IsSearching;
 
-            if (wantDrone || (colony != null && colony.PrologueStep <= 0))
+            // Survey stays in the hand for exploration whenever the team is free.
+            // It used to leave after step 0, so players could not paint more trails.
+            if (!cancelled && !surveying)
             {
-                // Always seat Survey Team — never Orbital Scan (masterDeck order used to pick Orbital first).
                 BlueprintCardSO scan = null;
                 foreach (var c in masterDeck)
                 {
@@ -698,6 +698,28 @@ namespace GameDevTV.RTS.Player
                     catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Survey Team card missing: {ex.Message}"); }
                 }
                 if (scan != null) hand.Add(scan);
+            }
+
+            // Company Orbital Scan: paid ping toward unrevealed ice when the team is free.
+            if (!cancelled && !surveying && colony != null && colony.HasUnrevealedIce())
+            {
+                BlueprintCardSO orbital = null;
+                foreach (var c in masterDeck)
+                {
+                    if (c is ScoutingCardSO scout
+                        && scout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    {
+                        orbital = c;
+                        break;
+                    }
+                }
+                if (orbital == null)
+                {
+                    try { orbital = EnsureStarterCard<ScoutingCardSO>("Cards/OrbitalScanCard"); }
+                    catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Orbital Scan card missing: {ex.Message}"); }
+                }
+                if (orbital != null && !hand.Contains(orbital))
+                    hand.Add(orbital);
             }
 
             foreach (PrologueBuildingId id in unlocked)
@@ -1398,13 +1420,32 @@ namespace GameDevTV.RTS.Player
 
             BlueprintCardSO played = hand[handIndex];
 
-            // Prologue Survey Team first — bypass sector unlock gates (all sectors may already be open).
+            // Prologue Survey Team / Orbital Scan — bypass sector unlock gates.
             if (PrologueController.IsActive
                 && played is ScoutingCardSO prologueScout
                 && (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan
                     || prologueScout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone))
             {
+                if (!played.CanApply())
+                {
+                    if (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    {
+                        int cost = PrologueData.OrbitalScanEnergyCost;
+                        int have = PrologueController.Instance?.Colony?.Energy ?? 0;
+                        ExplorationManager.NotifyPlacementFailed(
+                            $"Orbital Scan needs {cost} energy (have {have}).",
+                            Camera.main != null ? Camera.main.transform.position : Vector3.zero);
+                    }
+                    return;
+                }
                 played.Apply();
+                // Survey stays in hand until paint ✓. Orbital Scan is a one-shot hire.
+                if (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                {
+                    hand.RemoveAt(handIndex);
+                    discardPile.Add(played);
+                    RebuildPrologueHand(PrologueController.Instance?.Colony);
+                }
                 Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
                 OnHandChanged?.Invoke();
                 return;

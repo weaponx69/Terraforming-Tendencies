@@ -1,4 +1,5 @@
 using System;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 
@@ -23,6 +24,34 @@ namespace GameDevTV.RTS.Prologue
             id = PrologueBuildingId.None;
             if (building == null) return false;
             return MatchName(building.Name ?? building.name ?? "", out id);
+        }
+
+        /// <summary>Minerals this hand card spends when placed. Orbital uses energy (see EnergyCost), not minerals.</summary>
+        public static int MineralCost(BlueprintCardSO card)
+        {
+            if (card is UnlockBuildingCardSO unlock)
+                return MineralCost(unlock.buildingToUnlock);
+            // Orbital Scan / Survey: not a mineral spend.
+            return 0;
+        }
+
+        /// <summary>Energy this hand card spends when played (Orbital Scan pool spend).</summary>
+        public static int EnergyCost(BlueprintCardSO card)
+        {
+            if (card is ScoutingCardSO scout
+                && scout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                return PrologueData.OrbitalScanEnergyCost;
+            return 0;
+        }
+
+        public static int MineralCost(BuildingSO building)
+        {
+            if (building == null) return 0;
+            if (BuildingSiteRegistry.IsMineBuilding(building))
+                return PrologueData.MineMineralCost;
+            if (!TryGetPrologueId(building, out var id) || id == PrologueBuildingId.None || id == PrologueBuildingId.CommandPost)
+                return 0;
+            return PrologueData.MineralCost(id);
         }
 
         public static bool IsPrologueScanCard(BlueprintCardSO card)
@@ -73,7 +102,7 @@ namespace GameDevTV.RTS.Prologue
                 id = PrologueBuildingId.Habitat;
                 return true;
             }
-            // No dedicated Wind card yet — Geothermal stands in as storm-proof power.
+            // Storm power is the Geothermal Generator card. Older Wind-named cards map here too.
             if (n.IndexOf("Wind", StringComparison.OrdinalIgnoreCase) >= 0
                 || n.IndexOf("Geothermal", StringComparison.OrdinalIgnoreCase) >= 0)
             {

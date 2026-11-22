@@ -151,7 +151,7 @@ EOF
 - Modify: `Assets/Resources/Cards/OrbitalScanCard.asset` (description text only)
 - Modify: `Assets/Scripts/UI/PrologueHUD.cs` (optional note path already in Apply)
 
-- [ ] **Step 1: Update CanApply / GetMaterialsPlayCost / Apply**
+- [x] **Step 1: Update CanApply / GetMaterialsPlayCost / Apply**
 
 In `ScoutingCardSO.cs` Prologue Orbital branches:
 
@@ -185,11 +185,11 @@ public static int EnergyCost(BlueprintCardSO card)
 
 Update `OrbitalScanCard.asset` description to say energy, not minerals.
 
-- [ ] **Step 2: Compile check**
+- [x] **Step 2: Compile check**
 
 Grep for `OrbitalScanMineralCost` — must be zero hits. Fix stragglers.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Assets/Scripts/Player/ScoutingCardSO.cs Assets/Scripts/Player/CardDeckController.cs Assets/Scripts/Prologue/PrologueCardMap.cs Assets/Resources/Cards/OrbitalScanCard.asset
