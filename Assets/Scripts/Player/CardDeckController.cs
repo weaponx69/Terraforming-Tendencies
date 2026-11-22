@@ -1484,12 +1484,18 @@ namespace GameDevTV.RTS.Player
                         Camera.main != null ? Camera.main.transform.position : Vector3.zero);
                     return;
                 }
+                // Opens pause ladder pick; card stays until a project is begun
+                // (ConsumeResearchCardFromHand) or auto-pick fallback already started one.
                 played.Apply();
-                hand.RemoveAt(handIndex);
-                discardPile.Add(played);
-                RebuildPrologueHand(PrologueController.Instance?.Colony);
-                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
-                OnHandChanged?.Invoke();
+                var research = PrologueController.Instance?.Colony?.Research;
+                if (research != null && research.Active != PrologueResearchId.None)
+                {
+                    hand.RemoveAt(handIndex);
+                    discardPile.Add(played);
+                    RebuildPrologueHand(PrologueController.Instance?.Colony);
+                    Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+                    OnHandChanged?.Invoke();
+                }
                 return;
             }
 
@@ -1667,6 +1673,43 @@ namespace GameDevTV.RTS.Player
             hand.RemoveAt(idx);
             discardPile.Add(played);
             // Rebuild guided hand — never FillHand (that pulls Acts clutter).
+            if (PrologueController.Instance != null)
+                RebuildPrologueHand(PrologueController.Instance.Colony);
+            else
+                OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return true;
+        }
+
+        /// <summary>
+        /// Prologue Research: discard the research hire after a pause-ladder project begins.
+        /// Safe no-op when the card is not in hand (begin from Esc pause without playing it).
+        /// </summary>
+        public bool ConsumeResearchCardFromHand()
+        {
+            if (!PrologueController.IsActive) return false;
+            int idx = -1;
+            for (int i = 0; i < hand.Count; i++)
+            {
+                if (hand[i] is ResearchCardSO)
+                {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx < 0)
+            {
+                // Still refresh seating so the hire leaves once Active is set.
+                if (PrologueController.Instance != null)
+                    RebuildPrologueHand(PrologueController.Instance.Colony);
+                else
+                    OnHandChanged?.Invoke();
+                return false;
+            }
+
+            BlueprintCardSO played = hand[idx];
+            hand.RemoveAt(idx);
+            discardPile.Add(played);
             if (PrologueController.Instance != null)
                 RebuildPrologueHand(PrologueController.Instance.Colony);
             else

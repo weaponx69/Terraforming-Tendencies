@@ -42,6 +42,15 @@ namespace GameDevTV.RTS.Prologue
             return true;
         }
 
+        /// <summary>Pause / HUD label for a research id.</summary>
+        public static string DisplayName(PrologueResearchId id) => id switch
+        {
+            PrologueResearchId.FasterBuild => "Faster Build",
+            PrologueResearchId.LongerPowerReach => "Longer Power Reach",
+            PrologueResearchId.ExtraScanType => "Extra Scan Type",
+            _ => id.ToString()
+        };
+
         public void TickWeek(List<string> log)
         {
             if (Active == PrologueResearchId.None || WeeksRemaining <= 0) return;

@@ -6,8 +6,7 @@ using UnityEngine;
 namespace GameDevTV.RTS.Player
 {
     /// <summary>
-    /// Prologue research hire: starts a week-long project (Tier-2 unlocks).
-    /// Pause-tree pick is Task 7; v1 auto-picks the first locked id.
+    /// Prologue research hire: opens the pause research ladder to pick a Tier-2 project.
     /// </summary>
     [CreateAssetMenu(fileName = "ResearchCard", menuName = "Cards/Research Card")]
     public class ResearchCardSO : BlueprintCardSO
@@ -28,7 +27,18 @@ namespace GameDevTV.RTS.Player
             var c = PrologueController.Instance?.Colony;
             if (c?.Research == null) return;
 
-            // v1: auto-pick first locked Tier-2 id; pause-tree pick is Task 7.
+            var pause = Object.FindFirstObjectByType<PauseMenuUI>(FindObjectsInactive.Exclude);
+            if (pause != null)
+            {
+                pause.OpenResearchPick();
+                PrologueHUD.Instance?.ShowNote(new List<string>
+                {
+                    "Choose a research project from the pause ladder."
+                });
+                return;
+            }
+
+            // Fallback if pause UI is missing: auto-pick first locked Tier-2 id.
             var pick = PrologueResearchId.FasterBuild;
             if (c.Research.IsUnlocked(pick))
                 pick = PrologueResearchId.LongerPowerReach;
@@ -43,7 +53,7 @@ namespace GameDevTV.RTS.Player
 
             PrologueHUD.Instance?.ShowNote(new List<string>
             {
-                $"Research started: {pick} ({PrologueData.ResearchWeeks(pick)} wk)."
+                $"Research started: {PrologueResearch.DisplayName(pick)} ({PrologueData.ResearchWeeks(pick)} wk)."
             });
         }
 

@@ -575,7 +575,7 @@ EOF
 - Modify: `Assets/Scripts/UI/Containers/TechTreeUI.cs` (read-only highlight for Prologue)
 - Optional: wire Research card Apply to open pause tree pick instead of auto-pick
 
-- [ ] **Step 1: Prologue pause panel**
+- [x] **Step 1: Prologue pause panel**
 
 When `PrologueController.IsActive`, pause menu shows tech ladder text or existing `TechTreeUI` with:
 - Tier‑1 nodes marked complete  
@@ -590,9 +590,9 @@ If full `TechTreeSO` asset wiring is heavy, ship a **Prologue research list UI**
 // "Faster Build — 2 wk" / "complete" / "in progress 1 wk left"
 ```
 
-- [ ] **Step 2: Research card opens pause list to pick target** (replace auto-pick from Task 6)
+- [x] **Step 2: Research card opens pause list to pick target** (replace auto-pick from Task 6)
 
-- [ ] **Step 3: Commit + update PROJECT_KNOWLEDGE**
+- [x] **Step 3: Commit + update PROJECT_KNOWLEDGE**
 
 Document: connected tubes Tier‑1, camp energy, Orbital energy cost, research cards / weeks.
 
