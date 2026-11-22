@@ -209,7 +209,7 @@ EOF
 - Modify: `Assets/Scripts/Tests/PrologueColonyTests.cs`
 - Modify: `Assets/Scripts/UI/PrologueHUD.cs`
 
-- [ ] **Step 1: Rewrite failing / update storm test**
+- [x] **Step 1: Rewrite failing / update storm test**
 
 Replace `DustStorm_DarkensSolar_WindKeepsOxygenPowered` expectations to match **adjacency graph** (already Dist≤1). Add:
 
@@ -251,7 +251,7 @@ public void IsPowered_GeneratorTwoHops_ViaConductor()
 }
 ```
 
-- [ ] **Step 2: Implement graph `IsPowered`**
+- [x] **Step 2: Implement graph `IsPowered`**
 
 ```csharp
 public bool IsPowered(int tile)
@@ -321,9 +321,9 @@ static string PowerStatus(PrologueColony colony)
 }
 ```
 
-- [ ] **Step 3: Tests PASS**
+- [x] **Step 3: Tests PASS**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Assets/Scripts/Prologue/PrologueColony.cs Assets/Scripts/Tests/PrologueColonyTests.cs Assets/Scripts/UI/PrologueHUD.cs

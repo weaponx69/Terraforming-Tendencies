@@ -328,22 +328,50 @@ namespace GameDevTV.RTS.Prologue
             if (b == PrologueBuildingId.None) return false;
             var info = PrologueData.Get(b);
             if (!info.NeedsPower) return true;
-            if (SolarDarkened)
+            return HasPowerPath(tile);
+        }
+
+        /// <summary>
+        /// Tier-1 connected power: BFS over finished buildings with Dist ≤ 1.
+        /// Camp is a virtual energy source until the dust storm; during storm only
+        /// buildings with PowerOutput &gt; 0 count as sources.
+        /// </summary>
+        bool HasPowerPath(int startTile)
+        {
+            var q = new Queue<int>();
+            var seen = new HashSet<int>();
+            q.Enqueue(startTile);
+            seen.Add(startTile);
+            while (q.Count > 0)
             {
+                int cur = q.Dequeue();
+                var curB = Board.At(cur).Building;
+                if (curB == PrologueBuildingId.None || Board.At(cur).Broken) continue;
+                if (IsEnergySource(cur)) return true;
                 foreach (var t in Board.Tiles)
                 {
-                    if (t.Building != PrologueBuildingId.WindTurbine || t.Broken) continue;
-                    if (Dist(t.Index, tile) <= 1) return true;
+                    if (t.Building == PrologueBuildingId.None || t.Broken) continue;
+                    if (seen.Contains(t.Index)) continue;
+                    if (Dist(cur, t.Index) > 1) continue;
+                    // Under-construction sites do not conduct yet.
+                    bool building = false;
+                    foreach (var s in Board.Sites)
+                        if (s.Tile == t.Index) { building = true; break; }
+                    if (building) continue;
+                    seen.Add(t.Index);
+                    q.Enqueue(t.Index);
                 }
-                return false;
-            }
-            foreach (var t in Board.Tiles)
-            {
-                if (t.Broken) continue;
-                if (t.Building != PrologueBuildingId.Solar && t.Building != PrologueBuildingId.WindTurbine) continue;
-                if (Dist(t.Index, tile) <= 1) return true;
             }
             return false;
+        }
+
+        bool IsEnergySource(int tile)
+        {
+            var b = Board.At(tile).Building;
+            if (b != PrologueBuildingId.None && PrologueData.Get(b).PowerOutput > 0)
+                return true;
+            // Camp is a virtual source until storm.
+            return !SolarDarkened;
         }
 
         public bool AquiferReachesIce(int aquiferTile)

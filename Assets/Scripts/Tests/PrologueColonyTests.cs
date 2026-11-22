@@ -142,15 +142,17 @@ namespace GameDevTV.RTS.Tests
         [Test]
         public void DustStorm_DarkensSolar_WindKeepsOxygenPowered()
         {
+            // Graph rules: camp powers until storm; during storm only PowerOutput > 0
+            // sources count. Solar has PowerOutput — keep it non-adjacent so Wind alone
+            // is what keeps Oxygen powered during the storm.
             var c = PrologueColony.CreateLanding();
             c.DebugPlaceComplete(3, PrologueBuildingId.Oxygen);
-            c.DebugPlaceComplete(4, PrologueBuildingId.Solar);
+            c.DebugPlaceComplete(9, PrologueBuildingId.Solar);
             c.DebugPlaceComplete(2, PrologueBuildingId.WindTurbine);
             c.SetDistanceFn((a, b) =>
             {
                 if (a == b) return 0;
-                // Touching ring around oxygen tile 3: 2 and 4 are adjacent.
-                if ((a == 3 && (b == 2 || b == 4)) || (b == 3 && (a == 2 || a == 4))) return 1;
+                if ((a == 3 && b == 2) || (a == 2 && b == 3)) return 1;
                 return 99;
             });
             Assert.IsTrue(c.IsPowered(3));
@@ -158,6 +160,42 @@ namespace GameDevTV.RTS.Tests
             Assert.IsTrue(c.IsPowered(3));
             c.Board.At(2).Building = PrologueBuildingId.None;
             Assert.IsFalse(c.IsPowered(3));
+        }
+
+        [Test]
+        public void IsPowered_CampPowersOxygen_UntilStorm_ThenNeedsAdjacentGenerator()
+        {
+            var c = PrologueColony.CreateLanding();
+            c.DebugPlaceComplete(3, PrologueBuildingId.Oxygen);
+            Assert.IsTrue(c.IsPowered(3)); // camp
+            c.DebugForceStorm(true);
+            Assert.IsFalse(c.IsPowered(3));
+            c.DebugPlaceComplete(2, PrologueBuildingId.WindTurbine);
+            c.SetDistanceFn((a, b) =>
+            {
+                if (a == b) return 0;
+                if ((a == 3 && b == 2) || (a == 2 && b == 3)) return 1;
+                return 99;
+            });
+            Assert.IsTrue(c.IsPowered(3));
+        }
+
+        [Test]
+        public void IsPowered_GeneratorTwoHops_ViaConductor()
+        {
+            // Tile 1 Geo — 2 Habitat — 3 Oxygen; Dist ortho 1 between pairs.
+            var c = PrologueColony.CreateLanding();
+            c.DebugForceStorm(true);
+            c.DebugPlaceComplete(1, PrologueBuildingId.WindTurbine);
+            c.DebugPlaceComplete(2, PrologueBuildingId.Habitat);
+            c.DebugPlaceComplete(3, PrologueBuildingId.Oxygen);
+            c.SetDistanceFn((a, b) =>
+            {
+                if (a == b) return 0;
+                int d = System.Math.Abs(a - b);
+                return d == 1 ? 1 : 99;
+            });
+            Assert.IsTrue(c.IsPowered(3)); // path Geo-Habitat-Oxygen
         }
 
         [Test]

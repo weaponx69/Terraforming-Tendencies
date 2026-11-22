@@ -98,6 +98,7 @@ namespace GameDevTV.RTS.UI
             string runwayStr = runway > 1000 ? "∞" : runway.ToString("0.0");
             airText.text =
                 $"AIR {colony.Oxygen}  ·  need {need}/wk  ·  {runwayStr} wk left  ·  ice {colony.IceStock}  ·  beds {colony.TotalBeds()}/{colony.Colonists}"
+                + $"  ·  power {PowerStatus(colony)}"
                 + FormatTypedStocks(colony);
 
             if (scanButton != null)
@@ -191,6 +192,28 @@ namespace GameDevTV.RTS.UI
                 sb.Append(n);
             }
             return sb.ToString();
+        }
+
+        static string PowerStatus(PrologueColony colony)
+        {
+            if (colony == null) return "—";
+            int processors = 0;
+            int powered = 0;
+            foreach (var t in colony.Board.Tiles)
+            {
+                if (t.Building != PrologueBuildingId.Oxygen || t.Broken) continue;
+                processors++;
+                if (colony.IsPowered(t.Index)) powered++;
+            }
+            if (processors == 0)
+                return colony.SolarDarkened ? "storm (camp dark)" : $"camp · {colony.Energy} energy";
+            if (colony.SolarDarkened)
+                return powered > 0
+                    ? $"grid · {colony.Energy} energy"
+                    : "NONE — connect Geothermal by tube";
+            return powered > 0
+                ? $"camp · {colony.Energy} energy"
+                : $"NONE · {colony.Energy} energy";
         }
 
         static string BuildPlaceHint(PrologueColony colony)
