@@ -253,6 +253,7 @@ namespace GameDevTV.RTS.Prologue
             var colony = PrologueController.Instance?.Colony;
             if (colony == null || tile < 0) return;
             int want = Mathf.Max(1, baseWeeks + PrologueData.HaulWeeks(colony.SupplyDistance(tile)));
+            want = colony.ApplyFasterBuild(want);
             if (hasSite)
             {
                 var site = FindSite();

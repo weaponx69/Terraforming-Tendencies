@@ -25,6 +25,12 @@ namespace GameDevTV.RTS.Prologue
         public bool IsUnlocked(PrologueResearchId id) =>
             id == PrologueResearchId.None || unlocked.Contains(id);
 
+        /// <summary>True when at least one Tier-2 research id is still locked (hand seating).</summary>
+        public bool HasLockedProject() =>
+            !unlocked.Contains(PrologueResearchId.FasterBuild)
+            || !unlocked.Contains(PrologueResearchId.LongerPowerReach)
+            || !unlocked.Contains(PrologueResearchId.ExtraScanType);
+
         public bool TryBegin(PrologueResearchId id, out string reason)
         {
             reason = null;

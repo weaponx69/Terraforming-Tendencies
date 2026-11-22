@@ -722,6 +722,30 @@ namespace GameDevTV.RTS.Player
                     hand.Add(orbital);
             }
 
+            // Research: seat when no project is active and at least one Tier-2 id is still locked.
+            if (!cancelled
+                && colony?.Research != null
+                && colony.Research.Active == PrologueResearchId.None
+                && colony.Research.HasLockedProject())
+            {
+                BlueprintCardSO research = null;
+                foreach (var c in masterDeck)
+                {
+                    if (c is ResearchCardSO)
+                    {
+                        research = c;
+                        break;
+                    }
+                }
+                if (research == null)
+                {
+                    try { research = EnsureStarterCard<ResearchCardSO>("Cards/ResearchCard"); }
+                    catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Research card missing: {ex.Message}"); }
+                }
+                if (research != null && !hand.Contains(research))
+                    hand.Add(research);
+            }
+
             foreach (PrologueBuildingId id in unlocked)
             {
                 if (id == PrologueBuildingId.None || id == PrologueBuildingId.CommandPost) continue;
@@ -1420,7 +1444,7 @@ namespace GameDevTV.RTS.Player
 
             BlueprintCardSO played = hand[handIndex];
 
-            // Prologue Survey Team / Orbital Scan — bypass sector unlock gates.
+            // Prologue Survey Team / Orbital Scan / Research — bypass sector unlock gates.
             if (PrologueController.IsActive
                 && played is ScoutingCardSO prologueScout
                 && (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan
@@ -1446,6 +1470,24 @@ namespace GameDevTV.RTS.Player
                     discardPile.Add(played);
                     RebuildPrologueHand(PrologueController.Instance?.Colony);
                 }
+                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+                OnHandChanged?.Invoke();
+                return;
+            }
+
+            if (PrologueController.IsActive && played is ResearchCardSO)
+            {
+                if (!played.CanApply())
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        "Research already underway or nothing left to unlock.",
+                        Camera.main != null ? Camera.main.transform.position : Vector3.zero);
+                    return;
+                }
+                played.Apply();
+                hand.RemoveAt(handIndex);
+                discardPile.Add(played);
+                RebuildPrologueHand(PrologueController.Instance?.Colony);
                 Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
                 OnHandChanged?.Invoke();
                 return;
@@ -1859,7 +1901,7 @@ namespace GameDevTV.RTS.Player
         public static int GetWeekCost(BlueprintCardSO card)
         {
             if (card == null) return 1;
-            if (card is ScoutingCardSO) return 0;
+            if (card is ScoutingCardSO || card is ResearchCardSO) return 0;
 
             if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
                 return GetWeekCost(unlock.buildingToUnlock);

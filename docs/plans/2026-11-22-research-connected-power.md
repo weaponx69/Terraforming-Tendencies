@@ -507,7 +507,7 @@ EOF
 - Modify: `Assets/Scripts/Player/CardDeckController.cs` (`RebuildPrologueHand`)
 - Modify: `Assets/Scripts/UI/PrologueBriefingPanel.cs` / note UI if needed for pick target
 
-- [ ] **Step 1: Card type**
+- [x] **Step 1: Card type**
 
 ```csharp
 namespace GameDevTV.RTS.Player
@@ -548,14 +548,14 @@ namespace GameDevTV.RTS.Player
 
 Seat in `RebuildPrologueHand` when `Research.Active == None` and at least one Tier‑2 id still locked (mirror Survey seating pattern). Create asset under `Assets/Resources/Cards/ResearchCard.asset` via Editor or YAML clone of a simple card; set script to `ResearchCardSO`.
 
-- [ ] **Step 2: Gate one Tier‑2 effect**
+- [x] **Step 2: Gate one Tier‑2 effect**
 
 Example — `LongerPowerReach` changes `HasPowerPath` neighbor check from `Dist > 1` to `Dist > (unlocked ? 2 : 1)`.  
 `FasterBuild`: `HaulWeeks` or build weeks −1 when unlocked (clamp ≥ 1) in `PrologueData.HaulWeeks` / place path.
 
-- [ ] **Step 3: Play-mode — draw Research, play, End Week until complete, confirm unlock log**
+- [x] **Step 3: Play-mode — draw Research, play, End Week until complete, confirm unlock log**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Assets/Scripts/Player/ResearchCardSO.cs Assets/Resources/Cards/ResearchCard.asset Assets/Scripts/Player/CardDeckController.cs Assets/Scripts/Prologue/PrologueColony.cs

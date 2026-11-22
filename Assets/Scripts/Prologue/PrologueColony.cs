@@ -170,7 +170,7 @@ namespace GameDevTV.RTS.Prologue
         public bool TryPlace(int tile, PrologueBuildingId id, out string reason)
         {
             if (!Preview(tile, id, out reason)) return false;
-            int buildWeeks = PrologueData.Get(id).BuildWeeks;
+            int buildWeeks = ApplyFasterBuild(PrologueData.Get(id).BuildWeeks);
             if (buildWeeks <= 0)
             {
                 Board.At(tile).Building = id;
@@ -334,12 +334,26 @@ namespace GameDevTV.RTS.Prologue
         }
 
         /// <summary>
-        /// Tier-1 connected power: BFS over finished buildings with Dist ≤ 1.
+        /// Build weeks with FasterBuild research (−1, clamp ≥ 1 when &gt; 0). Instant (0) stays 0.
+        /// </summary>
+        public int ApplyFasterBuild(int weeks)
+        {
+            if (weeks <= 0) return 0;
+            if (Research != null && Research.IsUnlocked(PrologueResearchId.FasterBuild))
+                return Math.Max(1, weeks - 1);
+            return weeks;
+        }
+
+        /// <summary>
+        /// Connected power BFS: Dist ≤ 1 (Tier-1), or Dist ≤ 2 with LongerPowerReach.
         /// Camp is a virtual energy source until the dust storm; during storm only
         /// buildings with PowerOutput &gt; 0 count as sources.
         /// </summary>
         bool HasPowerPath(int startTile)
         {
+            int reach = Research != null && Research.IsUnlocked(PrologueResearchId.LongerPowerReach)
+                ? 2
+                : 1;
             var q = new Queue<int>();
             var seen = new HashSet<int>();
             q.Enqueue(startTile);
@@ -354,7 +368,7 @@ namespace GameDevTV.RTS.Prologue
                 {
                     if (t.Building == PrologueBuildingId.None || t.Broken) continue;
                     if (seen.Contains(t.Index)) continue;
-                    if (Dist(cur, t.Index) > 1) continue;
+                    if (Dist(cur, t.Index) > reach) continue;
                     // Under-construction sites do not conduct yet.
                     bool building = false;
                     foreach (var s in Board.Sites)
