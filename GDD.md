@@ -119,4 +119,4 @@ Does this "Search and Discovery" phase feel like the right level of "Casual" for
 - Survey uncovers a typed deposit → player places the matching **mine building on that pad** → building produces that resource on the time-lapse week/day clock.
 - Harvest presentation: small Survey-style drones (and optionally crew) animate at the mine — not a player-selected Mining Drone unit gathering in real time.
 
-Specs: [`.summer/specs/2026-11-19-prologue-survey-team-design.md`](.summer/specs/2026-11-19-prologue-survey-team-design.md), [`.summer/specs/2026-11-20-individual-resources-design.md`](.summer/specs/2026-11-20-individual-resources-design.md).
+Specs: [`docs/specs/2026-11-19-prologue-survey-team-design.md`](docs/specs/2026-11-19-prologue-survey-team-design.md), [`docs/specs/2026-11-20-individual-resources-design.md`](docs/specs/2026-11-20-individual-resources-design.md).

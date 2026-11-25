@@ -9,7 +9,7 @@ namespace GameDevTV.RTS.Prologue
     /// <summary>
     /// Survey Team job: after paint + ✓, colony days tick on the time-lapse clock while
     /// drones/crew walk the painted path <b>forward only</b> (no ping-pong), revealing as they go.
-    /// Spec: .summer/specs/2026-11-19-prologue-survey-team-design.md
+    /// Spec: docs/specs/2026-11-19-prologue-survey-team-design.md
     /// </summary>
     public class PrologueSurveyMission : MonoBehaviour
     {

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Unity C#, NUnit EditMode tests under `Assets/Scripts/Tests/`, existing hex/`ColonyTileGrid`/`PlayerInput`, UGUI/TMP HUD, live Editor via `unity command eval` only (no second Editor / `unity test`).
 
-**Spec:** [`.summer/specs/2026-11-18-unity-unreal-prologue-clone-design.md`](../specs/2026-11-18-unity-unreal-prologue-clone-design.md)  
+**Spec:** [`docs/specs/2026-11-18-unity-unreal-prologue-clone-design.md`](../specs/2026-11-18-unity-unreal-prologue-clone-design.md)  
 **Unreal source:** `~/Documents/Unreal Projects/TerraformTendencies/Source/TerraformTendencies/TT/`
 
 ---

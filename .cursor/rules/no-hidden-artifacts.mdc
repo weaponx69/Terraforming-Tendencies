@@ -1,0 +1,17 @@
+---
+description: Do not write playtest dumps or owner docs under dot-prefixed folders (.summer, etc.).
+alwaysApply: true
+---
+
+# No hidden artifact folders
+
+This is a **Unity** repo. `.summer/` is a Summer Engine (Godot) convention — **do not create or write** `.summer/` or `Assets/.summer/` here.
+
+| Kind of file | Put it here |
+|--------------|-------------|
+| Design specs | `docs/specs/` |
+| Implementation plans | `docs/plans/` |
+| Playtest screenshots, `steps.jsonl`, logs | `Assets/Playtest/` (e.g. `tools/prologue-ui-playthrough.sh` default) |
+| Agent rules only | `.cursor/rules/` |
+
+Harness `OUT_DIR` must stay under **`Assets/Playtest/`**, never `Assets/.summer/`. See [`AGENTS.md`](../../AGENTS.md) and [`docs/plans/2026-11-23-prologue-playtest-agent-handoff.md`](../../docs/plans/2026-11-23-prologue-playtest-agent-handoff.md).
