@@ -285,7 +285,7 @@ GameObject:
   - component: {fileID: 1439095290914704481}
   - component: {fileID: 6804156434460374913}
   m_Layer: 0
-  m_Name: Placeholder Visual (Cylinder)
+  m_Name: Building Mesh
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -300,8 +300,8 @@ Transform:
   m_GameObject: {fileID: 6197874886797181044}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.75, z: 0}
-  m_LocalScale: {x: 1.5, y: 1.5, z: 1.5}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 354710276182273158}
@@ -313,7 +313,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6197874886797181044}
-  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: 25219dce35279f775a92084f77c2b25c, type: 2}
 --- !u!23 &6804156434460374913
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -339,7 +339,11 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6b5c1117cba693e1690199a435b44aec, type: 2}
+  - {fileID: 2100000, guid: 47c863f4a678697b896fc510fd04b71d, type: 2}
+  - {fileID: 2100000, guid: ef77a2aced4b30aca815cdbb0cbfdb7f, type: 2}
+  - {fileID: 2100000, guid: 58c984397666a16c3a3d6f95da2d4575, type: 2}
+  - {fileID: 2100000, guid: 311e7eddb582b3201a08213ff18b5294, type: 2}
+  - {fileID: 2100000, guid: d756512c27ac3d47bb893cda5346165c, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

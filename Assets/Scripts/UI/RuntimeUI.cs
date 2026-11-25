@@ -13,7 +13,6 @@ using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI
 {
-    [ExecuteAlways]
     public class RuntimeUI : MonoBehaviour
     {
         [SerializeField] private TextMeshProUGUI materialsLabelText;
@@ -327,6 +326,10 @@ namespace GameDevTV.RTS.UI
 
         private void Awake()
         {
+            // Prologue HUD is built in code at play. Do not paint or recreate the old
+            // Acts bars while the editor is idle — they used to sit on screen before Play.
+            if (!Application.isPlaying) return;
+
             Transform objectivesPanelT = FindChildRecursive(transform, "Active Objectives Panel");
             if (objectivesPanelT == null)
             {
@@ -722,6 +725,8 @@ namespace GameDevTV.RTS.UI
             RefreshUI();
         }
 
+        static bool prologueChromeHiddenOnce;
+
         private void Update()
         {
             if (!Application.isPlaying) return;
@@ -730,9 +735,15 @@ namespace GameDevTV.RTS.UI
             // cannot overlap / scroll the Prologue objective off-screen.
             if (PrologueController.IsActive)
             {
-                HideActsResourceChrome();
+                if (!prologueChromeHiddenOnce)
+                {
+                    prologueChromeHiddenOnce = true;
+                    HideActsResourceChrome();
+                }
                 return;
             }
+
+            prologueChromeHiddenOnce = false;
 
             UpdateSectorsUI();
             if (!layoutRebuilt)

@@ -85,7 +85,7 @@ Does this "Search and Discovery" phase feel like the right level of "Casual" for
 
 ## Current design decisions (authoritative intent)
 
-*Gameplay rules that conflict with archived Colony Acts notes in [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) should follow this section + live Prologue specs under `.summer/specs/`.*
+*Gameplay rules that conflict with archived Colony Acts notes in [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) should follow this section + live Prologue specs under `docs/specs/`.*
 
 *Older “casual / probe droid” notes above this section are historical brainstorm only — not the tone target.*
 

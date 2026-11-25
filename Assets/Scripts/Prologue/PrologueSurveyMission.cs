@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Collections.Generic;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
 using UnityEngine;
 
@@ -6,14 +8,15 @@ namespace GameDevTV.RTS.Prologue
 {
     /// <summary>
     /// Survey Team job: after paint + ✓, colony days tick on the time-lapse clock while
-    /// drones/crew animate over the painted tiles, then the area is revealed.
+    /// drones/crew walk the painted path <b>forward only</b> (no ping-pong), revealing as they go.
     /// Spec: .summer/specs/2026-11-19-prologue-survey-team-design.md
     /// </summary>
     public class PrologueSurveyMission : MonoBehaviour
     {
         public static PrologueSurveyMission Instance { get; private set; }
 
-        public const int DefaultTileBudget = 5;
+        /// <summary>Prologue board is small — high cap so the player is not stopped at 5 hexes.</summary>
+        public const int DefaultTileBudget = 99;
         public const int DefaultDays = 3;
 
         public bool IsSearching { get; private set; }
@@ -24,9 +27,15 @@ namespace GameDevTV.RTS.Prologue
         readonly List<int> searchPath = new();
         readonly List<GameObject> team = new();
         readonly List<Vector3> waypoints = new();
-        readonly List<int> wanderTargets = new();
+        /// <summary>Next waypoint index along the painted path (0…Count-1). Never wraps backward.</summary>
+        readonly List<int> pathIndex = new();
+        int revealedThrough = -1;
         float dayAccum;
         GameObject teamRoot;
+        readonly List<int> litVisualQueue = new(64);
+        Coroutine litSpreadRoutine;
+        const int LitVisualSpreadFrames = 3;
+        const int LitVisualMinChunk = 8;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Ensure()
@@ -60,8 +69,8 @@ namespace GameDevTV.RTS.Prologue
                        ?? new GameObject("PrologueDroneScan").AddComponent<PrologueDroneScan>();
             scan.BeginPaintMission(TileBudget, DaysRequired);
             ShowHint(
-                $"Survey Team: paint up to {TileBudget} tiles from lit ground, then click the green ✓. " +
-                $"Search takes {DaysRequired} colony day{(DaysRequired == 1 ? "" : "s")} (hit 1x to run time).");
+                $"Survey Team: stretch the yellow band toward a ?, click the ? to paint the path, then click [OK]. " +
+                $"{DaysRequired} colony day{(DaysRequired == 1 ? "" : "s")} — hit 1x to run time.");
         }
 
         /// <summary>Paint confirmed — start the day timer + team animation.</summary>
@@ -74,14 +83,22 @@ namespace GameDevTV.RTS.Prologue
             DaysRequired = Mathf.Max(1, days);
             DaysElapsed = 0f;
             dayAccum = 0f;
+            revealedThrough = -1;
             IsSearching = true;
 
             BuildWaypoints();
-            SpawnSearchTeam();
+            // Crew and drones stay off. The search still takes its colony days,
+            // then the road and the reveal land together.
+            // SpawnSearchTeam();
+            // First tile is underfoot at spawn.
+            RevealPathThrough(0);
+            var ctrl = PrologueController.Instance;
+            if (ctrl != null)
+                PrologueVisionThrottle.FlushSurveyConfirmImmediate(ctrl, searchPath);
             CardDeckController.Instance?.ConsumePrologueSurveyCard();
+            PrologueTimeLapse.Instance?.ResumeAfterSurveyConfirm();
             ShowHint(
-                $"Survey Team searching ({searchPath.Count} tiles) — {DaysRequired} colony day{(DaysRequired == 1 ? "" : "s")}. " +
-                "Hit 1x / Space if paused.");
+                $"Survey Team searching ({searchPath.Count} tiles) — {DaysRequired} colony day{(DaysRequired == 1 ? "" : "s")}.");
             GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(
                 PrologueController.Instance != null ? PrologueController.Instance.Colony : null);
             return true;
@@ -91,7 +108,8 @@ namespace GameDevTV.RTS.Prologue
         {
             if (!PrologueController.IsActive || !IsSearching) return;
 
-            AnimateTeam();
+            if (team.Count > 0)
+                AnimateTeam();
 
             // Colony days share Time.timeScale with the rest of the game.
             if (Time.timeScale <= 0.01f) return;
@@ -100,9 +118,39 @@ namespace GameDevTV.RTS.Prologue
             dayAccum += Time.deltaTime;
             DaysElapsed = dayAccum / secondsPerDay;
 
+            if (searchPath.Count > 0 && DaysRequired > 0f)
+            {
+                float t = Mathf.Clamp01(DaysElapsed / DaysRequired);
+                int lead = Mathf.Clamp(Mathf.CeilToInt(t * searchPath.Count) - 1, 0, searchPath.Count - 1);
+                RevealPathThrough(lead);
+            }
+
             if (DaysElapsed >= DaysRequired)
                 CompleteSearch();
         }
+
+        /// <summary>End Week skips remaining colony-day timer — survey finishes immediately.</summary>
+        public void FinishOnEndWeek()
+        {
+            if (!IsSearching) return;
+            CompleteSearch();
+        }
+
+        /// <summary>Fresh playtest run — clear in-flight survey so bootstrap does not resume mid-search.</summary>
+        public void AbortForPlaytest()
+        {
+            IsSearching = false;
+            searchPath.Clear();
+            revealedThrough = -1;
+            DaysElapsed = 0;
+            dayAccum = 0;
+            ClearTeam();
+            PrologueDroneScan.Instance?.SetScanMode(false);
+        }
+
+        /// <summary>Diagnostics: simulate crew partway along the painted path (vision / road churn).</summary>
+        public void AutomationSimulateRevealProgress(int waypointIndex) =>
+            RevealPathThrough(waypointIndex);
 
         void CompleteSearch()
         {
@@ -113,18 +161,18 @@ namespace GameDevTV.RTS.Prologue
             if (ctrl?.Colony != null && searchPath.Count > 0)
             {
                 ctrl.Colony.RevealTiles(searchPath);
-                foreach (int tile in searchPath)
-                    PrologueResourceFog.RevealNearTile(ctrl, tile);
+                RevealIceDepositsNearPath(ctrl, searchPath);
+                PrologueVisionThrottle.QueueSurveyFog(ctrl, searchPath);
 
-                foreach (var t in ctrl.Colony.Board.Tiles)
-                {
-                    if (t.Revealed) t.Lit = true;
-                }
+            EnqueueLitAndTrailVisuals(searchPath, flushAllImmediately: true);
 
-                ctrl.RefreshHandUnlocks();
+            ctrl.RefreshHandUnlocks();
                 GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(ctrl.Colony);
-                PrologueIceMarkers.Instance?.Refresh();
-                PrologueSearchedTiles.Instance?.RefreshAll();
+                foreach (int tile in searchPath)
+                    PrologueIceMarkers.Instance?.OnTileRevealed(tile);
+
+                if (ctrl.Colony.HasSurveyedIce())
+                    DiscoverySystem.MarkTypeKnownWithoutMassReveal("Ice");
 
                 ctrl.Colony.ObjectiveText(out _, out bool wantMore);
                 if (!wantMore)
@@ -134,6 +182,12 @@ namespace GameDevTV.RTS.Prologue
             }
 
             searchPath.Clear();
+            litVisualQueue.Clear();
+            if (litSpreadRoutine != null)
+            {
+                StopCoroutine(litSpreadRoutine);
+                litSpreadRoutine = null;
+            }
             PrologueDroneScan.Instance?.NotifySearchFinished();
         }
 
@@ -145,8 +199,8 @@ namespace GameDevTV.RTS.Prologue
             foreach (int tile in searchPath)
             {
                 if (!ctrl.TryGetCell(tile, out Vector2Int cell)) continue;
-                Vector3 p = ColonyTileGrid.CellToWorld(cell, 0f);
-                p.y = 0.2f;
+                Vector3 p = ColonyTileGrid.CellToWorldOnGround(cell);
+                p.y += 0.2f;
                 waypoints.Add(p);
             }
         }
@@ -159,45 +213,46 @@ namespace GameDevTV.RTS.Prologue
             teamRoot = new GameObject("SurveySearchTeam");
             DontDestroyOnLoad(teamRoot);
 
-            // 2 aerial drones + 2 ground crew.
+            // Stagger along the route so the team reads as a column walking out, not a swarm.
+            // 2 aerial drones + 2 ground crew — all start near the first painted tile.
+            Vector3 start = waypoints[0];
             for (int i = 0; i < 2; i++)
             {
                 var drone = BuildMiniDrone($"SurveyDrone_{i}");
                 drone.transform.SetParent(teamRoot.transform, false);
-                Vector3 p = waypoints[i % waypoints.Count];
-                p.y = 5.5f + i * 0.8f;
+                Vector3 p = start + new Vector3((i - 0.5f) * 1.2f, 5.5f + i * 0.8f, -1.2f * i);
                 drone.transform.position = p;
                 team.Add(drone);
-                wanderTargets.Add(i % waypoints.Count);
+                pathIndex.Add(0);
             }
 
             for (int i = 0; i < 2; i++)
             {
                 var crew = BuildCrewCapsule($"SurveyCrew_{i}");
                 crew.transform.SetParent(teamRoot.transform, false);
-                Vector3 p = waypoints[(i + 1) % waypoints.Count];
-                p.y = 0.9f;
+                Vector3 p = start + new Vector3((i - 0.5f) * 0.9f, 0.9f, -0.8f - i * 0.7f);
                 crew.transform.position = p;
                 team.Add(crew);
-                wanderTargets.Add((i + 1) % waypoints.Count);
+                pathIndex.Add(0);
             }
         }
 
         void AnimateTeam()
         {
             if (waypoints.Count == 0 || team.Count == 0) return;
-            float speed = Time.deltaTime * (Time.timeScale > 0.01f ? 1f : 0f) * 4.5f;
-            // When paused, freeze in place (deltaTime may be 0 already via timeScale).
-            speed = 4.5f * Time.deltaTime;
+            // Progressive patrol: walk painted waypoints in order; hold at the last (no wrap / ping-pong).
+            float speed = 4.5f * Time.deltaTime;
+            int lead = 0;
 
             for (int i = 0; i < team.Count; i++)
             {
                 var go = team[i];
                 if (go == null) continue;
                 bool airborne = go.name.StartsWith("SurveyDrone");
-                int wi = wanderTargets[i];
+                int wi = Mathf.Clamp(pathIndex[i], 0, waypoints.Count - 1);
                 Vector3 goal = waypoints[wi];
-                goal.y = airborne ? (5.5f + (i % 2) * 0.8f) : 0.9f;
+                float groundY = ColonyTileGrid.SampleGroundY(goal);
+                goal.y = airborne ? (groundY + 5.5f + (i % 2) * 0.8f) : (groundY + 0.9f);
 
                 Vector3 pos = go.transform.position;
                 go.transform.position = Vector3.MoveTowards(pos, goal, speed);
@@ -209,10 +264,11 @@ namespace GameDevTV.RTS.Prologue
                         Quaternion.LookRotation(flat.normalized, Vector3.up),
                         8f * Mathf.Max(Time.deltaTime, 0.01f));
 
-                if (Vector3.Distance(go.transform.position, goal) < 0.35f)
-                    wanderTargets[i] = (wi + 1 + (i % 2)) % waypoints.Count;
+                if (Vector3.Distance(go.transform.position, goal) < 0.35f && wi < waypoints.Count - 1)
+                    pathIndex[i] = wi + 1;
 
-                // Bob drones slightly.
+                lead = Mathf.Max(lead, pathIndex[i]);
+
                 if (airborne)
                 {
                     var p = go.transform.position;
@@ -220,6 +276,88 @@ namespace GameDevTV.RTS.Prologue
                     go.transform.position = p;
                 }
             }
+
+            RevealPathThrough(lead);
+        }
+
+        void RevealPathThrough(int waypointIndex)
+        {
+            if (waypointIndex <= revealedThrough) return;
+            var ctrl = PrologueController.Instance;
+            if (ctrl?.Colony == null) return;
+
+            int from = revealedThrough + 1;
+            int to = Mathf.Min(waypointIndex, searchPath.Count - 1);
+            var batch = new List<int>();
+            for (int i = from; i <= to; i++)
+                batch.Add(searchPath[i]);
+            ctrl.Colony.RevealTiles(batch);
+            PrologueVisionThrottle.QueueSurveyFog(ctrl, batch);
+            revealedThrough = to;
+
+            EnqueueLitAndTrailVisuals(batch, flushAllImmediately: false);
+            foreach (int tile in batch)
+                PrologueIceMarkers.Instance?.OnTileRevealed(tile);
+        }
+
+        void EnqueueLitAndTrailVisuals(IReadOnlyList<int> tiles, bool flushAllImmediately)
+        {
+            if (tiles == null || tiles.Count == 0) return;
+            if (flushAllImmediately)
+            {
+                var ctrl = PrologueController.Instance;
+                if (ctrl?.Colony != null)
+                {
+                    LitTiles(ctrl.Colony, tiles);
+                    PrologueSearchedTiles.Instance?.PaintTrailTiles(tiles, immediateGpu: true);
+                    PrologueSearchedTiles.Instance?.RefreshForTiles(tiles);
+                }
+                return;
+            }
+
+            for (int i = 0; i < tiles.Count; i++)
+                litVisualQueue.Add(tiles[i]);
+            if (litSpreadRoutine == null)
+                litSpreadRoutine = StartCoroutine(SpreadLitAndTrailVisuals());
+        }
+
+        IEnumerator SpreadLitAndTrailVisuals()
+        {
+            var ctrl = PrologueController.Instance;
+            var colony = ctrl?.Colony;
+            if (colony == null)
+            {
+                litVisualQueue.Clear();
+                litSpreadRoutine = null;
+                yield break;
+            }
+
+            int framesLeft = LitVisualSpreadFrames;
+            while (litVisualQueue.Count > 0 && framesLeft > 0)
+            {
+                int chunk = Mathf.Max(LitVisualMinChunk,
+                    Mathf.CeilToInt((float)litVisualQueue.Count / framesLeft));
+                chunk = Mathf.Min(chunk, litVisualQueue.Count);
+                var slice = litVisualQueue.GetRange(0, chunk);
+                litVisualQueue.RemoveRange(0, chunk);
+                LitTiles(colony, slice);
+                PrologueSearchedTiles.Instance?.PaintTrailTiles(slice, immediateGpu: true);
+                PrologueSearchedTiles.Instance?.RefreshForTiles(slice);
+                framesLeft--;
+                if (litVisualQueue.Count > 0)
+                    yield return null;
+            }
+
+            if (litVisualQueue.Count > 0)
+            {
+                var tail = new List<int>(litVisualQueue);
+                litVisualQueue.Clear();
+                LitTiles(colony, tail);
+                PrologueSearchedTiles.Instance?.PaintTrailTiles(tail, immediateGpu: true);
+                PrologueSearchedTiles.Instance?.RefreshForTiles(tail);
+            }
+
+            litSpreadRoutine = null;
         }
 
         static GameObject BuildMiniDrone(string name)
@@ -273,6 +411,25 @@ namespace GameDevTV.RTS.Prologue
             return m;
         }
 
+        static void RevealIceDepositsNearPath(PrologueController ctrl, List<int> path)
+        {
+            var colony = ctrl?.Colony;
+            if (colony == null || path == null || path.Count == 0) return;
+            int end = path[path.Count - 1];
+            var toReveal = new List<int>();
+            foreach (var t in colony.Board.Tiles)
+            {
+                if (t.DepositLeft <= 0) continue;
+                if (t.Feature != PrologueFeature.Ice && t.Feature != PrologueFeature.Glacier) continue;
+                if (colony.PrologueStep >= 4 && colony.Board.FirstIceTiles.Contains(t.Index)) continue;
+                if (colony.Dist(end, t.Index) > PrologueData.HarvestRange) continue;
+                if (!t.Revealed)
+                    toReveal.Add(t.Index);
+            }
+            if (toReveal.Count > 0)
+                colony.RevealTiles(toReveal);
+        }
+
         void ClearTeam()
         {
             for (int i = 0; i < team.Count; i++)
@@ -280,7 +437,7 @@ namespace GameDevTV.RTS.Prologue
                 if (team[i] != null) Destroy(team[i]);
             }
             team.Clear();
-            wanderTargets.Clear();
+            pathIndex.Clear();
             if (teamRoot != null)
             {
                 Destroy(teamRoot);
@@ -288,9 +445,20 @@ namespace GameDevTV.RTS.Prologue
             }
         }
 
+        static void LitTiles(PrologueColony colony, IReadOnlyList<int> indices)
+        {
+            if (colony == null || indices == null) return;
+            for (int i = 0; i < indices.Count; i++)
+            {
+                int idx = indices[i];
+                if (idx < 0 || idx >= colony.Board.Tiles.Count) continue;
+                colony.Board.At(idx).Lit = true;
+            }
+        }
+
         static void ShowHint(string msg)
         {
-            GameDevTV.RTS.UI.PrologueHUD.Instance?.ShowWeekReport(new List<string> { msg });
+            GameDevTV.RTS.UI.PrologueHUD.Instance?.ShowNote(new List<string> { msg });
         }
     }
 }

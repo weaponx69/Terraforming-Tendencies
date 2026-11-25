@@ -266,7 +266,9 @@ namespace GameDevTV.RTS.Units
 
             if (MainRenderer != null && primaryMaterial == null)
             {
-                primaryMaterial = MainRenderer.material;
+                primaryMaterial = GameDevTV.RTS.Prologue.PrologueController.IsActive
+                    ? MainRenderer.sharedMaterial
+                    : MainRenderer.material;
             }
 
             if (navMeshObstacle == null)
@@ -370,6 +372,7 @@ namespace GameDevTV.RTS.Units
 
             // Ensure we are initialized before checking BuildingSO
             InitializeIfNeeded();
+            ColonyGroundMesh.Apply(gameObject);
 
             // Automatically attach damaged status indicator programmatically
             if (gameObject.GetComponent<GameDevTV.RTS.UI.Components.DamagedIndicator>() == null)
@@ -515,8 +518,9 @@ namespace GameDevTV.RTS.Units
             CurrentHealth = MaxHealth;
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
-            // Prefabs often ship with BaseBuilding disabled — climate / production need Update.
             enabled = true;
+            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                GameDevTV.RTS.Prologue.ProloguePerformanceBudget.ApplyBuildingVisuals(gameObject);
             EnsureBuildingHealthBar();
             Supplies.BeginColonyIntegrityIfNeeded(this);
 
@@ -731,6 +735,8 @@ namespace GameDevTV.RTS.Units
                 GameDevTV.RTS.Player.BuildingUpkeepManager.Instance.RegisterBuilding(this);
             }
 
+            ScheduleNavMeshCarveWhenStationary();
+
             RaiseSpawnEvent();
         }
 
@@ -932,12 +938,14 @@ namespace GameDevTV.RTS.Units
         {
             if (BuildingSO == null) return;
 
+            // The aquifer is the drill rig. A marker sphere used to replace it when the build finished.
             bool isAquifer = BuildingSO.Name.Contains("Water Ice Aquifer", System.StringComparison.OrdinalIgnoreCase);
+            if (isAquifer) return;
             bool isExtractor = BuildingSO.Name.Contains("Subglacial Water Extractor", System.StringComparison.OrdinalIgnoreCase);
             bool isBiosphere = BuildingSO.Name.Contains("Biosphere Center", System.StringComparison.OrdinalIgnoreCase);
             bool isLake = BuildingSO.Name.Contains("Lake", System.StringComparison.OrdinalIgnoreCase);
 
-            if (!(isAquifer || isExtractor || isBiosphere || isLake)) return;
+            if (!(isExtractor || isBiosphere || isLake)) return;
 
             // Abstract marker — a solid geometric shape, not a fake water surface.
             float size = isBiosphere ? 6f : (isLake ? 5f : (isExtractor ? 4f : 3f));
@@ -1179,16 +1187,40 @@ namespace GameDevTV.RTS.Units
             AutoConnectAdjacentPowerNodes();
         }
 
-        private void Update()
+        /// <summary>Disable carving while ghosts move or scaffolds animate.</summary>
+        public void SuppressNavMeshCarving()
         {
-            // Prefer the global ticker when present; keep a local fallback for editor/tests.
-            // Colony Acts drive climate from week spend — never real-time here.
-            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
-                return;
-            if (ClimateGenerationTicker.Instance == null)
+            if (navMeshObstacle == null)
+                navMeshObstacle = GetComponentInChildren<UnityEngine.AI.NavMeshObstacle>();
+            if (navMeshObstacle == null) return;
+
+            navMeshObstacle.carving = false;
+            navMeshObstacle.enabled = false;
+        }
+
+        /// <summary>Deferred lazy carve after placement settles (see <see cref="BuildingManager"/>).</summary>
+        public void ScheduleNavMeshCarveWhenStationary()
+        {
+            if (BuildingManager.Instance != null)
             {
-                TickClimateGeneration(Time.deltaTime);
+                BuildingManager.Instance.QueueNavMeshCarve(this);
+                return;
             }
+
+            EnableLazyNavMeshCarve();
+        }
+
+        public void EnableLazyNavMeshCarve()
+        {
+            if (navMeshObstacle == null)
+                navMeshObstacle = GetComponentInChildren<UnityEngine.AI.NavMeshObstacle>();
+            if (navMeshObstacle == null) return;
+
+            navMeshObstacle.carveOnlyStationary = true;
+            navMeshObstacle.carvingMoveThreshold = 0.5f;
+            navMeshObstacle.carvingTimeToStationary = 0.5f;
+            navMeshObstacle.enabled = true;
+            navMeshObstacle.carving = true;
         }
 
         public void TryRepair()
@@ -1261,6 +1293,7 @@ namespace GameDevTV.RTS.Units
 
         private void EnsureBuildingHealthBar()
         {
+            if (GameDevTV.RTS.Prologue.PrologueController.IsActive) return;
             if (GetComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>() != null) return;
             gameObject.AddComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>();
         }
@@ -1444,10 +1477,7 @@ namespace GameDevTV.RTS.Units
 
             ApplyGhostMaterialToRenderers(effectiveMat);
 
-            if (navMeshObstacle != null)
-            {
-                navMeshObstacle.enabled = false;
-            }
+            SuppressNavMeshCarving();
 
             Collider[] colliders = GetComponentsInChildren<Collider>();
             foreach (Collider c in colliders)
@@ -1530,10 +1560,7 @@ namespace GameDevTV.RTS.Units
                 Progress.Completion
             );
 
-            if (navMeshObstacle != null)
-            {
-                navMeshObstacle.enabled = true;
-            }
+            SuppressNavMeshCarving();
 
             Collider[] colliders = GetComponentsInChildren<Collider>();
             foreach (Collider c in colliders)
@@ -1553,7 +1580,7 @@ namespace GameDevTV.RTS.Units
         private Coroutine selfBuildCoroutine;
 
         /// <summary>
-        /// Combolands card place: building finishes immediately (no rise timer / drone).
+        /// Combolands card place: building finishes immediately (no scaffold timer / drone).
         /// Defers Colony Act score until after <see cref="CardDeckController.ConsumeCardAfterBuild"/>.
         /// </summary>
         public void CompleteInstantCardPlace(Owner owner, BuildingSO definition = null)
@@ -1572,7 +1599,7 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
-        /// Free place / no-drone fallback: ghost → rise animation → complete.
+        /// Free place / no-drone fallback: ghost stays on the pad under scaffolding, then completes.
         /// Card plays use <see cref="CompleteInstantCardPlace"/> instead.
         /// </summary>
         public void BeginSelfConstruction(Owner owner, BuildingSO definition = null, Material ghostMaterial = null)
@@ -1589,6 +1616,7 @@ namespace GameDevTV.RTS.Units
                 : (ResolvedBuildingSO != null ? ResolvedBuildingSO.PlacementMaterial : null);
             InitializeAsGhost(mat, owner);
             StartBuilding(null);
+            ConstructionScaffold.Ensure(transform);
 
             if (selfBuildCoroutine != null)
                 StopCoroutine(selfBuildCoroutine);
@@ -1601,15 +1629,6 @@ namespace GameDevTV.RTS.Units
             float buildTime = Mathf.Max(0.35f, def != null ? def.BuildTime : 3f);
             if (def?.BuildingConfig != null)
                 buildTime *= Mathf.Max(0.1f, def.BuildingConfig.BuildTimeMultiplier);
-
-            Renderer buildingRenderer = MainRenderer;
-            Vector3 endPosition = transform.position;
-            Vector3 startPosition = endPosition;
-            if (buildingRenderer != null)
-            {
-                startPosition = endPosition - Vector3.up * buildingRenderer.bounds.size.y;
-                buildingRenderer.transform.position = startPosition;
-            }
 
             float elapsed = 0f;
             float targetHealth = 0f;
@@ -1628,9 +1647,6 @@ namespace GameDevTV.RTS.Units
                     targetHealth -= healAmount;
                 }
 
-                if (buildingRenderer != null)
-                    buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalized);
-
                 // Keep Progress.Completion moving for any UI that reads it.
                 Progress = new BuildingProgress(
                     BuildingProgress.BuildingState.Building,
@@ -1640,9 +1656,7 @@ namespace GameDevTV.RTS.Units
                 yield return null;
             }
 
-            if (buildingRenderer != null && buildingRenderer.transform != transform)
-                buildingRenderer.transform.localPosition = Vector3.zero;
-
+            ConstructionScaffold.Clear(transform);
             enabled = true;
             CompleteConstruction();
             ReservedSiteBuildUtility.GroundBuilding(this);

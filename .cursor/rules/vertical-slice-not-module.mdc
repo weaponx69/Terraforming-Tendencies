@@ -1,0 +1,36 @@
+---
+description: Prologue is the vertical slice of the full game—not a separate module, tutorial, or throwaway silo. Read before any work.
+alwaysApply: true
+---
+
+# Vertical slice = the game
+
+## Non-negotiable truth
+
+The **main-scene run** (today: scripts under `Prologue/`, `PrologueController`) is the **vertical slice** of Terraforming Tendencies—the same loop the **shipped game** will use: planet surface, sectors, survey-as-puzzle, typed resources, cards, placement, build weeks, End Week, corporate pressure.
+
+**`Prologue` in a type or folder name is legacy organization from what shipped first—not a license to build a parallel “real game” later.**
+
+## Do
+
+- Extend **slice systems** toward the full product: `PrologueController`, `PrologueColony`, shared planet (`PlanetGenerator`, `SectorManager`), cards, `ColonyTileGrid`, placement, HUD.
+- Frame plans as **game-wide** (perf, DOTS, culling, fog, economy, UI)—applicable as the slice grows (more sectors, planet pick), not “for prologue only.”
+- Treat **player verification** on the slice as verifying **the game** ([`player-verify-after-changes.mdc`](player-verify-after-changes.mdc)).
+- Use **archived** only where the repo already says so (e.g. **Colony Acts**), not for the vertical slice.
+
+## Do not
+
+- Call the slice a **separate module**, **tutorial**, **demo**, **one-off**, or **side quest**.
+- Propose **prologue-only** code paths, **prologue-only** optimizations, or **“defer until full game”** for core mechanics.
+- Split architecture into “prologue” vs “real game” (e.g. two fog systems, two economies) without explicit user direction.
+- Dismiss folder names (`Prologue*`) as “not production” when they **own the authoritative run** today.
+
+## Quick reference
+
+| | |
+|--|--|
+| **Authoritative run** | Vertical slice / `PrologueController` path |
+| **Archived** | Colony Acts (`ColonyActManager` must not own run when slice active) |
+| **Design + architecture** | [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) §0, [`docs/specs/2026-11-24-vertical-slice-authority.md`](../../docs/specs/2026-11-24-vertical-slice-authority.md) |
+
+When unsure, read those before changing architecture or telling the user what to build next.

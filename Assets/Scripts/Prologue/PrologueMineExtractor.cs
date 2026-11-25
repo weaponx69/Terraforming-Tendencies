@@ -46,12 +46,6 @@ namespace GameDevTV.RTS.Prologue
             }
         }
 
-        void Update()
-        {
-            if ((Deposit == null || Deposit.Amount <= 0) && drones != null)
-                drones.Clear();
-        }
-
         void Register()
         {
             if (registered || Deposit == null) return;
@@ -77,6 +71,8 @@ namespace GameDevTV.RTS.Prologue
             int g = Mathf.Min(want, Mathf.Max(0, Deposit.Amount));
             if (g <= 0) return 0;
             Deposit.Amount -= g;
+            if (Deposit.Amount <= 0 && drones != null)
+                drones.Clear();
             return g;
         }
 

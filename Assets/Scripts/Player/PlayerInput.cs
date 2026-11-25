@@ -13,6 +13,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.LowLevel;
 using GameDevTV.RTS.Utilities;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.Prologue;
 using TMPro;
@@ -44,6 +45,8 @@ namespace GameDevTV.RTS.Player
         private Color joinedTileFresnelColor = new (0.4f, 4f, 1.2f, 2);
 
         private Vector2 startingMousePosition;
+        // World XZ velocity left over from a middle-mouse flick (globe spin).
+        private Vector3 globeSpinVelocity;
 
         private BaseCommand activeCommand;
         private List<ISelectable> commandTargetUnits = new(12);
@@ -62,6 +65,7 @@ namespace GameDevTV.RTS.Player
         private Vector2Int? lastComboPreviewCell;
         private BuildingSO lastComboPreviewBuilding;
         private Vector2Int? tileGhostStickyCell;
+        string placementCaption;
         private int lastJoinCount = -1;
         private bool lastGhostRestrictionsPass = true;
         private int restrictionAgreeFrames;
@@ -91,6 +95,26 @@ namespace GameDevTV.RTS.Player
 
         public static PlayerInput Instance { get; private set; }
 
+        /// <summary>True while a building card ghost is on the map. Escape cancels it instead of opening pause.</summary>
+        public static bool PlacementGhostActive { get; private set; }
+
+        /// <summary>Hand slot armed for placement, or -1 when no card is picked.</summary>
+        public static int PickedHandIndex
+        {
+            get
+            {
+                if (Instance == null) return -1;
+                if (Instance.activeCommand is BuildBuildingCommand building && building.HandIndex >= 0)
+                    return building.HandIndex;
+                if (Instance.activeCommand is PlayCardCommand play && play.HandIndex >= 0)
+                    return play.HandIndex;
+                return -1;
+            }
+        }
+
+        /// <summary>The camera the player looks through. Camera.main can be the fog camera.</summary>
+        public Camera GameplayCamera => playerCamera;
+
         /// <summary>Pan the follow target over a world point (keeps current camera height).</summary>
         public static void FocusCameraOnWorldPosition(Vector3 worldPosition)
         {
@@ -98,7 +122,7 @@ namespace GameDevTV.RTS.Player
             worldPosition.y = Instance.cameraTarget.position.y;
             Instance.cameraTarget.position = worldPosition;
             Instance.currentHex?.SetHighlighted(false);
-            Instance.currentHex = HexGridManager.Instance?.GetNearestHex(worldPosition);
+            Instance.currentHex = HexGridManager.Instance?.GetHexForHover(worldPosition);
             // Keep the cyan grid off unless the mouse is over a tile (keyboard nav still highlights).
             if (!GameDevTV.RTS.Prologue.PrologueController.IsActive)
                 Instance.currentHex?.SetHighlighted(true);
@@ -331,7 +355,7 @@ namespace GameDevTV.RTS.Player
             targetPosition.y = cameraTarget.position.y;
             cameraTarget.position = targetPosition;
             currentHex?.SetHighlighted(false);
-            currentHex = HexGridManager.Instance?.GetNearestHex(cameraTarget.position);
+            currentHex = HexGridManager.Instance?.GetHexForHover(cameraTarget.position);
             if (!GameDevTV.RTS.Prologue.PrologueController.IsActive)
                 currentHex?.SetHighlighted(true);
         }
@@ -469,6 +493,13 @@ namespace GameDevTV.RTS.Player
                 {
                     ghostInstance = Instantiate(prefabToInstantiate);
                     ghostInstance.name = "Ghost_" + prefabToInstantiate.name;
+                    PlacementGhostActive = true;
+                    foreach (var indicator in ghostInstance.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (indicator != null
+                            && indicator.name.IndexOf("Selection Indicator", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                            indicator.gameObject.SetActive(false);
+                    }
 
                     if (ghostInstance.TryGetComponent(out BaseBuilding bb))
                     {
@@ -688,8 +719,7 @@ namespace GameDevTV.RTS.Player
 
             if (Keyboard.current.escapeKey.wasReleasedThisFrame)
             {
-                ClearGhostVisuals();
-                activeCommand = null;
+                CancelPlacement();
                 return;
             }
 
@@ -718,22 +748,43 @@ namespace GameDevTV.RTS.Player
             else if (cardTilePlace)
             {
                 Vector2Int? previousSticky = tileGhostStickyCell;
-                hitPos = ColonyTileGrid.SnapForPlacement(
-                    hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
-
-                // Mines lock to the matching discovered deposit tile (not free ground).
+                // Mines lock to the deposit under the cursor before occupied-cell push.
+                // The push was kicking the laser off the ghost's pad, then the short snap
+                // could not reach back, so every click said it could not be placed.
+                Vector3 mineSnap = hitPos.Value;
+                Vector2Int mineCell = default;
+                bool mineLocked = false;
                 if (activeCommand is BuildBuildingCommand mineBbc
-                    && BuildingSiteRegistry.IsMineBuilding(mineBbc.Building)
-                    && DiscoverySystem.TrySnapToMineDeposit(
-                        mineBbc.Building, hitPos.Value, out Vector3 mineSnap, out Vector2Int mineCell))
+                    && BuildingSiteRegistry.IsMineBuilding(mineBbc.Building))
+                {
+                    mineLocked = DiscoverySystem.TrySnapToMineDeposit(
+                        mineBbc.Building, hitPos.Value, out mineSnap, out mineCell);
+                    if (!mineLocked)
+                    {
+                        Vector3? aimed = RaycastActionPoint();
+                        if (aimed.HasValue)
+                        {
+                            mineLocked = DiscoverySystem.TrySnapToMineDeposit(
+                                mineBbc.Building, aimed.Value, out mineSnap, out mineCell);
+                        }
+                    }
+                }
+                if (mineLocked)
                 {
                     hitPos = mineSnap;
                     tileGhostStickyCell = mineCell;
                     joinCount = ColonyTileGrid.CountOrthogonalNeighbors(mineCell, Owner.Player1);
                 }
+                else
+                {
+                    hitPos = ColonyTileGrid.SnapForPlacement(
+                        hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
+                }
+
                 // Aquifers / feature tiles: soft-snap toward their geology sector when nearby.
                 // Prologue places by ice range instead — do not yank the ghost to a WaterDeposit sector.
-                else if (!PrologueController.IsActive
+                if (!mineLocked
+                    && !PrologueController.IsActive
                     && activeCommand is BuildBuildingCommand featureBbc
                     && DiscoverySystem.TryGetRequiredSectorFeature(featureBbc.Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(featureBbc.Building, hitPos.Value)
@@ -758,20 +809,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
-            {
-                agentTypeID = 0,
-                areaMask = UnityEngine.AI.NavMesh.AllAreas
-            };
-            if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
-            {
-                if (cardTilePlace)
-                    hitPos = new Vector3(hitPos.Value.x, navHit.position.y, hitPos.Value.z);
-                else
-                    hitPos = navHit.position;
-            }
-
-            Vector3 snapTarget = hitPos.Value;
+            Vector3 snapTarget = ColonyTileGrid.ApplyGroundY(hitPos.Value);
             // Hard snap to the cell — lerp made occupancy thrash look like a strobing animation.
             ghostInstance.transform.position = snapTarget;
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
@@ -782,7 +820,8 @@ namespace GameDevTV.RTS.Player
             else
                 allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
             bool colonyActs = ColonyActManager.Instance != null;
-            if (cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
+            if (!PrologueController.IsActive
+                && cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
             {
                 allRestrictionsPass = false;
@@ -805,7 +844,10 @@ namespace GameDevTV.RTS.Player
             {
                 allRestrictionsPass = false;
             }
-            if (cardTilePlace && activeCommand is BuildBuildingCommand depositReserveBbc
+            // Prologue: ice-range / Preview owns placement — do not apply Acts deposit / geology gates.
+            bool prologueGates = PrologueController.IsActive;
+            if (!prologueGates
+                && cardTilePlace && activeCommand is BuildBuildingCommand depositReserveBbc
                 && !BuildingSiteRegistry.IsMineBuilding(depositReserveBbc.Building)
                 && !BuildingSiteRegistry.IsCommandPostBuilding(depositReserveBbc.Building)
                 && DiscoverySystem.IsOnAnyMineableDeposit(snapTarget))
@@ -814,17 +856,20 @@ namespace GameDevTV.RTS.Player
             }
             if (cardTilePlace && activeCommand is BuildBuildingCommand centerReserveBbc
                 && !BuildingSiteRegistry.IsCommandPostBuilding(centerReserveBbc.Building)
+                && !(prologueGates && BuildingSiteRegistry.IsMineBuilding(centerReserveBbc.Building))
                 && SectorColonization.IsReservedCommandPostTile(snapTarget))
             {
                 allRestrictionsPass = false;
             }
-            if (cardTilePlace && activeCommand is BuildBuildingCommand featureGateBbc
+            if (!prologueGates
+                && cardTilePlace && activeCommand is BuildBuildingCommand featureGateBbc
                 && DiscoverySystem.TryGetRequiredSectorFeature(featureGateBbc.Building, out _)
                 && !DiscoverySystem.IsOnRequiredSectorFeature(featureGateBbc.Building, snapTarget))
             {
                 allRestrictionsPass = false;
             }
-            if (cardTilePlace && activeCommand is BuildBuildingCommand matBbc
+            if (!PrologueController.IsActive
+                && cardTilePlace && activeCommand is BuildBuildingCommand matBbc
                 && matBbc.Building != null)
             {
                 int need = ReservedSiteBuildUtility.GetMaterialsCost(matBbc.Building);
@@ -837,17 +882,31 @@ namespace GameDevTV.RTS.Player
             if (PrologueController.IsActive
                 && cardTilePlace
                 && activeCommand is BuildBuildingCommand prologueBbc
-                && PrologueCardMap.TryGetPrologueId(prologueBbc.Building, out var prologueId)
-                && prologueId != PrologueBuildingId.CommandPost
-                && PrologueController.Instance != null
-                && PrologueController.Instance.TryGetTileIndex(snapTarget, out int prologueTile))
+                && PrologueController.Instance != null)
             {
-                allRestrictionsPass = PrologueController.Instance.Colony.Preview(
-                    prologueTile, prologueId, out _);
+                var colony = PrologueController.Instance.Colony;
+                if (BuildingSiteRegistry.IsMineBuilding(prologueBbc.Building))
+                {
+                    bool onPad = DiscoverySystem.IsOnDiscoveredMineDeposit(prologueBbc.Building, snapTarget);
+                    bool paid = colony.GetStock(PrologueResourceId.Minerals) >= PrologueData.MineMineralCost;
+                    allRestrictionsPass = onPad && paid;
+                }
+                else if (PrologueCardMap.TryGetPrologueId(prologueBbc.Building, out var prologueId)
+                         && prologueId != PrologueBuildingId.CommandPost
+                         && PrologueController.Instance.TryGetTileIndex(snapTarget, out int prologueTile))
+                {
+                    allRestrictionsPass = colony.Preview(prologueTile, prologueId, out _);
+                }
+                placementCaption = ProloguePlacementCaption(prologueBbc, snapTarget, allRestrictionsPass);
             }
 
-            // Hysteresis so NavMesh / overlap edge cases don't strobe red/blue every frame.
-            if (allRestrictionsPass == displayedRestrictionsPass)
+            // Prologue copy has to match the click on this frame. Acts overlap can still wait a few frames.
+            if (PrologueController.IsActive)
+            {
+                displayedRestrictionsPass = allRestrictionsPass;
+                restrictionAgreeFrames = 0;
+            }
+            else if (allRestrictionsPass == displayedRestrictionsPass)
             {
                 restrictionAgreeFrames = RestrictionHysteresisFrames;
             }
@@ -895,17 +954,68 @@ namespace GameDevTV.RTS.Player
             return null;
         }
 
-        /// <summary>
-        /// Ground pick that ignores buildings so hovering near existing tiles does not thrash the snap cell.
-        /// </summary>
-        private Vector3? RaycastGroundForTileGhost()
+        /// <summary>The same first hit the click uses, so a mine aimed at its deposit ghost snaps to that pad.</summary>
+        private Vector3? RaycastActionPoint()
         {
+            if (playerCamera == null) return null;
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
+                return hit.point;
+            return null;
+        }
+
+        string ProloguePlacementCaption(BuildBuildingCommand bbc, Vector3 snap, bool legal)
+        {
+            var colony = PrologueController.Instance?.Colony;
+            if (colony == null || bbc?.Building == null)
+                return legal ? "Can build." : "Can't place here.";
+
+            int have = colony.GetStock(PrologueResourceId.Minerals);
+            if (BuildingSiteRegistry.IsMineBuilding(bbc.Building))
+            {
+                DiscoverySystem.TryGetMineResourceType(bbc.Building, out string type);
+                string kind = string.IsNullOrEmpty(type) ? "resource" : type;
+                int cost = PrologueData.MineMineralCost;
+                if (!DiscoverySystem.HasDiscoveredMineDeposit(bbc.Building))
+                    return $"Survey a {kind} deposit before building this.";
+                if (!DiscoverySystem.IsOnDiscoveredMineDeposit(bbc.Building, snap))
+                    return $"Aim at a surveyed {kind} deposit.";
+                if (have < cost)
+                    return $"Need {cost} minerals (have {have}).";
+                return $"Can build · {cost} minerals (have {have}).";
+            }
+
+            if (PrologueCardMap.TryGetPrologueId(bbc.Building, out var id)
+                && id != PrologueBuildingId.CommandPost
+                && PrologueController.Instance.TryGetTileIndex(snap, out int tile))
+            {
+                if (!colony.Preview(tile, id, out string reason))
+                    return string.IsNullOrEmpty(reason) ? "Can't place here." : reason;
+                int cost = PrologueData.MineralCost(id);
+                int weeks = PrologueData.Get(id).BuildWeeks + PrologueData.HaulWeeks(colony.SupplyDistance(tile));
+                if (cost <= 0)
+                    return weeks > 0 ? $"Can build · {weeks} wk." : "Can build.";
+                return $"Can build · {cost} minerals (have {have}) · {weeks} wk.";
+            }
+
+            return legal ? "Can build." : "Can't place here.";
+        }
+
+        /// <summary>Ground under cursor — same ray path for hover, ghost, and placement.</summary>
+        bool TryRaycastGroundUnderCursor(out Vector3 ground)
+        {
+            ground = default;
+            if (playerCamera == null || Mouse.current == null) return false;
+
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-            if (Physics.Raycast(cameraRay, out RaycastHit floorHit, float.MaxValue, floorLayers))
-                return floorHit.point;
+            if (Physics.Raycast(cameraRay, out RaycastHit floorHit, float.MaxValue, floorLayers, QueryTriggerInteraction.Ignore))
+            {
+                ground = floorHit.point;
+                return true;
+            }
 
-            int count = Physics.RaycastNonAlloc(cameraRay, ghostRayHits, float.MaxValue);
+            int count = Physics.RaycastNonAlloc(cameraRay, ghostRayHits, float.MaxValue, ~0, QueryTriggerInteraction.Ignore);
             float bestDist = float.MaxValue;
             Vector3? best = null;
             for (int i = 0; i < count; i++)
@@ -921,14 +1031,30 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            if (best.HasValue) return best;
+            if (best.HasValue)
+            {
+                ground = best.Value;
+                return true;
+            }
 
-            // Stable fallback: horizontal plane at last ghost height / camera focus.
             float y = ghostInstance != null ? ghostInstance.transform.position.y : GetCameraFocusPosition().y;
             var plane = new Plane(Vector3.up, new Vector3(0f, y, 0f));
             if (plane.Raycast(cameraRay, out float enter))
-                return cameraRay.GetPoint(enter);
+            {
+                ground = cameraRay.GetPoint(enter);
+                return true;
+            }
 
+            return false;
+        }
+
+        /// <summary>
+        /// Ground pick that ignores buildings so hovering near existing tiles does not thrash the snap cell.
+        /// </summary>
+        private Vector3? RaycastGroundForTileGhost()
+        {
+            if (TryRaycastGroundUnderCursor(out Vector3 ground))
+                return ground;
             return null;
         }
 
@@ -1250,6 +1376,15 @@ namespace GameDevTV.RTS.Player
             comboSummaryLabel.gameObject.SetActive(true);
             // Sit above the ghost; link chips sit lower on neighbors.
             comboSummaryWorldPos = snapPos + Vector3.up * 5.5f;
+            if (PrologueController.IsActive && !string.IsNullOrEmpty(placementCaption))
+            {
+                comboSummaryLabel.text = placementCaption;
+                comboSummaryLabel.color = legal
+                    ? new Color(0.75f, 1f, 0.82f, 1f)
+                    : new Color(1f, 0.55f, 0.45f, 1f);
+                UpdateComboLabelScreens();
+                return;
+            }
             if (!legal)
             {
                 comboSummaryLabel.text = "Can't place";
@@ -1496,14 +1631,32 @@ namespace GameDevTV.RTS.Player
             ClearJoinLines();
             ClearComboHalo();
             tileGhostStickyCell = null;
+            placementCaption = null;
             lastJoinCount = -1;
             restrictionAgreeFrames = 0;
             displayedRestrictionsPass = true;
             lastGhostRestrictionsPass = true;
+            PlacementGhostActive = false;
+        }
+
+        private void CancelPlacement()
+        {
+            ClearGhostVisuals();
+            activeCommand = null;
+            commandTargetUnits.Clear();
         }
 
         private void HandleDragSelect()
         {
+            if (PrologueController.IsActive
+                && !PlacementGhostActive
+                && PrologueDroneScan.Instance != null
+                && PrologueDroneScan.Instance.ScanMode
+                && !PrologueDroneScan.Instance.IsFlying)
+            {
+                return;
+            }
+
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
                 HandleMouseDown();
@@ -1581,7 +1734,7 @@ namespace GameDevTV.RTS.Player
             }
             startingMousePosition = Mouse.current.position.ReadValue();
             addedUnits.Clear();
-            wasMouseDownOnUI = EventSystem.current.IsPointerOverGameObject();
+            wasMouseDownOnUI = UiPlaythroughUtil.PointerBlocksWorldInteraction();
         }
 
         private void DeselectAllUnits()
@@ -1614,6 +1767,12 @@ namespace GameDevTV.RTS.Player
 
         private void HandleRightClick()
         {
+            if (Mouse.current.rightButton.wasReleasedThisFrame && (ghostInstance != null || PlacementGhostActive))
+            {
+                CancelPlacement();
+                return;
+            }
+
             if (Mouse.current.rightButton.wasReleasedThisFrame)
             {
                 // Draft / pause overlays use full-screen raycast blockers. Without this check,
@@ -1779,7 +1938,7 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            if (EventSystem.current.IsPointerOverGameObject()) { return; }
+            if (UiPlaythroughUtil.PointerBlocksWorldInteraction()) return;
 
             if (activeCommand == null)
             {
@@ -1819,7 +1978,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
             else if (activeCommand != null
-                && !EventSystem.current.IsPointerOverGameObject())
+                && !UiPlaythroughUtil.PointerBlocksWorldInteraction())
             {
                 if (Physics.Raycast(cameraRay, out RaycastHit hitAction, float.MaxValue, interactableLayers | floorLayers))
                 {
@@ -1845,9 +2004,21 @@ namespace GameDevTV.RTS.Player
 
         private void ActivateAction(RaycastHit hit)
         {
-            // Prologue boots paused (timeScale=0). Instant hand cards like Survey Team must
-            // still fire — only ghost/placement clicks need a running clock.
-            bool allowWhilePaused = activeCommand is PlayCardCommand
+            var prologue = PrologueController.Instance;
+            if (prologue != null && prologue.Colony != null && prologue.Colony.ContractCancelled)
+            {
+                ExplorationManager.NotifyPlacementFailed(
+                    "The corporation cancelled the contract. The mission is over.",
+                    hit.point);
+                return;
+            }
+
+            // Prologue boots paused (timeScale=0). Survey + Prologue hand tile places must still work.
+            bool prologueHandPlace = PrologueController.IsActive
+                && activeCommand is BuildBuildingCommand prologueBbc
+                && prologueBbc.HandIndex >= 0;
+            bool allowWhilePaused = prologueHandPlace
+                                    || activeCommand is PlayCardCommand
                                     || (activeCommand != null && !activeCommand.RequiresClickToActivate
                                         && activeCommand is not BuildBuildingCommand);
             if (Time.timeScale <= 0.01f && !allowWhilePaused)
@@ -1867,6 +2038,13 @@ namespace GameDevTV.RTS.Player
 
             // Commit the cell the ghost/footprint was showing — not a fresh noisy ray hit.
             bool cardTilePlace = activeCommand is BuildBuildingCommand placeCmd && placeCmd.HandIndex >= 0;
+            if (cardTilePlace && PrologueController.IsActive && !displayedRestrictionsPass)
+            {
+                ExplorationManager.NotifyPlacementFailed(
+                    string.IsNullOrEmpty(placementCaption) ? "Can't place here." : placementCaption,
+                    hit.point);
+                return;
+            }
             if (cardTilePlace)
             {
                 var placeBbc = (BuildBuildingCommand)activeCommand;
@@ -1905,15 +2083,6 @@ namespace GameDevTV.RTS.Player
                 };
                 if (UnityEngine.AI.NavMesh.SamplePosition(placePoint, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
                     placePoint = new Vector3(placePoint.x, navHit.position.y, placePoint.z);
-
-                if (activeCommand is BuildBuildingCommand placeMine
-                    && BuildingSiteRegistry.IsMineBuilding(placeMine.Building)
-                    && DiscoverySystem.TrySnapToMineDeposit(
-                        placeMine.Building, placePoint, out Vector3 minePlace, out Vector2Int mineCell))
-                {
-                    placePoint = new Vector3(minePlace.x, placePoint.y, minePlace.z);
-                    tileGhostStickyCell = mineCell;
-                }
 
                 hit.point = placePoint;
             }
@@ -1968,29 +2137,46 @@ namespace GameDevTV.RTS.Player
                     return;
                 }
 
-                // Prologue sim registration before the Unity building spawn.
+                // Prologue sim: pay minerals + queue build weeks before the Unity spawn.
                 if (PrologueController.IsActive
                     && activeCommand is BuildBuildingCommand prologuePlace
-                    && PrologueCardMap.TryGetPrologueId(prologuePlace.Building, out var placeId)
-                    && placeId != PrologueBuildingId.CommandPost
-                    && PrologueController.Instance != null
-                    && PrologueController.Instance.TryGetTileIndex(hit.point, out int placeTile))
+                    && PrologueController.Instance != null)
                 {
-                    if (!PrologueController.Instance.Colony.TryPlaceImmediate(placeTile, placeId, out string prologueReason))
+                    var colony = PrologueController.Instance.Colony;
+                    if (BuildingSiteRegistry.IsMineBuilding(prologuePlace.Building))
                     {
-                        ExplorationManager.NotifyPlacementFailed(
-                            string.IsNullOrEmpty(prologueReason)
-                                ? "Prologue: can't place here."
-                                : prologueReason,
-                            hit.point);
-                        activeCommand = null;
-                        commandTargetUnits.Clear();
-                        return;
+                        if (!colony.TrySpendStock(PrologueResourceId.Minerals, PrologueData.MineMineralCost))
+                        {
+                            ExplorationManager.NotifyPlacementFailed(
+                                $"Need {PrologueData.MineMineralCost} minerals to place {prologuePlace.Building.Name} " +
+                                $"(have {colony.GetStock(PrologueResourceId.Minerals)}).",
+                                hit.point);
+                            activeCommand = null;
+                            commandTargetUnits.Clear();
+                            return;
+                        }
                     }
-                    PrologueController.Instance.RefreshHandUnlocks();
+                    else if (PrologueCardMap.TryGetPrologueId(prologuePlace.Building, out var placeId)
+                             && placeId != PrologueBuildingId.CommandPost
+                             && PrologueController.Instance.TryGetTileIndex(hit.point, out int placeTile))
+                    {
+                        if (!colony.TryPlace(placeTile, placeId, out string prologueReason))
+                        {
+                            ExplorationManager.NotifyPlacementFailed(
+                                string.IsNullOrEmpty(prologueReason)
+                                    ? "Prologue: can't place here."
+                                    : prologueReason,
+                                hit.point);
+                            activeCommand = null;
+                            commandTargetUnits.Clear();
+                            return;
+                        }
+                        PrologueController.Instance.RefreshHandUnlocks();
+                    }
                 }
 
                 activeCommand.Handle(ownerContext);
+                AudioManager.Instance?.PlayPlaceClickSound();
 
                 activeCommand = null;
                 commandTargetUnits.Clear();
@@ -2044,12 +2230,46 @@ namespace GameDevTV.RTS.Player
 
         private void HandleRotation()
         {
-            // Full 360-degree free rotation using Middle Mouse Button
-            if (cameraTarget != null && Mouse.current.middleButton.isPressed)
+            // Middle-mouse drag grabs the ground. Releasing a flick keeps the view coasting
+            // like spinning a globe, then friction settles it.
+            if (cameraTarget != null && Mouse.current != null)
             {
-                float rotationInput = Mouse.current.delta.x.ReadValue();
-                float rotationSpeed = cameraConfig.RotationSpeed * 0.2f; 
-                cameraTarget.transform.Rotate(Vector3.up, rotationInput * rotationSpeed, Space.World);
+                float dt = Mathf.Max(Time.unscaledDeltaTime, 0.0001f);
+                if (Mouse.current.middleButton.wasPressedThisFrame)
+                    globeSpinVelocity = Vector3.zero;
+
+                if (Mouse.current.middleButton.isPressed)
+                {
+                    Vector2 delta = Mouse.current.delta.ReadValue();
+                    if (delta.sqrMagnitude > 0.0001f)
+                    {
+                        float panScale = MiddleMousePanScale();
+                        Vector3 move = GlobePanAxes(delta, panScale);
+                        Vector3 pos = cameraTarget.position + move;
+                        pos.y = cameraTarget.position.y;
+                        cameraTarget.position = WrapCameraOnPlanet(pos);
+                        Vector3 instant = move / dt;
+                        const float maxSpin = 110f;
+                        if (instant.sqrMagnitude > maxSpin * maxSpin)
+                            instant = instant.normalized * maxSpin;
+                        globeSpinVelocity = Vector3.Lerp(globeSpinVelocity, instant, 0.58f);
+                    }
+                    else
+                    {
+                        globeSpinVelocity = Vector3.Lerp(globeSpinVelocity, Vector3.zero, 0.2f);
+                    }
+                }
+                else if (globeSpinVelocity.sqrMagnitude > 0.02f)
+                {
+                    Vector3 pos = cameraTarget.position + globeSpinVelocity * dt;
+                    pos.y = cameraTarget.position.y;
+                    cameraTarget.position = WrapCameraOnPlanet(pos);
+                    globeSpinVelocity *= Mathf.Exp(-1.55f * dt);
+                }
+                else
+                {
+                    globeSpinVelocity = Vector3.zero;
+                }
             }
 
             if (cinemachineFollow == null) return;
@@ -2093,6 +2313,52 @@ namespace GameDevTV.RTS.Player
                 targetFollowOffset,
                 rotationTime
             );
+        }
+
+        /// <summary>Pixels → world units for middle-mouse grab pan; scales with zoom so tiny drags nudge the view.</summary>
+        float MiddleMousePanScale()
+        {
+            float zoom = cinemachineFollow != null ? cinemachineFollow.FollowOffset.y : 40f;
+            float zoomFactor = Mathf.Clamp(zoom / 38f, 0.4f, 1.15f);
+            float config = Mathf.Max(0.05f, cameraConfig != null ? cameraConfig.MousePanSpeed : 5f);
+            const float basePerPixel = 0.024f;
+            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                return basePerPixel * zoomFactor * 1.08f;
+            return basePerPixel * zoomFactor * Mathf.Clamp(config / 5f, 0.5f, 1.25f);
+        }
+
+        /// <summary>Wrap focus on the repeating planet so fling pan does not run into void at map edges.</summary>
+        Vector3 WrapCameraOnPlanet(Vector3 worldPos)
+        {
+            var planet = GameDevTV.RTS.Environment.PlanetGenerator.Instance;
+            if (planet == null || planet.Config == null) return worldPos;
+
+            float mapW = planet.Config.MapWidth * planet.CellSize;
+            float mapH = planet.Config.MapHeight * planet.CellSize;
+            if (mapW < 1f || mapH < 1f) return worldPos;
+
+            float x = worldPos.x;
+            float z = worldPos.z;
+            x = Mathf.Repeat(x, mapW);
+            z = Mathf.Repeat(z, mapH);
+            worldPos.x = x;
+            worldPos.z = z;
+            return worldPos;
+        }
+
+        Vector3 GlobePanAxes(Vector2 delta, float panScale)
+        {
+            Transform basis = playerCamera != null ? playerCamera.transform : cameraTarget;
+            Vector3 right = basis.right;
+            right.y = 0f;
+            if (right.sqrMagnitude < 0.0001f) right = Vector3.right;
+            else right.Normalize();
+            Vector3 forward = basis.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
+            else forward.Normalize();
+            // Invert so dragging feels like grabbing the ground.
+            return (-right * delta.x - forward * delta.y) * panScale;
         }
 
         private bool ShouldSetRotationStartTime()
@@ -2197,23 +2463,25 @@ namespace GameDevTV.RTS.Player
         {
             if (playerCamera == null || HexGridManager.Instance == null || Mouse.current == null) return;
 
+            // While grabbing or coasting the globe, skip hover rays — pan should stay cheap.
+            if (Mouse.current.middleButton.isPressed || globeSpinVelocity.sqrMagnitude > 1.5f)
+            {
+                if (hoveredHex != null)
+                {
+                    hoveredHex.SetHovered(false);
+                    hoveredHex = null;
+                }
+                return;
+            }
+
+            // Ground pick is one Physics ray + O(1) cell lookup — skip when the mouse did not move.
+            Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+            if (hoveredHex != null && mouseDelta.sqrMagnitude < 0.25f)
+                return;
+
             HexGridManager.HexTile nextHoveredHex = null;
-            Ray ray = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
-            if (Physics.Raycast(ray, out RaycastHit hit, float.MaxValue, floorLayers, QueryTriggerInteraction.Ignore))
-            {
-                // Any hex under the cursor (not only revealed) so the outline still appears while surveying.
-                nextHoveredHex = HexGridManager.Instance.GetNearestHex(hit.point);
-                if (highlightTrace) Debug.Log($"[HexHighlight] Hover floor hit: point={hit.point}, collider={hit.collider.name}, mask={floorLayers.value}");
-            }
-            else if (Physics.Raycast(ray, out hit, float.MaxValue, ~0, QueryTriggerInteraction.Ignore))
-            {
-                nextHoveredHex = HexGridManager.Instance.GetNearestHex(hit.point);
-                if (highlightTrace) Debug.Log($"[HexHighlight] Hover fallback hit: point={hit.point}, collider={hit.collider.name}");
-            }
-            else if (highlightTrace)
-            {
-                Debug.Log("[HexHighlight] Hover ray missed floor and fallback geometry.");
-            }
+            if (TryRaycastGroundUnderCursor(out Vector3 ground))
+                nextHoveredHex = HexGridManager.Instance.GetHexForHover(ground);
 
             if (nextHoveredHex == hoveredHex) return;
 
@@ -2227,7 +2495,7 @@ namespace GameDevTV.RTS.Player
         {
             if (currentHex != null || cameraTarget == null || HexGridManager.Instance == null) return;
 
-            currentHex = HexGridManager.Instance.GetNearestHex(cameraTarget.position);
+            currentHex = HexGridManager.Instance.GetHexForHover(cameraTarget.position);
             if (highlightTrace) Debug.Log($"[HexHighlight] Current tile initialized at camera {cameraTarget.position}: {currentHex?.HexCoordinates.ToString() ?? "NULL"}");
             // Prologue: hex outlines only appear under the cursor — don't pin a permanent selection ring.
             if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
@@ -2277,26 +2545,14 @@ namespace GameDevTV.RTS.Player
             }
             
             if (mousePosition.x <= cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near left edge");
                 moveAmount.x -= cameraConfig.MousePanSpeed;
-            }
             else if (mousePosition.x >= screenWidth - cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near right edge");
                 moveAmount.x += cameraConfig.MousePanSpeed;
-            }
-            
+
             if (mousePosition.y >= screenHeight - cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near top edge");
                 moveAmount.y += cameraConfig.MousePanSpeed;
-            }
             else if (mousePosition.y <= cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near bottom edge");
                 moveAmount.y -= cameraConfig.MousePanSpeed;
-            }
             
             return moveAmount;
         }
@@ -2324,5 +2580,171 @@ namespace GameDevTV.RTS.Player
             
             return moveAmount;
         }
+
+#if UNITY_EDITOR
+        public void PlaytestCancelPlacement() => CancelPlacement();
+
+        /// <summary>CLI playthrough: place the active card ghost at a board tile (mines need deposit pads).</summary>
+        public bool EditorPlaytestPlaceAtTile(int tileIndex)
+        {
+            if (!PlacementGhostActive || activeCommand == null) return false;
+            var ctrl = GameDevTV.RTS.Prologue.PrologueController.Instance;
+            if (ctrl == null || !ctrl.TryGetCell(tileIndex, out Vector2Int cell)) return false;
+            // Match human play: commit the cell the ghost shows, not a re-snap from raw world pos.
+            tileGhostStickyCell = cell;
+            Vector3 world = ColonyTileGrid.CellToWorldOnGround(cell);
+            world = ColonyTileGrid.ApplyGroundY(world);
+            // Bot does not run ghost tint each frame — refresh Prologue Preview so ActivateAction can commit.
+            if (activeCommand is BuildBuildingCommand playBbc)
+            {
+                var colony = ctrl.Colony;
+                if (BuildingSiteRegistry.IsMineBuilding(playBbc.Building))
+                {
+                    bool onPad = DiscoverySystem.IsOnDiscoveredMineDeposit(playBbc.Building, world);
+                    bool paid = colony.GetStock(PrologueResourceId.Minerals) >= PrologueData.MineMineralCost;
+                    displayedRestrictionsPass = onPad && paid;
+                }
+                else if (PrologueCardMap.TryGetPrologueId(playBbc.Building, out var playId)
+                         && playId != PrologueBuildingId.CommandPost
+                         && ctrl.TryGetTileIndex(world, out int playTile))
+                {
+                    displayedRestrictionsPass = colony.Preview(playTile, playId, out string reason);
+                    placementCaption = displayedRestrictionsPass ? "" : reason;
+                }
+                restrictionAgreeFrames = RestrictionHysteresisFrames;
+            }
+            var hit = new RaycastHit
+            {
+                point = world,
+                normal = Vector3.up,
+                distance = 0f
+            };
+            ActivateAction(hit);
+            return !PlacementGhostActive;
+        }
+
+        /// <summary>CLI playthrough: place the active card ghost at a Game-view screen point.</summary>
+        public bool EditorPlaytestPlaceAtScreen(Vector2 screenBottomLeft)
+        {
+            if (!PlacementGhostActive || activeCommand == null || playerCamera == null) return false;
+            if (TryGetPlaytestPlacementTile(out int tile) && EditorPlaytestPlaceAtTile(tile))
+                return !PlacementGhostActive;
+            Ray ray = playerCamera.ScreenPointToRay(new Vector3(screenBottomLeft.x, screenBottomLeft.y, 0f));
+            if (Physics.Raycast(ray, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
+            {
+                ActivateAction(hit);
+                return true;
+            }
+
+            if (Physics.Raycast(ray, out hit, float.MaxValue))
+            {
+                ActivateAction(hit);
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool TryGetPlaytestPlacementTile(out int tileIndex)
+        {
+            tileIndex = -1;
+            var ctrl = GameDevTV.RTS.Prologue.PrologueController.Instance;
+            var colony = ctrl?.Colony;
+            if (ctrl == null || colony == null) return false;
+
+            PrologueBuildingId id = colony.PrologueStep switch
+            {
+                1 or 4 => PrologueBuildingId.Aquifer,
+                2 => PrologueBuildingId.Oxygen,
+                3 => PrologueBuildingId.Habitat,
+                5 => PrologueBuildingId.WindTurbine,
+                _ => PrologueBuildingId.None
+            };
+            if (id == PrologueBuildingId.None) return false;
+
+            int secondIce = colony.PrologueStep >= 4 ? colony.SecondIceTargetTile() : -1;
+            int anchor = id switch
+            {
+                PrologueBuildingId.WindTurbine => FindBuildingTileIndex(colony, PrologueBuildingId.Oxygen),
+                PrologueBuildingId.Oxygen => FindBuildingTileIndex(colony, PrologueBuildingId.CommandPost),
+                PrologueBuildingId.Habitat => FindBuildingTileIndex(colony, PrologueBuildingId.Oxygen),
+                PrologueBuildingId.Aquifer when colony.PrologueStep >= 4 && secondIce >= 0 => secondIce,
+                PrologueBuildingId.Aquifer when colony.Board.FirstIceTiles.Count > 0
+                    => FirstSetElement(colony.Board.FirstIceTiles),
+                _ => FindBuildingTileIndex(colony, PrologueBuildingId.CommandPost)
+            };
+            if (anchor < 0) anchor = 0;
+
+            int best = -1;
+            int bestD = int.MaxValue;
+
+            // Step 4: must satisfy ReachesNewIce — not just nearest pad to the anchor.
+            if (id == PrologueBuildingId.Aquifer && colony.PrologueStep >= 4 && secondIce >= 0)
+            {
+                for (int i = 0; i < colony.Board.Tiles.Count; i++)
+                {
+                    var pad = colony.Board.At(i);
+                    if (pad.Building != PrologueBuildingId.None) continue;
+                    if (pad.Feature == PrologueFeature.Ice || pad.Feature == PrologueFeature.Glacier) continue;
+                    if (!colony.Preview(i, id, out _)) continue;
+                    if (!colony.ReachesNewIce(i)) continue;
+                    int d = colony.Dist(secondIce, i);
+                    if (d >= bestD) continue;
+                    bestD = d;
+                    best = i;
+                }
+                if (best >= 0)
+                {
+                    tileIndex = best;
+                    return true;
+                }
+
+                return false;
+            }
+
+            for (int i = 0; i < colony.Board.Tiles.Count; i++)
+            {
+                var pad = colony.Board.At(i);
+                if (pad.Building != PrologueBuildingId.None) continue;
+                // Aquifer drills beside ice — not on the deposit hex (grid snap there misses TryPlace).
+                if (id == PrologueBuildingId.Aquifer
+                    && (pad.Feature == PrologueFeature.Ice || pad.Feature == PrologueFeature.Glacier))
+                    continue;
+                if (!colony.Preview(i, id, out _)) continue;
+                int d = anchor >= 0 ? colony.Dist(anchor, i) : 0;
+                if (d >= bestD) continue;
+                bestD = d;
+                best = i;
+            }
+
+            if (best < 0) return false;
+            tileIndex = best;
+            return true;
+        }
+
+        static int FindBuildingTileIndex(PrologueColony colony, PrologueBuildingId id)
+        {
+            for (int i = 0; i < colony.Board.Tiles.Count; i++)
+                if (colony.Board.At(i).Building == id) return i;
+            return -1;
+        }
+
+        static int FindAnyRevealedIceTile(PrologueColony colony)
+        {
+            for (int i = 0; i < colony.Board.Tiles.Count; i++)
+            {
+                var t = colony.Board.At(i);
+                if (!t.Revealed || t.DepositLeft <= 0) continue;
+                if (t.Feature == PrologueFeature.Ice || t.Feature == PrologueFeature.Glacier) return i;
+            }
+            return -1;
+        }
+
+        static int FirstSetElement(System.Collections.Generic.HashSet<int> set)
+        {
+            foreach (int i in set) return i;
+            return -1;
+        }
+#endif
     }
 }

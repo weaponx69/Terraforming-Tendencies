@@ -120,11 +120,11 @@ namespace GameDevTV.RTS.UI.Containers
             currentSectorText.raycastTarget = false;
 
             // Q/E dock left under Weeks Left — never beside Colony Acts.
-            navPrevRt = CreateLeftNavButton(canvasGo.transform, font, "◀ Q", 18f, () =>
+            navPrevRt = CreateLeftNavButton(canvasGo.transform, font, "< Q", 18f, () =>
             {
                 PlayerInput.Instance?.PageSectors(-1);
             });
-            navNextRt = CreateLeftNavButton(canvasGo.transform, font, "E ▶", 114f, () =>
+            navNextRt = CreateLeftNavButton(canvasGo.transform, font, "E >", 114f, () =>
             {
                 PlayerInput.Instance?.PageSectors(1);
             });

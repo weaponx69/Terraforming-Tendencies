@@ -1,0 +1,35 @@
+---
+description: After gameplay changes, verify in Play as the player. Prologue scene = vertical slice of the full game, not an isolated module.
+alwaysApply: true
+---
+
+# Player-verify after changes
+
+When you change **player-visible behavior** (input, UI, survey, placement, cards, planet, buildings, lag/perf in Play), you **must not** tell the user it works until you have exercised it **in the running game the way a player would**.
+
+The main scene’s **Prologue** is the **vertical slice** — the prototype that becomes the whole game. Do not design or verify features as “prologue-only” silos; extend slice systems (`PrologueController` / shared planet & card stack) toward the full product.
+
+**No smoke tests** — compile-only, cheat instant-place, fake-board “golden path” unit tests, or DevDemo-style grants **do not count** as verification anywhere in this project.
+
+Pure refactors, comments-only edits, and docs-only work are exempt.
+
+## How to verify (Terraforming Tendencies)
+
+1. **Read** [`.zoo/rules/UnityCLI-Automation.md`](.zoo/rules/UnityCLI-Automation.md) — **one** open Editor; no `unity test` / `unity open` / second Editor.
+2. **`unity status`** — confirm `ready`.
+3. **Pick the harness for the area you changed:**
+   - **Vertical slice (default E2E):** [`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh) — bootstrap + full player UI every run.
+   - **Archived Acts only** (if explicitly testing legacy): [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) — not DevDemo cheat smoke.
+   - **Everything else:** Play Mode + **shortest real UI sequence** for that feature; screenshot or eval of outcome **after** the action.
+4. **Evidence** — screenshot, step log (`steps.jsonl`), or Console + Game view — not “build succeeded.”
+5. If Play is blocked, **say so** — do not claim the feature is fixed.
+
+**Policy (full project):** [`docs/specs/2026-11-23-player-verification-policy.md`](docs/specs/2026-11-23-player-verification-policy.md)
+
+## Unit tests
+
+May exist for **rules/math only**. They never substitute for player verification and must not be called playthrough or smoke coverage.
+
+## Reporting
+
+Same turn you ship code: short **Play verify** line — what you did as the player and what you observed. If skipped, what blocked it.

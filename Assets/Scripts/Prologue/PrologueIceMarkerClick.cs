@@ -8,5 +8,8 @@ namespace GameDevTV.RTS.Prologue
         public int TileIndex { get; private set; } = -1;
 
         public void Setup(int tileIndex) => TileIndex = tileIndex;
+
+        void OnEnable() => PrologueInteractableIndex.Register(this);
+        void OnDisable() => PrologueInteractableIndex.Unregister(this);
     }
 }

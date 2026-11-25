@@ -24,6 +24,7 @@ namespace GameDevTV.RTS.Prologue
 
         bool syncedFromPlanet;
         bool handSeeded;
+        bool openingBriefingShown;
         bool refreshingHand;
         GameObject commandPostVisual;
 
@@ -50,6 +51,8 @@ namespace GameDevTV.RTS.Prologue
         {
             PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
             CardDeckController.OnHandChanged += HandleDeckChanged;
+            if (Application.isPlaying)
+                ProloguePerformanceBudget.ApplyIfNeeded();
         }
 
         void OnDisable()
@@ -68,15 +71,28 @@ namespace GameDevTV.RTS.Prologue
         {
             TrySyncWhenReady();
             TrySeedHand();
+            TryOpeningBriefing();
+        }
+
+        void TryOpeningBriefing()
+        {
+            if (openingBriefingShown || !syncedFromPlanet || Colony == null) return;
+            if (GameDevTV.RTS.UI.PrologueHUD.Instance == null) return;
+            openingBriefingShown = true;
+            GameDevTV.RTS.UI.PrologueHUD.Instance.ShowOpeningBriefing();
         }
 
         void HandleDeckChanged()
         {
             // BlueprintDraftUI / Acts seating may refill after us — reclaim Prologue hand.
-            if (refreshingHand || !IsActive || !syncedFromPlanet || Colony == null) return;
+            if (refreshingHand || ignoreNextDeckChanged || !IsActive || !syncedFromPlanet || Colony == null)
+                return;
             if (!HandLooksWrongForPrologue()) return;
             RefreshHandUnlocks();
         }
+
+        /// <summary>Set while our own RebuildPrologueHand fires OnHandChanged (avoid feedback loops).</summary>
+        internal static bool ignoreNextDeckChanged;
 
         bool HandLooksWrongForPrologue()
         {
@@ -85,9 +101,13 @@ namespace GameDevTV.RTS.Prologue
 
             Colony.ObjectiveText(out _, out bool wantSurvey);
             bool hasSurvey = false;
-            int maxAllowed = Colony.Unlocked.Count + Colony.KnownResources.Count + 2;
+            // Survey + Orbital Scan + Research are seated outside unlock/mine lists.
+            int maxAllowed = Colony.Unlocked.Count + Colony.KnownResources.Count + 3;
             if (deck.Hand.Count > maxAllowed) return true;
             if (deck.Hand.Count == 0 && wantSurvey) return true;
+
+            bool surveying = PrologueSurveyMission.Instance != null
+                && PrologueSurveyMission.Instance.IsSearching;
 
             foreach (var card in deck.Hand)
             {
@@ -98,8 +118,11 @@ namespace GameDevTV.RTS.Prologue
                     hasSurvey = true;
                     continue;
                 }
-                // Orbital Scan is not the Prologue Survey Team card.
-                if (PrologueCardMap.IsPrologueScanCard(card)) return true;
+                if (card is ScoutingCardSO orbital
+                    && orbital.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    continue;
+                if (card is ResearchCardSO)
+                    continue;
                 if (PrologueCardMap.TryGetPrologueId(card, out var id)
                     && (Colony.Unlocked.Contains(id) || id == PrologueBuildingId.CommandPost))
                     continue;
@@ -113,7 +136,7 @@ namespace GameDevTV.RTS.Prologue
                 return true; // foreign Acts card
             }
 
-            if (wantSurvey && !hasSurvey) return true;
+            if (wantSurvey && !hasSurvey && !surveying) return true;
             return false;
         }
 
@@ -132,10 +155,18 @@ namespace GameDevTV.RTS.Prologue
             if (!syncedFromPlanet || Colony == null) return;
             var deck = CardDeckController.Instance;
             if (deck == null || deck.MasterDeck == null || deck.MasterDeck.Count == 0) return;
-            if (handSeeded && !HandLooksWrongForPrologue()) return;
+            if (handSeeded)
+            {
+                if (!HandLooksWrongForPrologue()) return;
+                // Wrong hand usually means Acts deck wiring caught up once — not every frame.
+                if (Time.frameCount == lastHandWrongFrame) return;
+                lastHandWrongFrame = Time.frameCount;
+            }
             RefreshHandUnlocks();
             handSeeded = true;
         }
+
+        int lastHandWrongFrame = -1;
 
         void OnDestroy()
         {
@@ -145,6 +176,8 @@ namespace GameDevTV.RTS.Prologue
         void HandlePlanetGenerated()
         {
             SyncBoardFromPlanet();
+            var homeCell = ResolveHomeCell();
+            HexGridManager.Instance?.GenerateLocalHexDisk(homeCell, axialRadius: 20);
             Colony.StartPrologue();
             syncedFromPlanet = Colony.Board.Tiles.Count > 16;
             handSeeded = false;
@@ -153,6 +186,7 @@ namespace GameDevTV.RTS.Prologue
             if (PrologueTimeLapse.Instance == null)
                 gameObject.AddComponent<PrologueTimeLapse>();
             TrySeedHand();
+            ProloguePerformanceBudget.RefreshPlanetRendering();
             GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(Colony);
             HexGridManager.Instance?.RefreshAllOutlineVisibility();
             // Floating "?" over unrevealed ice — without these the objective text is meaningless.
@@ -160,13 +194,43 @@ namespace GameDevTV.RTS.Prologue
                 new GameObject("PrologueIceMarkers").AddComponent<PrologueIceMarkers>();
             if (PrologueSearchedTiles.Instance == null)
                 new GameObject("PrologueSearchedTiles").AddComponent<PrologueSearchedTiles>();
-            PrologueIceMarkers.Instance.Refresh();
+            ApplySliceRenderingPerformanceDefaults();
+            PrologueSearchedTiles.Instance?.Clear();
+            PrologueRevealGhosts.ResetSession();
+            PrologueBuildingRegistry.Invalidate();
+            PrologueIceMarkers.Instance.RebuildAll();
             PrologueSearchedTiles.Instance.RefreshAll();
             ArmResourceFogReapply(4f);
             // Prologue: Command Post only — despawn Acts free gather drones.
             DespawnAutoGatherDronesNearHome();
+            // No wall-clock meteor waves during Prologue.
+            GameDevTV.RTS.Environment.NaturalEventManager.StopAssaultIfAny();
             GameDevTV.RTS.UI.PrologueHUD.Instance?.RefreshTimeControls();
             Debug.Log($"[PrologueController] Prologue started (tiles={Colony.Board.Tiles.Count}, Acts archived).");
+            if (ProloguePerfScenario.ShouldApply)
+                ProloguePerfScenario.Apply(this);
+        }
+
+        /// <summary>Baked survey trails, silhouette ghosts, overlay fit — default for the vertical slice.</summary>
+        static void ApplySliceRenderingPerformanceDefaults()
+        {
+            // Survey trails: one transparent ground quad + per-hex brown tint — not DirtRoad_* cube meshes.
+            ProloguePathGroundOverlay.SetEnabled(true);
+            PrologueSearchedTiles.UseBakedPathOverlay = true;
+            PrologueSearchedTiles.TileTintOnly = true;
+            PrologueSearchedTiles.UseCubeRoadMeshes = false;
+            PrologueRevealGhosts.SilhouetteFootprintsOnly = true;
+            PrologueRevealGhosts.FrustumCullRevealGhosts = false;
+            PrologueDroneScan.EnableRubberBandPreview = false;
+            if (Instance != null)
+                ProloguePathGroundOverlay.Instance?.FitBoard(Instance);
+        }
+
+        /// <summary>Perf soak: surveyed path, baked dirt overlay, finished buildings (vertical slice).</summary>
+        public void BeginFilledPerfRun()
+        {
+            ProloguePerfScenario.RequestFilledRun = true;
+            BeginNewPrologueRunForPlaytest();
         }
 
         static void DespawnAutoGatherDronesNearHome()
@@ -191,12 +255,19 @@ namespace GameDevTV.RTS.Prologue
             }
         }
 
-        public void SyncBoardFromPlanet()
+        public         Vector2Int ResolveHomeCell()
+        {
+            Vector3 home = ResolveHomeWorld();
+            return ColonyTileGrid.WorldToCell(home);
+        }
+
+        void SyncBoardFromPlanet()
         {
             Colony ??= PrologueColony.CreateLanding();
             Colony.Board.Tiles.Clear();
             Colony.Board.Sites.Clear();
             Colony.Board.FirstIceTiles.Clear();
+            Colony.Board.SecondIceTiles.Clear();
             indexToCell.Clear();
             cellToIndex.Clear();
 
@@ -216,8 +287,8 @@ namespace GameDevTV.RTS.Prologue
                     Colony.Board.Tiles.Add(new PrologueTile
                     {
                         Index = index,
-                        Lit = isHome,
-                        Revealed = isHome,
+                        Lit = false,
+                        Revealed = false,
                         Building = isHome ? PrologueBuildingId.CommandPost : PrologueBuildingId.None
                     });
                     indexToCell.Add(cell);
@@ -230,6 +301,7 @@ namespace GameDevTV.RTS.Prologue
                 if (a < 0 || b < 0 || a >= indexToCell.Count || b >= indexToCell.Count) return 99;
                 return ColonyTileGrid.HexDistance(indexToCell[a], indexToCell[b]);
             });
+            Colony.SetSupplyDistanceFn(PrologueHaul.HexesFromNearestSupply);
 
             SeedIceFromSectors(home);
             EnsureCommandPostVisual(home);
@@ -239,50 +311,104 @@ namespace GameDevTV.RTS.Prologue
 
         /// <summary>
         /// Prologue data marks the home tile as Command Post, but nothing was spawned in-world.
-        /// Place the real Command Post prefab so the landing pad is visible (Unreal pad).
+        /// Place the real Command Post on the reserved Command Post pad (not sector center).
         /// </summary>
         void EnsureCommandPostVisual(Vector3 homeWorld)
         {
-            // Already have a player Command Post near home?
+            BuildingSiteSlot pad = FindStartingCommandPad();
+            // Seat the building on the hex center. Navmesh XZ sits off that pad.
+            Vector3 padPos = pad != null
+                ? ColonyTileGrid.CellToWorldOnGround(ColonyTileGrid.WorldToCell(pad.Position))
+                : ColonyTileGrid.CellToWorldOnGround(ColonyTileGrid.WorldToCell(homeWorld));
+
+            if (pad != null)
+            {
+                pad.Position = padPos;
+                if (pad.MarkerGO != null)
+                    pad.MarkerGO.transform.position = padPos;
+            }
+
+            BaseBuilding seated = null;
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
                 if (b == null || b.BuildingSO == null) continue;
                 if (b.BuildingSO.Name.IndexOf("Command", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
-                if (Vector3.Distance(b.transform.position, homeWorld) < 40f)
+                if (Vector3.Distance(b.transform.position, padPos) < 80f)
                 {
-                    commandPostVisual = b.gameObject;
-                    PlayerInput.FocusCameraOnWorldPosition(b.transform.position);
-                    return;
+                    seated = b;
+                    break;
                 }
             }
 
-            if (commandPostVisual != null) return;
+            if (seated == null && commandPostVisual != null) return;
 
-            var def = Resources.Load<BuildingSO>("Buildings/Command Post/Command Post");
-            if (def == null || def.Prefab == null)
+            if (seated == null)
             {
-                Debug.LogWarning("[PrologueController] Command Post BuildingSO/prefab missing — landing pad will be invisible.");
-                return;
+                var def = Resources.Load<BuildingSO>("Buildings/Command Post/Command Post");
+                if (def == null || def.Prefab == null)
+                {
+                    Debug.LogWarning("[PrologueController] Command Post BuildingSO/prefab missing — landing pad will be invisible.");
+                    return;
+                }
+
+                var go = Object.Instantiate(def.Prefab, padPos, Quaternion.identity);
+                go.name = "PrologueCommandPost";
+                if (!go.TryGetComponent(out seated))
+                {
+                    commandPostVisual = go;
+                    return;
+                }
+
+                seated.CompleteInstantCardPlace(Owner.Player1, def);
             }
 
-            Vector3 pos = homeWorld;
-            pos.y = 0f;
-            var go = Object.Instantiate(def.Prefab, pos, Quaternion.identity);
-            go.name = "PrologueCommandPost";
-            commandPostVisual = go;
-            if (go.TryGetComponent(out BaseBuilding building))
+            // GroundBuilding nav-snaps XZ off the hex. Put the mesh back on the disc.
+            seated.transform.position = padPos;
+            commandPostVisual = seated.gameObject;
+            if (pad != null)
             {
-                building.CompleteInstantCardPlace(Owner.Player1, def);
+                pad.SetOccupied(seated);
+                pad.MarkerGO?.GetComponent<BuildingSiteMarker>()?.RefreshVisibility();
             }
-            PlayerInput.FocusCameraOnWorldPosition(pos);
-            Debug.Log($"[PrologueController] Spawned Command Post at {pos}");
+            else
+            {
+                BuildingSiteRegistry.RegisterOccupancy(seated);
+            }
+
+            PlayerInput.FocusCameraOnWorldPosition(padPos);
+            Debug.Log($"[PrologueController] Command Post seated on pad hex at {padPos}");
         }
 
+        static BuildingSiteSlot FindStartingCommandPad()
+        {
+            if (SectorManager.Instance == null || SectorManager.Instance.Sectors.Count == 0)
+                return null;
+
+            var sector = SectorManager.Instance.Sectors[0];
+            if (sector?.BuildingSites == null) return null;
+            foreach (var site in sector.BuildingSites)
+            {
+                if (site != null && site.Kind == BuildingSiteKind.CommandPost)
+                    return site;
+            }
+
+            return null;
+        }
+
+        /// <summary>Home = sector 0 Command Post pad when planet sites exist; else sector center.</summary>
         static Vector3 ResolveHomeWorld()
         {
             if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
             {
                 var s0 = SectorManager.Instance.Sectors[0];
+                if (s0?.BuildingSites != null)
+                {
+                    foreach (var site in s0.BuildingSites)
+                    {
+                        if (site != null && site.Kind == BuildingSiteKind.CommandPost)
+                            return site.Position;
+                    }
+                }
                 if (s0 != null) return s0.Center;
             }
             if (PlanetGenerator.Instance != null && PlanetGenerator.Instance.Config != null)
@@ -343,6 +469,7 @@ namespace GameDevTV.RTS.Prologue
 
             // Guarantee at least TWO ice deposits so step 4 (second drill) is playable.
             EnsureMinimumIceDeposits(2);
+            PrologueSectorDepositBootstrap.BootstrapSectorZero(this, Colony);
         }
 
         /// <summary>
@@ -411,6 +538,7 @@ namespace GameDevTV.RTS.Prologue
                 Debug.Log($"[PrologueController] Seeded Prologue ice deposit at tile {best}.");
             }
 
+            Colony?.RefreshSecondIceTiles();
             PrologueIceMarkers.Instance?.Refresh();
         }
 
@@ -434,11 +562,25 @@ namespace GameDevTV.RTS.Prologue
         public void EndWeek()
         {
             if (Colony == null) return;
+            if (Colony.ContractCancelled)
+            {
+                PrologueTimeLapse.Instance?.EndRun();
+                return;
+            }
+            bool alreadyComplete = Colony.PrologueStep >= PrologueData.PrologueSteps;
+            PrologueSurveyMission.Instance?.FinishOnEndWeek();
             PrologueTimeLapse.Instance?.NotifyManualEndWeek();
             var log = Colony.EndWeek();
+            PrologueConstruction.NotifyWeekAdvanced();
             foreach (string line in log)
                 Debug.Log($"[Prologue Week {Colony.Week}] {line}");
-            GameDevTV.RTS.UI.PrologueHUD.Instance?.ShowWeekReport(log);
+            if (Colony.ContractCancelled)
+                PrologueTimeLapse.Instance?.EndRun();
+            var hud = GameDevTV.RTS.UI.PrologueHUD.Instance;
+            if (alreadyComplete)
+                hud?.ShowNote(log);
+            else
+                hud?.ShowWeekReport(log);
             GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(Colony);
             RefreshHandUnlocks();
             PrologueIceMarkers.Instance?.Refresh();
@@ -449,13 +591,16 @@ namespace GameDevTV.RTS.Prologue
             var deck = CardDeckController.Instance;
             if (deck == null || refreshingHand) return;
             refreshingHand = true;
+            ignoreNextDeckChanged = true;
             try
             {
-                deck.RebuildPrologueHand(Colony);
+                if (!deck.RebuildPrologueHand(Colony))
+                    return;
                 GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(Colony);
             }
             finally
             {
+                ignoreNextDeckChanged = false;
                 refreshingHand = false;
             }
         }
@@ -464,10 +609,7 @@ namespace GameDevTV.RTS.Prologue
 
         void LateUpdate()
         {
-            // Keep hand synced after step advances from reveal/place.
             if (!IsActive || Colony == null) return;
-            if (Time.frameCount % 30 == 0)
-                GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(Colony);
 
             // Planet gen / Acts bootstrap can re-show deposits after the first fog pass.
             if (Time.unscaledTime < fogReapplyUntil && Time.frameCount % 15 == 0)
@@ -478,6 +620,25 @@ namespace GameDevTV.RTS.Prologue
         {
             fogReapplyUntil = Mathf.Max(fogReapplyUntil, Time.unscaledTime + seconds);
             PrologueResourceFog.ApplyHiddenState();
+        }
+
+        /// <summary>
+        /// Fresh prologue run for player-style playtests: board sync, deposit bootstrap, fog, ice markers.
+        /// </summary>
+        public void BeginNewPrologueRunForPlaytest()
+        {
+            PrologueSurveyMission.Instance?.AbortForPlaytest();
+            PrologueDroneScan.Instance?.SetScanMode(false);
+            Colony = PrologueColony.CreateLanding();
+            syncedFromPlanet = false;
+            handSeeded = false;
+            openingBriefingShown = false;
+            PrologueUiPlaythrough.ResetSession();
+            if (PlanetGenerator.Instance != null)
+                HandlePlanetGenerated();
+            else
+                TrySyncWhenReady();
+            Debug.Log("[PrologueController] BeginNewPrologueRunForPlaytest — bootstrap applied.");
         }
     }
 }

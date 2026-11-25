@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: SurveyDroneCard
   m_EditorClassIdentifier: 
   cardName: Survey Team
-  cardDescription: Paint up to 5 tiles from lit ground, then ✓. Search takes 3 colony days — drones and crew uncover ice and deposits.
+  cardDescription: Paint a trail from camp (or surveyed ground), then ✓. Search takes 3 colony days — crew uncover ice and deposits.
+  icon: {fileID: 21300000, guid: c4d5e6f708192a3b4c5d6e7f8091a2b3, type: 3}
   scoutingType: 2
   materialsAmount: 0
-  surveyTileBudget: 5
+  surveyTileBudget: 99
   surveyDays: 3

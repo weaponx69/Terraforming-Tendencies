@@ -137,6 +137,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.UI.Components.UnpoweredIndicator
   visualIndicator: {fileID: 0}
   heightOffset: 4
+--- !u!114 &881122334455667788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773036561045915792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b5c6d7e8f9a41894a5b6c7d8e9f0a1b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.MineDepositVisual
+  visualPrefab: {fileID: -102380980666007386, guid: 921cb2a69d3c7a279a9d465afb5b35cf, type: 3}
+  localOffset: {x: 0, y: 0, z: 0}
+  localScale: {x: 8, y: 8, z: 8}
+  hidePlaceholderChildren: 1
 --- !u!1 &4389684369125521140
 GameObject:
   m_ObjectHideFlags: 0
@@ -149,7 +165,7 @@ GameObject:
   - component: {fileID: 6941656049447982478}
   - component: {fileID: 7324426715396977837}
   m_Layer: 0
-  m_Name: Placeholder Visual (Cylinder)
+  m_Name: Building Mesh
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -164,8 +180,8 @@ Transform:
   m_GameObject: {fileID: 4389684369125521140}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.75, z: 0}
-  m_LocalScale: {x: 1.5, y: 1.5, z: 1.5}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6250205162110973002}
@@ -177,7 +193,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4389684369125521140}
-  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: 69f5928ab23975d1ea633c974c2d3e58, type: 2}
 --- !u!23 &7324426715396977837
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -203,7 +219,11 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: abcc56cc5b4048789bc0fac9cc3eb50b, type: 2}
+  - {fileID: 2100000, guid: 47c863f4a678697b896fc510fd04b71d, type: 2}
+  - {fileID: 2100000, guid: ef77a2aced4b30aca815cdbb0cbfdb7f, type: 2}
+  - {fileID: 2100000, guid: 58c984397666a16c3a3d6f95da2d4575, type: 2}
+  - {fileID: 2100000, guid: 311e7eddb582b3201a08213ff18b5294, type: 2}
+  - {fileID: 2100000, guid: d756512c27ac3d47bb893cda5346165c, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -681,20 +701,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 981dc53f9c78ccd4eb6a545f083bc814, type: 3}
   m_PrefabInstance: {fileID: 8169283193332871923}
   m_PrefabAsset: {fileID: 0}
-
---- !u!114 &881122334455667788
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1773036561045915792}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b5c6d7e8f9a41894a5b6c7d8e9f0a1b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.MineDepositVisual
-  visualPrefab: {fileID: -102380980666007386, guid: 921cb2a69d3c7a279a9d465afb5b35cf, type: 3}
-  localOffset: {x: 0, y: 0, z: 0}
-  localScale: {x: 8, y: 8, z: 8}
-  hidePlaceholderChildren: 1

@@ -5,6 +5,7 @@
 * **Visual Scripting & C# Refactoring:** [.zoo/rules/UnityVisualScripting-conversion.md](.zoo/rules/UnityVisualScripting-conversion.md)
 * **AI Unity CLI Automation:** **§10** and [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md)
 * **Agent Rules:** [`AGENTS.md`](AGENTS.md) (mirrored in `.clinerules` / `.zoomodes`)
+* **RTS performance & main-thread budgets (mandatory):** **§4.1**
 
 If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
@@ -12,9 +13,15 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 ---
 
-## 0. Authoritative Run Model — Unreal Prologue clone (Frostpunk 2 + cards)
+## 0. Authoritative Run Model — vertical slice (today: “Prologue”)
 
-**One-sentence game:** Frostpunk 2–like guided Prologue on a flat hex board — find ice, drill it, power an Oxygen Processor, house the shuttle, survive the dust storm — via **cards** and **End Week** (O2 / beds / power pressure). Survey exploration should play as a **spatial puzzle** (Blue Prince–like), not casual fog-clear. **Future:** player picks planet type before the run.
+**The Prologue is not a separate mini-game or permanent “Prologue module.”** It is the **vertical slice** of Terraforming Tendencies: the same loop the full game will ship (planet surface, sector deposits, survey-as-puzzle, typed resources, cards, placement, build weeks, End Week, corporate pressure). Scripts and types still live under `Prologue/` and `PrologueController` because that slice shipped first — **new work should generalize those patterns**, not fork parallel “Acts-only” or “prologue-only” mechanics unless explicitly archiving legacy code.
+
+**Agents:** binding rule [`.cursor/rules/vertical-slice-not-module.mdc`](.cursor/rules/vertical-slice-not-module.mdc) (`alwaysApply`); spec [`docs/specs/2026-11-24-vertical-slice-authority.md`](docs/specs/2026-11-24-vertical-slice-authority.md). Read **before** other agent work ([`AGENTS.md`](AGENTS.md)).
+
+**One-sentence game:** Frostpunk 2–like opening contract on a flat hex board — find ice, drill it, power an Oxygen Processor, house the shuttle, survive the dust storm — via **cards** and **End Week** (O2 / beds / power pressure). Survey exploration should play as a **spatial puzzle** (Blue Prince–like), not casual fog-clear. **Future:** same run model widens (more sectors, planet pick at start); the slice is the prototype, not an isolated tutorial.
+
+**Verification:** Player-style runs through this slice ([`docs/specs/2026-11-23-player-verification-policy.md`](docs/specs/2026-11-23-player-verification-policy.md), [`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh)) count as verifying **the game**, not a optional side quest. **Agents resuming automation:** read **§10.1** before changing the bot or claiming until-win is done.
 
 **Source of truth:** Unreal `TerraformTendencies` Prologue (`TTStory` / `TTColony`). Spec: [`.summer/specs/2026-11-18-unity-unreal-prologue-clone-design.md`](.summer/specs/2026-11-18-unity-unreal-prologue-clone-design.md). Plan: [`.summer/plans/2026-11-18-unity-unreal-prologue-clone.md`](.summer/plans/2026-11-18-unity-unreal-prologue-clone.md).
 
@@ -35,11 +42,11 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 | Hex snap (shared) | [`ColonyTileGrid`](Assets/Scripts/Player/ColonyTileGrid.cs) |
 | Prologue-gated hand | [`CardDeckController.RebuildPrologueHand`](Assets/Scripts/Player/CardDeckController.cs) |
 
-**v1 delta vs Unreal:** Steel/Concrete/builder pool not ported — builds spend **Minerals** (`PrologueData.MineralCost` / `MineMineralCost`) and take **BuildWeeks** plus haul weeks from the nearest finished building (`PrologueData.HaulWeeks`, `TryPlace` + End Week). A closer finished building shortens a job already underway. Landing seeds `StartingMinerals`. Storm power is the **Geothermal Generator** card and mesh, placed beside the Oxygen Processor. **No Solar card** in Prologue — camp is a virtual energy source until the dust storm; after that, NeedsPower buildings need a **connected** path (Tier‑1 pressurized tubes, Dist≤1) to a generator. Finished Prologue builds get `PowerNode` auto-links (`NotifyProloguePowerLink` → tubes). **Camp energy pool:** each End Week refills `colony.Energy` from camp generation (`CampEnergyGeneration`, cut when storm-darkened) plus finished generators' `PowerOutput`. HUD shows camp/grid energy status (not the old camp/geothermal/NONE-only string). Mines are **ghost-placed** on deposits (never auto-build).
+**v1 delta vs Unreal:** Steel/Concrete/builder pool not ported — builds spend **Minerals** (`PrologueData.MineralCost` / `MineMineralCost`) and take **BuildWeeks** plus haul weeks from the nearest finished building (`PrologueData.HaulWeeks`, `TryPlace` + End Week). A closer finished building shortens a job already underway. Landing seeds `StartingMinerals` (72 — two Aquifers, Oxygen, two Habitats). Storm power is the **Geothermal Generator** card and mesh, placed beside the Oxygen Processor. **No Solar card** in Prologue — camp is a virtual energy source until the dust storm; after that, NeedsPower buildings need a **connected** path (Tier‑1 pressurized tubes, Dist≤1) to a generator. Finished Prologue builds get `PowerNode` auto-links (`NotifyProloguePowerLink` → tubes). **Camp energy pool:** each End Week refills `colony.Energy` from camp generation (`CampEnergyGeneration`, cut when storm-darkened) plus finished generators' `PowerOutput`. HUD shows camp/grid energy status (not the old camp/geothermal/NONE-only string). Mines are **ghost-placed** on deposits (never auto-build).
 
-**Planet surface (2026-11-22):** Easy shape is still `PlanetConfig.Heightmap`. Hills and valleys are the terrain photo `Albedo.jpg` plus `NormalFromDEM.png` (assigned, not the soft `GroundMacro` tint). Dust is the repeating regolith `DetailAlbedo` / `DetailNormal` at `DetailTiling` 32. The dust normal scale is 0.35 so grit does not replace those landforms. Spec: [`docs/specs/2026-11-21-planet-surface-dem-design.md`](docs/specs/2026-11-21-planet-surface-dem-design.md). Plan: [`docs/plans/2026-11-21-planet-surface-dem.md`](docs/plans/2026-11-21-planet-surface-dem.md). Grounding: `ColonyTileGrid.SampleGroundY` / `ApplyGroundY` / `CellToWorldOnGround`.
+**Planet surface (2026-11-22):** Easy shape is still `PlanetConfig.Heightmap`. Hills and valleys are the terrain photo `Albedo.jpg` plus `NormalFromDEM.png` (assigned, not the soft `GroundMacro` tint). Dust is the repeating regolith `DetailAlbedo` / `DetailNormal` at `DetailTiling` 32. The dust normal scale is 0.35 so grit does not replace those landforms. **Import cap 2048** on hero albedo/normal; **global texture streaming** on PC/Mobile quality (planet maps flagged in importer — see `Assets/Art/Planets/Easy/SOURCES.md`). Spec: [`docs/specs/2026-11-21-planet-surface-dem-design.md`](docs/specs/2026-11-21-planet-surface-dem-design.md). Plan: [`docs/plans/2026-11-21-planet-surface-dem.md`](docs/plans/2026-11-21-planet-surface-dem.md). Grounding: `ColonyTileGrid.SampleGroundY` / `ApplyGroundY` / `CellToWorldOnGround`.
 
-**Playability (2026-11-18 blind playtest):** Prologue completes step 0→6 with End Week. HUD owns the top of the screen. The old Acts supplies bar, top resource strip, weeks panel, objectives panel, and center debug plate are gone from the scene. The hand-built card slots, menu button, and minimap frame stay in the scene because play still uses them, and they are saved inactive so they do not draw before Play. Prologue HUD is built in code. Board seeds ≥2 ice pads; step-4 aquifer must reach the *new* ice. Screenshots under `Assets/.summer/playtest/`.
+**Playability (2026-11-18 blind playtest):** Prologue completes step 0→6 with End Week. HUD owns the top of the screen. The old Acts supplies bar, top resource strip, weeks panel, objectives panel, and center debug plate are gone from the scene. The hand-built card slots, menu button, and minimap frame stay in the scene because play still uses them, and they are saved inactive so they do not draw before Play. Prologue HUD is built in code. Board seeds ≥2 ice pads; step-4 aquifer must reach the *new* ice. Screenshots under `Assets/Playtest/` (visible folder; not under `.summer/`).
 
 **Time-lapse:** [`PrologueTimeLapse`](Assets/Scripts/Prologue/PrologueTimeLapse.cs) drives `Time.timeScale` (default **paused** = 0; 1× ≈ 20s/week) so anims/builds/weeks share one clock. Banner `II 0.5x 1x 2x 4x`; **Space** toggles pause. **Survey Team** card: stays in the hand whenever the team is free (not only on step 0 / step 4). Play → paint up to **5** tiles → green ✓ → **3 colony days** tick, then reveal. While the team is searching the card leaves the hand; if time is paused the days do not move — hit **1x** or **Space**. Paint clicks use the player camera. A new stroke can start on the camp or on any tile of a path already surveyed, and the next tile of that stroke still has to touch the last one. **Orbital Scan** (company hire, **`OrbitalScanEnergyCost` energy** from the camp pool — not minerals) seats while unrevealed ice remains: it pings the nearest ice with a pulsing yellow ? and a direction from camp; it does not clear fog. **Research** card seats when no project is Active and a Tier‑2 id is still locked: play opens the pause **research ladder** to pick a project (week costs via `PrologueData.ResearchWeeks`); Tier‑1 Connected Power starts unlocked. Pause (Esc / Menu) always shows the ladder in Prologue — active + weeks remaining, locked Tier‑2+, and Begin when no Active. Completions tick on End Week (`Research.TickWeek`). Walking crew and harvest drones are hidden for now; the build-over-time and the dirt road stay. ([`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs); spec [`.summer/specs/2026-11-19-prologue-survey-team-design.md`](.summer/specs/2026-11-19-prologue-survey-team-design.md)). Card stays in hand until ✓. Searched hexes stay dark; a dirt road runs from the Command Post along the trail ([`PrologueSearchedTiles`](Assets/Scripts/Prologue/PrologueSearchedTiles.cs)). Deposits stay **?** until searched ([`PrologueResourceFog`](Assets/Scripts/Prologue/PrologueResourceFog.cs)); a surveyed deposit then shows a see-through low-poly silhouette of the building card that belongs there (cached site mesh, not the full Tripo prefab), and that ghost leaves as soon as the building is placed (scaffolding stays until the weeks finish). The Oxygen Processor makes 12 air a week so the camp stays ahead of the 18 people after the shuttle (half a unit each) ([`PrologueRevealGhosts`](Assets/Scripts/Prologue/PrologueRevealGhosts.cs)). Playing that card builds it over its **BuildWeeks** on the colony clock ([`PrologueConstruction`](Assets/Scripts/Prologue/PrologueConstruction.cs)). **Every building uses scaffolding.** The mesh stays on the pad; orange scaffolding stands until the weeks (or the non-prologue build timer) finish, then comes down. Nothing rises out of the ground ([`ConstructionScaffold`](Assets/Scripts/Units/ConstructionScaffold.cs)). No construction crew walks out. Water Ice Aquifer keeps the drill-rig mesh ([`WaterIceAquiferMeshBuilder`](Assets/Scripts/Units/WaterIceAquiferMeshBuilder.cs)) when the build finishes, on the same pad it was placed. Command Post does **not** auto-spawn a gather drone. Aquifer places by ice range (not Acts WaterDeposit geology).
 
@@ -323,6 +330,51 @@ First climate-pair join in a sector also pulses ~7% of remaining sector budget (
 
 ---
 
+## 4.1 Real-Time Strategy (RTS) Performance & Architecture Rules
+
+This project is a **high-volume, flat-grid hexagonal strategy simulation** (Frostpunk-inspired). The engine tracks many map interactions, buildings, and active survey pathways at once; **strict main-thread budgets are mandatory**.
+
+Follow these constraints so runtime does not collapse to **1–7 FPS**.
+
+### Critical braking bottlenecks (never reintroduce)
+
+#### 1. The full-board spatial reset trap
+
+* **The error:** Clearing, invalidating, or rebuilding spatial dictionaries (`HiddenByCell`, `SectorNodesByCell`) or running scene-wide searches (`FindObjectsByType`) inside real-time movement or reveal loops.
+* **The rule:** Configure object data-caching and spatial indexes **once at boot** (`ApplyHiddenState()` in [`PrologueResourceFog`](Assets/Scripts/Prologue/PrologueResourceFog.cs)). Mid-game lookups must be **O(1)** array reads or local hex-neighbor math. **Do not** call `InvalidateSpatialIndex()` dynamically during play.
+
+#### 2. TextMeshPro canvas rebuild storms
+
+* **The error:** UI strings with glyphs missing from the active TMP font sheet (`LiberationSans SDF`) — e.g. `◀`, `▶`, `✓`, `∞` — force catastrophic canvas geometry rebuilds (`OnPreRenderCanvas`) every frame.
+* **The rule:** Route copy through [`PrologueUiText.SanitizeForTmp`](Assets/Scripts/UI/PrologueUiText.cs). Use safe ASCII substitutes (`<`, `>`, `[OK]`).
+* **The rule:** Throttle primary overlay refresh — [`PrologueHUD`](Assets/Scripts/UI/PrologueHUD.cs) uses `HudRefreshMinInterval = 0.33f` so layout is not over-polled.
+
+#### 3. Synchronous rendering passes (`LitTiles`)
+
+* **The error:** Applying lighting, path visuals, or instantiating trail geometry for an entire tile batch on the survey **confirm** frame on the main thread.
+* **The rule:** Amortize line illumination and path tinting over **2–3 frames** (coroutine or time-sliced budget). Hard cap **5–10 cells per frame**. See [`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs), [`ProloguePathGroundOverlay`](Assets/Scripts/Prologue/ProloguePathGroundOverlay.cs).
+
+#### 4. Unbounded simulation / time-lapse loops
+
+* **The error:** Runaway background ticks (`TickAllFromTimeLapse`, construction progress, week catch-up) with no per-frame breakout while the player waits on a build.
+* **The rule:** Every day/week or construction loop needs a hard iteration guard (e.g. `safetyCounter > 50` → `break` and defer remainder to the next frame). See [`PrologueTimeLapse`](Assets/Scripts/Prologue/PrologueTimeLapse.cs), [`PrologueConstruction`](Assets/Scripts/Prologue/PrologueConstruction.cs).
+
+**Related guards (already in tree):** Prologue hand rebuild must not loop per frame ([`CardDeckController.RebuildPrologueHand`](Assets/Scripts/Player/CardDeckController.cs), [`PrologueController.RefreshHandUnlocks`](Assets/Scripts/Prologue/PrologueController.cs)). Construction haul / aquifer ice range scans belong on **placement** and **completion**, not every idle tick.
+
+### Verification methodology
+
+Before marking a perf refactor **optimized** or **complete**, run the click-order dispatch matrix (Play Mode active):
+
+```bash
+SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh
+```
+
+Confirm `Assets/Playtest/click-order-diagnostic-report.json` (or run `matrix.json`) keeps **`maxDispatchSpikeMs` under 2.0** and gameplay stays near **60 FPS**. Instrumentation: [`ClickOrderDiagnostic`](Assets/Scripts/Diagnostics/ClickOrderDiagnostic.cs), [`PrologueFpsMonitor`](Assets/Scripts/Prologue/PrologueFpsMonitor.cs).
+
+For full vertical-slice UI load, also see **§10.1** ([`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh)).
+
+---
+
 ## 5. Backlog (after feel is right)
 
 1. Placement popcorn (+base / +adj floats)  
@@ -339,6 +391,47 @@ See [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md). **Un
 
 Safe while Editor is open: `unity status`, `unity command …`, `unity menu`, `unity eval`.  
 Avoid second-Editor paths (`unity test` / `unity build` / `unity run` / `-batchmode`) on this machine.
+
+### 10.1 Prologue UI playthrough harness (agent handoff — 2026-11-23)
+
+**In flight:** Drive the vertical slice to **prologue complete (steps 0→6)** via real UI (not eval cheats). Loop until exit **0**; abort if Editor RSS exceeds limit; notify the owner when stuck or OOM. **Evidence and logs** live under **`Assets/Playtest/`** (visible folder — do **not** write new playtest artifacts under `.summer/` or other dot paths).
+
+| Script | Role |
+|--------|------|
+| [`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh) | One attempt: bootstrap (`BeginNewPrologueRunForPlaytest`), step through [`PrologueUiPlaythrough`](Assets/Scripts/Prologue/PrologueUiPlaythrough.cs), screenshots/metrics under `OUT_DIR` (default `Assets/Playtest/…`). **flock** on `/tmp/prologue-ui-playthrough.lock` — only one run at a time. Exit **6** = RAM over `PROLOGUE_RAM_LIMIT_MB` (default **12288** ≈ 12 GiB). |
+| [`tools/prologue-ui-playthrough-until-win.sh`](tools/prologue-ui-playthrough-until-win.sh) | Retries until playthrough exits 0; logs to `/tmp/prologue-until-win.log`; optional notify every N failures. |
+| [`tools/unity-editor-reset.sh`](tools/unity-editor-reset.sh) | Stop Play, open main scene, close extra **Game** views (fixes “no cameras rendering” when bot + recompile left 4 views open). |
+| [`tools/notify-player-help.sh`](tools/notify-player-help.sh) | Appends `Assets/Playtest/player-help-inbox.txt`; desktop `notify-send`; **`GROK_HELP_CMD`** hook. **`NOTIFY_X_CHAT=1`** is **not fully wired** — still needs X plugin + `send_chat_message` to self-thread after `get_users_me` / Chat PIN. Owner handle: **`@HvnlyGamesBoss`**. If X tools show `needsAuth` in an old chat, start a **new Agent chat** (or Reload Window) and verify with `get_users_me`. |
+| [`Assets/Scripts/Editor/ProloguePlaythroughMenu.cs`](Assets/Scripts/Editor/ProloguePlaythroughMenu.cs) | Editor menu entry → same shell script. |
+
+**Recommended loop (Editor already in Play on slice scene, scripts compiled):**
+
+```bash
+SKIP_ENTER_PLAY=1 SKIP_RECOMPILE=1 ./tools/prologue-ui-playthrough-until-win.sh
+```
+
+Other env (see script headers): `OUT_DIR`, `MAX_ATTEMPTS`, `SKIP_ENTER_PLAY`, `SKIP_RECOMPILE`, `PROLOGUE_RAM_LIMIT_MB`. Stop runaway: `pkill -f prologue-ui-playthrough-until-win` and Unity **Stop Play**.
+
+**Bot / editor hooks (recent fixes — do not regress):**
+
+| Area | Change |
+|------|--------|
+| [`PlayerInput.EditorPlaytestPlaceAtTile`](Assets/Scripts/Player/PlayerInput.cs) | Sticky placement cell; refresh restrictions before commit; grounding via **`CellToWorldOnGround`** (not bare `CellToWorld`); **Water Ice Aquifer** beside ice pads, not on the deposit cell. |
+| [`BuildBuildingCommand.CanHandle`](Assets/Scripts/Commands/BuildBuildingCommand.cs) | Skip Acts **Command Post** pad reservation when Prologue is active. |
+| [`PrologueUiPlaythrough`](Assets/Scripts/Prologue/PrologueUiPlaythrough.cs) | End **construction** → **End Week** before replaying cards; mineral gates; briefing / `time_1x` / End Week editor paths; **`fps` / `heapMb`** in step JSON. |
+| [`BottomBarActionsUI`](Assets/Scripts/UI/Containers/BottomBarActionsUI.cs) | `EditorPlaytestSelectHandCard`, public `PlayBuildingCard` for reliable Habitat/card plays vs flaky UI raycasts. |
+
+**Bootstrap (required):** Every E2E run must call `PrologueController.BeginNewPrologueRunForPlaytest()` before UI steps — see player verification spec. Playthrough waits extended for prologue instance when Play load is slow (**~180×2s**).
+
+**Known pain (Nov 2026):** Survey + Aquifer + Oxygen progressed after placement fixes; **Habitat** was flaky on pure UI clicks (partially mitigated by direct card play). Until-win had many attempts (contract cancel, faith, RAM). **`no_instance`** if Play did not finish loading — use reset script + single Game view. Until-win is **not** signed off until a clean exit **0** through step 6.
+
+**Open work for next agent:**
+
+1. **X:** `get_users_me` → unlock Chat PIN → wire [`notify-player-help.sh`](tools/notify-player-help.sh) to X `send_chat_message` (self DM via `get_chat_conversations` + `participant_query`).
+2. **Until-win:** Finish Habitat → step **6** reliably; tune [`PrologueUiPlaythrough`](Assets/Scripts/Prologue/PrologueUiPlaythrough.cs) only with player-verification policy (real UI path).
+3. Optional: move `/tmp/prologue-until-win.log` under `Assets/Playtest/logs/` if owner wants repo-visible logs.
+
+**Longer narrative / session detail:** [`docs/plans/2026-11-23-prologue-playtest-agent-handoff.md`](docs/plans/2026-11-23-prologue-playtest-agent-handoff.md) (optional; **§10.1 is canonical** for agents).
 
 ---
 

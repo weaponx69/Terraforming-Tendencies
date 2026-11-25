@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace GameDevTV.RTS.Prologue
 {
@@ -26,6 +28,11 @@ namespace GameDevTV.RTS.Prologue
         float shown;
         bool finished;
         bool aquiferJob;
+        bool aquiferProximityAtPlacement;
+        bool aquiferProximityAtCompletion;
+        bool hideMeshesUntilComplete;
+        PrologueSite cachedSite;
+        bool siteCached;
         struct SavedRenderer
         {
             public Renderer Renderer;
@@ -43,7 +50,7 @@ namespace GameDevTV.RTS.Prologue
                 var job = Active[i];
                 if (job == null) continue;
                 job.firstSlice = false;
-                job.ApplyHaul();
+                job.InvalidateSiteCache();
                 if (!job.hasSite)
                     job.localWeeks++;
             }
@@ -76,14 +83,22 @@ namespace GameDevTV.RTS.Prologue
             aquiferJob = building != null && building.BuildingSO != null
                 && building.BuildingSO.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0;
             if (aquiferJob)
+            {
                 WaterIceAquiferMeshBuilder.Apply(gameObject);
+                RunAquiferIceProximityAtPlacement();
+            }
             ApplyHaul();
             ConstructionScaffold.Ensure(transform);
 
-            Apply(0f);
+            hideMeshesUntilComplete = PrologueController.IsActive;
+            if (hideMeshesUntilComplete)
+                SetBuildingRenderersVisible(false);
+            else
+                Apply(0f);
+
             if (!Active.Contains(this))
                 Active.Add(this);
-            PrologueRevealGhosts.Refresh();
+            PrologueBuildingRegistry.Invalidate();
         }
 
         void OnDestroy()
@@ -93,10 +108,60 @@ namespace GameDevTV.RTS.Prologue
                 ClearBuildSite();
         }
 
-        void Update()
+        const float MinProgressTickInterval = 0.12f;
+        static float nextProgressTickUnscaled;
+        static int ticksPending;
+
+        /// <summary>Queue at most one construction progress pass per frame.</summary>
+        public static void RequestTimeLapseTick() => ticksPending = 1;
+
+        /// <summary>Single tick from <see cref="PrologueTimeLapse"/> — not one Update per building.</summary>
+        public static void TickAllFromTimeLapse()
+        {
+            if (ticksPending <= 0) return;
+
+            var sw = Stopwatch.StartNew();
+            int safetyCounter = 0;
+            int iterations = 0;
+            while (ticksPending > 0 && safetyCounter < 50)
+            {
+                if (Time.unscaledTime < nextProgressTickUnscaled)
+                    break;
+
+                ticksPending--;
+                safetyCounter++;
+                iterations++;
+                nextProgressTickUnscaled = Time.unscaledTime + MinProgressTickInterval;
+
+                for (int i = Active.Count - 1; i >= 0; i--)
+                {
+                    var job = Active[i];
+                    if (job == null) continue;
+                    job.TickProgress();
+                }
+            }
+
+            sw.Stop();
+            if (sw.Elapsed.TotalMilliseconds > 2.0)
+            {
+                Debug.LogError(
+                    $"[PrologueConstruction] TickAllFromTimeLapse exceeded 2ms: " +
+                    $"{sw.Elapsed.TotalMilliseconds:F2}ms iterations={iterations} " +
+                    $"ticksPending={ticksPending} activeJobs={Active.Count}");
+            }
+        }
+
+        void TickProgress()
         {
             if (finished) return;
             float target = Target01();
+            if (hideMeshesUntilComplete)
+            {
+                if (Ready(target))
+                    Finish();
+                return;
+            }
+
             float step = Time.unscaledDeltaTime * 1.4f;
             if (Time.timeScale > 0.01f)
                 step = Mathf.Max(step, Time.deltaTime / (weeks * PrologueTimeLapse.SecondsPerWeekNormal));
@@ -111,7 +176,7 @@ namespace GameDevTV.RTS.Prologue
             float intra = Intra();
             if (hasSite)
             {
-                var site = FindSite();
+                var site = GetSite();
                 if (site == null) return 1f;
                 return Mathf.Clamp01((site.WeeksDone + intra) / Mathf.Max(1, site.WeeksTotal));
             }
@@ -131,8 +196,18 @@ namespace GameDevTV.RTS.Prologue
         bool Ready(float target)
         {
             if (target < 0.995f) return false;
-            if (hasSite) return FindSite() == null;
+            if (hasSite) return GetSite() == null;
             return localWeeks >= weeks;
+        }
+
+        void InvalidateSiteCache() => siteCached = false;
+
+        PrologueSite GetSite()
+        {
+            if (siteCached) return cachedSite;
+            cachedSite = FindSite();
+            siteCached = true;
+            return cachedSite;
         }
 
         PrologueSite FindSite()
@@ -144,6 +219,28 @@ namespace GameDevTV.RTS.Prologue
                 if (site.Tile == tile) return site;
             }
             return null;
+        }
+
+        void RunAquiferIceProximityAtPlacement()
+        {
+            if (!aquiferJob || aquiferProximityAtPlacement || tile < 0) return;
+            aquiferProximityAtPlacement = true;
+            TouchAquiferIceRangeCheck();
+        }
+
+        void RunAquiferIceProximityAtCompletion()
+        {
+            if (!aquiferJob || aquiferProximityAtCompletion || tile < 0) return;
+            aquiferProximityAtCompletion = true;
+            TouchAquiferIceRangeCheck();
+        }
+
+        /// <summary>One board pass for ice range — only from placement / completion hooks.</summary>
+        void TouchAquiferIceRangeCheck()
+        {
+            var colony = PrologueController.Instance?.Colony;
+            if (colony == null) return;
+            _ = colony.AquiferReachesIce(tile);
         }
 
         void CacheParts()
@@ -256,7 +353,7 @@ namespace GameDevTV.RTS.Prologue
             want = colony.ApplyFasterBuild(want);
             if (hasSite)
             {
-                var site = FindSite();
+                var site = GetSite();
                 if (site != null && want < site.WeeksTotal)
                     site.WeeksTotal = Mathf.Max(want, site.WeeksDone);
             }
@@ -286,17 +383,34 @@ namespace GameDevTV.RTS.Prologue
             ConstructionScaffold.Clear(transform);
         }
 
+        void SetBuildingRenderersVisible(bool on)
+        {
+            for (int p = 0; p < parts.Count; p++)
+            {
+                var part = parts[p];
+                if (part.Renderer == null) continue;
+                part.Renderer.enabled = on;
+                if (on)
+                {
+                    part.Renderer.transform.localPosition = part.LocalPosition;
+                    part.Renderer.sharedMaterials = part.Original;
+                }
+            }
+        }
+
         void Finish()
         {
             if (finished) return;
             finished = true;
             Active.Remove(this);
+            ApplyHaul();
+            if (aquiferJob)
+                RunAquiferIceProximityAtCompletion();
             ClearBuildSite();
+            SetBuildingRenderersVisible(true);
             foreach (var part in parts)
             {
                 if (part.Renderer == null) continue;
-                part.Renderer.transform.localPosition = part.LocalPosition;
-                part.Renderer.sharedMaterials = part.Original;
                 part.Renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             }
 
@@ -320,7 +434,9 @@ namespace GameDevTV.RTS.Prologue
                     PrologueMineExtractor.TryAttachToBuilding(building, building.BuildingSO);
             }
 
-            PrologueRevealGhosts.Refresh();
+            PrologueBuildingRegistry.Invalidate();
+            if (building != null)
+                PrologueRevealGhosts.OnPadBuilt(building.transform.position);
             Destroy(this);
         }
     }

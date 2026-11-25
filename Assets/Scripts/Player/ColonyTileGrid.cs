@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 
@@ -54,10 +55,28 @@ namespace GameDevTV.RTS.Player
             return new Vector3(x, y, z);
         }
 
+        /// <summary>Cell center with Y from planet Terrain (or 0 if none).</summary>
+        public static Vector3 CellToWorldOnGround(Vector2Int cell)
+        {
+            Vector3 p = CellToWorld(cell, 0f);
+            p.y = SampleGroundY(p);
+            return p;
+        }
+
+        public static float SampleGroundY(Vector3 worldPos)
+        {
+            if (PlanetGenerator.Instance != null)
+                return PlanetGenerator.Instance.SampleGroundY(worldPos);
+            return worldPos.y;
+        }
+
         public static Vector3 SnapToTile(Vector3 world)
         {
             Vector2Int cell = WorldToCell(world);
-            return CellToWorld(cell, world.y);
+            Vector3 p = CellToWorld(cell, world.y);
+            if (PlanetGenerator.Instance != null)
+                p.y = PlanetGenerator.Instance.SampleGroundY(p);
+            return p;
         }
 
         public static float HorizontalDistSq(Vector3 a, Vector3 b)
@@ -125,7 +144,14 @@ namespace GameDevTV.RTS.Player
 
             stickyCell = chosen;
             joinCount = CountOrthogonalNeighbors(chosen, occupied);
-            return CellToWorld(chosen, rawWorld.y);
+            return CellToWorldOnGround(chosen);
+        }
+
+        /// <summary>Keep XZ, set Y from planet height field (mesh / SampleGroundY).</summary>
+        public static Vector3 ApplyGroundY(Vector3 world)
+        {
+            world.y = SampleGroundY(world);
+            return world;
         }
 
         /// <summary>Stateless snap for final place / CanHandle (no hysteresis).</summary>
@@ -220,8 +246,17 @@ namespace GameDevTV.RTS.Player
             return new Vector2Int(qi, ri);
         }
 
+        static int occupiedCellsFrame = -1;
+        static Owner occupiedCellsOwner;
+        static HashSet<Vector2Int> occupiedCellsCache;
+
         public static HashSet<Vector2Int> GetOccupiedCells(Owner owner)
         {
+            if (occupiedCellsCache != null
+                && occupiedCellsOwner == owner
+                && occupiedCellsFrame == Time.frameCount)
+                return occupiedCellsCache;
+
             var set = new HashSet<Vector2Int>();
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
@@ -237,6 +272,9 @@ namespace GameDevTV.RTS.Player
                     continue;
                 set.Add(WorldToCell(b.transform.position));
             }
+            occupiedCellsFrame = Time.frameCount;
+            occupiedCellsOwner = owner;
+            occupiedCellsCache = set;
             return set;
         }
 

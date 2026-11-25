@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82d784a53ab118875a8a86409a3bce3d, type: 3}
   m_Name: Planet 1 - Easy
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.PlanetConfig
-  MapWidth: 200
-  MapHeight: 200
+  MapWidth: 128
+  MapHeight: 128
   NoiseScale: 28
   HeightMultiplier: 24
   TerrainSeed: 1042
@@ -21,7 +21,11 @@ MonoBehaviour:
   Heightmap: {fileID: 2800000, guid: 5f6e3f7f7ef71362aabb69450cd6d204, type: 3}
   HeightAmplitude: 36
   AlbedoMap: {fileID: 2800000, guid: 66699c6387450b35e95e9fdbb8b23fd8, type: 3}
-  NormalMap: {fileID: 0}
+  NormalMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50601, type: 3}
+  OcclusionMap: {fileID: 0}
+  DetailAlbedoMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50602, type: 3}
+  DetailNormalMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50603, type: 3}
+  DetailTiling: 32
   ResourceCount: 40
   BaseDecayRate: 2
   ToxicityLevel: 0

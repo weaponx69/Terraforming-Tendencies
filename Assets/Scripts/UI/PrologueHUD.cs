@@ -17,9 +17,11 @@ namespace GameDevTV.RTS.UI
         TextMeshProUGUI objectiveText;
         TextMeshProUGUI comingUpText;
         TextMeshProUGUI airText;
+        TextMeshProUGUI statsText;
         TextMeshProUGUI weekReportText;
         TextMeshProUGUI hintText;
         TextMeshProUGUI timeLabel;
+        TextMeshProUGUI fpsText;
         Button endWeekButton;
         Button scanButton;
         Button pauseButton;
@@ -28,8 +30,24 @@ namespace GameDevTV.RTS.UI
         Button fastButton;
         Button fasterButton;
         Image weekProgressFill;
+        ScrollRect statsScroll;
+        RectTransform statsContent;
         GameObject rootPanel;
+        PrologueBriefingPanel briefing;
         float reportClearAt;
+        float nextHudRefreshTime;
+        string lastStatsSnapshot;
+        bool actsChromeSuppressed;
+        const float HudRefreshMinInterval = 0.33f;
+        const float StatsPanelWidth = 300f;
+        const float BannerHeight = 232f;
+        const float StatsHeaderHeight = 72f;
+        const float BannerRightReserve = StatsPanelWidth + 20f;
+        const int HudLayoutVersion = 7;
+        // Match BottomBarActionsUI card dock (286px face + padding + prologue bottom margin).
+        const float CardStripTopY = 48f + 286f + 12f;
+        const float AboveCardDockY = CardStripTopY + 10f;
+        static int builtHudLayoutVersion;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Ensure()
@@ -42,8 +60,31 @@ namespace GameDevTV.RTS.UI
 
         void Awake()
         {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
             Instance = this;
-            BuildUi();
+            if (builtHudLayoutVersion != HudLayoutVersion || rootPanel == null)
+            {
+                ClearBuiltUi();
+                BuildUi();
+                builtHudLayoutVersion = HudLayoutVersion;
+            }
+        }
+
+        void ClearBuiltUi()
+        {
+            statsScroll = null;
+            statsContent = null;
+            if (rootPanel != null)
+            {
+                Destroy(rootPanel);
+                rootPanel = null;
+            }
+            for (int i = transform.childCount - 1; i >= 0; i--)
+                Destroy(transform.GetChild(i).gameObject);
         }
 
         void OnDestroy()
@@ -60,24 +101,48 @@ namespace GameDevTV.RTS.UI
             }
 
             if (rootPanel != null) rootPanel.SetActive(true);
-            SuppressActsUi();
-            ForceHideActsResourceChrome();
 
-            if (PrologueController.Instance?.Colony != null)
-                Refresh(PrologueController.Instance.Colony);
+            if (!actsChromeSuppressed)
+            {
+                actsChromeSuppressed = true;
+                SuppressActsUi();
+                ForceHideActsResourceChrome();
+            }
 
-            UpdateWeekProgressBar();
+            if (Time.unscaledTime >= nextHudRefreshTime)
+            {
+                nextHudRefreshTime = Time.unscaledTime + HudRefreshMinInterval;
+                RefreshTimeControls();
+                UpdateWeekProgressBar();
+                var colony = PrologueController.Instance?.Colony;
+                if (colony != null)
+                    RefreshInternal(colony);
+            }
 
             if (weekReportText != null && Time.unscaledTime > reportClearAt)
                 weekReportText.text = "";
         }
 
-        public void Refresh(PrologueColony colony)
+        public void Refresh(PrologueColony colony) => Refresh(colony, force: false);
+
+        /// <param name="force">Bypass throttle (prologue boot only).</param>
+        public void Refresh(PrologueColony colony, bool force)
+        {
+            if (!force && Time.unscaledTime < nextHudRefreshTime) return;
+            nextHudRefreshTime = Time.unscaledTime + HudRefreshMinInterval;
+            RefreshInternal(colony);
+        }
+
+        void RefreshInternal(PrologueColony colony)
         {
             if (colony == null || objectiveText == null) return;
 
             string obj = colony.ObjectiveText(out _, out bool wantDrone);
-            objectiveText.text = $"PROLOGUE · Step {colony.PrologueStep}\n{obj}";
+            objectiveText.text = PrologueUiText.SanitizeForTmp(colony.ContractCancelled
+                ? "CONTRACT CANCELLED\n" + colony.ContractMessage
+                : $"PROLOGUE · Step {colony.PrologueStep}\n{obj}");
+            if (endWeekButton != null)
+                endWeekButton.interactable = !colony.ContractCancelled;
 
             var coming = new StringBuilder();
             if (!colony.ShuttleLanded && colony.ShuttleLandWeek >= 0)
@@ -91,15 +156,42 @@ namespace GameDevTV.RTS.UI
                 int w = Mathf.Max(0, colony.StormLandWeek - colony.Week);
                 coming.Append(colony.DustStormActive ? "DUST STORM" : $"Storm in {w} wk");
             }
-            comingUpText.text = coming.Length > 0 ? $"Coming up: {coming}" : "Coming up: —";
+            comingUpText.text = PrologueUiText.SanitizeForTmp(coming.Length > 0
+                ? $"Coming up: {coming}"
+                : "Coming up: The corporation is waiting on the current objective.");
 
             int need = colony.O2Need();
             double runway = colony.O2Runway();
-            string runwayStr = runway > 1000 ? "∞" : runway.ToString("0.0");
-            airText.text =
-                $"AIR {colony.Oxygen}  ·  need {need}/wk  ·  {runwayStr} wk left  ·  ice {colony.IceStock}  ·  beds {colony.TotalBeds()}/{colony.Colonists}"
+            string runwayStr = runway > 1000 ? "inf" : runway.ToString("0.0");
+            string crew = colony.ColonistsWorking ? "crew working" : "crew stopped";
+            airText.text = PrologueUiText.SanitizeForTmp(
+                $"Satisfaction {colony.Satisfaction} · {crew} · Faith {colony.Faith}  ·  "
+                + $"AIR {colony.Oxygen}  ·  need {need}/wk  ·  {runwayStr} wk left  ·  ice {colony.IceStock}  ·  beds {colony.TotalBeds()}/{colony.Colonists}"
                 + $"  ·  power {PowerStatus(colony)}"
-                + FormatTypedStocks(colony);
+                + FormatTypedStocks(colony));
+
+            if (statsText != null)
+            {
+                string activity = null;
+                var mission = PrologueSurveyMission.Instance;
+                if (mission != null && mission.IsSearching)
+                    activity = $"Surveying · day {Mathf.Min(mission.DaysElapsed, mission.DaysRequired):0.0}/{mission.DaysRequired}";
+                string body = colony.StatsText(activity);
+                if (body != lastStatsSnapshot)
+                {
+                    lastStatsSnapshot = body;
+                    statsText.text = PrologueUiText.SanitizeForTmp(body);
+                    statsText.ForceMeshUpdate();
+                    float bodyH = Mathf.Max(160f, statsText.preferredHeight + 8f);
+                    var textRt = statsText.rectTransform;
+                    if (textRt != null)
+                        textRt.sizeDelta = new Vector2(-8f, bodyH);
+                    if (statsContent != null)
+                        statsContent.sizeDelta = new Vector2(0f, bodyH);
+                    if (statsScroll != null)
+                        statsScroll.verticalNormalizedPosition = 1f;
+                }
+            }
 
             if (scanButton != null)
                 scanButton.gameObject.SetActive(false);
@@ -109,38 +201,69 @@ namespace GameDevTV.RTS.UI
                 var mission = PrologueSurveyMission.Instance;
                 if (mission != null && mission.IsSearching)
                 {
-                    hintText.text =
-                        $"Survey Team searching… day {Mathf.Min(mission.DaysElapsed + 0.01f, mission.DaysRequired):0.0}/{mission.DaysRequired} — hit 1x if paused.";
+                    bool paused = Time.timeScale <= 0.01f;
+                    hintText.text = PrologueUiText.SanitizeForTmp(paused
+                        ? $"Survey Team is in the field (day {Mathf.Min(mission.DaysElapsed + 0.01f, mission.DaysRequired):0.0}/{mission.DaysRequired}) — time is PAUSED. Hit 1x or Space to let the days run."
+                        : $"Survey Team searching… day {Mathf.Min(mission.DaysElapsed + 0.01f, mission.DaysRequired):0.0}/{mission.DaysRequired}.");
                 }
                 else if (wantDrone)
                 {
-                    hintText.text =
-                        "DO THIS: Play Survey Team from your hand → paint up to 5 tiles toward a yellow ? → click green ✓ (takes 3 colony days).";
+                    hintText.text = PrologueUiText.SanitizeForTmp(
+                        "DO THIS: Play Survey Team -> paint toward a yellow ? -> green [OK]. Stuck? Play Orbital Scan (uses camp energy) to ping the nearest ice or deposit.");
                 }
                 else
                 {
-                    hintText.text = BuildPlaceHint(colony);
+                    hintText.text = PrologueUiText.SanitizeForTmp(BuildPlaceHint(colony));
                 }
             }
 
-            RefreshTimeControls();
         }
+
+        public bool BriefingBlocksClicks => briefing != null && briefing.IsBlocking;
 
         public void RefreshTimeControls()
         {
             var clock = PrologueTimeLapse.Instance;
             if (timeLabel != null)
             {
-                timeLabel.text = clock != null
+                timeLabel.text = PrologueUiText.SanitizeForTmp(clock != null
                     ? $"TIME  {clock.SpeedLabel()}   week {(PrologueController.Instance?.Colony?.Week ?? 0)}"
-                    : "TIME  —";
+                    : "TIME  —");
             }
+
+            if (fpsText != null)
+            {
+                int fps = ProloguePerformanceBudget.SmoothedFps();
+                bool paused = clock != null && clock.IsPaused;
+                fpsText.text = PrologueUiText.SanitizeForTmp(fps > 0
+                    ? (paused ? $"PAUSED · {fps} fps" : $"FPS {fps}")
+                    : (paused ? "PAUSED" : "FPS —"));
+                fpsText.color = fps >= 45
+                    ? new Color(0.55f, 0.95f, 0.65f, 1f)
+                    : fps >= 30
+                        ? new Color(0.95f, 0.88f, 0.45f, 1f)
+                        : new Color(1f, 0.45f, 0.4f, 1f);
+            }
+
+            bool ended = clock != null && clock.RunEnded;
+            SetSpeedInteractable(pauseButton, !ended);
+            SetSpeedInteractable(slowButton, !ended);
+            SetSpeedInteractable(normalButton, !ended);
+            SetSpeedInteractable(fastButton, !ended);
+            SetSpeedInteractable(fasterButton, !ended);
+            if (endWeekButton != null && PrologueController.Instance?.Colony != null)
+                endWeekButton.interactable = !PrologueController.Instance.Colony.ContractCancelled;
 
             HighlightSpeedButton(PrologueTimeLapse.Speed.Pause, pauseButton);
             HighlightSpeedButton(PrologueTimeLapse.Speed.Slow, slowButton);
             HighlightSpeedButton(PrologueTimeLapse.Speed.Normal, normalButton);
             HighlightSpeedButton(PrologueTimeLapse.Speed.Fast, fastButton);
             HighlightSpeedButton(PrologueTimeLapse.Speed.Faster, fasterButton);
+        }
+
+        static void SetSpeedInteractable(Button btn, bool interactable)
+        {
+            if (btn != null) btn.interactable = interactable;
         }
 
         void HighlightSpeedButton(PrologueTimeLapse.Speed speed, Button btn)
@@ -162,12 +285,26 @@ namespace GameDevTV.RTS.UI
             weekProgressFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(p), 1f);
         }
 
+        public void ShowOpeningBriefing()
+        {
+            if (PrologueController.Instance?.Colony != null)
+                briefing?.PresentOpening(PrologueController.Instance.Colony);
+        }
+
         public void ShowWeekReport(List<string> log)
         {
+            ShowNote(log);
+            if (PrologueController.Instance?.Colony != null)
+                briefing?.Present(PrologueController.Instance.Colony, log);
+        }
+
+        /// <summary>A short line in the corner. Does not bring a person on screen.</summary>
+        public void ShowNote(List<string> log)
+        {
             if (weekReportText == null) return;
-            weekReportText.text = log == null || log.Count == 0
+            weekReportText.text = PrologueUiText.SanitizeForTmp(log == null || log.Count == 0
                 ? "Week ended."
-                : string.Join("\n", log);
+                : string.Join("\n", log));
             reportClearAt = Time.unscaledTime + 8f;
         }
 
@@ -221,12 +358,12 @@ namespace GameDevTV.RTS.UI
             if (colony == null) return "Place a card from the bottom-left hand on the ground.";
             return colony.PrologueStep switch
             {
-                1 => "Play Water Ice Aquifer from your hand → click ground next to the ice.",
-                2 => "Place Oxygen Processor, then Solar Array beside it for power.",
+                1 => "Place Ice Aquifer next to ice (costs minerals + build weeks — End Week to finish).",
+                2 => "Place Oxygen Processor (camp power — no Solar card). End Week to finish the build.",
                 3 => "Place two Habitat Domes before the shuttle arrives.",
-                4 => "Play Survey Team toward the new yellow ?, then place another Aquifer next to the ice.",
-                5 => "Place Geothermal (Wind) near Oxygen, then ride out the dust storm.",
-                _ => "Space pauses weeks. Use the hand cards, or End Week to skip."
+                4 => "Survey toward the new yellow ?, then place another Aquifer by the ice.",
+                5 => "Place the Geothermal Generator next to the Oxygen Processor before the dust storm. Camp power goes dark.",
+                _ => "Builds cost minerals + weeks. Mines: ghost onto the deposit pad. End Week advances sites."
             };
         }
 
@@ -300,42 +437,38 @@ namespace GameDevTV.RTS.UI
             bannerGo.transform.SetParent(rootPanel.transform, false);
             var bannerImg = bannerGo.AddComponent<Image>();
             bannerImg.color = new Color(0.04f, 0.06f, 0.09f, 0.9f);
+            bannerImg.raycastTarget = false;
             var banner = bannerGo.GetComponent<RectTransform>();
             banner.anchorMin = new Vector2(0f, 1f);
             banner.anchorMax = new Vector2(1f, 1f);
             banner.pivot = new Vector2(0.5f, 1f);
             banner.anchoredPosition = new Vector2(0f, -8f);
-            banner.sizeDelta = new Vector2(-32f, 220f);
+            banner.sizeDelta = new Vector2(-(BannerRightReserve + 12f), BannerHeight);
 
-            objectiveText = MakeLabel(bannerGo.transform, "Objective", 18, TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(16f, -10f), new Vector2(-210f, 64f));
-            comingUpText = MakeLabel(bannerGo.transform, "ComingUp", 15, TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(16f, -78f), new Vector2(-210f, 22f));
-            airText = MakeLabel(bannerGo.transform, "Air", 15, TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(16f, -102f), new Vector2(-210f, 22f));
+            objectiveText = MakeBannerRow(bannerGo.transform, "Objective", 21, 8f, 54f, true);
+            comingUpText = MakeBannerRow(bannerGo.transform, "ComingUp", 17, 64f, 22f, false);
+            airText = MakeBannerRow(bannerGo.transform, "Air", 16, 88f, 20f, false);
+            timeLabel = MakeBannerRow(bannerGo.transform, "TimeLabel", 16, 110f, 18f, false);
 
-            // Time-lapse row (Frostpunk-style) under AIR.
-            timeLabel = MakeLabel(bannerGo.transform, "TimeLabel", 14, TextAlignmentOptions.TopLeft,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(16f, -128f), new Vector2(-210f, 20f));
-
-            // ASCII labels — TMP fonts often lack ❚ / ▶ glyphs.
-            float speedY = -158f;
-            float speedX = 48f;
-            float speedStep = 58f;
-            pauseButton = MakeSizedButton(bannerGo.transform, "II", new Vector2(0f, 1f),
-                new Vector2(speedX, speedY), new Vector2(50f, 34f),
+            // Speed row sits below TIME — top-left pivot so it does not cover text.
+            const float speedTop = 142f;
+            const float speedX = 12f;
+            const float speedStep = 54f;
+            var speedSize = new Vector2(48f, 30f);
+            pauseButton = MakeCornerButton(bannerGo.transform, "II", new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(speedX, -speedTop), speedSize,
                 () => PrologueTimeLapse.Instance?.TogglePause());
-            slowButton = MakeSizedButton(bannerGo.transform, "0.5x", new Vector2(0f, 1f),
-                new Vector2(speedX + speedStep, speedY), new Vector2(54f, 34f),
+            slowButton = MakeCornerButton(bannerGo.transform, "0.5x", new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(speedX + speedStep, -speedTop), speedSize,
                 () => PrologueTimeLapse.Instance?.SetSpeed(PrologueTimeLapse.Speed.Slow));
-            normalButton = MakeSizedButton(bannerGo.transform, "1x", new Vector2(0f, 1f),
-                new Vector2(speedX + speedStep * 2f, speedY), new Vector2(50f, 34f),
+            normalButton = MakeCornerButton(bannerGo.transform, "1x", new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(speedX + speedStep * 2f, -speedTop), speedSize,
                 () => PrologueTimeLapse.Instance?.SetSpeed(PrologueTimeLapse.Speed.Normal));
-            fastButton = MakeSizedButton(bannerGo.transform, "2x", new Vector2(0f, 1f),
-                new Vector2(speedX + speedStep * 3f, speedY), new Vector2(50f, 34f),
+            fastButton = MakeCornerButton(bannerGo.transform, "2x", new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(speedX + speedStep * 3f, -speedTop), speedSize,
                 () => PrologueTimeLapse.Instance?.SetSpeed(PrologueTimeLapse.Speed.Fast));
-            fasterButton = MakeSizedButton(bannerGo.transform, "4x", new Vector2(0f, 1f),
-                new Vector2(speedX + speedStep * 4f, speedY), new Vector2(50f, 34f),
+            fasterButton = MakeCornerButton(bannerGo.transform, "4x", new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(speedX + speedStep * 4f, -speedTop), speedSize,
                 () => PrologueTimeLapse.Instance?.SetSpeed(PrologueTimeLapse.Speed.Faster));
 
             // Week progress bar under the speed buttons.
@@ -343,17 +476,19 @@ namespace GameDevTV.RTS.UI
             barBgGo.transform.SetParent(bannerGo.transform, false);
             var barBg = barBgGo.AddComponent<Image>();
             barBg.color = new Color(0.08f, 0.12f, 0.16f, 0.95f);
+            barBg.raycastTarget = false;
             var barBgRt = barBg.rectTransform;
             barBgRt.anchorMin = new Vector2(0f, 1f);
             barBgRt.anchorMax = new Vector2(0f, 1f);
             barBgRt.pivot = new Vector2(0f, 1f);
-            barBgRt.anchoredPosition = new Vector2(16f, -196f);
+            barBgRt.anchoredPosition = new Vector2(12f, -178f);
             barBgRt.sizeDelta = new Vector2(320f, 10f);
 
             var barFillGo = new GameObject("WeekProgressFill");
             barFillGo.transform.SetParent(barBgGo.transform, false);
             weekProgressFill = barFillGo.AddComponent<Image>();
             weekProgressFill.color = new Color(0.35f, 0.85f, 0.55f, 1f);
+            weekProgressFill.raycastTarget = false;
             var fillRt = weekProgressFill.rectTransform;
             fillRt.anchorMin = Vector2.zero;
             fillRt.anchorMax = new Vector2(0f, 1f);
@@ -361,23 +496,158 @@ namespace GameDevTV.RTS.UI
             fillRt.offsetMax = Vector2.zero;
             fillRt.pivot = new Vector2(0f, 0.5f);
 
-            endWeekButton = MakeButton(bannerGo.transform, "End Week", new Vector2(1f, 1f), new Vector2(-100f, -40f),
+            var statsGo = new GameObject("ColonyStats");
+            statsGo.transform.SetParent(rootPanel.transform, false);
+            var statsImg = statsGo.AddComponent<Image>();
+            statsImg.color = new Color(0.04f, 0.06f, 0.09f, 0.88f);
+            statsImg.raycastTarget = false;
+            var statsRt = statsGo.GetComponent<RectTransform>();
+            statsRt.anchorMin = new Vector2(1f, 0f);
+            statsRt.anchorMax = new Vector2(1f, 1f);
+            statsRt.pivot = new Vector2(1f, 1f);
+            statsRt.offsetMin = new Vector2(-(StatsPanelWidth + 16f), 268f);
+            statsRt.offsetMax = new Vector2(-16f, -8f);
+
+            endWeekButton = MakeCornerButton(statsGo.transform, "End Week", new Vector2(1f, 1f), new Vector2(1f, 1f),
+                new Vector2(-10f, -30f), new Vector2(124f, 32f),
                 () => PrologueController.Instance?.EndWeek());
+
+            var scrollGo = new GameObject("StatsScroll");
+            scrollGo.transform.SetParent(statsGo.transform, false);
+            statsScroll = scrollGo.AddComponent<ScrollRect>();
+            statsScroll.horizontal = false;
+            statsScroll.vertical = true;
+            statsScroll.movementType = ScrollRect.MovementType.Clamped;
+            statsScroll.scrollSensitivity = 24f;
+            var scrollRt = scrollGo.GetComponent<RectTransform>();
+            scrollRt.anchorMin = Vector2.zero;
+            scrollRt.anchorMax = Vector2.one;
+            scrollRt.offsetMin = new Vector2(8f, 8f);
+            scrollRt.offsetMax = new Vector2(-8f, -(StatsHeaderHeight + 4f));
+
+            var viewportGo = new GameObject("Viewport");
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewportRt = viewportGo.AddComponent<RectTransform>();
+            viewportRt.anchorMin = Vector2.zero;
+            viewportRt.anchorMax = Vector2.one;
+            viewportRt.offsetMin = viewportRt.offsetMax = Vector2.zero;
+            viewportGo.AddComponent<RectMask2D>();
+            statsScroll.viewport = viewportRt;
+
+            var contentGo = new GameObject("Content");
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            statsContent = contentGo.AddComponent<RectTransform>();
+            statsContent.anchorMin = new Vector2(0f, 1f);
+            statsContent.anchorMax = new Vector2(1f, 1f);
+            statsContent.pivot = new Vector2(0.5f, 1f);
+            statsContent.anchoredPosition = Vector2.zero;
+            statsContent.sizeDelta = new Vector2(0f, 280f);
+            statsScroll.content = statsContent;
+
+            var scrollBar = CreateStatsScrollbar(scrollGo.transform);
+            statsScroll.verticalScrollbar = scrollBar;
+            statsScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+
+            var statsLabelGo = new GameObject("Stats");
+            statsLabelGo.transform.SetParent(contentGo.transform, false);
+            statsText = statsLabelGo.AddComponent<TextMeshProUGUI>();
+            statsText.fontSize = 16;
+            statsText.alignment = TextAlignmentOptions.TopLeft;
+            statsText.color = Color.white;
+            statsText.textWrappingMode = TextWrappingModes.Normal;
+            statsText.raycastTarget = false;
+            var statsTextRt = statsText.rectTransform;
+            statsTextRt.anchorMin = new Vector2(0f, 1f);
+            statsTextRt.anchorMax = new Vector2(1f, 1f);
+            statsTextRt.pivot = new Vector2(0f, 1f);
+            statsTextRt.anchoredPosition = Vector2.zero;
+            statsTextRt.sizeDelta = new Vector2(-8f, 280f);
             // Legacy button kept hidden — Survey Team is played from the hand card.
             scanButton = MakeButton(bannerGo.transform, "Survey Team", new Vector2(1f, 1f), new Vector2(-100f, -96f),
                 BeginDroneScanFromUi);
             scanButton.gameObject.SetActive(false);
 
-            // Hint ABOVE the card strip so it never covers the hand.
-            hintText = MakeLabel(rootPanel.transform, "Hint", 17, TextAlignmentOptions.Center,
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 268f), new Vector2(980f, 36f));
+            // Yellow "DO THIS" — above the card dock (was at y=268 and covered the hand).
+            hintText = MakeLabel(rootPanel.transform, "Hint", 20, TextAlignmentOptions.MidlineLeft,
+                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(148f, AboveCardDockY), new Vector2(920f, 46f));
             hintText.color = new Color(1f, 0.92f, 0.55f, 1f);
 
-            // Week report above the hand, left side — keep compact so it never eats the map.
-            weekReportText = MakeLabel(rootPanel.transform, "WeekReport", 14, TextAlignmentOptions.BottomLeft,
-                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(16f, 268f), new Vector2(420f, 56f));
+            weekReportText = MakeLabel(rootPanel.transform, "WeekReport", 17, TextAlignmentOptions.BottomLeft,
+                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(16f, AboveCardDockY + 50f), new Vector2(520f, 58f));
+
+            var briefingGo = new GameObject("Briefing");
+            briefingGo.transform.SetParent(rootPanel.transform, false);
+            briefing = briefingGo.AddComponent<PrologueBriefingPanel>();
+            briefing.Build(rootPanel.transform);
+
+            // FPS: own pill above the card strip — never under stats scroll / End Week.
+            var fpsGo = new GameObject("FpsHud");
+            fpsGo.transform.SetParent(rootPanel.transform, false);
+            var fpsBg = fpsGo.AddComponent<Image>();
+            fpsBg.color = new Color(0.02f, 0.05f, 0.08f, 0.88f);
+            fpsBg.raycastTarget = false;
+            var fpsRt = fpsGo.GetComponent<RectTransform>();
+            // Above the card dock (286px cards + ~48px bottom margin), not on the leftmost card.
+            const float fpsAboveCardsY = AboveCardDockY;
+            fpsRt.anchorMin = new Vector2(0f, 0f);
+            fpsRt.anchorMax = new Vector2(0f, 0f);
+            fpsRt.pivot = new Vector2(0f, 0f);
+            fpsRt.anchoredPosition = new Vector2(12f, fpsAboveCardsY);
+            fpsRt.sizeDelta = new Vector2(132f, 28f);
+            fpsText = MakePinnedLabel(fpsGo.transform, "FpsLabel", 16, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 24f));
+            fpsText.fontStyle = FontStyles.Bold;
+            fpsGo.transform.SetAsLastSibling();
 
             RefreshTimeControls();
+        }
+
+        static TextMeshProUGUI MakeBannerRow(
+            Transform parent, string name, float fontSize, float topInset, float height, bool bold)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = fontSize;
+            tmp.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
+            tmp.alignment = TextAlignmentOptions.TopLeft;
+            tmp.color = Color.white;
+            tmp.textWrappingMode = TextWrappingModes.Normal;
+            tmp.overflowMode = TextOverflowModes.Ellipsis;
+            tmp.raycastTarget = false;
+            var rt = tmp.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.offsetMin = new Vector2(12f, -(topInset + height));
+            rt.offsetMax = new Vector2(-BannerRightReserve, -topInset);
+            return tmp;
+        }
+
+        static TextMeshProUGUI MakePinnedLabel(
+            Transform parent, string name, float fontSize, TextAlignmentOptions align,
+            Vector2 anchor, Vector2 anchoredPos, Vector2 sizeDelta)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = fontSize;
+            tmp.alignment = align;
+            tmp.color = Color.white;
+            tmp.textWrappingMode = TextWrappingModes.Normal;
+            tmp.raycastTarget = false;
+            var rt = tmp.rectTransform;
+            rt.anchorMin = anchor;
+            rt.anchorMax = anchor;
+            rt.pivot = align switch
+            {
+                TextAlignmentOptions.TopRight => new Vector2(1f, 1f),
+                TextAlignmentOptions.Center => new Vector2(0.5f, 0.5f),
+                _ => new Vector2(0f, 1f)
+            };
+            rt.anchoredPosition = anchoredPos;
+            rt.sizeDelta = sizeDelta;
+            return tmp;
         }
 
         static TextMeshProUGUI MakeLabel(
@@ -395,14 +665,14 @@ namespace GameDevTV.RTS.UI
             var rt = tmp.rectTransform;
             rt.anchorMin = anchorMin;
             rt.anchorMax = anchorMax;
-            rt.pivot = new Vector2(anchorMin.x < 0.5f ? 0f : 0.5f, anchorMin.y > 0.5f ? 1f : 0f);
-            if (anchorMin.x == 0f && anchorMax.x == 1f)
+            rt.pivot = new Vector2(0.5f, anchorMin.y > 0.5f ? 1f : 0f);
+            if (anchorMin == anchorMax)
             {
-                // Stretched width under banner: use offsets
-                rt.pivot = new Vector2(0f, 1f);
-                rt.offsetMin = new Vector2(16f, -anchoredPos.y - sizeDelta.y);
-                rt.offsetMax = new Vector2(-200f, -anchoredPos.y);
-                // anchoredPosition unused when offsets set this way for stretch; keep size via offsets
+                rt.pivot = align == TextAlignmentOptions.Center
+                    ? new Vector2(0.5f, anchorMin.y)
+                    : new Vector2(anchorMin.x, anchorMin.y > 0.5f ? 1f : 0f);
+                rt.anchoredPosition = anchoredPos;
+                rt.sizeDelta = sizeDelta;
             }
             else
             {
@@ -417,9 +687,53 @@ namespace GameDevTV.RTS.UI
             return MakeSizedButton(parent, label, anchor, anchoredPos, new Vector2(170f, 42f), onClick);
         }
 
+        static Scrollbar CreateStatsScrollbar(Transform parent)
+        {
+            var go = new GameObject("StatsScrollbar");
+            go.transform.SetParent(parent, false);
+            var rt = go.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(1f, 0f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 0.5f);
+            rt.anchoredPosition = new Vector2(-2f, 0f);
+            rt.sizeDelta = new Vector2(10f, 0f);
+            var bg = go.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.35f);
+            var sb = go.AddComponent<Scrollbar>();
+            sb.direction = Scrollbar.Direction.BottomToTop;
+            var handleGo = new GameObject("Handle");
+            handleGo.transform.SetParent(go.transform, false);
+            var handleImg = handleGo.AddComponent<Image>();
+            handleImg.color = new Color(0.4f, 0.65f, 0.85f, 0.95f);
+            var handleRt = handleGo.GetComponent<RectTransform>();
+            handleRt.anchorMin = Vector2.zero;
+            handleRt.anchorMax = Vector2.one;
+            handleRt.offsetMin = new Vector2(2f, 2f);
+            handleRt.offsetMax = new Vector2(-2f, -2f);
+            sb.handleRect = handleRt;
+            sb.targetGraphic = handleImg;
+            return sb;
+        }
+
+        static Button MakeCornerButton(
+            Transform parent, string label, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos,
+            Vector2 size, UnityEngine.Events.UnityAction onClick)
+        {
+            return MakeSizedButton(parent, label, anchorMin, anchorMax, anchoredPos, size, onClick,
+                anchorMin == anchorMax && anchorMin.x >= 0.5f ? new Vector2(1f, 1f) : new Vector2(0f, 1f));
+        }
+
         static Button MakeSizedButton(
             Transform parent, string label, Vector2 anchor, Vector2 anchoredPos, Vector2 size,
             UnityEngine.Events.UnityAction onClick)
+        {
+            return MakeSizedButton(parent, label, anchor, anchor, anchoredPos, size, onClick,
+                new Vector2(0.5f, 0.5f));
+        }
+
+        static Button MakeSizedButton(
+            Transform parent, string label, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, Vector2 size,
+            UnityEngine.Events.UnityAction onClick, Vector2 pivot)
         {
             var go = new GameObject(label.Replace(" ", "") + "Button");
             go.transform.SetParent(parent, false);
@@ -428,9 +742,9 @@ namespace GameDevTV.RTS.UI
             var btn = go.AddComponent<Button>();
             btn.onClick.AddListener(onClick);
             var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = anchor;
-            rt.anchorMax = anchor;
-            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.pivot = pivot;
             rt.anchoredPosition = anchoredPos;
             rt.sizeDelta = size;
 
@@ -438,7 +752,7 @@ namespace GameDevTV.RTS.UI
             textGo.transform.SetParent(go.transform, false);
             var tmp = textGo.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
-            tmp.fontSize = size.x < 60f ? 13f : 18f;
+            tmp.fontSize = size.x < 60f ? 16f : 22f;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
             tmp.raycastTarget = false;
@@ -448,6 +762,35 @@ namespace GameDevTV.RTS.UI
             trt.offsetMin = Vector2.zero;
             trt.offsetMax = Vector2.zero;
             return btn;
+        }
+
+        public bool TryGetBriefingContinueScreenPoint(out Vector2 screenBottomLeft)
+        {
+            screenBottomLeft = default;
+            if (briefing == null || !briefing.IsBlocking) return false;
+            return briefing.TryGetContinueScreenPoint(out screenBottomLeft);
+        }
+
+#if UNITY_EDITOR
+        public void PlaytestDismissBriefing() => briefing?.Dismiss();
+#endif
+
+        public bool TryGetEndWeekScreenPoint(out Vector2 screenBottomLeft) =>
+            UiPlaythroughUtil.TryScreenCenter(endWeekButton, out screenBottomLeft);
+
+        public bool TryGetSpeedButtonScreenPoint(string label, out Vector2 screenBottomLeft)
+        {
+            screenBottomLeft = default;
+            Button btn = label switch
+            {
+                "1x" => normalButton,
+                "2x" => fastButton,
+                "4x" => fasterButton,
+                "0.5x" => slowButton,
+                "Pause" or "||" => pauseButton,
+                _ => null
+            };
+            return UiPlaythroughUtil.TryScreenCenter(btn, out screenBottomLeft);
         }
     }
 }

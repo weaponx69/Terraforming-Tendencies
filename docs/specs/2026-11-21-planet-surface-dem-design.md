@@ -10,7 +10,7 @@
 
 ## Summary
 
-Easy planet ground uses a **curated real Mars elevation map (DEM)** for shape and a **real Mars photo** for color/detail. Height is stable per planet asset. Resources stay random per run and snap to DEM height. Landing / early colony stays mostly flat.
+Easy planet ground uses a **curated elevation map (DEM)** for shape and the terrain photo plus its normal for the hills and valleys. A repeating dust texture sits on top of that photo. Height is stable per planet asset. Resources stay random per run and snap to DEM height. Landing / early colony stays mostly flat.
 
 ## Goals
 

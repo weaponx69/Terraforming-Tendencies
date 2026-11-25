@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Debug = UnityEngine.Debug;
 
 namespace GameDevTV.RTS.Prologue
 {
@@ -28,9 +30,15 @@ namespace GameDevTV.RTS.Prologue
         public float WeekProgress01 { get; private set; }
 
         Speed speedBeforePause = Speed.Normal;
+        Speed speedBeforeBriefing = Speed.Pause;
         float weekAccum;
         bool spaceLatch;
         bool appliedScale;
+        bool briefingHold;
+        bool runEnded;
+
+        /// <summary>The corporation cancelled the contract. The clock stays stopped.</summary>
+        public bool RunEnded => runEnded;
 
         public static float MultiplierFor(Speed speed) => speed switch
         {
@@ -43,6 +51,42 @@ namespace GameDevTV.RTS.Prologue
         };
 
         public bool IsPaused => CurrentSpeed == Speed.Pause;
+
+        /// <summary>A crisis cutscene holds the clock until the player dismisses it.</summary>
+        public void HoldForBriefing(bool hold)
+        {
+            if (runEnded)
+            {
+                CurrentSpeed = Speed.Pause;
+                ApplyTimeScale();
+                return;
+            }
+
+            if (hold)
+            {
+                if (briefingHold) return;
+                speedBeforeBriefing = CurrentSpeed;
+                briefingHold = true;
+                CurrentSpeed = Speed.Pause;
+                ApplyTimeScale();
+                return;
+            }
+
+            if (!briefingHold) return;
+            briefingHold = false;
+            CurrentSpeed = speedBeforeBriefing;
+            ApplyTimeScale();
+        }
+
+        /// <summary>Contract cancelled. Pause stays on; speed and Space cannot resume the run.</summary>
+        public void EndRun()
+        {
+            runEnded = true;
+            briefingHold = true;
+            CurrentSpeed = Speed.Pause;
+            ApplyTimeScale();
+            GameDevTV.RTS.UI.PrologueHUD.Instance?.RefreshTimeControls();
+        }
 
         void Awake()
         {
@@ -85,11 +129,28 @@ namespace GameDevTV.RTS.Prologue
             weekAccum += Time.deltaTime;
             WeekProgress01 = Mathf.Clamp01(weekAccum / SecondsPerWeekNormal);
 
-            if (weekAccum >= SecondsPerWeekNormal)
+            int weekSafety = 0;
+            var weekSw = Stopwatch.StartNew();
+            while (weekAccum >= SecondsPerWeekNormal && weekSafety < 50)
             {
-                weekAccum = 0f;
-                WeekProgress01 = 0f;
+                weekAccum -= SecondsPerWeekNormal;
+                weekSafety++;
                 PrologueController.Instance?.EndWeek();
+            }
+
+            weekSw.Stop();
+            if (weekSw.Elapsed.TotalMilliseconds > 2.0)
+                Debug.LogError(
+                    $"[PrologueTimeLapse] EndWeek loop exceeded 2ms: {weekSw.Elapsed.TotalMilliseconds:F2}ms " +
+                    $"iterations={weekSafety} weekAccum={weekAccum:F3}");
+
+            if (weekAccum < SecondsPerWeekNormal)
+                WeekProgress01 = Mathf.Clamp01(weekAccum / SecondsPerWeekNormal);
+
+            if (mult > 0f)
+            {
+                PrologueConstruction.RequestTimeLapseTick();
+                PrologueConstruction.TickAllFromTimeLapse();
             }
         }
 
@@ -102,13 +163,14 @@ namespace GameDevTV.RTS.Prologue
                 spaceLatch = false;
                 return;
             }
-            if (spaceLatch) return;
+            if (spaceLatch || briefingHold) return;
             spaceLatch = true;
             TogglePause();
         }
 
         public void TogglePause()
         {
+            if (runEnded) return;
             if (CurrentSpeed == Speed.Pause)
                 SetSpeed(speedBeforePause == Speed.Pause ? Speed.Normal : speedBeforePause);
             else
@@ -121,11 +183,20 @@ namespace GameDevTV.RTS.Prologue
 
         public void SetSpeed(Speed speed)
         {
+            if (runEnded) return;
             if (speed != Speed.Pause)
                 speedBeforePause = speed;
             CurrentSpeed = speed;
             ApplyTimeScale();
             GameDevTV.RTS.UI.PrologueHUD.Instance?.RefreshTimeControls();
+        }
+
+        /// <summary>After Survey ✓ — days should tick without an extra 1x click.</summary>
+        public void ResumeAfterSurveyConfirm()
+        {
+            if (runEnded || briefingHold) return;
+            if (CurrentSpeed != Speed.Pause) return;
+            SetSpeed(speedBeforePause == Speed.Pause ? Speed.Normal : speedBeforePause);
         }
 
         void ApplyTimeScale()
@@ -143,6 +214,7 @@ namespace GameDevTV.RTS.Prologue
 
         public string SpeedLabel()
         {
+            if (runEnded) return "CONTRACT CANCELLED";
             return CurrentSpeed switch
             {
                 Speed.Pause => "PAUSED (Space to resume)",

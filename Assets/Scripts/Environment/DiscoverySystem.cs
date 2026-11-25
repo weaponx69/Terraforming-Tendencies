@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Prologue;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
@@ -348,6 +349,10 @@ namespace GameDevTV.RTS.Environment
             else if (name.Contains("iron")) resourceType = "Iron";
             else if (name.Contains("regolith") || name.Contains("basalt") || name.Contains("strip"))
                 resourceType = "Regolith";
+            else if (name.Contains("aquifer")
+                     || (name.Contains("water") && name.Contains("ice"))
+                     || name.Contains("subglacial"))
+                resourceType = "Ice";
             else if (name.Contains("laser") || name.Contains("deep"))
                 resourceType = "Minerals";
             else
@@ -359,6 +364,11 @@ namespace GameDevTV.RTS.Environment
         public static bool HasDiscoveredMineDeposit(BuildingSO building)
         {
             if (!TryGetMineResourceType(building, out string type)) return true;
+            if (PrologueController.IsActive
+                && type.Equals("Ice", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return PrologueController.Instance?.Colony?.HasSurveyedIce() ?? false;
+            }
             return HasDiscoveredDepositOfType(type);
         }
 
@@ -433,6 +443,20 @@ namespace GameDevTV.RTS.Environment
         public static bool IsOnDiscoveredMineDeposit(BuildingSO building, Vector3 worldPos)
         {
             if (!TryGetMineResourceType(building, out string type)) return true;
+            if (PrologueController.IsActive
+                && type.Equals("Ice", System.StringComparison.OrdinalIgnoreCase))
+            {
+                var colony = PrologueController.Instance?.Colony;
+                var ctrl = PrologueController.Instance;
+                if (colony != null && ctrl != null && ctrl.TryGetTileIndex(worldPos, out int tile))
+                {
+                    var t = colony.Board.At(tile);
+                    if (t.Revealed
+                        && (t.Feature == PrologueFeature.Ice || t.Feature == PrologueFeature.Glacier))
+                        return true;
+                }
+            }
+
             var cell = ColonyTileGrid.WorldToCell(worldPos);
             foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {
@@ -442,6 +466,39 @@ namespace GameDevTV.RTS.Environment
                 if (ColonyTileGrid.WorldToCell(hr.transform.position) == cell)
                     return true;
             }
+            // The see-through ghost sits on the surveyed node. That pad is a valid mine site
+            // even when the gatherable marker's hex does not match the ghost.
+            return ExploredNodeOnCell(type, cell);
+        }
+
+        static bool ExploredNodeOnCell(string resourceType, Vector2Int cell)
+        {
+            var sectors = SectorManager.Instance?.Sectors;
+            if (sectors == null) return false;
+            foreach (var sector in sectors)
+            {
+                if (sector?.Nodes == null) continue;
+                foreach (var node in sector.Nodes)
+                {
+                    if (!NodeMatchesResource(node, resourceType)) continue;
+                    if (ColonyTileGrid.WorldToCell(node.position) == cell)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        static bool NodeMatchesResource(SectorNode node, string resourceType)
+        {
+            if (node == null || !node.isExplored || string.IsNullOrEmpty(resourceType)) return false;
+            if (resourceType.Equals("Minerals", System.StringComparison.OrdinalIgnoreCase))
+                return node.type == SectorNode.NodeType.Minerals;
+            if (resourceType.Equals("Gas", System.StringComparison.OrdinalIgnoreCase))
+                return node.type == SectorNode.NodeType.Gas;
+            if (resourceType.Equals("Iron", System.StringComparison.OrdinalIgnoreCase))
+                return node.type == SectorNode.NodeType.Iron;
+            if (resourceType.Equals("Regolith", System.StringComparison.OrdinalIgnoreCase))
+                return node.type == SectorNode.NodeType.Regolith;
             return false;
         }
 
@@ -494,26 +551,51 @@ namespace GameDevTV.RTS.Environment
             cell = ColonyTileGrid.WorldToCell(cursorWorld);
             if (!TryGetMineResourceType(building, out string type)) return false;
 
-            float max = maxDist > 0f ? maxDist : ColonyTileGrid.TileSize * 1.25f;
+            // Wide enough to catch a click on the see-through building ghost, not only the hex center.
+            float max = maxDist > 0f ? maxDist : ColonyTileGrid.TileSize * 4.5f;
             float bestDist = max;
-            HiddenResource best = null;
+            Vector3 bestPos = cursorWorld;
+            bool found = false;
+            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+
+            void Consider(Vector3 pos)
+            {
+                // Never snap mines onto the Command Post keepout / sector center.
+                // Prologue deposits often sit on the home/CP cell — still mineable.
+                if (!prologue && SectorColonization.IsReservedCommandPostTile(pos))
+                    return;
+                float d = Mathf.Sqrt(ColonyTileGrid.HorizontalDistSq(cursorWorld, pos));
+                if (d > bestDist) return;
+                bestDist = d;
+                bestPos = pos;
+                found = true;
+            }
+
             foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {
                 if (hr == null || !hr.IsDiscovered) continue;
                 if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
                     continue;
-                // Never snap mines onto the Command Post keepout / sector center.
-                if (SectorColonization.IsReservedCommandPostTile(hr.transform.position))
-                    continue;
-                float d = Mathf.Sqrt(ColonyTileGrid.HorizontalDistSq(cursorWorld, hr.transform.position));
-                if (d > bestDist) continue;
-                bestDist = d;
-                best = hr;
+                Consider(hr.transform.position);
             }
 
-            if (best == null) return false;
-            cell = ColonyTileGrid.WorldToCell(best.transform.position);
-            snapped = ColonyTileGrid.CellToWorld(cell, cursorWorld.y);
+            var sectors = SectorManager.Instance?.Sectors;
+            if (sectors != null)
+            {
+                foreach (var sector in sectors)
+                {
+                    if (sector?.Nodes == null) continue;
+                    foreach (var node in sector.Nodes)
+                    {
+                        if (!NodeMatchesResource(node, type)) continue;
+                        Consider(node.position);
+                    }
+                }
+            }
+
+            if (!found) return false;
+            cell = ColonyTileGrid.WorldToCell(bestPos);
+            snapped = ColonyTileGrid.CellToWorldOnGround(cell);
             return true;
         }
 
@@ -538,15 +620,20 @@ namespace GameDevTV.RTS.Environment
             var occupied = ColonyTileGrid.GetOccupiedCells(Owner.Player1);
             HiddenResource focusBest = null;
             HiddenResource anyBest = null;
+            HiddenResource blockedByCp = null;
             var focus = SectorManager.Instance != null ? SectorManager.Instance.GetClimateFocusSector() : null;
+            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
 
             foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {
                 if (hr == null || !hr.IsDiscovered) continue;
                 if (!string.Equals(hr.ResourceTypeName, type, System.StringComparison.OrdinalIgnoreCase))
                     continue;
-                if (SectorColonization.IsReservedCommandPostTile(hr.transform.position))
+                if (!prologue && SectorColonization.IsReservedCommandPostTile(hr.transform.position))
+                {
+                    blockedByCp ??= hr;
                     continue;
+                }
                 var cell = ColonyTileGrid.WorldToCell(hr.transform.position);
                 if (occupied.Contains(cell)) continue;
 
@@ -562,7 +649,9 @@ namespace GameDevTV.RTS.Environment
             var chosen = focusBest != null ? focusBest : anyBest;
             if (chosen == null)
             {
-                failReason = $"No free {type} deposit outside the Command Post center.";
+                failReason = blockedByCp != null
+                    ? $"No free {type} deposit outside the Command Post center."
+                    : $"No free {type} deposit tile (already mined or occupied).";
                 return false;
             }
 

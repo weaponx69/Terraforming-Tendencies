@@ -485,39 +485,19 @@ namespace GameDevTV.RTS.Utilities
 
         private static Vector3 SnapToGround(Vector3 approximate)
         {
-            int terrainMask = LayerMask.GetMask("Terrain");
+            // Authoritative height field (matches visible mesh). Avoid Terrain collider offsets.
+            if (PlanetGenerator.Instance != null)
+                return ColonyTileGrid.ApplyGroundY(approximate);
+
             int groundMask = LayerMask.GetMask("Default", "Terrain");
             if (groundMask == 0) groundMask = Physics.DefaultRaycastLayers;
 
-            Vector3[] origins =
+            Vector3 origin = new Vector3(approximate.x, 200f, approximate.z);
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 400f, groundMask,
+                    QueryTriggerInteraction.Ignore)
+                && !IsIgnorableGroundHit(hit))
             {
-                new Vector3(approximate.x, approximate.y + 120f, approximate.z),
-                new Vector3(approximate.x, 200f, approximate.z),
-            };
-
-            foreach (Vector3 origin in origins)
-            {
-                if (terrainMask != 0
-                    && Physics.Raycast(origin, Vector3.down, out RaycastHit terrainHit, 400f, terrainMask,
-                        QueryTriggerInteraction.Ignore))
-                {
-                    return terrainHit.point;
-                }
-
-                if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 400f, groundMask,
-                        QueryTriggerInteraction.Ignore))
-                {
-                    if (IsIgnorableGroundHit(hit)) continue;
-                    return hit.point;
-                }
-            }
-
-            // Last resort: any non-trigger collider that is not a building/pad ghost.
-            if (Physics.Raycast(new Vector3(approximate.x, 200f, approximate.z), Vector3.down,
-                    out RaycastHit anyHit, 400f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
-                && !IsIgnorableGroundHit(anyHit))
-            {
-                return anyHit.point;
+                return hit.point;
             }
 
             return new Vector3(approximate.x, approximate.y, approximate.z);

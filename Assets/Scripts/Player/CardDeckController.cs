@@ -666,11 +666,50 @@ namespace GameDevTV.RTS.Player
         /// <summary>
         /// Prologue hand = scan card (when needed) + unlocked Unreal-mapped buildings only.
         /// </summary>
-        public void RebuildPrologueHand(PrologueColony colony)
+        /// <returns>True when the seated hand actually changed.</returns>
+        public bool RebuildPrologueHand(PrologueColony colony)
         {
-            hand.Clear();
             if (masterDeck.Count == 0)
                 InitializeDrawPile();
+
+            var next = BuildPrologueHandList(colony);
+            if (PrologueHandSequenceEqual(hand, next))
+                return false;
+
+            hand.Clear();
+            hand.AddRange(next);
+
+            Debug.Log($"[CardDeckController] Prologue hand ({hand.Count}): " +
+                      string.Join(", ", hand.ConvertAll(c => c != null ? c.cardName : "?")));
+
+            PrologueController.ignoreNextDeckChanged = true;
+            try
+            {
+                OnHandChanged?.Invoke();
+            }
+            finally
+            {
+                PrologueController.ignoreNextDeckChanged = false;
+            }
+
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return true;
+        }
+
+        static bool PrologueHandSequenceEqual(IReadOnlyList<BlueprintCardSO> a, IReadOnlyList<BlueprintCardSO> b)
+        {
+            if (a == null || b == null) return a == b;
+            if (a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (!ReferenceEquals(a[i], b[i])) return false;
+            }
+            return true;
+        }
+
+        List<BlueprintCardSO> BuildPrologueHandList(PrologueColony colony)
+        {
+            var next = new List<BlueprintCardSO>();
 
             HashSet<PrologueBuildingId> unlocked = colony != null
                 ? colony.Unlocked
@@ -697,11 +736,11 @@ namespace GameDevTV.RTS.Player
                     try { scan = EnsureStarterCard<ScoutingCardSO>("Cards/SurveyDroneCard"); }
                     catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Survey Team card missing: {ex.Message}"); }
                 }
-                if (scan != null) hand.Add(scan);
+                if (scan != null) next.Add(scan);
             }
 
             // Company Orbital Scan: paid ping toward unrevealed ice when the team is free.
-            if (!cancelled && !surveying && colony != null && colony.HasUnrevealedIce())
+            if (!cancelled && !surveying && colony != null && colony.HasUnrevealedTargets())
             {
                 BlueprintCardSO orbital = null;
                 foreach (var c in masterDeck)
@@ -718,8 +757,8 @@ namespace GameDevTV.RTS.Player
                     try { orbital = EnsureStarterCard<ScoutingCardSO>("Cards/OrbitalScanCard"); }
                     catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Orbital Scan card missing: {ex.Message}"); }
                 }
-                if (orbital != null && !hand.Contains(orbital))
-                    hand.Add(orbital);
+                if (orbital != null && !next.Contains(orbital))
+                    next.Add(orbital);
             }
 
             // Research: seat when no project is active and at least one Tier-2 id is still locked.
@@ -742,16 +781,16 @@ namespace GameDevTV.RTS.Player
                     try { research = EnsureStarterCard<ResearchCardSO>("Cards/ResearchCard"); }
                     catch (Exception ex) { Debug.LogWarning($"[CardDeckController] Prologue Research card missing: {ex.Message}"); }
                 }
-                if (research != null && !hand.Contains(research))
-                    hand.Add(research);
+                if (research != null && !next.Contains(research))
+                    next.Add(research);
             }
 
             foreach (PrologueBuildingId id in unlocked)
             {
                 if (id == PrologueBuildingId.None || id == PrologueBuildingId.CommandPost) continue;
                 BlueprintCardSO match = FindPrologueCard(id);
-                if (match != null && !hand.Contains(match))
-                    hand.Add(match);
+                if (match != null && !next.Contains(match))
+                    next.Add(match);
             }
 
             // Typed mines for Survey-uncovered deposits (individual resources).
@@ -762,16 +801,12 @@ namespace GameDevTV.RTS.Player
                     BlueprintCardSO mine = FindPrologueMineCard(res);
                     if (mine is UnlockBuildingCardSO unlockMine && unlockMine.buildingToUnlock != null)
                         BlueprintDraftManager.RegisterBuildingSO(unlockMine.buildingToUnlock);
-                    if (mine != null && !hand.Contains(mine))
-                        hand.Add(mine);
+                    if (mine != null && !next.Contains(mine))
+                        next.Add(mine);
                 }
             }
 
-            Debug.Log($"[CardDeckController] Prologue hand ({hand.Count}): " +
-                      string.Join(", ", hand.ConvertAll(c => c != null ? c.cardName : "?")));
-
-            OnHandChanged?.Invoke();
-            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return next;
         }
 
         BlueprintCardSO FindPrologueMineCard(PrologueResourceId resource)

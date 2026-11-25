@@ -70,15 +70,7 @@ namespace GameDevTV.RTS.Commands
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
             if (HandIndex >= 0 && !BuildingSiteRegistry.IsCommandPostBuilding(Building))
                 targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
-
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
-            if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
-            {
-                if (HandIndex >= 0)
-                    targetPos = new Vector3(targetPos.x, navHit.position.y, targetPos.z);
-                else
-                    targetPos = navHit.position;
-            }
+            targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
 
             // Card plays: Materials waived under Colony Acts / Prologue; power is optional (not a place gate).
             if (HandIndex >= 0)
@@ -104,16 +96,21 @@ namespace GameDevTV.RTS.Commands
                         targetPos = mineSnap;
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
-                    // Mines still cannot claim the Command Post tile.
-                    if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                    // Acts: mines cannot claim the Command Post tile. Prologue deposits often sit on home/CP.
+                    if (!prologue
+                        && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         return false;
                 }
-                else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                // Prologue Aquifer / climate tiles use ice-range Preview, not Acts deposit reservation.
+                else if (!prologue
+                    && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                 {
                     return false;
                 }
-                if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                // Prologue occupancy is PrologueColony.Preview — not Acts Command Post pads.
+                if (!prologue
+                    && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     return false;
                 // Prologue uses ice-range / deposit rules, not Acts sector-feature geology.
@@ -132,13 +129,8 @@ namespace GameDevTV.RTS.Commands
             IBuildingBuilder builder = context.Commandable as IBuildingBuilder;
 
             bool isCommandPost = BuildingSiteRegistry.IsCommandPostBuilding(Building);
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
-            {
-                agentTypeID = 0,
-                areaMask = UnityEngine.AI.NavMesh.AllAreas
-            };
 
-            // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
+            // Snap to sector / tile, then pin Y to the visible planet mesh height field.
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
 
             // Card tiles snap to the Combolands square grid (join edges with neighbors).
@@ -155,9 +147,7 @@ namespace GameDevTV.RTS.Commands
                             context.Hit.point);
                         return;
                     }
-                    targetPos = claimPos;
-                    if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit claimHit, 20f, filter))
-                        targetPos = new Vector3(targetPos.x, claimHit.position.y, targetPos.z);
+                    targetPos = ColonyTileGrid.ApplyGroundY(claimPos);
                 }
                 else
                 {
@@ -165,17 +155,14 @@ namespace GameDevTV.RTS.Commands
                     if (BuildingSiteRegistry.IsMineBuilding(Building)
                         && DiscoverySystem.TrySnapToMineDeposit(Building, context.Hit.point, out Vector3 mineSnap, out _))
                     {
-                        targetPos = new Vector3(mineSnap.x, targetPos.y, mineSnap.z);
+                        targetPos = mineSnap;
                     }
+                    targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
                 }
             }
-
-            if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+            else
             {
-                if (HandIndex >= 0)
-                    targetPos = new Vector3(targetPos.x, navHit.position.y, targetPos.z);
-                else
-                    targetPos = navHit.position;
+                targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
             }
 
             // Check if this is the player's very first Command Post
@@ -247,9 +234,11 @@ namespace GameDevTV.RTS.Commands
                     }
 
                     // Mines always require a matching discovered deposit (Prologue + Acts).
+                    // Prologue already committed the hex the ghost showed. Do not jump to a different pad.
                     if (BuildingSiteRegistry.IsMineBuilding(Building))
                     {
-                        if (DiscoverySystem.TrySnapToMineDeposit(Building, targetPos, out Vector3 mineSnap, out _))
+                        if (!prologue
+                            && DiscoverySystem.TrySnapToMineDeposit(Building, targetPos, out Vector3 mineSnap, out _))
                             targetPos = mineSnap;
                         if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
                         {
@@ -266,7 +255,8 @@ namespace GameDevTV.RTS.Commands
                                 targetPos);
                             return;
                         }
-                        if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                        if (!prologue
+                            && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         {
                             ExplorationManager.NotifyPlacementFailed(
                                 "That tile is the Command Post pad — mine a deposit on another tile.",
@@ -324,10 +314,22 @@ namespace GameDevTV.RTS.Commands
                     GameObject cardInstance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                     if (cardInstance.TryGetComponent(out BaseBuilding cardBuilding))
                     {
-                        // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
-                        cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
-                        if (prologue)
-                            GameDevTV.RTS.Prologue.PrologueMineExtractor.TryAttachToBuilding(cardBuilding, Building);
+                        if (prologue && !isCommandPost)
+                        {
+                            // Scaffolding over build weeks on the colony clock. The sim site
+                            // (TryPlace) finishes on the same week ticks.
+                            cardBuilding.BindBuildingDefinition(Building);
+                            int weeks = 1;
+                            if (GameDevTV.RTS.Prologue.PrologueCardMap.TryGetPrologueId(Building, out var buildId))
+                                weeks = Mathf.Max(1, GameDevTV.RTS.Prologue.PrologueData.Get(buildId).BuildWeeks);
+                            cardBuilding.gameObject.AddComponent<GameDevTV.RTS.Prologue.PrologueConstruction>()
+                                .Begin(context.Owner, weeks);
+                        }
+                        else
+                        {
+                            // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
+                            cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
+                        }
                         // Command Posts must stay replayable across sectors — do not draft-lock them.
                         if (!isCommandPost)
                             BlueprintDraftManager.LockBuilding(Building.Name);
@@ -630,10 +632,12 @@ namespace GameDevTV.RTS.Commands
                 }
                 if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, point))
                     return "Place this mine on the matching discovered deposit tile.";
-                if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
+                if (!prologue
+                    && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
                     return "That tile is the Command Post pad — mine a deposit on another tile.";
             }
-            else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+            else if (!prologue
+                && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                 && DiscoverySystem.IsOnAnyMineableDeposit(point))
             {
                 return "Deposit tiles are reserved for mines — place elsewhere.";

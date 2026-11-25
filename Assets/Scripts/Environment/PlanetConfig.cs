@@ -22,10 +22,18 @@ namespace GameDevTV.RTS.Environment
         public Texture2D Heightmap;
         [Tooltip("World-unit vertical span from black (0) to white (1) on Heightmap.")]
         public float HeightAmplitude = 12f;
-        [Tooltip("Photo albedo for the planet mesh.")]
+        [Tooltip("Terrain photo. This is the hills-and-valleys color.")]
         public Texture2D AlbedoMap;
-        [Tooltip("Optional normal map; may be null in v1.")]
+        [Tooltip("Normal from that terrain photo so ridges catch the light.")]
         public Texture2D NormalMap;
+        [Tooltip("Crevice darkening so the photo doesn't read as a flat sticker.")]
+        public Texture2D OcclusionMap;
+        [Tooltip("Seamless dust albedo tiled over the terrain photo.")]
+        public Texture2D DetailAlbedoMap;
+        [Tooltip("Quiet dust normal. Kept weak so it does not replace the terrain.")]
+        public Texture2D DetailNormalMap;
+        [Tooltip("How many times the dust maps tile across the planet mesh UV.")]
+        public float DetailTiling = 32f;
 
         [Header("Difficulty Modifiers")]
         public int ResourceCount = 10;

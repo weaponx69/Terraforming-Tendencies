@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameDevTV.RTS.Player;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Prologue
@@ -16,20 +17,8 @@ namespace GameDevTV.RTS.Prologue
 
         public void Begin(Vector3 padCenter, int count = 2)
         {
+            // Harvest drones are off for now. The mine still pays its stock on End Week.
             Clear();
-            center = padCenter;
-            count = Mathf.Clamp(count, 1, 3);
-            BuildWaypoints();
-            for (int i = 0; i < count; i++)
-            {
-                var drone = BuildMiniDrone($"HarvestDrone_{i}");
-                drone.transform.SetParent(transform, false);
-                Vector3 p = waypoints[i % waypoints.Count];
-                p.y = 4.8f + i * 0.6f;
-                drone.transform.position = p;
-                drones.Add(drone);
-                wanderTargets.Add(i % waypoints.Count);
-            }
         }
 
         void Update()
@@ -42,7 +31,7 @@ namespace GameDevTV.RTS.Prologue
                 if (go == null) continue;
                 int wi = wanderTargets[i];
                 Vector3 goal = waypoints[wi];
-                goal.y = 4.8f + (i % 2) * 0.6f;
+                goal.y = ColonyTileGrid.SampleGroundY(goal) + 4.8f + (i % 2) * 0.6f;
                 Vector3 pos = go.transform.position;
                 go.transform.position = Vector3.MoveTowards(pos, goal, speed);
                 Vector3 flat = goal - pos;

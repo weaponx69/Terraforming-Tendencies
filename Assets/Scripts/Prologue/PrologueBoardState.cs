@@ -26,6 +26,8 @@ namespace GameDevTV.RTS.Prologue
         public readonly List<PrologueTile> Tiles = new();
         public readonly List<PrologueSite> Sites = new();
         public readonly HashSet<int> FirstIceTiles = new();
+        /// <summary>Non-first ice pads for step 4 (seeded or revealed after step 3).</summary>
+        public readonly HashSet<int> SecondIceTiles = new();
 
         public PrologueTile At(int i) => Tiles[i];
 

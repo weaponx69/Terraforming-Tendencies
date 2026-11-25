@@ -42,8 +42,9 @@ namespace GameDevTV.RTS.Player
                 if (PrologueController.IsActive && scoutingType == ScoutingType.OrbitalScan)
                 {
                     var colony = PrologueController.Instance?.Colony;
-                    if (colony == null || !colony.HasUnrevealedIce()) return false;
-                    return colony.Energy >= PrologueData.OrbitalScanEnergyCost;
+                    if (colony == null || !colony.HasUnrevealedTargets()) return false;
+                    return colony.HasUnrevealedTargets()
+                           && colony.Energy >= PrologueData.OrbitalScanEnergyCost;
                 }
 
                 if (!IsGateMet()) return false;
@@ -100,12 +101,12 @@ namespace GameDevTV.RTS.Player
                 if (PrologueController.IsActive && scoutingType == ScoutingType.OrbitalScan)
                 {
                     var colony = PrologueController.Instance?.Colony;
-                    if (colony == null || !colony.HasUnrevealedIce()) return;
+                    if (colony == null || !colony.HasUnrevealedTargets()) return;
                     int cost = PrologueData.OrbitalScanEnergyCost;
                     if (!colony.TrySpendEnergy(cost)) return;
                     string ping = PrologueIceMarkers.Instance != null
-                        ? PrologueIceMarkers.Instance.PingNearestIce()
-                        : "No ice signal.";
+                        ? PrologueIceMarkers.Instance.PingNearestTarget()
+                        : "No survey target.";
                     PrologueHUD.Instance?.ShowNote(new System.Collections.Generic.List<string>
                     {
                         $"Orbital Scan (−{cost} energy).",
