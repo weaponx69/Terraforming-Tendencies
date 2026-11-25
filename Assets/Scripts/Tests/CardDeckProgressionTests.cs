@@ -51,7 +51,7 @@ namespace GameDevTV.RTS.Tests
             Assert.AreEqual("ATMOSPHERE", GoalForBuilding("Carbon Dioxide Import Laser"));
             Assert.AreEqual("WATER", GoalForBuilding("Water Ice Aquifer"));
             Assert.AreEqual("WATER", GoalForBuilding("Subglacial Water Extractor"));
-            Assert.AreEqual("OXYGEN", GoalForBuilding("Oxygen Processor"));
+            Assert.AreEqual("OXYGEN", GoalForBuilding("Atmosphere Processor"));
             Assert.AreEqual("POWER", GoalForBuilding("Solar Panel"));
         }
 

@@ -30,23 +30,19 @@ namespace GameDevTV.RTS.Prologue
             savedShadowDistance = QualitySettings.shadowDistance;
             savedShadows = QualitySettings.shadows;
 
-            int low = PickLowQualityIndex();
-            if (low >= 0 && low != savedQuality)
-                QualitySettings.SetQualityLevel(low, applyExpensiveChanges: true);
-
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = TargetFps;
             QualitySettings.shadowDistance = Mathf.Min(QualitySettings.shadowDistance, 22f);
             QualitySettings.shadows = ShadowQuality.HardOnly;
-            QualitySettings.globalTextureMipmapLimit = Mathf.Max(QualitySettings.globalTextureMipmapLimit, 1);
             QualitySettings.pixelLightCount = 0;
-            QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
 
             GameDevTV.RTS.UI.Containers.MinimapUI.SetPrologueSuspended(true);
             DisableTerrainWrapCopies();
+            PrologueGroundVisualTuning.Bootstrap();
+            PrologueGroundVisualTuning.SharpenPlanetTextures(4);
 
             Debug.Log(
-                $"[ProloguePerformanceBudget] quality {savedQuality}->{QualitySettings.GetQualityLevel()}, " +
+                $"[ProloguePerformanceBudget] quality kept at {QualitySettings.GetQualityLevel()} (sharp ground tuning on), " +
                 $"shadowDist {savedShadowDistance:0}->{QualitySettings.shadowDistance:0}, targetFps {TargetFps}");
         }
 
@@ -68,17 +64,7 @@ namespace GameDevTV.RTS.Prologue
             QualitySettings.shadows = savedShadows;
             Application.targetFrameRate = -1;
             GameDevTV.RTS.UI.Containers.MinimapUI.SetPrologueSuspended(false);
-        }
-
-        static int PickLowQualityIndex()
-        {
-            string[] names = QualitySettings.names;
-            for (int i = 0; i < names.Length; i++)
-            {
-                if (names[i].IndexOf("Mobile", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                    return i;
-            }
-            return names.Length > 0 ? 0 : -1;
+            PrologueGroundVisualTuning.Restore();
         }
 
         /// <summary>Smoothed FPS for playtest JSON (uses same clock as the HUD).</summary>

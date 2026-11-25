@@ -264,9 +264,9 @@ namespace GameDevTV.RTS.Prologue
             return id switch
             {
                 PrologueBuildingId.Aquifer => LoadSo("Water Ice Aquifer", "Cards/WaterIceAquiferCard"),
-                PrologueBuildingId.Oxygen => LoadSo("Oxygen Processor", "Cards/OxygenProcessorCard"),
+                PrologueBuildingId.Oxygen => LoadSo("Atmosphere Processor", "Cards/OxygenProcessorCard"),
                 PrologueBuildingId.Habitat => LoadSo("Habitat", "Cards/HabitatCard"),
-                PrologueBuildingId.WindTurbine => LoadSo("Geothermal Generator", "Cards/GeothermalGeneratorCard"),
+                PrologueBuildingId.WindTurbine => LoadSo("Windmill", "Cards/GeothermalGeneratorCard"),
                 _ => null
             };
         }

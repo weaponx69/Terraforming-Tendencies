@@ -216,7 +216,7 @@ namespace GameDevTV.RTS.Prologue
                 return CanAfford(colony, PrologueBuildingId.Aquifer) ? "Aquifer" : "";
             }
             if (colony.PrologueStep == 5 && !HasCompleteBuilding(colony, PrologueBuildingId.WindTurbine))
-                return CanAfford(colony, PrologueBuildingId.WindTurbine) ? "Geothermal" : "";
+                return CanAfford(colony, PrologueBuildingId.WindTurbine) ? "Windmill" : "";
             return "";
         }
 
@@ -240,8 +240,6 @@ namespace GameDevTV.RTS.Prologue
                 _ => null
             };
             if (need == null) return false;
-            if (need == PrologueBuildingId.WindTurbine && colony.PrologueStep == 5)
-                return false;
             if (need == PrologueBuildingId.Aquifer && colony.PrologueStep == 4
                 && (CountAquiferPads(colony) >= 2 || HasAquiferUnderConstruction(colony)))
                 return false;

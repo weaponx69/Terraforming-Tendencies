@@ -32,6 +32,7 @@ namespace GameDevTV.RTS.Units
             if (efficiency <= 0f) return;
 
             bool shouldGenerateOxygen = BuildingSO != null && (
+                BuildingSO.Name.Contains("Atmosphere Processor") ||
                 BuildingSO.Name.Contains("Oxygen Processor") ||
                 BuildingSO.Name.Contains("Algae Spreader") ||
                 BuildingSO.Name.Contains("Greenery Dome")

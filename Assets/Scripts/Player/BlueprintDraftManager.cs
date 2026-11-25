@@ -44,9 +44,10 @@ namespace GameDevTV.RTS.Player
             unlockedBuildings.Add("Command Post");
             unlockedBuildings.Add("Supply Hut");
             unlockedBuildings.Add("Solar Panel");
-            unlockedBuildings.Add("Oxygen Processor");
+            unlockedBuildings.Add("Atmosphere Processor");
             unlockedBuildings.Add("GHG Factory");
             unlockedBuildings.Add("Geothermal Generator");
+            unlockedBuildings.Add("Windmill");
             unlockedBuildings.Add("Methanogenic Microbe Spreader");
             unlockedBuildings.Add("Atmospheric Condenser");
             unlockedBuildings.Add("Carbon Dioxide Import Laser");
@@ -103,6 +104,9 @@ namespace GameDevTV.RTS.Player
         public static BuildingSO GetBuildingSOByName(string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
+
+            if (string.Equals(name, "Oxygen Processor", StringComparison.OrdinalIgnoreCase))
+                name = "Atmosphere Processor";
 
             if (knownBuildings.TryGetValue(name, out var b)) return b;
 

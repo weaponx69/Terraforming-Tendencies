@@ -71,10 +71,10 @@ namespace GameDevTV.RTS.Prologue
         public static PrologueBuildingInfo Get(PrologueBuildingId id) => id switch
         {
             PrologueBuildingId.Aquifer => new(id, "Ice Aquifer", 2, 0, 0, false, 8, 0, 0),
-            PrologueBuildingId.Oxygen => new(id, "Oxygen Processor", 1, 0, 0, true, 0, 4, 12),
+            PrologueBuildingId.Oxygen => new(id, "Atmosphere Processor", 1, 0, 0, true, 0, 4, 12),
             PrologueBuildingId.Solar => new(id, "Solar Array", 1, 0, 1, false, 0, 0, 0),
             PrologueBuildingId.Habitat => new(id, "Habitat Domes", 1, 10, 0, false, 0, 0, 0),
-            PrologueBuildingId.WindTurbine => new(id, "Wind Turbine", 1, 0, 2, false, 0, 0, 0),
+            PrologueBuildingId.WindTurbine => new(id, "Windmill", 1, 0, 2, false, 0, 0, 0),
             PrologueBuildingId.CommandPost => new(id, "Command Post", 0, 0, 0, false, 0, 0, 0),
             _ => new(PrologueBuildingId.None, "", 0, 0, 0, false, 0, 0, 0)
         };

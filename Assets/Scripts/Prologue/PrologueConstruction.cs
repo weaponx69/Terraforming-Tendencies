@@ -88,6 +88,8 @@ namespace GameDevTV.RTS.Prologue
                 WaterIceAquiferMeshBuilder.Apply(gameObject);
                 RunAquiferIceProximityAtPlacement();
             }
+            else if (building != null && WindTurbineMeshBuilder.IsWindBuilding(building.BuildingSO))
+                WindTurbineMeshBuilder.Apply(gameObject);
             ApplyHaul();
             ConstructionScaffold.Ensure(transform);
 
@@ -425,6 +427,8 @@ namespace GameDevTV.RTS.Prologue
                 // Keep the drill. Completion used to drop a blue sphere on top of it.
                 if (aquiferJob)
                     WaterIceAquiferMeshBuilder.Apply(building.gameObject);
+                else if (WindTurbineMeshBuilder.IsWindBuilding(building.BuildingSO))
+                    WindTurbineMeshBuilder.Apply(building.gameObject);
                 building.CompleteConstruction();
                 SeatWherePlaced(building);
                 // Ensure PowerNode + pressurized tubes after final pad seat

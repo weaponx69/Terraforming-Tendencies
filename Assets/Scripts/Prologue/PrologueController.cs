@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 
@@ -26,6 +27,7 @@ namespace GameDevTV.RTS.Prologue
         bool handSeeded;
         bool openingBriefingShown;
         bool refreshingHand;
+        bool prologueVictoryCelebrated;
         GameObject commandPostVisual;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -588,6 +590,25 @@ namespace GameDevTV.RTS.Prologue
             GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(Colony);
             RefreshHandUnlocks();
             PrologueIceMarkers.Instance?.Refresh();
+
+            TryCelebratePrologueVictory();
+        }
+
+        /// <summary>Step 6 reached — show the same victory overlay as Colony Acts (once per run).</summary>
+        public void TryCelebratePrologueVictory()
+        {
+            if (prologueVictoryCelebrated || Colony == null || Colony.ContractCancelled) return;
+            if (Colony.PrologueStep < PrologueData.PrologueSteps) return;
+
+            prologueVictoryCelebrated = true;
+            PrologueTimeLapse.Instance?.EndRun();
+            GameOverManager.LastOutcomeDetail =
+                "Corporation contract held — ice, air, housing, and the dust storm. The opening mission is complete.";
+            GameOverUI.EnsureAllSubscribed();
+            if (GameOverManager.Instance != null)
+                GameOverManager.Instance.TriggerVictory();
+            else
+                Debug.LogError("[PrologueController] GameOverManager missing — cannot show prologue victory.");
         }
 
         public void RefreshHandUnlocks()
@@ -615,6 +636,8 @@ namespace GameDevTV.RTS.Prologue
         {
             if (!IsActive || Colony == null) return;
 
+            PrologueGroundVisualTuning.Tick();
+
             // Planet gen / Acts bootstrap can re-show deposits after the first fog pass.
             if (Time.unscaledTime < fogReapplyUntil && Time.frameCount % 15 == 0)
                 PrologueResourceFog.ApplyHiddenState();
@@ -637,6 +660,7 @@ namespace GameDevTV.RTS.Prologue
             syncedFromPlanet = false;
             handSeeded = false;
             openingBriefingShown = false;
+            prologueVictoryCelebrated = false;
             PrologueUiPlaythrough.ResetSession();
             if (PlanetGenerator.Instance != null)
                 HandlePlanetGenerated();

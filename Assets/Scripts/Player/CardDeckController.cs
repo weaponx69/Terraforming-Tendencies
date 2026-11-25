@@ -1146,7 +1146,7 @@ namespace GameDevTV.RTS.Player
                 "TEMPERATURE" => "GHG Factory",
                 "ATMOSPHERE" => "Atmospheric Condenser",
                 "WATER" => "Water Ice Aquifer",
-                "OXYGEN" => "Oxygen Processor",
+                "OXYGEN" => "Atmosphere Processor",
                 "MATERIALS" => "Deep-Core Mining Laser",
                 "POPULATION" => "Subterranean Apartment",
                 _ => null

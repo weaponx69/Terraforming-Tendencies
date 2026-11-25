@@ -702,11 +702,13 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (string.IsNullOrEmpty(buildingName)) return false;
             if (stepKey.IndexOf("Atmosphere", System.StringComparison.OrdinalIgnoreCase) >= 0
-                && buildingName.IndexOf("Oxygen", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                && (buildingName.IndexOf("Atmosphere Processor", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || buildingName.IndexOf("Oxygen Processor", System.StringComparison.OrdinalIgnoreCase) >= 0))
                 return true;
-            if (stepKey.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0
-                && (buildingName.IndexOf("Geothermal", System.StringComparison.OrdinalIgnoreCase) >= 0
-                    || buildingName.IndexOf("Wind", System.StringComparison.OrdinalIgnoreCase) >= 0))
+            if ((stepKey.IndexOf("Windmill", System.StringComparison.OrdinalIgnoreCase) >= 0
+                 || stepKey.IndexOf("Wind", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                && (buildingName.IndexOf("Wind", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || buildingName.IndexOf("Windmill", System.StringComparison.OrdinalIgnoreCase) >= 0))
                 return true;
             return false;
         }

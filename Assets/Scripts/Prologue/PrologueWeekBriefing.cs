@@ -76,11 +76,11 @@ namespace GameDevTV.RTS.Prologue
                     else if (line.Contains("AIR CRITICAL"))
                         worry.Add($"The air ran short. People breathed less than the {colony.O2Need()} the week required.");
                     else if (line.Contains("unpowered"))
-                        worry.Add("The Oxygen Processor had no power, so it made no air.");
+                        worry.Add("The Atmosphere Processor had no power, so it made no air.");
                     else if (line.Contains("starved for ice"))
-                        worry.Add("The Oxygen Processor had no ice, so it made no air.");
+                        worry.Add("The Atmosphere Processor had no ice, so it made no air.");
                     else if (line.Contains("air. Colonists ran"))
-                        did.Add(line.Replace(" Colonists ran the Oxygen Processor.", " The crew ran the Oxygen Processor."));
+                        did.Add(line.Replace(" Colonists ran the Atmosphere Processor.", " The crew ran the Atmosphere Processor."));
                     else if (line.StartsWith("Completed "))
                         did.Add("The crew finished the " + line.Substring("Completed ".Length) + ".");
                     else if (line.Contains("colonists landed"))
@@ -93,7 +93,7 @@ namespace GameDevTV.RTS.Prologue
             if (colony.DustStormActive && !before.Storm)
             {
                 crisis = true;
-                worry.Add("The dust storm is on the camp. Camp power is dark. A Wind Turbine within 2 tiles of the Oxygen Processor has to run or the air stops.");
+                worry.Add("The dust storm is on the camp. Camp power is dark. A Windmill within 2 tiles of the Atmosphere Processor has to run or the air stops.");
             }
             if (!crisis && colony.Faith < before.Faith)
                 worry.Add($"The corporation's faith fell to {colony.Faith}.");

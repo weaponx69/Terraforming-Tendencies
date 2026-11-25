@@ -373,6 +373,8 @@ namespace GameDevTV.RTS.Units
             // Ensure we are initialized before checking BuildingSO
             InitializeIfNeeded();
             ColonyGroundMesh.Apply(gameObject);
+            if (WindTurbineMeshBuilder.IsWindBuilding(BuildingSO))
+                WindTurbineMeshBuilder.Apply(gameObject);
 
             // Automatically attach damaged status indicator programmatically
             if (gameObject.GetComponent<GameDevTV.RTS.UI.Components.DamagedIndicator>() == null)
@@ -583,7 +585,11 @@ namespace GameDevTV.RTS.Units
 
             // Attach a LifeSupportNode so GlobalDecayManager protects this building and those nearby.
             bool isLifeSupportBldg = BuildingSO != null && (BuildingSO.Name.Contains("Command", System.StringComparison.OrdinalIgnoreCase));
-            bool isOxygenProcessor = BuildingSO != null && (BuildingSO.Name.Contains("Oxygen", System.StringComparison.OrdinalIgnoreCase));
+            bool isOxygenProcessor = BuildingSO != null
+                && (BuildingSO.Name.Contains("Atmosphere Processor", System.StringComparison.OrdinalIgnoreCase)
+                    || BuildingSO.Name.Contains("Oxygen Processor", System.StringComparison.OrdinalIgnoreCase)
+                    || (BuildingSO.Name.Contains("Oxygen", System.StringComparison.OrdinalIgnoreCase)
+                        && BuildingSO.Name.IndexOf("Atmos", System.StringComparison.OrdinalIgnoreCase) < 0));
             if ((BuildingSO != null && BuildingSO.IsLifeSupport) || isLifeSupportBldg || isOxygenProcessor)
             {
                 if (!TryGetComponent<LifeSupportNode>(out _))
@@ -1476,6 +1482,8 @@ namespace GameDevTV.RTS.Units
                 : (TryGetComponent<SmokestackVisuals>(out var sv) ? sv.GhostMaterial : null);
 
             ApplyGhostMaterialToRenderers(effectiveMat);
+            if (WindTurbineMeshBuilder.IsWindBuilding(BuildingSO))
+                WindTurbineMeshBuilder.Apply(gameObject);
 
             SuppressNavMeshCarving();
 

@@ -138,11 +138,17 @@ namespace GameDevTV.RTS.UI
             if (colony == null || objectiveText == null) return;
 
             string obj = colony.ObjectiveText(out _, out bool wantDrone);
+            bool won = !colony.ContractCancelled
+                        && colony.PrologueStep >= PrologueData.PrologueSteps;
             objectiveText.text = PrologueUiText.SanitizeForTmp(colony.ContractCancelled
                 ? "CONTRACT CANCELLED\n" + colony.ContractMessage
-                : $"PROLOGUE · Step {colony.PrologueStep}\n{obj}");
+                : won
+                    ? "PROLOGUE COMPLETE\nContract held. The corporation signs off on the opening mission."
+                    : $"PROLOGUE · Step {colony.PrologueStep}\n{obj}");
             if (endWeekButton != null)
-                endWeekButton.interactable = !colony.ContractCancelled;
+                endWeekButton.interactable = !colony.ContractCancelled && !won;
+            if (won)
+                PrologueController.Instance?.TryCelebratePrologueVictory();
 
             var coming = new StringBuilder();
             if (!colony.ShuttleLanded && colony.ShuttleLandWeek >= 0)
@@ -359,10 +365,10 @@ namespace GameDevTV.RTS.UI
             return colony.PrologueStep switch
             {
                 1 => "Place Ice Aquifer next to ice (costs minerals + build weeks — End Week to finish).",
-                2 => "Place Oxygen Processor (camp power — no Solar card). End Week to finish the build.",
+                2 => "Place Atmosphere Processor (camp power — no Solar card). End Week to finish the build.",
                 3 => "Place two Habitat Domes before the shuttle arrives.",
                 4 => "Survey toward the new yellow ?, then place another Aquifer by the ice.",
-                5 => "Place Wind or Solar within 2 tiles of the Oxygen Processor. Wind keeps working when the dust storm hits.",
+                5 => "Place the Windmill or Solar within 2 tiles of the Atmosphere Processor. The windmill keeps spinning in the dust storm.",
                 _ => "Builds cost minerals + weeks. Mines: ghost onto the deposit pad. End Week advances sites."
             };
         }

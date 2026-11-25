@@ -411,7 +411,8 @@ namespace GameDevTV.RTS.UI.Components
         }
 
         /// <summary>
-        /// Prologue hand: show the mineral price. Grey the card and refuse clicks while the stock is short.
+        /// Prologue hand: show the mineral price. Grey the card when short but keep clicks —
+        /// PlayBuildingCard shows the same failure message.
         /// </summary>
         public void ApplyPrologueMinerals(int cost, int have)
         {
@@ -425,15 +426,23 @@ namespace GameDevTV.RTS.UI.Components
             }
             if (!shortStock)
             {
+                if (button != null)
+                    button.interactable = true;
+                if (buttonImage != null)
+                {
+                    Color c = defaultButtonColor;
+                    c.a = Mathf.Clamp(c.a, 0.55f, 0.92f);
+                    if (c.a < 0.4f) c.a = 0.7f;
+                    buttonImage.color = c;
+                }
+                if (icon != null)
+                    icon.color = Color.white;
                 RefreshCardTextContrast();
                 return;
             }
 
             if (button != null)
-            {
-                button.interactable = false;
-                button.onClick.RemoveAllListeners();
-            }
+                button.interactable = true;
             if (buttonImage != null)
                 buttonImage.color = new Color(0.38f, 0.38f, 0.42f, 0.92f);
             if (icon != null)
@@ -442,7 +451,7 @@ namespace GameDevTV.RTS.UI.Components
                 goalOutline.effectColor = new Color(0.3f, 0.3f, 0.32f, 0.5f);
             RefreshCardTextContrast();
             if (tooltip != null)
-                tooltip.SetText($"Need {cost} minerals to build this. You have {have}. A mine adds minerals each week the crew is working.");
+                tooltip.SetText($"Need {cost} minerals to build this. You have {have}. End Week while a mineral mine works, or place a cheaper Solar Array first.");
         }
 
         private void ApplyGoalAccent(string goal)

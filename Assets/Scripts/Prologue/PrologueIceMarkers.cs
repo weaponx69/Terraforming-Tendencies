@@ -112,12 +112,6 @@ namespace GameDevTV.RTS.Prologue
             if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && colony.SecondIceTargetTile() >= 0)
                 return PingNearestIce();
 
-            if (colony.PrologueStep >= 5 && !colony.HasBuilding(PrologueBuildingId.WindTurbine))
-            {
-                if (TryFindNearestDeposit(out SectorNode geo, out int gDist, out string gDir, wantGeothermal: true))
-                    return PingDepositNode(geo, "Geothermal vent", gDist, gDir);
-            }
-
             if (TryFindNearestDeposit(out SectorNode node, out int dist, out string dir, wantGeothermal: false))
             {
                 string label = DepositLabel(node);
@@ -316,13 +310,6 @@ namespace GameDevTV.RTS.Prologue
             if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && colony.SecondIceTargetTile() >= 0
                 && TryPickNearestIceTile(out iceTile, out _, out _, out _))
                 return true;
-
-            if (colony.PrologueStep >= 5 && !colony.HasBuilding(PrologueBuildingId.WindTurbine)
-                && TryFindNearestDeposit(out SectorNode geo, out _, out _, wantGeothermal: true))
-            {
-                deposit = geo;
-                return true;
-            }
 
             if (TryFindNearestDeposit(out SectorNode node, out _, out _, wantGeothermal: false))
             {

@@ -79,10 +79,15 @@ namespace GameDevTV.RTS.Prologue
                 id = PrologueBuildingId.Aquifer;
                 return true;
             }
-            // Prefer exact Oxygen Processor — not Atmospheric Condenser / Atmosphere Processor.
-            if (n.IndexOf("Oxygen Processor", StringComparison.OrdinalIgnoreCase) >= 0
-                || (n.IndexOf("Oxygen", StringComparison.OrdinalIgnoreCase) >= 0
-                    && n.IndexOf("Atmos", StringComparison.OrdinalIgnoreCase) < 0))
+            // Life-support plant — not Atmospheric Condenser.
+            if (n.IndexOf("Atmosphere Processor", StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Oxygen Processor", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                id = PrologueBuildingId.Oxygen;
+                return true;
+            }
+            if (n.IndexOf("Oxygen", StringComparison.OrdinalIgnoreCase) >= 0
+                && n.IndexOf("Atmos", StringComparison.OrdinalIgnoreCase) < 0)
             {
                 id = PrologueBuildingId.Oxygen;
                 return true;
@@ -102,9 +107,9 @@ namespace GameDevTV.RTS.Prologue
                 id = PrologueBuildingId.Habitat;
                 return true;
             }
-            // Storm power is the Geothermal Generator card. Older Wind-named cards map here too.
+            // Prologue storm power — hill windmill (not volcano Geothermal).
             if (n.IndexOf("Wind", StringComparison.OrdinalIgnoreCase) >= 0
-                || n.IndexOf("Geothermal", StringComparison.OrdinalIgnoreCase) >= 0)
+                || n.IndexOf("Windmill", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 id = PrologueBuildingId.WindTurbine;
                 return true;

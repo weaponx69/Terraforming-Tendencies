@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2f185a45e660fa34bb6472929a4cdd40, type: 3}
-  m_Name: Oxygen Processor
+  m_Name: Atmosphere Processor
   m_EditorClassIdentifier: 
-  <Name>k__BackingField: Oxygen Processor
+  <Name>k__BackingField: Atmosphere Processor
   <IsOneTimeUnlock>k__BackingField: 0
   <BuildTime>k__BackingField: 5
   <Icon>k__BackingField: {fileID: 21300000, guid: ca66bc91edfb9b988b60086bc688a759, type: 3}

@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.Environment
                 BuildingSiteKind.Solar => BlueprintDraftManager.GetBuildingSOByName("Solar Panel"),
                 BuildingSiteKind.Mine => ResolveMineBuilding(site),
                 // Default paired-pad preview is Oxygen Processor — the bootstrap consumer building.
-                BuildingSiteKind.PairedBuilding => BlueprintDraftManager.GetBuildingSOByName("Oxygen Processor"),
+                BuildingSiteKind.PairedBuilding => BlueprintDraftManager.GetBuildingSOByName("Atmosphere Processor"),
                 _ => null
             };
         }

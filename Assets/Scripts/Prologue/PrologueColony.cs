@@ -246,6 +246,22 @@ namespace GameDevTV.RTS.Prologue
                     return false;
                 }
             }
+            if (id == PrologueBuildingId.WindTurbine || id == PrologueBuildingId.Solar)
+            {
+                int reach = 2;
+                if (Research != null && Research.IsUnlocked(PrologueResearchId.LongerPowerReach))
+                    reach = 3;
+                if (!TryGetOxygenProcessorTile(out int oxygenTile))
+                {
+                    reason = "Build the Atmosphere Processor first.";
+                    return false;
+                }
+                if (Dist(tile, oxygenTile) > reach)
+                {
+                    reason = $"Place within {reach} tiles of the Atmosphere Processor.";
+                    return false;
+                }
+            }
             int mineralCost = PrologueData.MineralCost(id);
             if (mineralCost > 0 && GetStock(PrologueResourceId.Minerals) < mineralCost)
             {
@@ -345,7 +361,7 @@ namespace GameDevTV.RTS.Prologue
                     return $"Build Ice Aquifer within 3 of ice ({PrologueData.MineralCost(PrologueBuildingId.Aquifer)} minerals, {PrologueData.Get(PrologueBuildingId.Aquifer).BuildWeeks} wk)";
                 case 2:
                     suggestBuild = PrologueBuildingId.Oxygen;
-                    return $"Build Oxygen Processor ({PrologueData.MineralCost(PrologueBuildingId.Oxygen)} minerals, {PrologueData.Get(PrologueBuildingId.Oxygen).BuildWeeks} wk)";
+                    return $"Build Atmosphere Processor ({PrologueData.MineralCost(PrologueBuildingId.Oxygen)} minerals, {PrologueData.Get(PrologueBuildingId.Oxygen).BuildWeeks} wk)";
                 case 3:
                     suggestBuild = PrologueBuildingId.Habitat;
                     if (ShuttleLandWeek >= 0)
@@ -369,7 +385,7 @@ namespace GameDevTV.RTS.Prologue
                     if (!HasBuilding(PrologueBuildingId.WindTurbine))
                     {
                         suggestBuild = PrologueBuildingId.WindTurbine;
-                        return "Place a Wind Turbine or Solar Array within 2 tiles of the Oxygen Processor (wind works in the dust storm)";
+                        return "Place a Windmill or Solar Array within 2 tiles of the Atmosphere Processor (wind works in the dust storm)";
                     }
                     return "Store oxygen and ride out the dust storm";
                 default:
@@ -557,7 +573,7 @@ namespace GameDevTV.RTS.Prologue
             sb.AppendLine("GOALS");
             sb.AppendLine(GoalMark(0) + " Find ice");
             sb.AppendLine(GoalMark(1) + " Drill ice within 3");
-            sb.AppendLine(GoalMark(2) + " Power the Oxygen Processor");
+            sb.AppendLine(GoalMark(2) + " Power the Atmosphere Processor");
             sb.Append(GoalMark(3)).Append(" Beds ").Append(TotalBeds()).Append("/20");
             if (ShuttleLandWeek >= 0 && !ShuttleLanded)
                 sb.Append(" · shuttle in ").Append(Math.Max(0, ShuttleLandWeek - Week)).Append(" wk");
@@ -592,20 +608,20 @@ namespace GameDevTV.RTS.Prologue
             if (powered == 0)
             {
                 sb.AppendLine(SolarDarkened
-                    ? "Oxygen Processor has no power. Place a Wind Turbine within 2 tiles."
-                    : "Oxygen Processor has no power. Add Solar or Wind within 2 tiles.");
+                    ? "Atmosphere Processor has no power. Place a Windmill within 2 tiles."
+                    : "Atmosphere Processor has no power. Add Solar or Wind within 2 tiles.");
                 return;
             }
             sb.AppendLine(SolarDarkened
-                ? "Storm power: Wind Turbine is feeding the Oxygen Processor."
-                : "Camp power is feeding the Oxygen Processor.");
+                ? "Storm power: Windmill is feeding the Atmosphere Processor."
+                : "Camp power is feeding the Atmosphere Processor.");
             if (!ColonistsWorking)
-                sb.AppendLine("Oxygen Processor is idle. The crew is not running it.");
+                sb.AppendLine("Atmosphere Processor is idle. The crew is not running it.");
             else if (IceStock < info.IceConsumedPerWeek)
-                sb.Append("Oxygen Processor needs ").Append(info.IceConsumedPerWeek)
+                sb.Append("Atmosphere Processor needs ").Append(info.IceConsumedPerWeek)
                     .Append(" ice. Stock is ").Append(IceStock).AppendLine(".");
             else
-                sb.Append("Oxygen Processor will make ").Append(info.OxygenProducedPerWeek)
+                sb.Append("Atmosphere Processor will make ").Append(info.OxygenProducedPerWeek)
                     .Append(" air from ").Append(info.IceConsumedPerWeek).AppendLine(" ice.");
         }
 
@@ -615,7 +631,7 @@ namespace GameDevTV.RTS.Prologue
             {
                 case 0: return "The crew needs a surveyed ice deposit.";
                 case 1: return "The drill has to sit within 3 tiles of that ice.";
-                case 2: return "The Oxygen Processor has to be powered and fed ice.";
+                case 2: return "The Atmosphere Processor has to be powered and fed ice.";
                 case 3: return "The shuttle needs 20 beds. " + TotalBeds() + " are ready.";
                 case 4: return "A second drill has to reach a new ice deposit.";
                 case 5: return Oxygen > 0
@@ -875,12 +891,12 @@ namespace GameDevTV.RTS.Prologue
                 foreach (var t in Board.Tiles)
                 {
                     if (t.Building != PrologueBuildingId.Oxygen || t.Broken) continue;
-                    if (!IsPowered(t.Index)) { log.Add("Oxygen Processor unpowered"); continue; }
+                    if (!IsPowered(t.Index)) { log.Add("Atmosphere Processor unpowered"); continue; }
                     var info = PrologueData.Get(PrologueBuildingId.Oxygen);
-                    if (IceStock < info.IceConsumedPerWeek) { log.Add("Oxygen Processor starved for ice"); continue; }
+                    if (IceStock < info.IceConsumedPerWeek) { log.Add("Atmosphere Processor starved for ice"); continue; }
                     IceStock -= info.IceConsumedPerWeek;
                     Oxygen += info.OxygenProducedPerWeek;
-                    log.Add($"+{info.OxygenProducedPerWeek} air. Colonists ran the Oxygen Processor.");
+                    log.Add($"+{info.OxygenProducedPerWeek} air. Colonists ran the Atmosphere Processor.");
                 }
             }
 
@@ -1053,6 +1069,11 @@ namespace GameDevTV.RTS.Prologue
                         {
                             Unlocked.Add(PrologueBuildingId.Solar);
                             Unlocked.Add(PrologueBuildingId.WindTurbine);
+                            // Mines are optional but costly — always leave room for storm power.
+                            int windCost = PrologueData.MineralCost(PrologueBuildingId.WindTurbine);
+                            int haveMinerals = GetStock(PrologueResourceId.Minerals);
+                            if (haveMinerals < windCost)
+                                AddStock(PrologueResourceId.Minerals, windCost - haveMinerals);
                             if (StormLandWeek < 0)
                                 StormLandWeek = Week + PrologueData.PrologueStormWeeks;
                             PrologueStep = 5;
@@ -1139,6 +1160,28 @@ namespace GameDevTV.RTS.Prologue
             foreach (var t in Board.Tiles)
             {
                 if (t.Building == id && !t.Broken) return true;
+            }
+            foreach (var s in Board.Sites)
+            {
+                if (s.Id == id) return true;
+            }
+            return false;
+        }
+
+        bool TryGetOxygenProcessorTile(out int tile)
+        {
+            tile = -1;
+            foreach (var t in Board.Tiles)
+            {
+                if (t.Building != PrologueBuildingId.Oxygen || t.Broken) continue;
+                tile = t.Index;
+                return true;
+            }
+            foreach (var s in Board.Sites)
+            {
+                if (s.Id != PrologueBuildingId.Oxygen) continue;
+                tile = s.Tile;
+                return true;
             }
             return false;
         }

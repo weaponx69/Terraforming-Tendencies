@@ -795,6 +795,9 @@ namespace GameDevTV.RTS.Environment
                     gmr.sharedMaterial = mat;
             }
 
+            if (Application.isPlaying && GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                GameDevTV.RTS.Prologue.PrologueGroundVisualTuning.SharpenPlanetTextures();
+
             Debug.Log(Config.AlbedoMap != null
                 ? $"[PlanetGenerator] Surface material = photo albedo '{Config.AlbedoMap.name}'"
                 : "[PlanetGenerator] Surface material = ClimateGroundGrad fallback");

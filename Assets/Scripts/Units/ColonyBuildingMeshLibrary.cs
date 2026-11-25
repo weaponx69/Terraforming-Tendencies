@@ -38,9 +38,13 @@ namespace GameDevTV.RTS.Units
                 case "Lichen Nursery": Nursery(d); break;
                 case "Lava Tube Outpost": LavaTube(d); break;
                 case "Habitat": HabitatDomes(d); break;
+                case "Atmosphere Processor":
                 case "Oxygen Processor": OxygenProcessor(d); break;
                 case "Inflatable Bio-Dome": Dome(d, 1.55f, true); break;
                 case "Greenery Dome": Dome(d, 1.25f, false); break;
+                case "Windmill":
+                case "Wind Turbine":
+                case "Wind Mill": Windmill(d); break;
                 case "Geothermal Generator": Geothermal(d); break;
                 case "Genetically Modified Algae Spreader": Algae(d); break;
                 case "Biosphere Center": Biosphere(d); break;
@@ -323,6 +327,16 @@ namespace GameDevTV.RTS.Units
                 d.Box(new Vector3(-0.7f, 0.12f, 0.85f), new Vector3(0.7f, 0.12f, 0.4f), Trim);
                 d.Box(new Vector3(0.75f, 0.12f, 0.4f), new Vector3(0.5f, 0.12f, 0.7f), Trim);
             }
+        }
+
+        static void Windmill(Draft d)
+        {
+            d.Box(new Vector3(0f, 0.07f, 0f), new Vector3(2.9f, 0.12f, 2.5f), Hull);
+            d.Box(new Vector3(0.45f, 0.22f, 0.35f), new Vector3(1.5f, 0.22f, 1.0f), Trim);
+            d.Cylinder(new Vector3(0f, 1.05f, 0f), 0.14f, 2.05f, 12, Vector3.up, Steel);
+            d.Box(new Vector3(0f, 2.2f, 0f), new Vector3(0.42f, 0.32f, 0.5f), Steel);
+            d.Cylinder(new Vector3(0f, 2.45f, 0f), 0.2f, 0.28f, 12, Vector3.forward, Trim);
+            d.Box(new Vector3(0.75f, 0.18f, -0.85f), new Vector3(0.55f, 0.35f, 0.4f), Hull);
         }
 
         static void Geothermal(Draft d)

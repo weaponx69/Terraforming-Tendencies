@@ -515,12 +515,12 @@ namespace GameDevTV.RTS.Tests
         public void WeekBriefing_AirGain_ForemanSaysWhatMovedAndWhatIsNext()
         {
             var c = PrologueColony.CreateLanding();
-            var log = new List<string> { "+12 air. Colonists ran the Oxygen Processor." };
+            var log = new List<string> { "+12 air. Colonists ran the Atmosphere Processor." };
             var before = new PrologueWeekMemory { Satisfaction = 80, Faith = 80, Oxygen = 40, Step = 0, Storm = false };
             var briefing = PrologueWeekBriefing.Compose(c, log, before);
             Assert.AreEqual(PrologueBriefingTone.Progress, briefing.Tone);
             StringAssert.Contains("Mara Voss", briefing.Speaker);
-            StringAssert.Contains("Oxygen Processor", briefing.Speech);
+            StringAssert.Contains("Atmosphere Processor", briefing.Speech);
             StringAssert.Contains("Next:", briefing.Speech);
         }
 

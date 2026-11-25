@@ -665,7 +665,7 @@ namespace GameDevTV.RTS.Player
             BlueprintDraftManager.UnlockBuilding("Carbon Dioxide Import Laser");
             BlueprintDraftManager.UnlockBuilding("Water Ice Aquifer");
             BlueprintDraftManager.UnlockBuilding("Subglacial Water Extractor");
-            BlueprintDraftManager.UnlockBuilding("Oxygen Processor");
+            BlueprintDraftManager.UnlockBuilding("Atmosphere Processor");
         }
 
         public void CompleteExpansion()
