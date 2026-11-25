@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Units;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -26,6 +27,8 @@ namespace GameDevTV.RTS.Prologue
         public static bool ShowPaintMarkMeshes;
 
         public bool ScanMode { get; private set; }
+        /// <summary>Survey Team card played — waiting for the player to click a ? before paint mode.</summary>
+        public bool AwaitingMarkPick { get; private set; }
         /// <summary>True while the survey team is in the field (days ticking).</summary>
         public bool IsFlying => PrologueSurveyMission.Instance != null && PrologueSurveyMission.Instance.IsSearching;
         public bool HasPaint => route.Count > 0;
@@ -61,9 +64,11 @@ namespace GameDevTV.RTS.Prologue
         Vector2 lastPreviewMouse = new(float.NaN, float.NaN);
         float nextBillboardAt;
         int routingMarkTarget = -1;
+        int selectedMarkGoal = -1;
         int paintHitsFrame = -1;
         Vector2Int paintHitCellCache;
         bool paintHitCellValid;
+        static readonly RaycastHit[] paintRayHits = new RaycastHit[24];
 
         public bool IsRoutingMark => routingMarkTarget >= 0;
         static readonly Color PreviewOk = new(1f, 0.88f, 0.22f, 0.92f);
@@ -87,12 +92,38 @@ namespace GameDevTV.RTS.Prologue
             {
                 CancelPaint();
                 ScanMode = false;
+                AwaitingMarkPick = false;
+                selectedMarkGoal = -1;
+                SetSurveyPaintVisuals(false);
                 return;
             }
             BeginPaintMission(PrologueSurveyMission.DefaultTileBudget, PrologueSurveyMission.DefaultDays);
         }
 
-        /// <summary>Enter paint mode with the card's tile budget and day cost.</summary>
+        /// <summary>Survey Team card — pick a ? before painting. Orbital Scan locates and flies the camera.</summary>
+        public void ArmSurveyFromCard(int tileBudget, int days)
+        {
+            if (PrologueSurveyMission.Instance != null && PrologueSurveyMission.Instance.IsSearching)
+            {
+                ShowHint("Wait for the current Survey Team to finish.");
+                return;
+            }
+
+            maxPaintTiles = Mathf.Max(MinConfirmTiles, tileBudget);
+            missionDays = Mathf.Max(1, days);
+            AwaitingMarkPick = true;
+            selectedMarkGoal = -1;
+            ScanMode = false;
+            CancelPaint();
+
+            PrologueIceMarkers.Instance?.EnsureMarkersForActiveObjectives();
+            ShowHint(
+                $"Survey Team ready — click a yellow ? (near the on-screen icon if a hill blocks the ray), then paint from camp " +
+                $"(up to {maxPaintTiles} tiles). Play Orbital Scan to find or pan to a target. " +
+                $"{missionDays} colony day{(missionDays == 1 ? "" : "s")} after [OK].");
+        }
+
+        /// <summary>Enter paint mode with the card's tile budget and day cost (playtests / legacy).</summary>
         public void BeginPaintMission(int tileBudget, int days)
         {
             if (PrologueSurveyMission.Instance != null && PrologueSurveyMission.Instance.IsSearching)
@@ -103,8 +134,11 @@ namespace GameDevTV.RTS.Prologue
 
             maxPaintTiles = Mathf.Max(MinConfirmTiles, tileBudget);
             missionDays = Mathf.Max(1, days);
+            AwaitingMarkPick = false;
+            selectedMarkGoal = -1;
             CancelPaint();
             ScanMode = true;
+            SetSurveyPaintVisuals(true);
             nextPreviewAt = 0f;
             lastPreviewMouse = new Vector2(float.NaN, float.NaN);
             var ctrl = PrologueController.Instance;
@@ -112,13 +146,52 @@ namespace GameDevTV.RTS.Prologue
             if (ctrl != null)
                 PrologueSearchedTiles.Instance?.EnsureOverlayReadyPublic(ctrl);
             ShowHint(
-                $"Survey Team ready — stretch the band toward a yellow ?, then click it to paint the path (up to {maxPaintTiles} tiles). " +
+                $"Survey Team ready — paint from camp toward a yellow ? (up to {maxPaintTiles} tiles), then click [OK]. " +
                 $"{missionDays} colony day{(missionDays == 1 ? "" : "s")} after ✓.");
+        }
+
+        void BeginPaintTowardMark(int markTile)
+        {
+            if (markTile < 0) return;
+            int priorGoal = selectedMarkGoal;
+            bool switchingTarget = ScanMode && priorGoal >= 0 && priorGoal != markTile;
+
+            AwaitingMarkPick = false;
+            selectedMarkGoal = markTile;
+
+            CancelPaint();
+            ScanMode = true;
+            SetSurveyPaintVisuals(true);
+            nextPreviewAt = 0f;
+            lastPreviewMouse = new Vector2(float.NaN, float.NaN);
+
+            var ctrl = PrologueController.Instance;
+            droneTile = ctrl?.Colony != null ? FindHomeLit(ctrl.Colony) : -1;
+            if (ctrl != null)
+            {
+                PrologueSearchedTiles.Instance?.EnsureOverlayReadyPublic(ctrl);
+                ProloguePathGroundOverlay.Instance?.FitBoardIfNeeded(ctrl);
+            }
+
+            PrologueIceMarkers.Instance?.PulseTileForSurvey(markTile);
+
+            string change = switchingTarget ? "New target — " : "";
+            ShowHint(
+                $"{change}Click or drag on lit ground next to camp to paint toward this ? — up to {maxPaintTiles} tiles, then [OK] ({missionDays} day{(missionDays == 1 ? "" : "s")}).");
+        }
+
+        static void SetSurveyPaintVisuals(bool active)
+        {
+            EnableRubberBandPreview = active;
+            ShowPaintMarkMeshes = active;
         }
 
         public void NotifySearchFinished()
         {
             ScanMode = false;
+            AwaitingMarkPick = false;
+            selectedMarkGoal = -1;
+            SetSurveyPaintVisuals(false);
             CancelPaint();
         }
 
@@ -141,6 +214,9 @@ namespace GameDevTV.RTS.Prologue
             var path = new List<int>(route);
             int days = missionDays;
             PrologueSearchedTiles.Instance?.PaintTrailTiles(path, immediateGpu: true);
+            AwaitingMarkPick = false;
+            selectedMarkGoal = -1;
+            SetSurveyPaintVisuals(false);
             CancelPaint();
             ScanMode = false;
 
@@ -187,14 +263,22 @@ namespace GameDevTV.RTS.Prologue
             if (Mouse.current == null) return;
             if (IsFlying) return;
 
-            if (!ScanMode && !PointerBlocksWorldClick() && Mouse.current.leftButton.wasPressedThisFrame)
+            if (AwaitingMarkPick)
             {
-                if (TryClickDeposit(out int depositTile) || TryClickIceMarker(out depositTile))
+                if (PointerBlocksWorldClick()) return;
+                if (Mouse.current.leftButton.wasPressedThisFrame)
                 {
-                    BeginPaintMission(PrologueSurveyMission.DefaultTileBudget, PrologueSurveyMission.DefaultDays);
-                    TrySendTeamToMark(depositTile);
-                    return;
+                    if (TryHoverQuestionMarkTile(out int pick)
+                        || TryClickDeposit(out pick)
+                        || TryClickIceMarker(out pick))
+                        BeginPaintTowardMark(pick);
+                    else if (PrologueIceMarkers.Instance != null
+                             && PrologueIceMarkers.Instance.TryGetNearestSurveyBoardTile(out int auto, out _))
+                        BeginPaintTowardMark(auto);
+                    else
+                        ShowHint("Click the yellow ? — or play Orbital Scan to pan to the nearest target.");
                 }
+                return;
             }
 
             if (!ScanMode) return;
@@ -247,17 +331,29 @@ namespace GameDevTV.RTS.Prologue
 
                 if (TryClickIceMarker(out int iceTile))
                 {
-                    TrySendTeamToMark(iceTile);
+                    if (iceTile != selectedMarkGoal || !ScanMode)
+                        BeginPaintTowardMark(iceTile);
+                    else
+                    {
+                        paintStrokeActive = true;
+                        TryPaintUnderCursor(allowIceMarker: false);
+                    }
                     return;
                 }
 
                 if (TryClickDeposit(out int depositTile))
                 {
-                    TrySendTeamToMark(depositTile);
+                    if (depositTile != selectedMarkGoal || !ScanMode)
+                        BeginPaintTowardMark(depositTile);
+                    else
+                    {
+                        paintStrokeActive = true;
+                        TryPaintUnderCursor(allowIceMarker: false);
+                    }
                     return;
                 }
 
-                if (TryResolvePaintTile(allowIceMarker: true, out int paintTile)
+                if (TryResolvePaintTile(allowIceMarker: false, out int paintTile)
                     && !route.Contains(paintTile)
                     && string.IsNullOrEmpty(PaintRefusal(PrologueController.Instance.Colony, paintTile)))
                 {
@@ -267,7 +363,7 @@ namespace GameDevTV.RTS.Prologue
                 }
 
                 paintStrokeActive = true;
-                TryPaintUnderCursor(allowIceMarker: true);
+                TryPaintUnderCursor(allowIceMarker: false);
             }
             else if (held && paintStrokeActive)
             {
@@ -551,6 +647,17 @@ namespace GameDevTV.RTS.Prologue
         void BillboardCheckmark()
         {
             if (checkmarkGo == null) return;
+            var ctrl = PrologueController.Instance;
+            if (ctrl != null && route.Count > 0)
+            {
+                int last = route[route.Count - 1];
+                if (ctrl.TryGetCell(last, out Vector2Int cell))
+                {
+                    Vector3 ground = ColonyTileGrid.CellToWorldOnGround(cell);
+                    checkmarkGo.transform.position = ground + Vector3.up * 6.2f;
+                }
+            }
+
             Camera cam = ViewCamera();
             if (cam == null) return;
             var label = checkmarkGo.transform.Find("CheckLabel");
@@ -620,9 +727,40 @@ namespace GameDevTV.RTS.Prologue
             return Vector2.Distance(new Vector2(screen.x, screen.y), mouse) <= pickPx;
         }
 
-        bool TryClickIceMarker(out int tileIndex) => TryPickIceTileNearCursor(out tileIndex);
+        bool TryClickIceMarker(out int tileIndex) =>
+            TryPickIceTileFromRaycast(out tileIndex) || TryPickIceTileNearCursor(out tileIndex);
 
-        bool TryClickDeposit(out int tileIndex) => TryPickDepositTileNearCursor(out tileIndex);
+        bool TryClickDeposit(out int tileIndex) =>
+            TryPickDepositFromRaycast(out tileIndex) || TryPickDepositTileNearCursor(out tileIndex);
+
+        bool TryPickIceTileFromRaycast(out int tileIndex)
+        {
+            tileIndex = -1;
+            Camera cam = ViewCamera();
+            if (cam == null || Mouse.current == null) return false;
+            Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (!Physics.Raycast(ray, out RaycastHit hit, 1200f, ~0, QueryTriggerInteraction.Ignore))
+                return false;
+            var ice = hit.collider.GetComponentInParent<PrologueIceMarkerClick>();
+            if (ice == null || ice.TileIndex < 0) return false;
+            tileIndex = ice.TileIndex;
+            return true;
+        }
+
+        bool TryPickDepositFromRaycast(out int tileIndex)
+        {
+            tileIndex = -1;
+            var ctrl = PrologueController.Instance;
+            Camera cam = ViewCamera();
+            if (ctrl == null || cam == null || Mouse.current == null) return false;
+            Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (!Physics.Raycast(ray, out RaycastHit hit, 1200f, ~0, QueryTriggerInteraction.Ignore))
+                return false;
+            var mark = hit.collider.GetComponentInParent<PrologueDepositMark>();
+            if (mark == null || !TryTileForSurveyMark(ctrl, mark.GroundPoint, out int tile)) return false;
+            tileIndex = tile;
+            return true;
+        }
 
         bool TryPickDepositTileNearCursor(out int tileIndex)
         {
@@ -831,7 +969,7 @@ namespace GameDevTV.RTS.Prologue
         }
 
         /// <summary>
-        /// Hex under the cursor from a horizontal plane through camp — hills no longer steal the tile.
+        /// Hex under cursor: terrain raycast first, then trail/camp plane fallback for flat areas.
         /// </summary>
         bool TryPickPaintCell(out Vector2Int cell)
         {
@@ -839,6 +977,33 @@ namespace GameDevTV.RTS.Prologue
             {
                 cell = paintHitCellCache;
                 return true;
+            }
+
+            var ctrl = PrologueController.Instance;
+            Camera cam = ViewCamera();
+
+            if (TryRaycastPaintGround(cam, out Vector3 ground)
+                && ctrl != null
+                && TryTileForSurveyMark(ctrl, ground, out int fromTerrain)
+                && ctrl.TryGetCell(fromTerrain, out Vector2Int terrainCell))
+            {
+                cell = terrainCell;
+                paintHitsFrame = Time.frameCount;
+                paintHitCellCache = cell;
+                paintHitCellValid = true;
+                return true;
+            }
+
+            if (route.Count > 0 && ctrl != null && ctrl.TryGetCell(route[route.Count - 1], out Vector2Int lastCell))
+            {
+                float trailY = ColonyTileGrid.SampleGroundY(ColonyTileGrid.CellToWorldOnGround(lastCell));
+                if (TryPickPaintCellOnPlane(trailY, out cell))
+                {
+                    paintHitsFrame = Time.frameCount;
+                    paintHitCellCache = cell;
+                    paintHitCellValid = true;
+                    return true;
+                }
             }
 
             if (!TryPickPaintCellOnPlane(PaintPlaneY(), out cell))
@@ -851,6 +1016,34 @@ namespace GameDevTV.RTS.Prologue
             paintHitCellCache = cell;
             paintHitCellValid = true;
             return true;
+        }
+
+        static bool TryRaycastPaintGround(Camera cam, out Vector3 ground)
+        {
+            ground = default;
+            if (cam == null || Mouse.current == null) return false;
+
+            Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
+            int count = Physics.RaycastNonAlloc(
+                ray, paintRayHits, 800f, ~0, QueryTriggerInteraction.Ignore);
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                var hit = paintRayHits[i];
+                if (hit.collider == null) continue;
+                var t = hit.collider.transform;
+                if (t.GetComponentInParent<PrologueSurveyCheckClick>() != null) continue;
+                if (t.GetComponentInParent<PrologueIceMarkerClick>() != null) continue;
+                if (t.GetComponentInParent<BaseBuilding>() != null) continue;
+                if (t.GetComponentInParent<LineRenderer>() != null
+                    && t.name.IndexOf("Survey", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    continue;
+                if (hit.distance >= bestDist) continue;
+                bestDist = hit.distance;
+                ground = hit.point;
+            }
+
+            return bestDist < float.MaxValue;
         }
 
         static bool TryPickPaintCellOnPlane(float planeY, out Vector2Int cell)
@@ -935,10 +1128,10 @@ namespace GameDevTV.RTS.Prologue
             }
 
             Vector3 startPos = TileBandPoint(startCell);
-            int goalTile = -1;
-            if (TryHoverQuestionMarkTile(out int markTile))
+            int goalTile = selectedMarkGoal >= 0 ? selectedMarkGoal : -1;
+            if (goalTile < 0 && TryHoverQuestionMarkTile(out int markTile))
                 goalTile = markTile;
-            else if (TryPickBestPaintTile(out int pickTile))
+            else if (goalTile < 0 && TryPickBestPaintTile(out int pickTile))
                 goalTile = pickTile;
             else if (TryPickPaintCell(out Vector2Int hoverCell)
                      && ctrl.TryGetTileIndex(ColonyTileGrid.CellToWorldOnGround(hoverCell), out int hoverIdx))
@@ -1022,7 +1215,12 @@ namespace GameDevTV.RTS.Prologue
         bool TryGetMouseBandPoint(out Vector3 point)
         {
             point = default;
-            if (TryPickPaintCellOnPlane(PaintPlaneY(), out Vector2Int cell))
+            if (TryRaycastPaintGround(ViewCamera(), out Vector3 ground))
+            {
+                point = ColonyTileGrid.ApplyGroundY(ground) + Vector3.up * 0.5f;
+                return true;
+            }
+            if (TryPickPaintCell(out Vector2Int cell))
             {
                 point = ColonyTileGrid.CellToWorldOnGround(cell) + Vector3.up * 0.5f;
                 return true;
@@ -1037,7 +1235,7 @@ namespace GameDevTV.RTS.Prologue
             Camera cam = ViewCamera();
             if (ctrl == null || cam == null || Mouse.current == null) return false;
 
-            const float pickPx = 80f;
+            const float pickPx = 112f;
             float bestPx = float.MaxValue;
             int best = -1;
             Vector2 mouse = Mouse.current.position.ReadValue();
@@ -1069,7 +1267,7 @@ namespace GameDevTV.RTS.Prologue
             Camera cam = ViewCamera();
             if (ctrl == null || cam == null || Mouse.current == null) return false;
 
-            const float pickPx = 80f;
+            const float pickPx = 112f;
             float bestPx = float.MaxValue;
             int best = -1;
             Vector2 mouse = Mouse.current.position.ReadValue();

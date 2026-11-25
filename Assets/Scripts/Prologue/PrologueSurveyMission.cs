@@ -67,10 +67,7 @@ namespace GameDevTV.RTS.Prologue
 
             var scan = PrologueDroneScan.Instance
                        ?? new GameObject("PrologueDroneScan").AddComponent<PrologueDroneScan>();
-            scan.BeginPaintMission(TileBudget, DaysRequired);
-            ShowHint(
-                $"Survey Team: stretch the yellow band toward a ?, click the ? to paint the path, then click [OK]. " +
-                $"{DaysRequired} colony day{(DaysRequired == 1 ? "" : "s")} — hit 1x to run time.");
+            scan.ArmSurveyFromCard(TileBudget, DaysRequired);
         }
 
         /// <summary>Paint confirmed — start the day timer + team animation.</summary>

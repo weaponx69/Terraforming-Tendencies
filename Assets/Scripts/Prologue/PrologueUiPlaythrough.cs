@@ -24,6 +24,7 @@ namespace GameDevTV.RTS.Prologue
         static int stuckPhaseCount;
         static int stuckStep = -1;
         static int stuckWeek = -1;
+        static bool depositClipAuditDone;
         static readonly List<string> log = new();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -37,6 +38,7 @@ namespace GameDevTV.RTS.Prologue
             stuckPhaseCount = 0;
             stuckStep = -1;
             stuckWeek = -1;
+            depositClipAuditDone = false;
             log.Clear();
         }
 
@@ -75,6 +77,19 @@ namespace GameDevTV.RTS.Prologue
                 paintStreak = 0;
                 return Click("briefing_continue", cont, true, "dismiss briefing");
             }
+
+#if UNITY_EDITOR
+            if (!depositClipAuditDone
+                && PrologueDepositRevealPlaytest.TryRunClipAudit(out Vector3 auditWorld, out string auditMsg))
+            {
+                depositClipAuditDone = true;
+                var cam = PlayerInput.Instance != null ? PlayerInput.Instance.GameplayCamera : Camera.main;
+                Vector2 screen = cam != null
+                    ? cam.WorldToScreenPoint(auditWorld)
+                    : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                return Click("deposit_clip_audit", screen, true, auditMsg);
+            }
+#endif
 
             var scan = PrologueDroneScan.Instance;
             var mission = PrologueSurveyMission.Instance;

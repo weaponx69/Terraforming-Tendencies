@@ -54,6 +54,10 @@ Automated **vertical-slice** verifies must run:
 
 Skipping bootstrap means the run is **invalid** for slice sign-off (deposits/`?` will lie about real player experience). When the full game adds more boot steps, they belong in the same “fresh world” path — not a separate test harness.
 
+## Prologue / vertical slice
+
+Same rules as the rest of the project. Bootstrap for automated runs: `BeginNewPrologueRunForPlaytest()` then UI playthrough (see **World bootstrap** above). Supersedes any older prologue-only verification doc.
+
 ## Agents and contributors
 
-Always apply [`.cursor/rules/player-verify-after-changes.mdc`](../../.cursor/rules/player-verify-after-changes.mdc) when touching player-visible behavior.
+Always apply [`.cursor/rules/player-verify-after-changes.mdc`](../../.cursor/rules/player-verify-after-changes.mdc). Entry point: [`AGENTS.md`](../../AGENTS.md). Harness detail: [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) §10.1.

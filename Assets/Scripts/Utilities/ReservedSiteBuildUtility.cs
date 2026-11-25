@@ -460,6 +460,32 @@ namespace GameDevTV.RTS.Utilities
             if (building == null) return;
             Vector3 grounded = SnapToNavMesh(building.transform.position);
             building.transform.position = grounded;
+            SeatVisualsOnGround(building.gameObject, 0.04f);
+        }
+
+        /// <summary>Sample ground at XZ, then lift so lowest enabled renderer sits on the surface (slopes / hills).</summary>
+        public static void SeatVisualsOnGround(GameObject root, float groundPad = 0.04f)
+        {
+            if (root == null) return;
+            Vector3 p = root.transform.position;
+            float groundY = SnapToGround(p).y;
+            p.y = groundY + groundPad;
+            root.transform.position = p;
+
+            float minY = float.PositiveInfinity;
+            bool any = false;
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null || !renderer.enabled) continue;
+                if (renderer is ParticleSystemRenderer) continue;
+                minY = Mathf.Min(minY, renderer.bounds.min.y);
+                any = true;
+            }
+
+            if (!any || float.IsInfinity(minY)) return;
+            float lift = groundY + groundPad - minY;
+            if (Mathf.Abs(lift) > 0.005f)
+                root.transform.position += Vector3.up * lift;
         }
 
         private static Vector3 SnapToNavMesh(Vector3 approximate)

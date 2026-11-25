@@ -76,8 +76,10 @@ namespace GameDevTV.RTS.UI
 
             if (iconImage != null)
             {
-                iconImage.sprite = card.icon;
-                iconImage.enabled = card.icon != null;
+                Sprite art = BlueprintCardIcon.Resolve(card);
+                iconImage.sprite = art;
+                iconImage.enabled = art != null;
+                iconImage.preserveAspect = true;
             }
 
             if (selectButton != null)

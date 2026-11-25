@@ -26,6 +26,9 @@ MonoBehaviour:
   DetailAlbedoMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50602, type: 3}
   DetailNormalMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50603, type: 3}
   DetailTiling: 32
+  PlanetPatchDiameter: 768
+  HorizonBodyRadiusMeters: 1737400
+  EnableHorizonCurvature: 0
   ResourceCount: 40
   BaseDecayRate: 2
   ToxicityLevel: 0

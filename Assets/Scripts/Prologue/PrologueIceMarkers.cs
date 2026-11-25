@@ -109,6 +109,9 @@ namespace GameDevTV.RTS.Prologue
             if (colony.PrologueStep <= 4 && colony.HasUnrevealedIce())
                 return PingNearestIce();
 
+            if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && colony.SecondIceTargetTile() >= 0)
+                return PingNearestIce();
+
             if (colony.PrologueStep >= 5 && !colony.HasBuilding(PrologueBuildingId.WindTurbine))
             {
                 if (TryFindNearestDeposit(out SectorNode geo, out int gDist, out string gDir, wantGeothermal: true))
@@ -131,64 +134,281 @@ namespace GameDevTV.RTS.Prologue
             return "Satellites found no unsurveyed targets near camp.";
         }
 
+        /// <summary>Pulse one chosen ? after Survey Team picks a target (no camera move).</summary>
+        public void PulseTileForSurvey(int tileIndex)
+        {
+            var ctrl = PrologueController.Instance;
+            var colony = ctrl?.Colony;
+            if (colony == null || tileIndex < 0 || tileIndex >= colony.Board.Tiles.Count)
+                return;
+
+            var tile = colony.Board.At(tileIndex);
+            if (tile.Feature == PrologueFeature.Ice || tile.Feature == PrologueFeature.Glacier)
+            {
+                BeginIcePing(tileIndex, 16f);
+                return;
+            }
+
+            if (SectorManager.Instance?.Sectors == null || SectorManager.Instance.Sectors.Count == 0)
+                return;
+            foreach (var node in SectorManager.Instance.Sectors[0].Nodes)
+            {
+                if (node == null || node.isExplored) continue;
+                if (!ctrl.TryGetTileIndex(node.position, out int t) || t != tileIndex) continue;
+                BeginDepositPing(node, 16f);
+                return;
+            }
+        }
+
         /// <summary>
-        /// Company Orbital Scan: highlight the nearest unrevealed ice and say how far it is.
+        /// Same target Orbital Scan uses — pan the camera there (Orbital Scan only).
+        /// </summary>
+        public void FlyCameraToNearestSurveyTarget(bool pulseMarker = true, float pulseSeconds = PingSeconds)
+        {
+            if (!TryResolveNearestSurveyTarget(out int iceTile, out SectorNode deposit))
+                return;
+
+            if (!TryObjectiveWorldPosition(iceTile, deposit, out Vector3 world))
+                return;
+
+            if (pulseMarker)
+            {
+                if (iceTile >= 0)
+                    BeginIcePing(iceTile, pulseSeconds);
+                else
+                    BeginDepositPing(deposit, pulseSeconds);
+            }
+
+            PlayerInput.FlyCameraToWorldPosition(world);
+        }
+
+        /// <summary>
+        /// Company Orbital Scan: highlight objective ice (first deposit, or second ice on step 4+).
         /// </summary>
         public string PingNearestIce()
         {
             var ctrl = PrologueController.Instance;
             if (ctrl?.Colony == null) return "No ice signal.";
 
-            int home = -1;
-            for (int i = 0; i < ctrl.Colony.Board.Tiles.Count; i++)
+            var colony = ctrl.Colony;
+            if (!TryPickNearestIceTile(out int best, out int bestDist, out int home, out bool secondIceObjective))
             {
-                if (ctrl.Colony.Board.At(i).Building == PrologueBuildingId.CommandPost)
-                {
-                    home = i;
-                    break;
-                }
-            }
-            if (home < 0) home = 0;
-
-            int best = -1;
-            int bestDist = int.MaxValue;
-            for (int i = 0; i < ctrl.Colony.Board.Tiles.Count; i++)
-            {
-                var tile = ctrl.Colony.Board.At(i);
-                if (tile.DepositLeft <= 0) continue;
-                if (tile.Feature != PrologueFeature.Ice && tile.Feature != PrologueFeature.Glacier) continue;
-                if (tile.Revealed) continue;
-                int d = ctrl.Colony.Dist(home, i);
-                if (d >= bestDist) continue;
-                bestDist = d;
-                best = i;
+                if (secondIceObjective)
+                    return "No second ice on the board — advance the week or run a fresh bootstrap.";
+                return "Satellites found no unsurveyed ice.";
             }
 
-            if (best < 0) return "Satellites found no unsurveyed ice.";
-
-            Refresh();
-            pingDeposit = null;
-            pingTile = best;
-            pingUntil = Time.unscaledTime + PingSeconds;
+            BeginIcePing(best, PingSeconds);
             if (!ctrl.TryGetCell(best, out Vector2Int cell) || !ctrl.TryGetCell(home, out Vector2Int homeCell))
-                return $"Ice signal about {bestDist} tiles from camp. Look for the pulsing yellow ?.";
+            {
+                string tag = secondIceObjective ? "Second ice" : "Ice";
+                return $"{tag} about {bestDist} tiles from camp. Look for the pulsing yellow ? on the ridge.";
+            }
 
             Vector3 ice = ColonyTileGrid.CellToWorldOnGround(cell);
             Vector3 camp = ColonyTileGrid.CellToWorldOnGround(homeCell);
             Vector3 delta = ice - camp;
             delta.y = 0f;
             string dir = Compass(delta);
-            return $"Ice signal {bestDist} tiles {dir} of camp. The yellow ? is pulsing — paint Survey toward it.";
+            float rise = ice.y - camp.y;
+            string elev = rise > 1.5f
+                ? $" It sits about {rise:F0}m higher — paint up the slope; [OK] follows your last hex."
+                : rise < -1.5f
+                    ? $" It is lower in the valley — paint downhill toward the ?."
+                    : "";
+            string label = secondIceObjective ? "Second ice" : "Ice";
+            return $"{label} {bestDist} tiles {dir} of camp. Yellow ? pulsing — Survey Team toward it.{elev}";
         }
 
         string PingDepositNode(SectorNode node, string label, int dist, string dir)
         {
             if (node?.questionMarkGO == null)
                 return $"{label} about {dist} tiles {dir} — look for a yellow ?.";
-            pingTile = -1;
-            pingDeposit = node.questionMarkGO.transform;
-            pingUntil = Time.unscaledTime + PingSeconds;
+            BeginDepositPing(node, PingSeconds);
             return $"{label} signal {dist} tiles {dir} of camp. The yellow ? is pulsing — paint Survey toward it.";
+        }
+
+        void BeginIcePing(int tileIndex, float pulseSeconds)
+        {
+            Refresh();
+            EnsureMarker(tileIndex);
+            pingDeposit = null;
+            pingTile = tileIndex;
+            pingUntil = Time.unscaledTime + pulseSeconds;
+        }
+
+        void BeginDepositPing(SectorNode node, float pulseSeconds)
+        {
+            pingTile = -1;
+            pingDeposit = node?.questionMarkGO != null ? node.questionMarkGO.transform : null;
+            pingUntil = Time.unscaledTime + pulseSeconds;
+        }
+
+        /// <summary>Spawn ? markers on objective ice (including second ice) so they show on hills.</summary>
+        public void EnsureMarkersForActiveObjectives()
+        {
+            var colony = PrologueController.Instance?.Colony;
+            if (colony == null) return;
+
+            bool secondIce = colony.PrologueStep >= 4 && !colony.SecondIceDrill();
+            if (secondIce)
+                colony.RefreshSecondIceTiles();
+
+            for (int i = 0; i < colony.Board.Tiles.Count; i++)
+            {
+                var tile = colony.Board.At(i);
+                if (tile.DepositLeft <= 0) continue;
+                if (tile.Feature != PrologueFeature.Ice && tile.Feature != PrologueFeature.Glacier) continue;
+                if (secondIce && colony.Board.FirstIceTiles.Contains(i)) continue;
+                if (tile.Revealed) continue;
+                EnsureMarker(i);
+            }
+        }
+
+        /// <summary>Current survey goal on the prologue board (second ice, next deposit, etc.).</summary>
+        public bool TryGetNearestSurveyBoardTile(out int tileIndex, out Vector3 world)
+        {
+            tileIndex = -1;
+            world = default;
+            var ctrl = PrologueController.Instance;
+            if (ctrl == null || !TryResolveNearestSurveyTarget(out int iceTile, out SectorNode deposit))
+                return false;
+
+            if (iceTile >= 0)
+            {
+                EnsureMarker(iceTile);
+                tileIndex = iceTile;
+                if (ctrl.TryGetCell(iceTile, out Vector2Int cell))
+                    world = ColonyTileGrid.CellToWorldOnHighestGround(cell);
+                return tileIndex >= 0;
+            }
+
+            if (deposit == null) return false;
+            PrologueDepositVisuals.SeatNode(deposit);
+            if (deposit.questionMarkGO != null)
+                deposit.questionMarkGO.SetActive(true);
+            Vector3 ground = deposit.position;
+            ground.y = ColonyTileGrid.SampleGroundY(ground);
+            if (!ctrl.TryGetTileIndex(ground, out tileIndex))
+            {
+                Vector2Int cell = ColonyTileGrid.WorldToCell(ground);
+                if (!ctrl.TryGetTileIndex(ColonyTileGrid.CellToWorldOnHighestGround(cell), out tileIndex))
+                    return false;
+            }
+            if (ctrl.TryGetCell(tileIndex, out Vector2Int boardCell))
+                world = ColonyTileGrid.CellToWorldOnHighestGround(boardCell);
+            else
+                world = ground;
+            return true;
+        }
+
+        bool TryResolveNearestSurveyTarget(out int iceTile, out SectorNode deposit)
+        {
+            iceTile = -1;
+            deposit = null;
+            var colony = PrologueController.Instance?.Colony;
+            if (colony == null) return false;
+
+            if (colony.PrologueStep <= 4 && colony.HasUnrevealedIce()
+                && TryPickNearestIceTile(out iceTile, out _, out _, out _))
+                return true;
+
+            if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && colony.SecondIceTargetTile() >= 0
+                && TryPickNearestIceTile(out iceTile, out _, out _, out _))
+                return true;
+
+            if (colony.PrologueStep >= 5 && !colony.HasBuilding(PrologueBuildingId.WindTurbine)
+                && TryFindNearestDeposit(out SectorNode geo, out _, out _, wantGeothermal: true))
+            {
+                deposit = geo;
+                return true;
+            }
+
+            if (TryFindNearestDeposit(out SectorNode node, out _, out _, wantGeothermal: false))
+            {
+                deposit = node;
+                return true;
+            }
+
+            if (colony.HasUnrevealedIce()
+                && TryPickNearestIceTile(out iceTile, out _, out _, out _))
+                return true;
+
+            return false;
+        }
+
+        static bool TryObjectiveWorldPosition(int iceTile, SectorNode deposit, out Vector3 world)
+        {
+            world = default;
+            var ctrl = PrologueController.Instance;
+            if (iceTile >= 0 && ctrl != null && ctrl.TryGetCell(iceTile, out Vector2Int cell))
+            {
+                world = ColonyTileGrid.CellToWorldOnGround(cell);
+                return true;
+            }
+
+            if (deposit != null)
+            {
+                world = deposit.position;
+                world.y = ColonyTileGrid.SampleGroundY(world);
+                return true;
+            }
+
+            return false;
+        }
+
+        bool TryPickNearestIceTile(out int best, out int bestDist, out int home, out bool secondIceObjective)
+        {
+            best = -1;
+            bestDist = int.MaxValue;
+            home = 0;
+            secondIceObjective = false;
+
+            var ctrl = PrologueController.Instance;
+            var colony = ctrl?.Colony;
+            if (colony == null) return false;
+
+            for (int i = 0; i < colony.Board.Tiles.Count; i++)
+            {
+                if (colony.Board.At(i).Building == PrologueBuildingId.CommandPost)
+                {
+                    home = i;
+                    break;
+                }
+            }
+
+            secondIceObjective = colony.PrologueStep >= 4;
+
+            if (secondIceObjective)
+            {
+                colony.RefreshSecondIceTiles();
+                best = colony.NewIceTile();
+                if (best < 0)
+                    best = colony.SecondIceTargetTile();
+                if (best >= 0)
+                    bestDist = colony.Dist(home, best);
+            }
+
+            if (best < 0)
+            {
+                for (int i = 0; i < colony.Board.Tiles.Count; i++)
+                {
+                    var tile = colony.Board.At(i);
+                    if (tile.DepositLeft <= 0) continue;
+                    if (tile.Feature != PrologueFeature.Ice && tile.Feature != PrologueFeature.Glacier) continue;
+                    if (secondIceObjective)
+                    {
+                        if (colony.Board.FirstIceTiles.Contains(i)) continue;
+                    }
+                    else if (tile.Revealed) continue;
+                    int d = colony.Dist(home, i);
+                    if (d >= bestDist) continue;
+                    bestDist = d;
+                    best = i;
+                }
+            }
+
+            return best >= 0;
         }
 
         bool TryFindNearestDeposit(out SectorNode best, out int bestDist, out string dir, bool wantGeothermal)
@@ -316,7 +536,8 @@ namespace GameDevTV.RTS.Prologue
 
         public void OnTileRevealed(int tileIndex)
         {
-            var colony = PrologueController.Instance?.Colony;
+            var ctrl = PrologueController.Instance;
+            var colony = ctrl?.Colony;
             if (colony == null) return;
             if (tileIndex < 0 || tileIndex >= colony.Board.Tiles.Count) return;
 
@@ -326,6 +547,8 @@ namespace GameDevTV.RTS.Prologue
                 if (tile.Revealed || tile.DepositLeft <= 0)
                     RemoveMarker(tileIndex);
             }
+
+            PrologueDepositVisuals.SeatNodesForBoardTile(ctrl, tileIndex);
 
             PrologueRevealGhosts.OnTileSurveyRevealed(tileIndex);
         }

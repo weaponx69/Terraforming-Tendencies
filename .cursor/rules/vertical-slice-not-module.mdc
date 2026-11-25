@@ -31,6 +31,6 @@ The **main-scene run** (today: scripts under `Prologue/`, `PrologueController`) 
 |--|--|
 | **Authoritative run** | Vertical slice / `PrologueController` path |
 | **Archived** | Colony Acts (`ColonyActManager` must not own run when slice active) |
-| **Design + architecture** | [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) §0, [`docs/specs/2026-11-24-vertical-slice-authority.md`](../../docs/specs/2026-11-24-vertical-slice-authority.md) |
+| **Agent router** | [`AGENTS.md`](../../AGENTS.md) — default: PK **§0** + **§2** only |
 
-When unsure, read those before changing architecture or telling the user what to build next.
+When unsure, read the router + §0 before changing architecture.

@@ -108,7 +108,15 @@ namespace GameDevTV.RTS.Environment
             
             FixPreplacedGatherables();
 
+            ApplyPatchScaleFromConfig();
             bool meshReady = HasBuiltRelief();
+            if (meshReady && NeedsPlanetRegenForPatchScale())
+            {
+                Debug.Log($"[PlanetGenerator] Regenerating terrain for PlanetPatchDiameter={Config.PlanetPatchDiameter:0} (was ~{CurrentMeshSpanX():0}m wide).");
+                ClearPlanet();
+                meshReady = false;
+            }
+
             if (!meshReady)
             {
                 ClearPlanet();
@@ -123,10 +131,79 @@ namespace GameDevTV.RTS.Environment
                 EnsureCoarseCollider();
                 EnsureWrapStreaming();
                 RefreshDepositMarkHeights();
+                ApplyHorizonPresentationFromConfig();
                 GroundExistingWorldObjects();
                 if (Application.isPlaying)
                     BakeAllNavMeshes();
             }
+            }
+
+            void ApplyPatchScaleFromConfig()
+            {
+                if (Config == null || Config.PlanetPatchDiameter < 1f) return;
+                int span = Mathf.Max(Config.MapWidth, Config.MapHeight);
+                CellSize = Config.PlanetPatchDiameter / span;
+            }
+
+            bool NeedsPlanetRegenForPatchScale()
+            {
+                if (Config == null || Config.PlanetPatchDiameter < 1f) return false;
+                float want = Config.MapWidth * CellSize;
+                float have = CurrentMeshSpanX();
+                if (have < 1f) return false;
+                return Mathf.Abs(have - want) > want * 0.12f;
+            }
+
+            float CurrentMeshSpanX()
+            {
+                if (!TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null)
+                    return 0f;
+                return mf.sharedMesh.bounds.size.x;
+            }
+
+            public void ApplyHorizonPresentationFromConfig()
+            {
+                if (Config != null && Config.EnableHorizonCurvature)
+                    EnableHorizonPresentation();
+                else
+                    DisableHorizonPresentation();
+            }
+
+            /// <summary>Curved terrain shader in Play Mode (off by default — keep geometry flat).</summary>
+            public void EnableHorizonPresentation()
+            {
+                if (Config == null || !Config.EnableHorizonCurvature) return;
+                float bodyR = Mathf.Max(Config.HorizonBodyRadiusMeters, 100f);
+                float patch = Config.PlanetPatchDiameter > 1f
+                    ? Config.PlanetPatchDiameter
+                    : Mathf.Max(Config.MapWidth, Config.MapHeight) * CellSize;
+                float half = patch * 0.5f;
+                float strength = (half * half) / (2f * bodyR);
+                strength = Mathf.Clamp(strength, 0.00004f, 0.004f);
+
+                ApplyCurvedWorldShader(gameObject);
+                CurvedWorldUpdater updater = GetComponentInChildren<CurvedWorldUpdater>(true);
+                if (updater == null)
+                {
+                    var go = new GameObject("CurvedWorldUpdater");
+                    go.transform.SetParent(transform, false);
+                    updater = go.AddComponent<CurvedWorldUpdater>();
+                }
+                updater.CurveStrength = strength;
+                updater.CurveOrigin = null;
+            }
+
+            public void DisableHorizonPresentation()
+            {
+                Shader.SetGlobalFloat("_CurveStrength", 0f);
+                var updater = GetComponentInChildren<CurvedWorldUpdater>(true);
+                if (updater != null)
+                {
+                    if (Application.isPlaying)
+                        Destroy(updater.gameObject);
+                    else
+                        DestroyImmediate(updater.gameObject);
+                }
             }
 
             private void BakeAllNavMeshes()
@@ -438,6 +515,7 @@ namespace GameDevTV.RTS.Environment
                 public void GeneratePlanet()
                 {
                 if (Config == null) return;
+                ApplyPatchScaleFromConfig();
 
                 Mesh mesh = new Mesh();
                 mesh.name = "Procedural Planet Surface";
@@ -642,11 +720,7 @@ namespace GameDevTV.RTS.Environment
                 EnsureWrapStreaming();
                 RefreshDepositMarkHeights();
                 BakeAllNavMeshes();
-                // Curved world shader disabled — Terrain provides relief instead.
-                // ApplyCurvedWorldShader(gameObject);
-                // GameObject updater = new GameObject("CurvedWorldUpdater");
-                // updater.transform.parent = transform;
-                // updater.AddComponent<CurvedWorldUpdater>();
+                ApplyHorizonPresentationFromConfig();
 
                 GroundExistingWorldObjects();
 
@@ -1388,7 +1462,8 @@ namespace GameDevTV.RTS.Environment
                             if (node.visualGO != null) continue;
 
                             // Snap deposit pad to the visible mesh height field.
-                            Vector3 spawnPos = ColonyTileGrid.ApplyGroundY(node.position);
+                            Vector2Int depositCell = ColonyTileGrid.WorldToCell(node.position);
+                            Vector3 spawnPos = ColonyTileGrid.CellToWorldOnGround(depositCell);
                             node.position = spawnPos;
 
                             // --- Dot marker (small flat circle) ---
@@ -1420,8 +1495,9 @@ namespace GameDevTV.RTS.Environment
                             dot.name = $"Node_{node.type}";
                             dot.transform.position = spawnPos;
                             float visSize = Mathf.Max(dotSize, 0.7f);
-                            dot.transform.localScale = new Vector3(visSize, 0.12f, visSize);
+                            dot.transform.localScale = new Vector3(visSize, 0.08f, visSize);
                             dot.transform.parent = transform; // Parent to PlanetGenerator so AI can find it
+                            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(dot, 0.02f);
                             dot.layer = LayerMask.NameToLayer("Supplies"); // Set to Supplies layer
                             var dotRenderer = dot.GetComponent<MeshRenderer>();
                             var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -1601,6 +1677,7 @@ namespace GameDevTV.RTS.Environment
 
                 public void ApplyCurvedWorldShader(GameObject root)
                 {
+                    if (Config != null && !Config.EnableHorizonCurvature) return;
                     Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
                     Shader curvedShaderTransparent = Shader.Find("Custom/URP_CurvedWorld_Transparent");
                     if (curvedShader == null || curvedShaderTransparent == null) return;

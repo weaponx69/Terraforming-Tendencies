@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using GameDevTV.RTS.Environment;
+using GameDevTV.RTS.Player;
+using UnityEngine;
 
 namespace GameDevTV.RTS.Prologue
 {
@@ -170,7 +172,10 @@ namespace GameDevTV.RTS.Prologue
                 foreach (var s in Board.Sites)
                     if (s.Tile == t.Index) { underConstruction = true; break; }
                 if (underConstruction) continue;
-                gen += PrologueData.Get(t.Building).PowerOutput;
+                int output = PrologueData.Get(t.Building).PowerOutput;
+                if (SolarDarkened && t.Building == PrologueBuildingId.Solar)
+                    continue;
+                gen += output;
             }
             return gen;
         }
@@ -224,6 +229,11 @@ namespace GameDevTV.RTS.Prologue
             }
             if (id == PrologueBuildingId.Aquifer)
             {
+                if (cell.Feature == PrologueFeature.Ice || cell.Feature == PrologueFeature.Glacier)
+                {
+                    reason = "Place the Ice Aquifer on the hex beside the deposit — not on the ice.";
+                    return false;
+                }
                 if (!HasIceInHarvestRange(tile))
                 {
                     reason = $"Ice Aquifer must be within {PrologueData.HarvestRange} tiles of revealed ice";
@@ -359,7 +369,7 @@ namespace GameDevTV.RTS.Prologue
                     if (!HasBuilding(PrologueBuildingId.WindTurbine))
                     {
                         suggestBuild = PrologueBuildingId.WindTurbine;
-                        return "Build a Geothermal Generator beside the Oxygen Processor before the dust storm";
+                        return "Place a Wind Turbine or Solar Array within 2 tiles of the Oxygen Processor (wind works in the dust storm)";
                     }
                     return "Store oxygen and ride out the dust storm";
                 default:
@@ -582,12 +592,12 @@ namespace GameDevTV.RTS.Prologue
             if (powered == 0)
             {
                 sb.AppendLine(SolarDarkened
-                    ? "Oxygen Processor has no power. Place Geothermal beside it."
-                    : "Oxygen Processor has no power.");
+                    ? "Oxygen Processor has no power. Place a Wind Turbine within 2 tiles."
+                    : "Oxygen Processor has no power. Add Solar or Wind within 2 tiles.");
                 return;
             }
             sb.AppendLine(SolarDarkened
-                ? "Storm power: Geothermal is feeding the Oxygen Processor."
+                ? "Storm power: Wind Turbine is feeding the Oxygen Processor."
                 : "Camp power is feeding the Oxygen Processor.");
             if (!ColonistsWorking)
                 sb.AppendLine("Oxygen Processor is idle. The crew is not running it.");
@@ -673,15 +683,15 @@ namespace GameDevTV.RTS.Prologue
         }
 
         /// <summary>
-        /// Connected power BFS: Dist ≤ 1 (Tier-1), or Dist ≤ 2 with LongerPowerReach.
-        /// Camp is a virtual energy source until the dust storm; during storm only
-        /// buildings with PowerOutput &gt; 0 count as sources.
+        /// Connected power BFS. Prologue: 2-tile reach by default (3 with Longer Power Reach).
+        /// Camp powers consumers until the dust storm; during storm only
+        /// non-solar generators count as sources.
         /// </summary>
         bool HasPowerPath(int startTile)
         {
-            int reach = Research != null && Research.IsUnlocked(PrologueResearchId.LongerPowerReach)
-                ? 2
-                : 1;
+            int reach = 2;
+            if (Research != null && Research.IsUnlocked(PrologueResearchId.LongerPowerReach))
+                reach = 3;
             var q = new Queue<int>();
             var seen = new HashSet<int>();
             q.Enqueue(startTile);
@@ -712,6 +722,8 @@ namespace GameDevTV.RTS.Prologue
         bool IsEnergySource(int tile)
         {
             var b = Board.At(tile).Building;
+            if (b == PrologueBuildingId.Solar && SolarDarkened)
+                return false;
             if (b != PrologueBuildingId.None && PrologueData.Get(b).PowerOutput > 0)
                 return true;
             // Camp is a virtual source until storm.
@@ -727,6 +739,66 @@ namespace GameDevTV.RTS.Prologue
                 if (Dist(aquiferTile, t.Index) <= PrologueData.HarvestRange) return true;
             }
             return false;
+        }
+
+        /// <summary>Empty build hex beside ice (prefer adjacent) where an aquifer may sit (ignores mineral stock).</summary>
+        public bool TryFindAquiferPadNearIce(int iceTile, out int padTile)
+        {
+            padTile = -1;
+            if (iceTile < 0 || iceTile >= Board.Tiles.Count) return false;
+
+            var ctrl = PrologueController.Instance;
+            if (ctrl == null || !ctrl.TryGetCell(iceTile, out Vector2Int iceCell))
+                return false;
+            float iceY = ColonyTileGrid.SampleGroundY(ColonyTileGrid.CellToWorld(iceCell, 0f));
+
+            int bestScore = int.MaxValue;
+            for (int ring = 1; ring <= PrologueData.HarvestRange; ring++)
+            {
+                for (int i = 0; i < Board.Tiles.Count; i++)
+                {
+                    if (Dist(iceTile, i) != ring) continue;
+                    if (!CanPlaceAquiferPad(i)) continue;
+                    if (!ctrl.TryGetCell(i, out Vector2Int padCell)) continue;
+                    float padY = ColonyTileGrid.SampleGroundY(ColonyTileGrid.CellToWorld(padCell, 0f));
+                    int iceDelta = Mathf.RoundToInt(Mathf.Abs(padY - iceY) * 25f);
+                    int localSlope = Mathf.RoundToInt(ColonyTileGrid.HexLocalSlopeMeters(padCell) * 40f);
+                    int score = ring * 1000 + iceDelta * 2 + localSlope * 3;
+                    if (score >= bestScore) continue;
+                    bestScore = score;
+                    padTile = i;
+                }
+            }
+            return padTile >= 0;
+        }
+
+        /// <summary>Tile rules for an aquifer pad (no mineral check — hand UI shows cost).</summary>
+        public bool CanPlaceAquiferPad(int tile)
+        {
+            var cell = Board.At(tile);
+            if (cell.Building != PrologueBuildingId.None || SiteOnTile(tile)) return false;
+            if (!Unlocked.Contains(PrologueBuildingId.Aquifer)) return false;
+            if (cell.Feature == PrologueFeature.Ice || cell.Feature == PrologueFeature.Glacier) return false;
+            if (!HasIceInHarvestRange(tile)) return false;
+            if (PrologueStep >= 4 && !SecondIceDrill() && SecondIceTargetTile() >= 0 && !ReachesNewIce(tile))
+                return false;
+            return true;
+        }
+
+        public int NearestRevealedIceTile(int fromTile)
+        {
+            int best = -1;
+            int bestD = int.MaxValue;
+            foreach (var t in Board.Tiles)
+            {
+                if (!t.Revealed || t.DepositLeft <= 0) continue;
+                if (t.Feature != PrologueFeature.Ice && t.Feature != PrologueFeature.Glacier) continue;
+                int d = Dist(fromTile, t.Index);
+                if (d >= bestD) continue;
+                bestD = d;
+                best = t.Index;
+            }
+            return best;
         }
 
         void SettleSites(List<string> log, bool advance)
@@ -888,7 +960,7 @@ namespace GameDevTV.RTS.Prologue
                 Faith -= PrologueData.DeadlineFaithLoss;
             if (StormLandWeek >= 0
                 && StormLandWeek - Week <= window
-                && !WindBesideOxygen())
+                && !PowerBesideOxygen())
                 Faith -= PrologueData.DeadlineFaithLoss;
             Faith = Math.Clamp(Faith, 0, 100);
         }
@@ -899,15 +971,18 @@ namespace GameDevTV.RTS.Prologue
             ContractMessage = message;
         }
 
-        bool WindBesideOxygen()
+        bool PowerBesideOxygen()
         {
+            int reach = 2;
             foreach (var oxygen in Board.Tiles)
             {
                 if (oxygen.Building != PrologueBuildingId.Oxygen || oxygen.Broken) continue;
-                foreach (var wind in Board.Tiles)
+                foreach (var plant in Board.Tiles)
                 {
-                    if (wind.Building != PrologueBuildingId.WindTurbine || wind.Broken) continue;
-                    if (Dist(oxygen.Index, wind.Index) <= 1) return true;
+                    if (plant.Building == PrologueBuildingId.None || plant.Broken) continue;
+                    if (plant.Building == PrologueBuildingId.Solar && SolarDarkened) continue;
+                    if (PrologueData.Get(plant.Building).PowerOutput <= 0) continue;
+                    if (Dist(oxygen.Index, plant.Index) <= reach) return true;
                 }
             }
             return false;
@@ -976,6 +1051,7 @@ namespace GameDevTV.RTS.Prologue
                     case 4:
                         if (StepIsComplete(4))
                         {
+                            Unlocked.Add(PrologueBuildingId.Solar);
                             Unlocked.Add(PrologueBuildingId.WindTurbine);
                             if (StormLandWeek < 0)
                                 StormLandWeek = Week + PrologueData.PrologueStormWeeks;
@@ -1004,7 +1080,7 @@ namespace GameDevTV.RTS.Prologue
             return false;
         }
 
-        bool HasIceInHarvestRange(int tile)
+        public bool HasIceInHarvestRange(int tile)
         {
             foreach (var t in Board.Tiles)
             {

@@ -86,6 +86,20 @@ namespace GameDevTV.RTS.Tests
         }
 
         [Test]
+        public void Preview_Aquifer_OnIceDepositHex_Refuses()
+        {
+            var c = PrologueColony.CreateLanding();
+            c.StartPrologue();
+            c.Unlocked.Add(PrologueBuildingId.Aquifer);
+            c.Board.At(2).Feature = PrologueFeature.Ice;
+            c.Board.At(2).DepositLeft = 50;
+            c.Board.At(2).Revealed = true;
+            c.SetDistanceFn((a, b) => a == b ? 0 : 1);
+            Assert.IsFalse(c.Preview(2, PrologueBuildingId.Aquifer, out string reason));
+            StringAssert.Contains("beside", reason);
+        }
+
+        [Test]
         public void Preview_AquiferTooFarFromIce_Refuses()
         {
             var c = PrologueColony.CreateLanding();
@@ -159,9 +173,7 @@ namespace GameDevTV.RTS.Tests
         [Test]
         public void DustStorm_DarkensSolar_WindKeepsOxygenPowered()
         {
-            // Graph rules: camp powers until storm; during storm only PowerOutput > 0
-            // sources count. Solar has PowerOutput but SolarDarkened still leaves it
-            // as a graph source — place it non-adjacent so Wind alone keeps Oxygen up.
+            // During storm solar arrays stop conducting; wind within reach keeps oxygen up.
             var c = PrologueColony.CreateLanding();
             c.DebugPlaceComplete(3, PrologueBuildingId.Oxygen);
             c.DebugPlaceComplete(9, PrologueBuildingId.Solar);

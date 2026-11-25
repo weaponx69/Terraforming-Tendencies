@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -373,9 +374,8 @@ namespace GameDevTV.RTS.Prologue
         /// </summary>
         static void SeatWherePlaced(BaseBuilding building)
         {
-            Vector3 placed = building.transform.position;
-            placed.y = ColonyTileGrid.SampleGroundY(placed);
-            building.transform.position = placed;
+            if (building == null) return;
+            ReservedSiteBuildUtility.GroundBuilding(building);
         }
 
         void ClearBuildSite()

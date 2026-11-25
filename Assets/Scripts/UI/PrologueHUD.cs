@@ -347,7 +347,7 @@ namespace GameDevTV.RTS.UI
             if (colony.SolarDarkened)
                 return powered > 0
                     ? $"grid · {colony.Energy} energy"
-                    : "NONE — connect Geothermal by tube";
+                    : "NONE — connect Wind within 2 tiles";
             return powered > 0
                 ? $"camp · {colony.Energy} energy"
                 : $"NONE · {colony.Energy} energy";
@@ -362,7 +362,7 @@ namespace GameDevTV.RTS.UI
                 2 => "Place Oxygen Processor (camp power — no Solar card). End Week to finish the build.",
                 3 => "Place two Habitat Domes before the shuttle arrives.",
                 4 => "Survey toward the new yellow ?, then place another Aquifer by the ice.",
-                5 => "Place the Geothermal Generator next to the Oxygen Processor before the dust storm. Camp power goes dark.",
+                5 => "Place Wind or Solar within 2 tiles of the Oxygen Processor. Wind keeps working when the dust storm hits.",
                 _ => "Builds cost minerals + weeks. Mines: ghost onto the deposit pad. End Week advances sites."
             };
         }

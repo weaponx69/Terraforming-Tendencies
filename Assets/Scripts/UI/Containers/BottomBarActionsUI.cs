@@ -564,9 +564,11 @@ namespace GameDevTV.RTS.UI.Containers
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
                     {
                         var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
-                        buildCmd.Name = unlockCard.buildingToUnlock.Name;
                         buildCmd.Building = unlockCard.buildingToUnlock;
-                        buildCmd.Icon = unlockCard.buildingToUnlock.Icon;
+                        buildCmd.Name = string.IsNullOrEmpty(unlockCard.cardName)
+                            ? unlockCard.buildingToUnlock.Name
+                            : unlockCard.cardName;
+                        buildCmd.Icon = BlueprintCardIcon.Resolve(unlockCard);
                         buildCmd.Slot = i;
                         buildCmd.HandIndex = cardIndex;
                         buildCmd.GhostPrefab = FindGhostPrefabForBuilding(unlockCard.buildingToUnlock);
@@ -582,13 +584,7 @@ namespace GameDevTV.RTS.UI.Containers
                     {
                         var playCmd = ScriptableObject.CreateInstance<PlayCardCommand>();
                         playCmd.Name = card.cardName;
-                        Sprite cardIcon = card.icon;
-                        if (cardIcon == null && card is SpawnUnitCardSO spawnCard && spawnCard.unitPrefab != null)
-                        {
-                            var unit = spawnCard.unitPrefab.GetComponent<AbstractUnit>();
-                            if (unit != null) cardIcon = unit.Icon;
-                        }
-                        playCmd.Icon = cardIcon;
+                        playCmd.Icon = BlueprintCardIcon.Resolve(card);
                         playCmd.Slot = i;
                         playCmd.HandIndex = cardIndex;
                         playCmd.MaterialsCost = card.GetMaterialsPlayCost();

@@ -95,7 +95,7 @@ namespace GameDevTV.RTS.Player
                     var mission = PrologueSurveyMission.Instance
                                   ?? new GameObject("PrologueSurveyMission").AddComponent<PrologueSurveyMission>();
                     mission.BeginFromCard(tiles, days);
-                    Debug.Log($"[Prologue] Survey Team card → paint up to {tiles} tiles / {days} days.");
+                    Debug.Log($"[Prologue] Survey Team card → pick a ?, paint up to {tiles} tiles / {days} days.");
                     return;
                 }
                 if (PrologueController.IsActive && scoutingType == ScoutingType.OrbitalScan)
@@ -107,6 +107,7 @@ namespace GameDevTV.RTS.Player
                     string ping = PrologueIceMarkers.Instance != null
                         ? PrologueIceMarkers.Instance.PingNearestTarget()
                         : "No survey target.";
+                    PrologueIceMarkers.Instance?.FlyCameraToNearestSurveyTarget(pulseMarker: false);
                     PrologueHUD.Instance?.ShowNote(new System.Collections.Generic.List<string>
                     {
                         $"Orbital Scan (−{cost} energy).",

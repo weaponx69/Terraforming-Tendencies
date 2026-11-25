@@ -93,7 +93,7 @@ namespace GameDevTV.RTS.Prologue
             if (colony.DustStormActive && !before.Storm)
             {
                 crisis = true;
-                worry.Add("The dust storm is on the camp. Camp power is dark. The Geothermal Generator has to sit beside the Oxygen Processor or the air stops.");
+                worry.Add("The dust storm is on the camp. Camp power is dark. A Wind Turbine within 2 tiles of the Oxygen Processor has to run or the air stops.");
             }
             if (!crisis && colony.Faith < before.Faith)
                 worry.Add($"The corporation's faith fell to {colony.Faith}.");

@@ -14,7 +14,7 @@ namespace GameDevTV.RTS.Prologue
         public readonly string DisplayName;
         public readonly int BuildWeeks;
         public readonly int Beds;
-        public readonly int PowerOutput; // solar=1, wind=2 (Unreal wind stronger in hills later; use 1 for both if needed)
+        public readonly int PowerOutput; // solar=1 pre-storm; wind=2 through dust storm
         public readonly bool NeedsPower;
         public readonly int IceHarvestPerWeek; // aquifer
         public readonly int IceConsumedPerWeek; // oxygen
@@ -74,7 +74,7 @@ namespace GameDevTV.RTS.Prologue
             PrologueBuildingId.Oxygen => new(id, "Oxygen Processor", 1, 0, 0, true, 0, 4, 12),
             PrologueBuildingId.Solar => new(id, "Solar Array", 1, 0, 1, false, 0, 0, 0),
             PrologueBuildingId.Habitat => new(id, "Habitat Domes", 1, 10, 0, false, 0, 0, 0),
-            PrologueBuildingId.WindTurbine => new(id, "Geothermal Generator", 1, 0, 2, false, 0, 0, 0),
+            PrologueBuildingId.WindTurbine => new(id, "Wind Turbine", 1, 0, 2, false, 0, 0, 0),
             PrologueBuildingId.CommandPost => new(id, "Command Post", 0, 0, 0, false, 0, 0, 0),
             _ => new(PrologueBuildingId.None, "", 0, 0, 0, false, 0, 0, 0)
         };

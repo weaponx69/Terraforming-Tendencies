@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
@@ -121,11 +122,51 @@ namespace GameDevTV.RTS.Player
             if (Instance == null || Instance.cameraTarget == null) return;
             worldPosition.y = Instance.cameraTarget.position.y;
             Instance.cameraTarget.position = worldPosition;
-            Instance.currentHex?.SetHighlighted(false);
-            Instance.currentHex = HexGridManager.Instance?.GetHexForHover(worldPosition);
-            // Keep the cyan grid off unless the mouse is over a tile (keyboard nav still highlights).
+            Instance.FinishCameraFocus(worldPosition);
+        }
+
+        /// <summary>Smooth pan the gameplay camera toward a world XZ point (Prologue survey / scan objectives).</summary>
+        public static void FlyCameraToWorldPosition(Vector3 worldPosition, float durationSeconds = 1.35f)
+        {
+            if (Instance == null || Instance.cameraTarget == null) return;
+            Instance.BeginCameraFly(worldPosition, durationSeconds);
+        }
+
+        Coroutine activeCameraFly;
+
+        void BeginCameraFly(Vector3 worldPosition, float durationSeconds)
+        {
+            if (activeCameraFly != null)
+                StopCoroutine(activeCameraFly);
+            activeCameraFly = StartCoroutine(CameraFlyRoutine(worldPosition, durationSeconds));
+        }
+
+        IEnumerator CameraFlyRoutine(Vector3 targetWorld, float durationSeconds)
+        {
+            Vector3 start = cameraTarget.position;
+            targetWorld.y = start.y;
+            durationSeconds = Mathf.Max(0.08f, durationSeconds);
+            float elapsed = 0f;
+            while (elapsed < durationSeconds)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / durationSeconds);
+                float eased = t * t * (3f - 2f * t);
+                cameraTarget.position = Vector3.Lerp(start, targetWorld, eased);
+                yield return null;
+            }
+
+            cameraTarget.position = targetWorld;
+            FinishCameraFocus(targetWorld);
+            activeCameraFly = null;
+        }
+
+        void FinishCameraFocus(Vector3 worldPosition)
+        {
+            currentHex?.SetHighlighted(false);
+            currentHex = HexGridManager.Instance?.GetHexForHover(worldPosition);
             if (!GameDevTV.RTS.Prologue.PrologueController.IsActive)
-                Instance.currentHex?.SetHighlighted(true);
+                currentHex?.SetHighlighted(true);
         }
 
         /// <summary>Current camera follow target on the map (XZ focus point).</summary>
@@ -473,6 +514,9 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            if (TryFlyToAquiferBuildSiteIfNeeded(evt.Command))
+                hasCameraBeenFocused = true;
+
             // if this thing does not require a click to activate...
             // Should probably say requires placement click to activate
             if (!activeCommand.RequiresClickToActivate)
@@ -810,8 +854,65 @@ namespace GameDevTV.RTS.Player
             }
 
             Vector3 snapTarget = ColonyTileGrid.ApplyGroundY(hitPos.Value);
+            if (PrologueController.IsActive
+                && cardTilePlace
+                && activeCommand is BuildBuildingCommand prologueSnapBbc
+                && prologueSnapBbc.Building != null
+                && PrologueController.Instance != null
+                && PrologueController.Instance.Colony is { } prologueColony
+                && PrologueCardMap.TryGetPrologueId(prologueSnapBbc.Building, out var prologueSnapId)
+                && prologueSnapId != PrologueBuildingId.CommandPost)
+            {
+                float snapRadius = ColonyTileGrid.TileSize * 1.85f;
+                if (PrologueRevealGhostPad.TryGetPadNear(snapTarget, snapRadius, out int suggestPad, out _)
+                    && prologueColony.Preview(suggestPad, prologueSnapId, out _)
+                    && PrologueController.Instance.TryGetCell(suggestPad, out Vector2Int suggestCell))
+                {
+                    tileGhostStickyCell = suggestCell;
+                    snapTarget = ColonyTileGrid.CellToWorldOnHighestGround(suggestCell);
+                    joinCount = ColonyTileGrid.CountOrthogonalNeighbors(suggestCell, Owner.Player1);
+                }
+            }
+
+            if (PrologueController.IsActive
+                && cardTilePlace
+                && activeCommand is BuildBuildingCommand aquiferBbc
+                && aquiferBbc.Building != null
+                && aquiferBbc.Building.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
+                && PrologueController.Instance != null
+                && PrologueController.Instance.Colony is { } aquiferColony
+                && PrologueCardMap.TryGetPrologueId(aquiferBbc.Building, out var aquiferId)
+                && aquiferId == PrologueBuildingId.Aquifer)
+            {
+                if (PrologueController.Instance.TryGetTileIndex(snapTarget, out int aquiferSnapTile))
+                {
+                    var snapPad = aquiferColony.Board.At(aquiferSnapTile);
+                    bool onIceHex = snapPad.Feature == PrologueFeature.Ice || snapPad.Feature == PrologueFeature.Glacier;
+                    bool legalHere = !onIceHex && aquiferColony.CanPlaceAquiferPad(aquiferSnapTile)
+                        && aquiferColony.Preview(aquiferSnapTile, PrologueBuildingId.Aquifer, out _);
+                    if (!legalHere)
+                    {
+                        int iceAnchor = onIceHex
+                            ? aquiferSnapTile
+                            : aquiferColony.NearestRevealedIceTile(aquiferSnapTile);
+                        if (iceAnchor >= 0
+                            && aquiferColony.TryFindAquiferPadNearIce(iceAnchor, out int padTile)
+                            && PrologueController.Instance.TryGetCell(padTile, out Vector2Int padCell))
+                        {
+                            snapTarget = ColonyTileGrid.CellToWorldOnHighestGround(padCell);
+                            tileGhostStickyCell = padCell;
+                            joinCount = ColonyTileGrid.CountOrthogonalNeighbors(padCell, Owner.Player1);
+                        }
+                    }
+                }
+            }
+
+            if (PrologueController.IsActive && tileGhostStickyCell.HasValue)
+                snapTarget = ColonyTileGrid.CellToWorldOnHighestGround(tileGhostStickyCell.Value);
+
             // Hard snap to the cell — lerp made occupancy thrash look like a strobing animation.
             ghostInstance.transform.position = snapTarget;
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(ghostInstance, 0.04f);
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
             bool allRestrictionsPass;
@@ -990,7 +1091,12 @@ namespace GameDevTV.RTS.Player
                 && PrologueController.Instance.TryGetTileIndex(snap, out int tile))
             {
                 if (!colony.Preview(tile, id, out string reason))
+                {
+                    if (id == PrologueBuildingId.Aquifer
+                        && colony.Board.At(tile).Feature is PrologueFeature.Ice or PrologueFeature.Glacier)
+                        return "Drill goes on the flat hex beside the ice — follow the blue build ghost.";
                     return string.IsNullOrEmpty(reason) ? "Can't place here." : reason;
+                }
                 int cost = PrologueData.MineralCost(id);
                 int weeks = PrologueData.Get(id).BuildWeeks + PrologueData.HaulWeeks(colony.SupplyDistance(tile));
                 if (cost <= 0)
@@ -1651,8 +1757,8 @@ namespace GameDevTV.RTS.Player
             if (PrologueController.IsActive
                 && !PlacementGhostActive
                 && PrologueDroneScan.Instance != null
-                && PrologueDroneScan.Instance.ScanMode
-                && !PrologueDroneScan.Instance.IsFlying)
+                && !PrologueDroneScan.Instance.IsFlying
+                && (PrologueDroneScan.Instance.ScanMode || PrologueDroneScan.Instance.AwaitingMarkPick))
             {
                 return;
             }
@@ -2738,6 +2844,73 @@ namespace GameDevTV.RTS.Player
                 if (t.Feature == PrologueFeature.Ice || t.Feature == PrologueFeature.Glacier) return i;
             }
             return -1;
+        }
+
+        static bool TryFlyToAquiferBuildSiteIfNeeded(BaseCommand command)
+        {
+            if (!PrologueController.IsActive) return false;
+            if (command is not BuildBuildingCommand bbc || bbc.HandIndex < 0 || bbc.Building == null) return false;
+            if (bbc.Building.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (!TryResolveAquiferFocusWorld(out Vector3 focus)) return false;
+            FlyCameraToWorldPosition(focus, 1.15f);
+            return true;
+        }
+
+        static bool TryResolveAquiferFocusWorld(out Vector3 world)
+        {
+            world = default;
+            var ctrl = PrologueController.Instance;
+            var colony = ctrl?.Colony;
+            if (colony == null) return false;
+
+            var suggestPads = UnityEngine.Object.FindObjectsByType<PrologueRevealGhostPad>(FindObjectsInactive.Exclude);
+            float bestSq = float.MaxValue;
+            Vector3 cam = GetCameraFocusPosition();
+            PrologueRevealGhostPad best = null;
+            for (int i = 0; i < suggestPads.Length; i++)
+            {
+                var pad = suggestPads[i];
+                if (pad == null || pad.BoardTileIndex < 0) continue;
+                if (pad.gameObject.name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                if (!colony.CanPlaceAquiferPad(pad.BoardTileIndex)) continue;
+                if (!colony.Preview(pad.BoardTileIndex, PrologueBuildingId.Aquifer, out _)) continue;
+                float sq = ColonyTileGrid.HorizontalDistSq(cam, pad.transform.position);
+                if (sq >= bestSq) continue;
+                bestSq = sq;
+                best = pad;
+            }
+
+            if (best != null)
+            {
+                world = best.transform.position;
+                return true;
+            }
+
+            int secondIce = colony.PrologueStep >= 4 ? colony.SecondIceTargetTile() : -1;
+            int iceAnchor = -1;
+            if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && secondIce >= 0)
+                iceAnchor = secondIce;
+            else if (colony.Board.FirstIceTiles.Count > 0)
+                iceAnchor = FirstSetElement(colony.Board.FirstIceTiles);
+            else
+            {
+                for (int i = 0; i < colony.Board.Tiles.Count; i++)
+                {
+                    var t = colony.Board.At(i);
+                    if (!t.Revealed || t.DepositLeft <= 0) continue;
+                    if (t.Feature != PrologueFeature.Ice && t.Feature != PrologueFeature.Glacier) continue;
+                    iceAnchor = i;
+                    break;
+                }
+            }
+
+            if (iceAnchor < 0) iceAnchor = colony.NearestRevealedIceTile(FindBuildingTileIndex(colony, PrologueBuildingId.CommandPost));
+            if (iceAnchor < 0) return false;
+            if (!colony.TryFindAquiferPadNearIce(iceAnchor, out int padTile)) return false;
+            if (!ctrl.TryGetCell(padTile, out Vector2Int padCell)) return false;
+            world = ColonyTileGrid.CellToWorldOnHighestGround(padCell);
+            return true;
         }
 
         static int FirstSetElement(System.Collections.Generic.HashSet<int> set)

@@ -210,7 +210,7 @@ namespace GameDevTV.RTS.Prologue
             if (claimed.Contains(cell)) return false;
             if (MinSeparationFromClaimed(cell, claimed) < MinHexGapBetweenDeposits) return false;
 
-            Vector3 world = ColonyTileGrid.CellToWorldOnGround(cell);
+            Vector3 world = ColonyTileGrid.CellToWorldOnHighestGround(cell);
             if (!ctrl.TryGetTileIndex(world, out tileIndex)) return false;
             var t = colony.Board.At(tileIndex);
             if (t.Building != PrologueBuildingId.None && t.Building != PrologueBuildingId.CommandPost)
@@ -238,7 +238,7 @@ namespace GameDevTV.RTS.Prologue
 
         static void SnapNodeToTile(PrologueController ctrl, SectorNode node, Vector2Int cell, PlanetGenerator planet)
         {
-            Vector3 ground = ColonyTileGrid.CellToWorldOnGround(cell);
+            Vector3 ground = ColonyTileGrid.CellToWorldOnHighestGround(cell);
             if (planet != null)
                 ground.y = planet.SampleGroundY(ground);
             node.position = ground;
@@ -249,6 +249,7 @@ namespace GameDevTV.RTS.Prologue
             {
                 node.visualGO.transform.position = ground;
                 node.visualGO.transform.localScale = new Vector3(0.7f, 0.12f, 0.7f);
+                GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(node.visualGO, 0.05f);
             }
         }
 
@@ -277,12 +278,13 @@ namespace GameDevTV.RTS.Prologue
             var hr = dot.AddComponent<HiddenResource>();
             hr.ResourceTypeName = resourceType;
             Object.Destroy(dot.GetComponent<Collider>());
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(dot, 0.05f);
             node.visualGO = dot;
         }
 
         static void EnsureQuestionMark(SectorNode node, Vector2Int cell, PlanetGenerator planet)
         {
-            Vector3 ground = ColonyTileGrid.CellToWorldOnGround(cell);
+            Vector3 ground = ColonyTileGrid.CellToWorldOnHighestGround(cell);
             if (planet != null)
                 ground.y = planet.SampleGroundY(ground);
 

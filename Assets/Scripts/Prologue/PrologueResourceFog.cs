@@ -548,20 +548,10 @@ namespace GameDevTV.RTS.Prologue
                 ApplyTypedDotColor(node);
             }
 
+            PrologueDepositVisuals.SeatNode(node);
+
             if (node.questionMarkGO != null)
-            {
-                var tmp = node.questionMarkGO.GetComponent<TMP_Text>();
-                if (tmp != null)
-                {
-                    string label = !string.IsNullOrEmpty(node.labelOverride)
-                        ? node.labelOverride
-                        : node.type.ToString();
-                    tmp.text = label;
-                    tmp.color = node.type == SectorNode.NodeType.Feature
-                        ? new Color(0.55f, 0.95f, 1f)
-                        : new Color(1f, 0.95f, 0.55f);
-                }
-            }
+                node.questionMarkGO.SetActive(false);
 
             if (node.visualGO != null
                 && node.visualGO.TryGetComponent(out HiddenResource hr))

@@ -21,6 +21,9 @@ namespace GameDevTV.RTS.Prologue
         /// <summary>Flat hex footprint instead of full site mesh (RTS view only needs silhouette).</summary>
         public static bool SilhouetteFootprintsOnly;
 
+        /// <summary>Floating building names on suggest ghosts (off — mesh tint + cards are enough).</summary>
+        public static bool ShowWorldLabels;
+
         public static bool FrustumCullRevealGhosts;
 
         readonly Dictionary<string, GameObject> ghosts = new();
@@ -85,13 +88,53 @@ namespace GameDevTV.RTS.Prologue
             if (Instance == null)
                 new GameObject("PrologueRevealGhosts").AddComponent<PrologueRevealGhosts>();
             Instance.SyncAlreadyRevealed();
+            SuppressRedundantWorldLabels();
             bootstrapped = true;
+        }
+
+        /// <summary>Hide duplicate deposit/? text once meshes and ghosts mark the site.</summary>
+        public static void SuppressRedundantWorldLabels()
+        {
+            if (!PrologueController.IsActive) return;
+
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Include))
+            {
+                if (hr == null) continue;
+                var label = hr.transform.Find("DepositLabel");
+                if (label != null)
+                    label.gameObject.SetActive(false);
+            }
+
+            var sm = SectorManager.Instance;
+            if (sm?.Sectors == null) return;
+            foreach (var sector in sm.Sectors)
+            {
+                if (sector?.Nodes == null) continue;
+                foreach (var node in sector.Nodes)
+                {
+                    if (node == null || !node.isExplored) continue;
+                    if (node.questionMarkGO != null)
+                        node.questionMarkGO.SetActive(false);
+                }
+            }
         }
 
         public static void ResetSession()
         {
             bootstrapped = false;
+            MeshCache.Clear();
             Instance?.Clear();
+        }
+
+        /// <summary>Drops cached meshes and re-spawns ghosts (e.g. after toggling silhouette mode).</summary>
+        public static void ForceResyncMeshes()
+        {
+            MeshCache.Clear();
+            if (Instance == null) return;
+            Instance.Clear();
+            bootstrapped = false;
+            BootstrapFromColonyIfNeeded();
+            SuppressRedundantWorldLabels();
         }
 
         public static void OnTileSurveyRevealed(int tileIndex) => Instance?.TryEnsureIceAt(tileIndex);
@@ -139,7 +182,20 @@ namespace GameDevTV.RTS.Prologue
             string key = IceKey(cell);
             if (ghosts.TryGetValue(key, out var existing) && existing != null) return;
 
-            var ghost = SpawnGhost(aquifer, ColonyTileGrid.CellToWorldOnGround(cell));
+            if (!colony.TryFindAquiferPadNearIce(tileIndex, out int padTile)
+                || !ctrl.TryGetCell(padTile, out Vector2Int padCell))
+            {
+                PrologueDepositVisuals.SeatNodesForBoardTile(ctrl, tileIndex);
+                return;
+            }
+
+            PrologueDepositVisuals.SeatNodesForBoardTile(ctrl, tileIndex);
+            var ghost = SpawnGhost(
+                aquifer,
+                ColonyTileGrid.CellToWorldOnHighestGround(padCell),
+                padCell,
+                null,
+                padTile);
             if (ghost != null) ghosts[key] = ghost;
         }
 
@@ -147,8 +203,21 @@ namespace GameDevTV.RTS.Prologue
         {
             if (node == null || !node.isExplored || node.type == SectorNode.NodeType.Nexus) return;
 
+            var ctrl = PrologueController.Instance;
             BuildingSO building = BuildingForNode(node);
             if (building == null) return;
+
+            if (node.type == SectorNode.NodeType.Feature
+                && building.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                var colony = ctrl?.Colony;
+                if (colony != null && ctrl != null && ctrl.TryGetTileIndex(node.position, out int iceTile))
+                {
+                    TryEnsureIceAt(iceTile);
+                    HideNodeMarker(node);
+                    return;
+                }
+            }
 
             Vector2Int cell = ColonyTileGrid.WorldToCell(node.position);
             string iceKey = IceKey(cell);
@@ -168,8 +237,20 @@ namespace GameDevTV.RTS.Prologue
             string key = NodeKey(node);
             if (ghosts.TryGetValue(key, out var existing) && existing != null) return;
 
-            Vector3 world = ColonyTileGrid.ApplyGroundY(node.position);
-            var ghost = SpawnGhost(building, world);
+            Vector2Int depositCell = cell;
+            int boardTile = -1;
+            Vector3 world;
+            if (ctrl != null && ctrl.TryGetTileIndex(node.position, out int tile) && ctrl.TryGetCell(tile, out depositCell))
+            {
+                boardTile = tile;
+                world = ColonyTileGrid.CellToWorldOnHighestGround(depositCell);
+            }
+            else
+            {
+                depositCell = ColonyTileGrid.WorldToCell(node.position);
+                world = ColonyTileGrid.CellToWorldOnHighestGround(depositCell);
+            }
+            var ghost = SpawnGhost(building, world, depositCell, null, boardTile);
             if (ghost == null) return;
             ghosts[key] = ghost;
             HideNodeMarker(node);
@@ -262,11 +343,20 @@ namespace GameDevTV.RTS.Prologue
             return false;
         }
 
-        static GameObject SpawnGhost(BuildingSO building, Vector3 world)
+        static GameObject SpawnGhost(
+            BuildingSO building,
+            Vector3 world,
+            Vector2Int cell = default,
+            string subtitle = null,
+            int boardTileIndex = -1)
         {
             if (building == null) return null;
-            Mesh mesh = SilhouetteFootprintsOnly ? FootprintMesh(building) : MeshFor(building);
+            bool footprint = SilhouetteFootprintsOnly;
+            Mesh mesh = footprint ? FootprintMesh(building) : MeshFor(building);
             if (mesh == null) return null;
+
+            world = ColonyTileGrid.CellToWorldOnHighestGround(cell);
+            world.y += 0.06f;
 
             Color tint = TintFor(building);
             var ghost = new GameObject($"RevealGhost_{building.Name}");
@@ -291,9 +381,26 @@ namespace GameDevTV.RTS.Prologue
             box.size = mesh.bounds.size;
 
             SeatOnGround(ghost, world.y);
-            if (!SilhouetteFootprintsOnly)
-                AddName(ghost, building.Name, tint);
+            if (ShowWorldLabels)
+                AddName(ghost, DisplayLabel(building), tint, cell, footprint, subtitle);
+
+            if (boardTileIndex >= 0)
+            {
+                var pad = ghost.AddComponent<PrologueRevealGhostPad>();
+                pad.BoardTileIndex = boardTileIndex;
+            }
+
             return ghost;
+        }
+
+        static string DisplayLabel(BuildingSO building)
+        {
+            if (building == null) return "Deposit";
+            if (building.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Ice Aquifer";
+            if (building.Name.IndexOf("Oxygen", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return "O₂ Plant";
+            return building.Name;
         }
 
         static Mesh FootprintMesh(BuildingSO building)
@@ -321,8 +428,8 @@ namespace GameDevTV.RTS.Prologue
 
         static Mesh MeshFor(BuildingSO building)
         {
-            string name = building?.Name ?? string.Empty;
-            if (SilhouetteFootprintsOnly) return FootprintMesh(building);
+            if (building == null) return null;
+            string name = building.Name ?? string.Empty;
             if (MeshCache.TryGetValue(name, out var cached) && cached != null)
                 return cached;
 
@@ -331,6 +438,9 @@ namespace GameDevTV.RTS.Prologue
                 mesh = WaterIceAquiferMeshBuilder.SharedMesh;
             else
                 mesh = ColonyBuildingMeshLibrary.Build(name);
+
+            if (mesh == null)
+                mesh = MeshFromBuildingPrefab(building);
 
             if (mesh == null)
             {
@@ -359,46 +469,83 @@ namespace GameDevTV.RTS.Prologue
             return mesh;
         }
 
-        static void SeatOnGround(GameObject ghost, float groundY)
+        static Mesh MeshFromBuildingPrefab(BuildingSO building)
         {
-            float minY = float.PositiveInfinity;
-            bool any = false;
-            foreach (var renderer in ghost.GetComponentsInChildren<Renderer>(true))
+            if (building?.Prefab == null) return null;
+            var filters = building.Prefab.GetComponentsInChildren<MeshFilter>(true);
+            if (filters == null || filters.Length == 0) return null;
+
+            var root = building.Prefab.transform;
+            var combines = new List<CombineInstance>(filters.Length);
+            foreach (var filter in filters)
             {
-                if (renderer == null || !renderer.enabled) continue;
-                if (renderer is ParticleSystemRenderer) continue;
-                minY = Mathf.Min(minY, renderer.bounds.min.y);
-                any = true;
+                if (filter == null || filter.sharedMesh == null) continue;
+                combines.Add(new CombineInstance
+                {
+                    mesh = filter.sharedMesh,
+                    transform = root.worldToLocalMatrix * filter.transform.localToWorldMatrix
+                });
             }
-            if (!any || float.IsInfinity(minY)) return;
-            float sink = groundY - minY;
-            if (sink > 0.02f)
-                ghost.transform.position += Vector3.up * sink;
+
+            if (combines.Count == 0) return null;
+            if (combines.Count == 1)
+                return combines[0].mesh;
+
+            var combined = new Mesh { name = $"{building.Name}_RevealGhost" };
+            combined.CombineMeshes(combines.ToArray(), true, true);
+            combined.RecalculateBounds();
+            return combined;
         }
 
-        static void AddName(GameObject ghost, string buildingName, Color tint)
+        static void SeatOnGround(GameObject ghost, float groundY)
         {
-            float top = ghost.transform.position.y + 2.4f;
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(ghost, 0.06f);
+        }
+
+        static Vector3 LabelOffsetMeters(Vector2Int cell)
+        {
+            if (cell.x == 0 && cell.y == 0) return Vector3.zero;
+            int h = Mathf.Abs(cell.x * 73856093 ^ cell.y * 19349663);
+            float y = (h % 80) * 0.04f;
+            float x = ((h % 31) - 15) * 0.22f;
+            float z = ((h % 37) - 18) * 0.22f;
+            return new Vector3(x, y, z);
+        }
+
+        static void AddName(GameObject ghost, string buildingName, Color tint, Vector2Int cell, bool footprint, string subtitle)
+        {
+            float top = ghost.transform.position.y + (footprint ? 0.45f : 2.4f);
             foreach (var renderer in ghost.GetComponentsInChildren<Renderer>(true))
             {
                 if (renderer == null || !renderer.enabled) continue;
                 top = Mathf.Max(top, renderer.bounds.max.y);
             }
 
+            Vector3 labelOff = LabelOffsetMeters(cell);
+            float labelHeight = top - ghost.transform.position.y + 0.85f + labelOff.y;
             var textGo = new GameObject("Ghost Name");
-            textGo.transform.SetParent(ghost.transform, true);
-            textGo.transform.position = new Vector3(ghost.transform.position.x, top + 0.85f, ghost.transform.position.z);
-            textGo.transform.localScale = Vector3.one * 1.6f;
-            textGo.AddComponent<FaceCamera>();
+            textGo.transform.SetParent(ghost.transform, false);
+            textGo.transform.localPosition = new Vector3(labelOff.x, labelHeight, labelOff.z);
+            textGo.transform.localScale = Vector3.one * (footprint ? 1.35f : 1.75f);
+            var billboard = PrologueBillboardLabel.Ensure(textGo);
+            if (billboard != null)
+            {
+                billboard.AnchorToGround = false;
+                billboard.SetReadability(30f, 1.15f, 1.85f);
+            }
 
             var tmp = textGo.AddComponent<TextMeshPro>();
-            tmp.text = buildingName;
-            tmp.fontSize = 6f;
+            tmp.text = string.IsNullOrEmpty(subtitle)
+                ? buildingName
+                : $"{buildingName}\n<size=70%>{subtitle}</size>";
+            tmp.fontSize = footprint ? 6.5f : 7.5f;
+            tmp.lineSpacing = -4f;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Bold;
             tmp.color = Color.white;
-            tmp.outlineWidth = 0.22f;
-            tmp.outlineColor = new Color(tint.r * 0.25f, tint.g * 0.25f, tint.b * 0.25f, 1f);
+            tmp.outlineWidth = 0.28f;
+            tmp.outlineColor = new Color(tint.r * 0.2f, tint.g * 0.2f, tint.b * 0.2f, 1f);
             tmp.enableAutoSizing = false;
             tmp.raycastTarget = false;
         }

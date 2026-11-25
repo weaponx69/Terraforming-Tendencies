@@ -405,6 +405,8 @@ namespace GameDevTV.RTS.UI.Components
                 this.icon.sprite = icon;
                 this.icon.enabled = true;
                 this.icon.color = Color.white;
+                this.icon.preserveAspect = true;
+                this.icon.type = Image.Type.Simple;
             }
         }
 

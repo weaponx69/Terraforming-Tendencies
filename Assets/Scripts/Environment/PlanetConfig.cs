@@ -42,6 +42,14 @@ namespace GameDevTV.RTS.Environment
         public float BiomassDrainRate = 1f; // Biomass lost per second
         public float IntegrityDrainRate = 0.5f; // Integrity lost per second
 
+        [Header("Globe presentation")]
+        [Tooltip("World-unit diameter of the repeating flat terrain patch (camera wrap / middle-mouse spin).")]
+        public float PlanetPatchDiameter = 768f;
+        [Tooltip("Horizon bend radius — only used when EnableHorizonCurvature is on.")]
+        public float HorizonBodyRadiusMeters = 1737400f;
+        [Tooltip("Shader vertex bend (off = flat geometry; use PlanetPatchDiameter for more space).")]
+        public bool EnableHorizonCurvature;
+
         [Header("Sectors")]
         public int SectorsX = 3;
         public int SectorsY = 3;

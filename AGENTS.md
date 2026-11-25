@@ -1,29 +1,39 @@
-# Agent Instructions — Terraforming Tendencies
+# Agent instructions — Terraforming Tendencies
 
-## Read before any task (in order)
+**Start here.** Cursor already loads [`.cursor/rules/`](.cursor/rules/) (`alwaysApply`). Do **not** read [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) cover to cover.
 
-1. **[`.cursor/rules/vertical-slice-not-module.mdc`](.cursor/rules/vertical-slice-not-module.mdc)** — Prologue = **vertical slice of the full game**, not a separate module; no “prologue-only” silos for core systems.
-2. **[`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md)** — authoritative architecture and current systems (start with **§0**).
-3. **[`GDD.md`](GDD.md)** — when the change affects rules, balance, or player experience.
+**Out of scope:** Summer Engine MCP/skills, Hostinger, and other global Cursor skills unless the workspace is explicitly that product.
 
-Spec mirror: [`docs/specs/2026-11-24-vertical-slice-authority.md`](docs/specs/2026-11-24-vertical-slice-authority.md).
+## Authority
 
-## Additional rules (when relevant)
+| Topic | Wins |
+|--------|------|
+| Mechanics, architecture, harnesses | [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) |
+| Lore / tone / design intent | [`GDD.md`](GDD.md) (not run rules) |
 
-| Topic | Document |
-|-------|----------|
-| **Vertical slice = the game (permanent)** | [`.cursor/rules/vertical-slice-not-module.mdc`](.cursor/rules/vertical-slice-not-module.mdc) + [`docs/specs/2026-11-24-vertical-slice-authority.md`](docs/specs/2026-11-24-vertical-slice-authority.md) |
-| **Player verification (whole project — no smoke tests)** | [`docs/specs/2026-11-23-player-verification-policy.md`](docs/specs/2026-11-23-player-verification-policy.md) + [`.cursor/rules/player-verify-after-changes.mdc`](.cursor/rules/player-verify-after-changes.mdc) |
-| **Prologue UI playthrough bot (resume / automate slice)** | [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) **§10.1** — harnesses, env vars, recent code touchpoints, open work |
-| Unity CLI / live Editor commands (**CLI only — Unity MCP deprecated**) | [`.zoo/rules/UnityCLI-Automation.md`](.zoo/rules/UnityCLI-Automation.md) |
-| Visual Scripting conversion | [`.zoo/rules/UnityVisualScripting-conversion.md`](.zoo/rules/UnityVisualScripting-conversion.md) |
-| GitHub Copilot | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) |
-| Zoo custom modes | [`.zoomodes`](.zoomodes) |
+If `PROJECT_KNOWLEDGE.md` and `plans/project_knowledge.md` disagree, follow **PROJECT_KNOWLEDGE.md**.
 
-If `PROJECT_KNOWLEDGE.md` and `plans/project_knowledge.md` disagree, follow **`PROJECT_KNOWLEDGE.md`**.
+## Default read (most tasks)
 
-## Visible files
+1. **§0** — vertical slice run model + owner script table  
+2. **§2** — code map / where logic lives  
 
-Write every file the owner should be able to open in a visible folder. Design docs go in `docs/specs/`. Plans go in `docs/plans/`.
+Optional: **§4** (don't reintroduce), **§10** (Unity CLI), **§10.1** (UI bot).
 
-Never create, move, or edit a file whose name starts with `.`, or whose path contains a folder that starts with `.`. That includes `.summer/`, `.zoo/`, `.github/`, and `.cursor/`. If an existing note already lives in one of those folders, leave it there and put the new file in a visible folder.
+Balance or narrative changes: add **GDD.md**.
+
+## Task router
+
+| You're working on… | Also use | Verify (if player-visible) |
+|--------------------|----------|----------------------------|
+| Slice gameplay, UI, survey, cards, perf | Rules: `vertical-slice`, `player-verify`, `rts-perf-budget` | [`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh) or [`tools/click-order-diagnostic.sh`](tools/click-order-diagnostic.sh) for perf/input |
+| Unity Editor / CLI / eval | PK **§10**, rule `unity-cli.mdc` | `unity status` → `ready` |
+| Feature design (colonists, DEM, research…) | Matching `docs/specs/2026-11-*.md` only | Same as row 1 if it ships in slice |
+| Archived Colony Acts | PK **§3**, §0.2–0.7 (reference) | [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) only if asked |
+| Docs-only / comments / pure refactor | — | Build if C# touched; no Play required |
+
+**Player verify (summary):** One Editor; real UI; evidence (screenshot, `steps.jsonl`, or observed outcome). Compile-only ≠ done. Full policy: [`docs/specs/2026-11-23-player-verification-policy.md`](docs/specs/2026-11-23-player-verification-policy.md). Harness detail: PK **§10.1**.
+
+## Visible files for new work
+
+Design → `docs/specs/`. Plans → `docs/plans/`. Do not add **new** owner-facing docs under dot-prefixed folders (`.summer/`, `.zoo/`). **Exception:** maintain existing [`.cursor/rules/`](.cursor/rules/) for agents.

@@ -212,7 +212,7 @@ namespace GameDevTV.RTS.Prologue
 
         void EnsureQuad()
         {
-            float y = ColonyTileGrid.SampleGroundY(new Vector3(minX + worldW * 0.5f, 0f, minZ + worldH * 0.5f)) + 0.04f;
+            float y = ColonyTileGrid.SampleGroundY(new Vector3(minX + worldW * 0.5f, 0f, minZ + worldH * 0.5f)) + 0.12f;
             if (quadRenderer == null)
             {
                 var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);

@@ -1,6 +1,9 @@
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
+using GameDevTV.RTS.Player;
+using GameDevTV.RTS.Prologue;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.Utilities;
 using UnityEngine;
 using GameDevTV.RTS.VisualScriptingStubs;
 
@@ -103,6 +106,8 @@ namespace GameDevTV.RTS.Environment
         /// <summary>Larger emissive pad + floating type label so mine spots read from camera height.</summary>
         private void EnhanceDepositBeacon()
         {
+            ReservedSiteBuildUtility.SeatVisualsOnGround(gameObject, 0.05f);
+
             transform.localScale = new Vector3(
                 Mathf.Max(transform.localScale.x, 1.4f),
                 Mathf.Max(transform.localScale.y, 0.15f),
@@ -120,10 +125,21 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
+            if (PrologueController.IsActive)
+                return;
             if (transform.Find("DepositLabel") != null) return;
             var labelGo = new GameObject("DepositLabel");
+            labelGo.transform.SetParent(transform, true);
+            Vector2Int cell = ColonyTileGrid.WorldToCell(transform.position);
+            int h = Mathf.Abs(cell.x * 73856093 ^ cell.y * 19349663);
+            float jitterY = (h % 80) * 0.04f;
+            float jitterX = ((h % 31) - 15) * 0.22f;
+            float jitterZ = ((h % 37) - 18) * 0.22f;
             labelGo.transform.SetParent(transform, false);
-            labelGo.transform.localPosition = Vector3.up * 2.8f;
+            labelGo.transform.localPosition = new Vector3(jitterX, 2.2f + jitterY, jitterZ);
+            var billboard = PrologueBillboardLabel.Ensure(labelGo);
+            if (billboard != null)
+                billboard.AnchorToGround = false;
             var tmp = labelGo.AddComponent<TMPro.TextMeshPro>();
             tmp.text = string.IsNullOrEmpty(ResourceTypeName) ? "Deposit" : ResourceTypeName;
             tmp.fontSize = 5.5f;
@@ -131,6 +147,8 @@ namespace GameDevTV.RTS.Environment
             tmp.fontStyle = TMPro.FontStyles.Bold;
             tmp.color = new Color(1f, 0.95f, 0.55f, 1f);
             tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            tmp.enableAutoSizing = false;
+            tmp.raycastTarget = false;
         }
     }
 }

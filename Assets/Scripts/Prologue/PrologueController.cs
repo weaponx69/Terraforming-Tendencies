@@ -211,7 +211,7 @@ namespace GameDevTV.RTS.Prologue
                 ProloguePerfScenario.Apply(this);
         }
 
-        /// <summary>Baked survey trails, silhouette ghosts, overlay fit — default for the vertical slice.</summary>
+        /// <summary>Baked survey trails, full-mesh reveal ghosts, overlay fit — default for the vertical slice.</summary>
         static void ApplySliceRenderingPerformanceDefaults()
         {
             // Survey trails: one transparent ground quad + per-hex brown tint — not DirtRoad_* cube meshes.
@@ -219,8 +219,11 @@ namespace GameDevTV.RTS.Prologue
             PrologueSearchedTiles.UseBakedPathOverlay = true;
             PrologueSearchedTiles.TileTintOnly = true;
             PrologueSearchedTiles.UseCubeRoadMeshes = false;
-            PrologueRevealGhosts.SilhouetteFootprintsOnly = true;
+            PrologueRevealGhosts.SilhouetteFootprintsOnly = false;
             PrologueRevealGhosts.FrustumCullRevealGhosts = false;
+            PrologueRevealGhosts.ShowWorldLabels = false;
+            PrologueRevealGhosts.ForceResyncMeshes();
+            PrologueRevealGhosts.SuppressRedundantWorldLabels();
             PrologueDroneScan.EnableRubberBandPreview = false;
             if (Instance != null)
                 ProloguePathGroundOverlay.Instance?.FitBoard(Instance);
@@ -364,6 +367,7 @@ namespace GameDevTV.RTS.Prologue
 
             // GroundBuilding nav-snaps XZ off the hex. Put the mesh back on the disc.
             seated.transform.position = padPos;
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.GroundBuilding(seated);
             commandPostVisual = seated.gameObject;
             if (pad != null)
             {

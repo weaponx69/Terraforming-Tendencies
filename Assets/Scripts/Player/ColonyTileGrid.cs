@@ -63,6 +63,57 @@ namespace GameDevTV.RTS.Player
             return p;
         }
 
+        /// <summary>Hex center Y from highest ground sample in the cell (slopes / hill pads).</summary>
+        public static Vector3 CellToWorldOnHighestGround(Vector2Int cell)
+        {
+            Vector3 center = CellToWorld(cell, 0f);
+            center.y = HighestGroundYInCell(cell);
+            return center;
+        }
+
+        /// <summary>Max terrain Y sampled across the hex (center + inner + rim).</summary>
+        public static float HighestGroundYInCell(Vector2Int cell)
+        {
+            Vector3 center = CellToWorld(cell, 0f);
+            float y = SampleGroundY(center);
+            SampleHexRingY(center, TileSize * 0.42f, ref y);
+            SampleHexRingY(center, TileSize * 0.88f, ref y);
+            return y;
+        }
+
+        /// <summary>Peak − valley inside the hex — used to avoid hillside build suggests.</summary>
+        public static float HexLocalSlopeMeters(Vector2Int cell)
+        {
+            Vector3 center = CellToWorld(cell, 0f);
+            float minY = SampleGroundY(center);
+            float maxY = minY;
+            AccumulateHexRingSlope(center, TileSize * 0.42f, ref minY, ref maxY);
+            AccumulateHexRingSlope(center, TileSize * 0.88f, ref minY, ref maxY);
+            return maxY - minY;
+        }
+
+        static void SampleHexRingY(Vector3 center, float radius, ref float maxY)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI / 3f;
+                var sample = center + new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
+                maxY = Mathf.Max(maxY, SampleGroundY(sample));
+            }
+        }
+
+        static void AccumulateHexRingSlope(Vector3 center, float radius, ref float minY, ref float maxY)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI / 3f;
+                var sample = center + new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
+                float sy = SampleGroundY(sample);
+                minY = Mathf.Min(minY, sy);
+                maxY = Mathf.Max(maxY, sy);
+            }
+        }
+
         public static float SampleGroundY(Vector3 worldPos)
         {
             if (PlanetGenerator.Instance != null)

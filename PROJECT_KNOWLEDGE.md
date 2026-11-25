@@ -1,15 +1,17 @@
 ### Terraforming Tendencies — Project Knowledge & Architecture Notes
 
+**Agents:** Do not read this file end-to-end. Start at [`AGENTS.md`](AGENTS.md) (task router). Default skim: **§0** + **§2** only. Cursor rules (`vertical-slice`, `player-verify`, `rts-perf-budget`) load automatically.
+
 **📚 Central Hub Documentation**
+* **Agent entry:** [`AGENTS.md`](AGENTS.md)
 * **Game Design Document (lore / mechanics intent):** [GDD.md](GDD.md) — lore only; **this file wins** on run rules
 * **Visual Scripting & C# Refactoring:** [.zoo/rules/UnityVisualScripting-conversion.md](.zoo/rules/UnityVisualScripting-conversion.md)
 * **AI Unity CLI Automation:** **§10** and [.zoo/rules/UnityCLI-Automation.md](.zoo/rules/UnityCLI-Automation.md)
-* **Agent Rules:** [`AGENTS.md`](AGENTS.md) (mirrored in `.clinerules` / `.zoomodes`)
-* **RTS performance & main-thread budgets (mandatory):** **§4.1**
+* **RTS / main-thread FPS guardrails:** [`.cursor/rules/rts-perf-budget.mdc`](.cursor/rules/rts-perf-budget.mdc) (summary **§4.1**)
 
 If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
-**Visible files:** New designs go in `docs/specs/`. New plans go in `docs/plans/`. Do not write them under a folder or file whose name starts with `.` (`.summer/`, `.cursor/`, and the rest). See [`AGENTS.md`](AGENTS.md).
+**Visible files:** New designs go in `docs/specs/`. New plans go in `docs/plans/`. Do not write them under a folder or file whose name starts with `.` (`.summer/`, `.cursor/`, and the rest) except maintaining [`.cursor/rules/`](.cursor/rules/). See [`AGENTS.md`](AGENTS.md).
 
 ---
 
@@ -17,7 +19,7 @@ If this file and `plans/project_knowledge.md` disagree, follow **this file**.
 
 **The Prologue is not a separate mini-game or permanent “Prologue module.”** It is the **vertical slice** of Terraforming Tendencies: the same loop the full game will ship (planet surface, sector deposits, survey-as-puzzle, typed resources, cards, placement, build weeks, End Week, corporate pressure). Scripts and types still live under `Prologue/` and `PrologueController` because that slice shipped first — **new work should generalize those patterns**, not fork parallel “Acts-only” or “prologue-only” mechanics unless explicitly archiving legacy code.
 
-**Agents:** binding rule [`.cursor/rules/vertical-slice-not-module.mdc`](.cursor/rules/vertical-slice-not-module.mdc) (`alwaysApply`); spec [`docs/specs/2026-11-24-vertical-slice-authority.md`](docs/specs/2026-11-24-vertical-slice-authority.md). Read **before** other agent work ([`AGENTS.md`](AGENTS.md)).
+**Agents:** [`AGENTS.md`](AGENTS.md) router; [`vertical-slice-not-module.mdc`](.cursor/rules/vertical-slice-not-module.mdc) (`alwaysApply`).
 
 **One-sentence game:** Frostpunk 2–like opening contract on a flat hex board — find ice, drill it, power an Oxygen Processor, house the shuttle, survive the dust storm — via **cards** and **End Week** (O2 / beds / power pressure). Survey exploration should play as a **spatial puzzle** (Blue Prince–like), not casual fog-clear. **Future:** same run model widens (more sectors, planet pick at start); the slice is the prototype, not an isolated tutorial.
 
@@ -330,48 +332,11 @@ First climate-pair join in a sector also pulses ~7% of remaining sector budget (
 
 ---
 
-## 4.1 Real-Time Strategy (RTS) Performance & Architecture Rules
+## 4.1 RTS performance (summary)
 
-This project is a **high-volume, flat-grid hexagonal strategy simulation** (Frostpunk-inspired). The engine tracks many map interactions, buildings, and active survey pathways at once; **strict main-thread budgets are mandatory**.
+**Canonical:** [`.cursor/rules/rts-perf-budget.mdc`](.cursor/rules/rts-perf-budget.mdc) (`alwaysApply`). Four traps: spatial index resets in loops, TMP glyph storms, synchronous survey/trail batches, unbounded time-lapse ticks.
 
-Follow these constraints so runtime does not collapse to **1–7 FPS**.
-
-### Critical braking bottlenecks (never reintroduce)
-
-#### 1. The full-board spatial reset trap
-
-* **The error:** Clearing, invalidating, or rebuilding spatial dictionaries (`HiddenByCell`, `SectorNodesByCell`) or running scene-wide searches (`FindObjectsByType`) inside real-time movement or reveal loops.
-* **The rule:** Configure object data-caching and spatial indexes **once at boot** (`ApplyHiddenState()` in [`PrologueResourceFog`](Assets/Scripts/Prologue/PrologueResourceFog.cs)). Mid-game lookups must be **O(1)** array reads or local hex-neighbor math. **Do not** call `InvalidateSpatialIndex()` dynamically during play.
-
-#### 2. TextMeshPro canvas rebuild storms
-
-* **The error:** UI strings with glyphs missing from the active TMP font sheet (`LiberationSans SDF`) — e.g. `◀`, `▶`, `✓`, `∞` — force catastrophic canvas geometry rebuilds (`OnPreRenderCanvas`) every frame.
-* **The rule:** Route copy through [`PrologueUiText.SanitizeForTmp`](Assets/Scripts/UI/PrologueUiText.cs). Use safe ASCII substitutes (`<`, `>`, `[OK]`).
-* **The rule:** Throttle primary overlay refresh — [`PrologueHUD`](Assets/Scripts/UI/PrologueHUD.cs) uses `HudRefreshMinInterval = 0.33f` so layout is not over-polled.
-
-#### 3. Synchronous rendering passes (`LitTiles`)
-
-* **The error:** Applying lighting, path visuals, or instantiating trail geometry for an entire tile batch on the survey **confirm** frame on the main thread.
-* **The rule:** Amortize line illumination and path tinting over **2–3 frames** (coroutine or time-sliced budget). Hard cap **5–10 cells per frame**. See [`PrologueSurveyMission`](Assets/Scripts/Prologue/PrologueSurveyMission.cs), [`ProloguePathGroundOverlay`](Assets/Scripts/Prologue/ProloguePathGroundOverlay.cs).
-
-#### 4. Unbounded simulation / time-lapse loops
-
-* **The error:** Runaway background ticks (`TickAllFromTimeLapse`, construction progress, week catch-up) with no per-frame breakout while the player waits on a build.
-* **The rule:** Every day/week or construction loop needs a hard iteration guard (e.g. `safetyCounter > 50` → `break` and defer remainder to the next frame). See [`PrologueTimeLapse`](Assets/Scripts/Prologue/PrologueTimeLapse.cs), [`PrologueConstruction`](Assets/Scripts/Prologue/PrologueConstruction.cs).
-
-**Related guards (already in tree):** Prologue hand rebuild must not loop per frame ([`CardDeckController.RebuildPrologueHand`](Assets/Scripts/Player/CardDeckController.cs), [`PrologueController.RefreshHandUnlocks`](Assets/Scripts/Prologue/PrologueController.cs)). Construction haul / aquifer ice range scans belong on **placement** and **completion**, not every idle tick.
-
-### Verification methodology
-
-Before marking a perf refactor **optimized** or **complete**, run the click-order dispatch matrix (Play Mode active):
-
-```bash
-SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh
-```
-
-Confirm `Assets/Playtest/click-order-diagnostic-report.json` (or run `matrix.json`) keeps **`maxDispatchSpikeMs` under 2.0** and gameplay stays near **60 FPS**. Instrumentation: [`ClickOrderDiagnostic`](Assets/Scripts/Diagnostics/ClickOrderDiagnostic.cs), [`PrologueFpsMonitor`](Assets/Scripts/Prologue/PrologueFpsMonitor.cs).
-
-For full vertical-slice UI load, also see **§10.1** ([`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh)).
+**Verify:** `SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh` — `maxDispatchSpikeMs` &lt; 2.0. Slice load: **§10.1** + [`ProloguePerformanceBudget`](Assets/Scripts/Prologue/ProloguePerformanceBudget.cs).
 
 ---
 

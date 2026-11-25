@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Solar Greenhouse
   cardDescription: Integrates vegetation modules into habitats. REQUIRES Atmosphere >= 0.20 atm.
+  icon: {fileID: 21300000, guid: 99b3ca01176747228fdb40e44ff6afcd, type: 3}
   buildingToUnlock: {fileID: 11400000, guid: c95c3e1dab5e4319985da9c675edcfc7, type: 2}
   minTemperature: -9999.0
   maxTemperature: 9999.0
