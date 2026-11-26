@@ -183,21 +183,33 @@ namespace GameDevTV.RTS.UI.Containers
 
         static void CardFaceSize(out float width, out float height)
         {
-            width = 196f;
-            height = 286f;
+            if (PrologueController.IsActive)
+            {
+                width = PrologueUiLayout.CardWidth;
+                height = PrologueUiLayout.CardHeight;
+            }
+            else
+            {
+                width = 196f;
+                height = 286f;
+            }
         }
+
+        float HandCardSpacing() =>
+            PrologueController.IsActive ? PrologueUiLayout.CardSpacing : cardSpacing;
 
         private void ApplyPlayingCardLayout()
         {
             CardFaceSize(out float width, out float height);
+            float gap = HandCardSpacing();
 
             containerRt = transform.parent as RectTransform;
             if (containerRt == null) containerRt = cardsRt;
 
             // Dock container bottom-left with a fixed viewport size (scroll if more cards).
-            int padL = 8, padR = 8, padT = 6, padB = 6;
+            int padL = 6, padR = 6, padT = 4, padB = 4;
             viewportWidth = visibleCardCount * width
-                + Mathf.Max(0, visibleCardCount - 1) * cardSpacing
+                + Mathf.Max(0, visibleCardCount - 1) * gap
                 + padL + padR;
             float viewportHeight = height + padT + padB;
 
@@ -233,7 +245,7 @@ namespace GameDevTV.RTS.UI.Containers
             var hlg = GetComponent<HorizontalLayoutGroup>();
             if (hlg == null) hlg = gameObject.AddComponent<HorizontalLayoutGroup>();
             hlg.enabled = true;
-            hlg.spacing = cardSpacing;
+            hlg.spacing = gap;
             hlg.childAlignment = TextAnchor.MiddleLeft;
             hlg.childControlWidth = false;
             hlg.childControlHeight = false;
@@ -308,16 +320,17 @@ namespace GameDevTV.RTS.UI.Containers
                 le.minHeight = height;
             }
 
+            float gap = HandCardSpacing();
             contentWidth = activeSlots <= 0
                 ? leftPad + rightPad
                 : activeSlots * width
-                  + Mathf.Max(0, activeSlots - 1) * cardSpacing
+                  + Mathf.Max(0, activeSlots - 1) * gap
                   + leftPad + rightPad;
 
             viewportWidth = Mathf.Min(
                 contentWidth,
                 visibleCardCount * width
-                + Mathf.Max(0, visibleCardCount - 1) * cardSpacing
+                + Mathf.Max(0, visibleCardCount - 1) * gap
                 + leftPad + rightPad);
 
             float viewportHeight = height + topPad + bottomPad;
@@ -340,9 +353,8 @@ namespace GameDevTV.RTS.UI.Containers
 
         float EffectiveBottomMargin()
         {
-            // Lift the hand in Prologue so full card faces clear the screen edge.
-            if (GameDevTV.RTS.Prologue.PrologueController.Instance != null)
-                return Mathf.Max(bottomMargin, 48f);
+            if (PrologueController.IsActive)
+                return PrologueUiLayout.CardBottomMargin;
             return bottomMargin;
         }
 
@@ -514,6 +526,13 @@ namespace GameDevTV.RTS.UI.Containers
             lastHandFingerprint = fingerprint;
             lastHandCount = hand.Count;
             return true;
+        }
+
+        public void ApplyPrologueCompactLayout()
+        {
+            if (!isBuilt) return;
+            ApplyPlayingCardLayout();
+            RefreshBar();
         }
 
         public void RefreshBar()

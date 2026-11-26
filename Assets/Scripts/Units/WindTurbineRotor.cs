@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Units
                 rate *= stormBoost;
             if (host != null && host.Progress.State != BuildingProgress.BuildingState.Completed)
                 rate *= 0.15f;
-            transform.Rotate(0f, rate * Time.deltaTime, 0f, Space.Self);
+            transform.Rotate(0f, 0f, rate * Time.deltaTime, Space.Self);
         }
     }
 

@@ -22,7 +22,7 @@ namespace GameDevTV.RTS.Units
         static readonly Color Glass = new(0.12f, 0.16f, 0.20f);
         static readonly Color Beam = new(0.55f, 0.92f, 1f);
 
-        const int MeshVersion = 4;
+        const int MeshVersion = 5;
         static int builtVersion;
         static Mesh laserMesh;
         static Mesh stripMesh;
@@ -125,23 +125,23 @@ namespace GameDevTV.RTS.Units
             EnsureFresh();
             if (postMesh != null) return postMesh;
             var d = new Draft();
-            d.Disc(Vector3.zero, 2.15f, 0.05f, 22, Dirt);
-            d.Slope(0.05f, 2.1f, 0.16f, 1.45f, 18, Dirt);
-            d.Disc(Vector3.zero, 1.45f, 0.16f, 18, Dirt);
-            d.Box(new Vector3(1.15f, 0.08f, 0.4f), new Vector3(0.7f, 0.08f, 0.45f), Dirt);
-            d.Box(new Vector3(-0.9f, 0.07f, -0.7f), new Vector3(0.55f, 0.07f, 0.4f), Dirt);
-            d.Cylinder(new Vector3(0f, 0.72f, 0f), 0.82f, 1.15f, 16, Vector3.up, Pit);
-            d.Cylinder(new Vector3(0f, 1.42f, 0f), 0.52f, 0.38f, 14, Vector3.up, Pit);
-            d.Cylinder(new Vector3(0.95f, 0.48f, 0.15f), 0.32f, 0.55f, 10, Vector3.up, Pit);
-            d.Box(new Vector3(0f, 0.48f, 0.95f), new Vector3(0.42f, 0.55f, 0.28f), Pit);
-            d.Cylinder(new Vector3(0f, 0.95f, 0f), 0.84f, 0.07f, 16, Vector3.up, Metal);
-            d.Cylinder(new Vector3(-0.15f, 1.78f, 0.15f), 0.28f, 0.04f, 10, new Vector3(0.35f, 1f, 0.15f), Pit);
-            d.Cylinder(new Vector3(-0.55f, 1.55f, -0.2f), 0.025f, 0.7f, 5, Vector3.up, Pit);
-            d.Cylinder(new Vector3(0.15f, 1.62f, -0.35f), 0.02f, 0.85f, 5, Vector3.up, Pit);
+            d.Disc(Vector3.zero, 2.35f, 0.05f, 22, Dirt);
+            d.Slope(0.05f, 2.28f, 0.18f, 1.62f, 18, Dirt);
+            d.Disc(Vector3.zero, 1.62f, 0.18f, 18, Dirt);
+            d.Box(new Vector3(1.25f, 0.09f, 0.45f), new Vector3(0.78f, 0.09f, 0.5f), Dirt);
+            d.Box(new Vector3(-1.0f, 0.08f, -0.78f), new Vector3(0.62f, 0.08f, 0.45f), Dirt);
+            d.Cylinder(new Vector3(0f, 0.88f, 0f), 0.95f, 1.32f, 16, Vector3.up, Pit);
+            d.Cylinder(new Vector3(0f, 1.72f, 0f), 0.6f, 0.44f, 14, Vector3.up, Pit);
+            d.Cylinder(new Vector3(1.05f, 0.58f, 0.18f), 0.36f, 0.62f, 10, Vector3.up, Pit);
+            d.Box(new Vector3(0f, 0.58f, 1.05f), new Vector3(0.48f, 0.62f, 0.32f), Pit);
+            d.Cylinder(new Vector3(0f, 1.14f, 0f), 0.96f, 0.08f, 16, Vector3.up, Metal);
+            d.Cylinder(new Vector3(-0.18f, 2.12f, 0.18f), 0.32f, 0.05f, 10, new Vector3(0.35f, 1f, 0.15f), Pit);
+            d.Cylinder(new Vector3(-0.62f, 1.85f, -0.24f), 0.028f, 0.82f, 5, Vector3.up, Pit);
+            d.Cylinder(new Vector3(0.18f, 1.92f, -0.4f), 0.022f, 1f, 5, Vector3.up, Pit);
             for (int i = 0; i < 4; i++)
             {
                 float a = i * Mathf.PI * 0.5f + 0.4f;
-                d.Box(new Vector3(Mathf.Cos(a) * 0.78f, 0.78f, Mathf.Sin(a) * 0.78f), new Vector3(0.22f, 0.16f, 0.04f), Glow, a);
+                d.Box(new Vector3(Mathf.Cos(a) * 0.9f, 0.9f, Mathf.Sin(a) * 0.9f), new Vector3(0.26f, 0.18f, 0.05f), Glow, a);
             }
             postMesh = d.ToMesh("CommandPost");
             return postMesh;

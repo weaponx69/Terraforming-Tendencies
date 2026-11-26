@@ -1,6 +1,8 @@
 # Agent instructions — Terraforming Tendencies
 
-**Start here.** Cursor already loads [`.cursor/rules/`](.cursor/rules/) (`alwaysApply`). Do **not** read [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) cover to cover.
+**Start here.** Cursor already loads [`.cursor/rules/`](.cursor/rules/) (`alwaysApply`), including [`vertical-slice-not-module.mdc`](.cursor/rules/vertical-slice-not-module.mdc): the main-scene run is **the game**, not a separate module—do not fork or “prologue-only” core mechanics without explicit direction.
+
+**Wording:** In chat with the owner, frame tasks as **game / main run / vertical slice** work—not “prologue work.” Only say “prologue” when naming a file, type, or design step (0–6), and clarify that those names are legacy labels on the shipped loop. Do **not** read [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) cover to cover.
 
 **Out of scope:** Summer Engine MCP/skills, Hostinger, and other global Cursor skills unless the workspace is explicitly that product.
 
@@ -26,7 +28,7 @@ Balance or narrative changes: add **GDD.md**.
 
 | You're working on… | Also use | Verify (if player-visible) |
 |--------------------|----------|----------------------------|
-| Slice gameplay, UI, survey, cards, perf | Rules: `vertical-slice`, `player-verify`, `rts-perf-budget` | [`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh) or [`tools/click-order-diagnostic.sh`](tools/click-order-diagnostic.sh) for perf/input |
+| Slice gameplay, UI, survey, cards, perf | Rules: `vertical-slice`, `player-verify`, `rts-perf-budget`, `survey-team-no-camera-fly` (Survey Team card only) | [`tools/prologue-ui-playthrough.sh`](tools/prologue-ui-playthrough.sh) or [`tools/click-order-diagnostic.sh`](tools/click-order-diagnostic.sh) for perf/input |
 | Unity Editor / CLI / eval | PK **§10**, rule `unity-cli.mdc` | `unity status` → `ready` |
 | Feature design (colonists, DEM, research…) | Matching `docs/specs/2026-11-*.md` only | Same as row 1 if it ships in slice |
 | Archived Colony Acts | PK **§3**, §0.2–0.7 (reference) | [`tools/colony-acts-player-bot-cli.sh`](tools/colony-acts-player-bot-cli.sh) only if asked |

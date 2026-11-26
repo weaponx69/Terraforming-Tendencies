@@ -1,3 +1,5 @@
+using System;
+
 namespace GameDevTV.RTS.Prologue
 {
     public enum PrologueFeature
@@ -65,8 +67,14 @@ namespace GameDevTV.RTS.Prologue
         public const int NeedsMetSatisfactionGain = 8;
         public const int StepAdvancedFaithGain = 15;
         public const int QuietWeekFaithLoss = 8;
+        /// <summary>Faith bump when the colony meets life-support without advancing a story step.</summary>
+        public const int SteadyWeekFaithGain = 6;
         public const int DeadlineFaithLoss = 15;
         public const int DeadlinePressureWeeks = 2;
+        /// <summary>If Faith hits 0 but AIR ≥ this multiple of weekly need (and crew still works), contract extends here instead of cancelling.</summary>
+        public const int FaithRecoveryFloor = 12;
+        public static int AirReserveFaithExtensionThreshold(int weeklyNeed) =>
+            Math.Max(weeklyNeed, 1) * OxygenStoreTargetMult;
 
         public static PrologueBuildingInfo Get(PrologueBuildingId id) => id switch
         {

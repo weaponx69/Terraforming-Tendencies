@@ -95,7 +95,8 @@ namespace GameDevTV.RTS.Units
                 rotor.SetParent(root, false);
             }
 
-            rotor.localPosition = new Vector3(0f, 3.35f, 0f);
+            // Hub axle matches ColonyBuildingMeshLibrary.Windmill nacelle (y≈2.45, faces +Z).
+            rotor.localPosition = new Vector3(0f, 2.45f, 0.38f);
             rotor.localRotation = Quaternion.identity;
             rotor.localScale = Vector3.one;
 
@@ -118,8 +119,13 @@ namespace GameDevTV.RTS.Units
                     if (towerRend != null)
                         rend.sharedMaterials = towerRend.sharedMaterials;
                 }
+                else
+                {
+                    var filter = blade.GetComponent<MeshFilter>();
+                    if (filter != null) filter.sharedMesh = BladeMesh;
+                }
 
-                blade.localRotation = Quaternion.Euler(0f, i * 120f, 0f);
+                blade.localRotation = Quaternion.Euler(0f, 0f, i * 120f);
                 blade.localPosition = Vector3.zero;
             }
         }
@@ -149,7 +155,8 @@ namespace GameDevTV.RTS.Units
             var verts = new List<Vector3>();
             var normals = new List<Vector3>();
             var tris = new List<int>();
-            AddBox(verts, normals, tris, new Vector3(0f, 0f, 1.05f), new Vector3(0.12f, 0.05f, 2.0f));
+            // Vertical sail on a horizontal axle (extends +X; parent spins around Z).
+            AddBox(verts, normals, tris, new Vector3(1.02f, 0f, 0f), new Vector3(0.1f, 1.55f, 0.22f));
             var mesh = new Mesh { name = "WindmillBlade" };
             mesh.SetVertices(verts);
             mesh.SetNormals(normals);

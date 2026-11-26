@@ -176,6 +176,34 @@ namespace GameDevTV.RTS.Player
             return Vector3.zero;
         }
 
+        public float PlaytestZoomDistance =>
+            cinemachineFollow != null ? cinemachineFollow.FollowOffset.y : targetZoomDistance;
+
+        public float PlaytestMinZoom =>
+            cameraConfig != null ? cameraConfig.MinZoomDistance : 7.5f;
+
+        public float PlaytestMaxZoom =>
+            startingFollowOffset.y > 0.01f ? startingFollowOffset.y * 4f : 120f;
+
+        public void PlaytestSetZoomDistance(float y)
+        {
+            if (cinemachineFollow == null || cameraConfig == null) return;
+            targetZoomDistance = Mathf.Clamp(y, cameraConfig.MinZoomDistance, PlaytestMaxZoom);
+            Vector3 f = cinemachineFollow.FollowOffset;
+            cinemachineFollow.FollowOffset = new Vector3(f.x, targetZoomDistance, f.z);
+        }
+
+        public void ApplyPrologueDefaultZoom()
+        {
+            if (cinemachineFollow == null) return;
+            const float factor = 2.05f;
+            targetZoomDistance = startingFollowOffset.y * factor;
+            cinemachineFollow.FollowOffset = new Vector3(
+                startingFollowOffset.x,
+                targetZoomDistance,
+                startingFollowOffset.z * factor);
+        }
+
         private void Awake()
         {
             Instance = this;
@@ -209,7 +237,7 @@ namespace GameDevTV.RTS.Player
             {
                 startingFollowOffset = cinemachineFollow.FollowOffset;
                 // Start a bit more zoomed out than the scene default follow height.
-                const float startZoomOutFactor = 1.75f;
+                float startZoomOutFactor = PrologueController.IsActive ? 2.05f : 1.75f;
                 targetZoomDistance = startingFollowOffset.y * startZoomOutFactor;
                 cinemachineFollow.FollowOffset = new Vector3(
                     startingFollowOffset.x,
@@ -514,7 +542,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            if (TryFlyToAquiferBuildSiteIfNeeded(evt.Command))
+            if (CardPlayCameraGuide.TryFlyToHandCardPlaySite(evt.Command))
                 hasCameraBeenFocused = true;
 
             // if this thing does not require a click to activate...
@@ -610,7 +638,16 @@ namespace GameDevTV.RTS.Player
             HandleDragSelect();
             HandleBasePaging();
             HandleDemolishHotkey();
+            HandlePrologueChromeHotkey();
             HandleCheats();
+        }
+
+        void HandlePrologueChromeHotkey()
+        {
+            if (!PrologueController.IsActive || Keyboard.current == null) return;
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null) return;
+            if (!Keyboard.current.hKey.wasPressedThisFrame) return;
+            PrologueHUD.Instance?.ToggleChromeRetracted();
         }
 
         /// <summary>Select a building, then Delete/Backspace to scrap it for Materials refund.</summary>
@@ -2754,169 +2791,9 @@ namespace GameDevTV.RTS.Player
         public static bool TryGetPlaytestPlacementTile(out int tileIndex)
         {
             tileIndex = -1;
-            var ctrl = GameDevTV.RTS.Prologue.PrologueController.Instance;
-            var colony = ctrl?.Colony;
-            if (ctrl == null || colony == null) return false;
-
-            PrologueBuildingId id = colony.PrologueStep switch
-            {
-                1 or 4 => PrologueBuildingId.Aquifer,
-                2 => PrologueBuildingId.Oxygen,
-                3 => PrologueBuildingId.Habitat,
-                5 => PrologueBuildingId.WindTurbine,
-                _ => PrologueBuildingId.None
-            };
-            if (id == PrologueBuildingId.None) return false;
-
-            int secondIce = colony.PrologueStep >= 4 ? colony.SecondIceTargetTile() : -1;
-            int anchor = id switch
-            {
-                PrologueBuildingId.WindTurbine => FindBuildingTileIndex(colony, PrologueBuildingId.Oxygen),
-                PrologueBuildingId.Oxygen => FindBuildingTileIndex(colony, PrologueBuildingId.CommandPost),
-                PrologueBuildingId.Habitat => FindBuildingTileIndex(colony, PrologueBuildingId.Oxygen),
-                PrologueBuildingId.Aquifer when colony.PrologueStep >= 4 && secondIce >= 0 => secondIce,
-                PrologueBuildingId.Aquifer when colony.Board.FirstIceTiles.Count > 0
-                    => FirstSetElement(colony.Board.FirstIceTiles),
-                _ => FindBuildingTileIndex(colony, PrologueBuildingId.CommandPost)
-            };
-            if (anchor < 0) anchor = 0;
-
-            int best = -1;
-            int bestD = int.MaxValue;
-
-            // Step 4: must satisfy ReachesNewIce — not just nearest pad to the anchor.
-            if (id == PrologueBuildingId.Aquifer && colony.PrologueStep >= 4 && secondIce >= 0)
-            {
-                for (int i = 0; i < colony.Board.Tiles.Count; i++)
-                {
-                    var pad = colony.Board.At(i);
-                    if (pad.Building != PrologueBuildingId.None) continue;
-                    if (pad.Feature == PrologueFeature.Ice || pad.Feature == PrologueFeature.Glacier) continue;
-                    if (!colony.Preview(i, id, out _)) continue;
-                    if (!colony.ReachesNewIce(i)) continue;
-                    int d = colony.Dist(secondIce, i);
-                    if (d >= bestD) continue;
-                    bestD = d;
-                    best = i;
-                }
-                if (best >= 0)
-                {
-                    tileIndex = best;
-                    return true;
-                }
-
+            if (Instance?.activeCommand is not BuildBuildingCommand bbc || bbc.Building == null)
                 return false;
-            }
-
-            for (int i = 0; i < colony.Board.Tiles.Count; i++)
-            {
-                var pad = colony.Board.At(i);
-                if (pad.Building != PrologueBuildingId.None) continue;
-                // Aquifer drills beside ice — not on the deposit hex (grid snap there misses TryPlace).
-                if (id == PrologueBuildingId.Aquifer
-                    && (pad.Feature == PrologueFeature.Ice || pad.Feature == PrologueFeature.Glacier))
-                    continue;
-                if (!colony.Preview(i, id, out _)) continue;
-                int d = anchor >= 0 ? colony.Dist(anchor, i) : 0;
-                if (d >= bestD) continue;
-                bestD = d;
-                best = i;
-            }
-
-            if (best < 0) return false;
-            tileIndex = best;
-            return true;
-        }
-
-        static int FindBuildingTileIndex(PrologueColony colony, PrologueBuildingId id)
-        {
-            for (int i = 0; i < colony.Board.Tiles.Count; i++)
-                if (colony.Board.At(i).Building == id) return i;
-            return -1;
-        }
-
-        static int FindAnyRevealedIceTile(PrologueColony colony)
-        {
-            for (int i = 0; i < colony.Board.Tiles.Count; i++)
-            {
-                var t = colony.Board.At(i);
-                if (!t.Revealed || t.DepositLeft <= 0) continue;
-                if (t.Feature == PrologueFeature.Ice || t.Feature == PrologueFeature.Glacier) return i;
-            }
-            return -1;
-        }
-
-        static bool TryFlyToAquiferBuildSiteIfNeeded(BaseCommand command)
-        {
-            if (!PrologueController.IsActive) return false;
-            if (command is not BuildBuildingCommand bbc || bbc.HandIndex < 0 || bbc.Building == null) return false;
-            if (bbc.Building.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) < 0) return false;
-            if (!TryResolveAquiferFocusWorld(out Vector3 focus)) return false;
-            FlyCameraToWorldPosition(focus, 1.15f);
-            return true;
-        }
-
-        static bool TryResolveAquiferFocusWorld(out Vector3 world)
-        {
-            world = default;
-            var ctrl = PrologueController.Instance;
-            var colony = ctrl?.Colony;
-            if (colony == null) return false;
-
-            var suggestPads = UnityEngine.Object.FindObjectsByType<PrologueRevealGhostPad>(FindObjectsInactive.Exclude);
-            float bestSq = float.MaxValue;
-            Vector3 cam = GetCameraFocusPosition();
-            PrologueRevealGhostPad best = null;
-            for (int i = 0; i < suggestPads.Length; i++)
-            {
-                var pad = suggestPads[i];
-                if (pad == null || pad.BoardTileIndex < 0) continue;
-                if (pad.gameObject.name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) < 0)
-                    continue;
-                if (!colony.CanPlaceAquiferPad(pad.BoardTileIndex)) continue;
-                if (!colony.Preview(pad.BoardTileIndex, PrologueBuildingId.Aquifer, out _)) continue;
-                float sq = ColonyTileGrid.HorizontalDistSq(cam, pad.transform.position);
-                if (sq >= bestSq) continue;
-                bestSq = sq;
-                best = pad;
-            }
-
-            if (best != null)
-            {
-                world = best.transform.position;
-                return true;
-            }
-
-            int secondIce = colony.PrologueStep >= 4 ? colony.SecondIceTargetTile() : -1;
-            int iceAnchor = -1;
-            if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && secondIce >= 0)
-                iceAnchor = secondIce;
-            else if (colony.Board.FirstIceTiles.Count > 0)
-                iceAnchor = FirstSetElement(colony.Board.FirstIceTiles);
-            else
-            {
-                for (int i = 0; i < colony.Board.Tiles.Count; i++)
-                {
-                    var t = colony.Board.At(i);
-                    if (!t.Revealed || t.DepositLeft <= 0) continue;
-                    if (t.Feature != PrologueFeature.Ice && t.Feature != PrologueFeature.Glacier) continue;
-                    iceAnchor = i;
-                    break;
-                }
-            }
-
-            if (iceAnchor < 0) iceAnchor = colony.NearestRevealedIceTile(FindBuildingTileIndex(colony, PrologueBuildingId.CommandPost));
-            if (iceAnchor < 0) return false;
-            if (!colony.TryFindAquiferPadNearIce(iceAnchor, out int padTile)) return false;
-            if (!ctrl.TryGetCell(padTile, out Vector2Int padCell)) return false;
-            world = ColonyTileGrid.CellToWorldOnHighestGround(padCell);
-            return true;
-        }
-
-        static int FirstSetElement(System.Collections.Generic.HashSet<int> set)
-        {
-            foreach (int i in set) return i;
-            return -1;
+            return CardPlayCameraGuide.TryGetProloguePlacementTile(bbc.Building, out tileIndex);
         }
 #endif
     }

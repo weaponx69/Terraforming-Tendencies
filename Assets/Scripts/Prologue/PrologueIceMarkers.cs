@@ -154,9 +154,7 @@ namespace GameDevTV.RTS.Prologue
             }
         }
 
-        /// <summary>
-        /// Same target Orbital Scan uses — pan the camera there (Orbital Scan only).
-        /// </summary>
+        /// <summary>Pan camera to the same target Orbital Scan pings. Not used by Survey Team card.</summary>
         public void FlyCameraToNearestSurveyTarget(bool pulseMarker = true, float pulseSeconds = PingSeconds)
         {
             if (!TryResolveNearestSurveyTarget(out int iceTile, out SectorNode deposit))

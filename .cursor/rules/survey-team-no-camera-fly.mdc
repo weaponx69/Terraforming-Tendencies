@@ -1,0 +1,22 @@
+---
+description: Survey Team card — never auto-pan the camera (only this card)
+alwaysApply: true
+---
+
+# Survey Team: no camera fly on play
+
+The player does **not** want the camera to move when they play the **Survey Team** card (`ScoutingCardSO.SurveyDrone` → `BeginFromCard` / `ArmSurveyFromCard`).
+
+## Do not
+
+- Call `FlyCameraToNearestSurveyTarget` or `PlayerInput.FlyCameraToWorldPosition` from Survey Team card `Apply()` or survey paint **arm** paths
+- Re-add “fly to nearest ?” when Survey Team is clicked from the hand
+
+## OK elsewhere
+
+- **Orbital Scan**, building placement (`CardPlayCameraGuide`), boot camera, diagnostics — unchanged unless the player says otherwise
+- In-world survey crew walking the painted path after **OK** — that is gameplay, not camera automation
+
+## On Survey Team UX changes
+
+Use `EnsureMarkersForActiveObjectives()`, HUD hints, and player-chosen `?` clicks — not camera fly.

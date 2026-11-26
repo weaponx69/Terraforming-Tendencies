@@ -16,6 +16,10 @@ namespace GameDevTV.RTS.Units
         {
             if (visualPrefab == null) return;
 
+            // Themed buildings already ship a hex-sized SiteMesh — do not stack Foundry GLB geometry.
+            if (HasAuthoredBuildingMesh())
+                return;
+
             if (hidePlaceholderChildren)
             {
                 foreach (Transform child in transform)
@@ -51,6 +55,19 @@ namespace GameDevTV.RTS.Units
                     Destroy(mb);
                 }
             }
+        }
+
+        bool HasAuthoredBuildingMesh()
+        {
+            foreach (Transform child in transform)
+            {
+                if (child == null || !child.gameObject.activeInHierarchy) continue;
+                if (child.name.IndexOf("Building Mesh", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                var filter = child.GetComponent<MeshFilter>();
+                if (filter != null && filter.sharedMesh != null)
+                    return true;
+            }
+            return false;
         }
     }
 }

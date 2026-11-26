@@ -190,6 +190,8 @@ namespace GameDevTV.RTS.Prologue
             TrySeedHand();
             ProloguePerformanceBudget.RefreshPlanetRendering();
             GameDevTV.RTS.UI.PrologueHUD.Instance?.Refresh(Colony);
+            Object.FindAnyObjectByType<GameDevTV.RTS.UI.Containers.BottomBarActionsUI>()
+                ?.ApplyPrologueCompactLayout();
             HexGridManager.Instance?.RefreshAllOutlineVisibility();
             // Floating "?" over unrevealed ice — without these the objective text is meaningless.
             if (PrologueIceMarkers.Instance == null)
@@ -666,6 +668,9 @@ namespace GameDevTV.RTS.Prologue
                 HandlePlanetGenerated();
             else
                 TrySyncWhenReady();
+            PlayerInput.Instance?.ApplyPrologueDefaultZoom();
+            var hand = Object.FindAnyObjectByType<GameDevTV.RTS.UI.Containers.BottomBarActionsUI>();
+            hand?.ApplyPrologueCompactLayout();
             Debug.Log("[PrologueController] BeginNewPrologueRunForPlaytest — bootstrap applied.");
         }
     }

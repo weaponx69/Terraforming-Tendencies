@@ -1,5 +1,5 @@
 ---
-description: Prologue is the vertical slice of the full game—not a separate module, tutorial, or throwaway silo. Read before any work.
+description: Main run is the game (not a Prologue silo). Agent wording + architecture—read before any work.
 alwaysApply: true
 ---
 
@@ -34,3 +34,17 @@ The **main-scene run** (today: scripts under `Prologue/`, `PrologueController`) 
 | **Agent router** | [`AGENTS.md`](../../AGENTS.md) — default: PK **§0** + **§2** only |
 
 When unsure, read the router + §0 before changing architecture.
+
+## How agents talk to the player (required)
+
+The player is building **Terraforming Tendencies**, not a side “prologue project.”
+
+**Use when explaining work:** the **game**, **main run**, **vertical slice**, **current run**, **main scene**, **slice systems**.
+
+**Do not use as the framing** (especially in summaries, plans, and “what I did”): “prologue work”, “prologue feature”, “prologue UX”, “for the prologue”, “prologue-only task”, “the prologue game”, “finishing the prologue”.
+
+**OK when precise:** citing paths or types (`PrologueController`, `Assets/Scripts/Prologue/`, step 0–6) — then say they are **legacy folder/type names** for the **authoritative run**, not a separate product.
+
+**New naming:** do not add new top-level `Prologue*` types, scenes, or docs that imply a fork unless the user asks. Extend existing shared systems (`CardDeckController`, `PlanetGenerator`, `SectorManager`, HUD, colony sim).
+
+**Harness/script names** (`prologue-ui-playthrough.sh`, etc.) are historical filenames; describe them as **game / slice playtests**, not “prologue tests”.

@@ -144,14 +144,14 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1773036561045915792}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4b5c6d7e8f9a41894a5b6c7d8e9f0a1b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Units.MineDepositVisual
-  visualPrefab: {fileID: -102380980666007386, guid: 921cb2a69d3c7a279a9d465afb5b35cf, type: 3}
+  visualPrefab: {fileID: 0}
   localOffset: {x: 0, y: 0, z: 0}
-  localScale: {x: 8, y: 8, z: 8}
+  localScale: {x: 1, y: 1, z: 1}
   hidePlaceholderChildren: 1
 --- !u!1 &4389684369125521140
 GameObject:

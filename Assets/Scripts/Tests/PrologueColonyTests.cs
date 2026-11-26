@@ -421,10 +421,39 @@ namespace GameDevTV.RTS.Tests
         {
             var c = PrologueColony.CreateLanding();
             c.DebugSetCrew(PrologueData.SatisfactionStart, 5);
+            c.DebugSetOxygen(0);
             c.EndWeek();
             Assert.IsTrue(c.ContractCancelled);
             StringAssert.Contains("faith", c.ContractMessage);
             Assert.AreEqual(0, c.PrologueStep);
+        }
+
+        [Test]
+        public void EndWeek_FaithZero_WithAirReserves_ExtendsInsteadOfCancel()
+        {
+            var c = PrologueColony.CreateLanding();
+            int need = c.O2Need();
+            c.DebugSetCrew(PrologueData.SatisfactionStart, 6);
+            c.DebugSetOxygen(PrologueData.AirReserveFaithExtensionThreshold(need) + 10);
+            c.EndWeek();
+            Assert.IsFalse(c.ContractCancelled);
+            Assert.AreEqual(PrologueData.FaithRecoveryFloor, c.Faith);
+        }
+
+        [Test]
+        public void EndWeek_SteadyWeek_RaisesFaithWhenAirStocked()
+        {
+            var c = PrologueColony.CreateLanding();
+            c.DebugSetProgress(5, 0);
+            c.DebugSetCrew(PrologueData.SatisfactionStart, 40);
+            c.DebugPlaceComplete(1, PrologueBuildingId.Oxygen);
+            c.DebugPlaceComplete(2, PrologueBuildingId.WindTurbine);
+            c.DebugSetOxygen(80);
+            c.DebugSetIce(20);
+            c.SetDistanceFn((a, b) => a == b ? 0 : 1);
+            int before = c.Faith;
+            c.EndWeek();
+            Assert.Greater(c.Faith, before - PrologueData.QuietWeekFaithLoss);
         }
 
         [Test]

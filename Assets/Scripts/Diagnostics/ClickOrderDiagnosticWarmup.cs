@@ -46,7 +46,7 @@ namespace GameDevTV.RTS.Diagnostics
             PrologueSurveyMission.Instance?.AbortForPlaytest();
             PrologueDroneScan.Instance?.CancelPaint();
 
-            UnlockWarmupBuildings(ctrl.Colony);
+            UnlockWarmupBuildingsInternal(ctrl.Colony);
             report.HomeTile = HomeTile(ctrl.Colony);
             if (report.HomeTile < 0)
             {
@@ -136,7 +136,10 @@ namespace GameDevTV.RTS.Diagnostics
             sb.Append('}');
         }
 
-        static void UnlockWarmupBuildings(PrologueColony colony)
+        public static void UnlockWarmupBuildings(PrologueColony colony) =>
+            UnlockWarmupBuildingsInternal(colony);
+
+        static void UnlockWarmupBuildingsInternal(PrologueColony colony)
         {
             foreach (var id in new[]
                      {
@@ -190,6 +193,13 @@ namespace GameDevTV.RTS.Diagnostics
 
             return picks;
         }
+
+        public static int SpawnBuildingClusterPublic(
+            PrologueController ctrl,
+            List<int> nearPath,
+            int targetCount,
+            out int navObstacles) =>
+            SpawnBuildingCluster(ctrl, nearPath, targetCount, out navObstacles);
 
         static int SpawnBuildingCluster(
             PrologueController ctrl,

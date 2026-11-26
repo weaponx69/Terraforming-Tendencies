@@ -95,6 +95,8 @@ namespace GameDevTV.RTS.Player
                     var mission = PrologueSurveyMission.Instance
                                   ?? new GameObject("PrologueSurveyMission").AddComponent<PrologueSurveyMission>();
                     mission.BeginFromCard(tiles, days);
+                    // Survey Team only: no camera fly — .cursor/rules/survey-team-no-camera-fly.mdc
+                    PrologueIceMarkers.Instance?.EnsureMarkersForActiveObjectives();
                     Debug.Log($"[Prologue] Survey Team card → pick a ?, paint up to {tiles} tiles / {days} days.");
                     return;
                 }

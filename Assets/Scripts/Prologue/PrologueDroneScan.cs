@@ -100,7 +100,7 @@ namespace GameDevTV.RTS.Prologue
             BeginPaintMission(PrologueSurveyMission.DefaultTileBudget, PrologueSurveyMission.DefaultDays);
         }
 
-        /// <summary>Survey Team card — pick a ? before painting. Orbital Scan locates and flies the camera.</summary>
+        /// <summary>Survey Team card — pick a ? before painting. Orbital Scan may pan the camera.</summary>
         public void ArmSurveyFromCard(int tileBudget, int days)
         {
             if (PrologueSurveyMission.Instance != null && PrologueSurveyMission.Instance.IsSearching)

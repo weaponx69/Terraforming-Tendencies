@@ -42,9 +42,7 @@ namespace GameDevTV.RTS.Prologue
         public static PrologueWeekBriefing Opening(PrologueColony colony)
         {
             string next = colony.ObjectiveText(out _, out _);
-            string speech =
-                "The lander is down. I'm Mara Voss, colony foreman. The camp is set, and the corporation is waiting on the contract. Next: "
-                + next;
+            string speech = PrologueGuidance.OpeningSpeech(colony);
             return new PrologueWeekBriefing("Mara Voss", "Colony foreman", speech, PrologueBriefingTone.Progress);
         }
 
@@ -87,6 +85,8 @@ namespace GameDevTV.RTS.Prologue
                         did.Add(line + ". They need beds and air.");
                     else if (line.Contains("from mine"))
                         did.Add("The mine crew brought in stock. " + line);
+                    else if (line.Contains("Corporation holds the contract"))
+                        did.Add(line);
                 }
             }
 
@@ -96,7 +96,7 @@ namespace GameDevTV.RTS.Prologue
                 worry.Add("The dust storm is on the camp. Camp power is dark. A Windmill within 2 tiles of the Atmosphere Processor has to run or the air stops.");
             }
             if (!crisis && colony.Faith < before.Faith)
-                worry.Add($"The corporation's faith fell to {colony.Faith}.");
+                worry.Add($"The corporation's faith fell to {colony.Faith}. " + PrologueGuidance.FaithRecoveryHint(colony));
             if (!crisis && colony.Satisfaction < before.Satisfaction)
                 worry.Add($"Colonist satisfaction fell to {colony.Satisfaction}.");
 

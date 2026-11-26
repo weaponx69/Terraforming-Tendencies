@@ -13,6 +13,8 @@ namespace GameDevTV.RTS.UI
     /// </summary>
     public class PrologueBriefingPanel : MonoBehaviour
     {
+        static float WeekBriefingBottomInset => PrologueUiLayout.AboveCardDockY + 10f;
+
         GameObject card;
         GameObject cutscene;
         Image portraitSuit;
@@ -32,6 +34,8 @@ namespace GameDevTV.RTS.UI
         PrologueWeekMemory memory;
         bool memoryReady;
         bool gameOver;
+        ScrollRect cardBodyScroll;
+        ScrollRect crisisBodyScroll;
         static Sprite circle;
 
         public void Build(Transform parent)
@@ -82,9 +86,11 @@ namespace GameDevTV.RTS.UI
             ApplyPortrait(crisis ? cutsceneSuit : portraitSuit, crisis ? cutsceneHead : portraitHead, crisis ? cutsceneVisor : portraitVisor, briefing.Tone);
             TextMeshProUGUI name = crisis ? cutsceneName : nameText;
             TextMeshProUGUI body = crisis ? cutsceneBody : bodyText;
-            name.text = $"{briefing.Speaker}\n{briefing.Role}";
-            body.text = briefing.Speech;
+            name.text = PrologueUiText.SanitizeForTmp($"{briefing.Speaker}\n{briefing.Role}");
+            body.text = PrologueUiText.SanitizeForTmp(briefing.Speech);
+            ResizeSpeechContent(body, crisis ? crisisBodyScroll : cardBodyScroll);
             gameOver = colony.ContractCancelled;
+            transform.SetAsLastSibling();
             string buttonLabel = gameOver ? "New game" : "Continue";
             if (cardContinueLabel != null) cardContinueLabel.text = buttonLabel;
             if (cutsceneContinueLabel != null) cutsceneContinueLabel.text = buttonLabel;
@@ -179,18 +185,28 @@ namespace GameDevTV.RTS.UI
                 panelRt.anchorMin = new Vector2(0.5f, 0f);
                 panelRt.anchorMax = new Vector2(0.5f, 0f);
                 panelRt.pivot = new Vector2(0.5f, 0f);
-                panelRt.anchoredPosition = new Vector2(0f, 310f);
-                panelRt.sizeDelta = new Vector2(760f, 168f);
+                panelRt.anchoredPosition = new Vector2(0f, WeekBriefingBottomInset);
+                panelRt.sizeDelta = new Vector2(820f, 252f);
             }
 
             var portrait = new GameObject("Portrait");
             portrait.transform.SetParent(panel.transform, false);
             suit = portrait.AddComponent<Image>();
             var portraitRt = portrait.GetComponent<RectTransform>();
-            portraitRt.anchorMin = new Vector2(0f, 0.5f);
-            portraitRt.anchorMax = new Vector2(0f, 0.5f);
-            portraitRt.pivot = new Vector2(0f, 0.5f);
-            portraitRt.anchoredPosition = new Vector2(16f, 0f);
+            if (fullScreen)
+            {
+                portraitRt.anchorMin = new Vector2(0f, 0.5f);
+                portraitRt.anchorMax = new Vector2(0f, 0.5f);
+                portraitRt.pivot = new Vector2(0f, 0.5f);
+                portraitRt.anchoredPosition = new Vector2(16f, 0f);
+            }
+            else
+            {
+                portraitRt.anchorMin = new Vector2(0f, 1f);
+                portraitRt.anchorMax = new Vector2(0f, 1f);
+                portraitRt.pivot = new Vector2(0f, 1f);
+                portraitRt.anchoredPosition = new Vector2(16f, -10f);
+            }
             portraitRt.sizeDelta = fullScreen ? new Vector2(150f, 210f) : new Vector2(92f, 128f);
 
             var headGo = new GameObject("Head");
@@ -212,12 +228,17 @@ namespace GameDevTV.RTS.UI
             visorRt.anchorMax = new Vector2(0.5f, 0.5f);
             visorRt.sizeDelta = fullScreen ? new Vector2(64f, 16f) : new Vector2(38f, 10f);
 
-            name = MakeText(panel.transform, "Name", fullScreen ? 26f : 20f, FontStyles.Bold,
-                new Vector2(fullScreen ? 190f : 124f, fullScreen ? -28f : -12f),
-                new Vector2(fullScreen ? 580f : 500f, fullScreen ? 64f : 44f));
-            body = MakeText(panel.transform, "Speech", fullScreen ? 24f : 20f, FontStyles.Normal,
-                new Vector2(fullScreen ? 190f : 124f, fullScreen ? -100f : -56f),
-                new Vector2(fullScreen ? 580f : 500f, fullScreen ? 160f : 90f));
+            name = MakeAnchoredText(panel.transform, "Name", fullScreen ? 26f : 21f, FontStyles.Bold,
+                fullScreen
+                    ? (new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(190f, -72f), new Vector2(-24f, -10f))
+                    : (new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(112f, -48f), new Vector2(-16f, -8f)));
+            body = MakeSpeechScrollBody(panel.transform, fullScreen, out ScrollRect bodyScroll);
+            if (fullScreen)
+                crisisBodyScroll = bodyScroll;
+            else
+                cardBodyScroll = bodyScroll;
+            if (bodyScroll != null)
+                bodyScroll.verticalNormalizedPosition = 1f;
 
             var buttonGo = new GameObject("Continue");
             buttonGo.transform.SetParent(panel.transform, false);
@@ -272,6 +293,99 @@ namespace GameDevTV.RTS.UI
             if (suit != null) suit.color = suitColor;
             if (head != null) head.color = skin;
             if (visor != null) visor.color = glass;
+        }
+
+        static TextMeshProUGUI MakeSpeechScrollBody(Transform panel, bool fullScreen, out ScrollRect scroll)
+        {
+            scroll = null;
+            var scrollGo = new GameObject("SpeechScroll");
+            scrollGo.transform.SetParent(panel, false);
+            scroll = scrollGo.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 20f;
+            var scrollRt = scrollGo.GetComponent<RectTransform>();
+            if (fullScreen)
+            {
+                scrollRt.anchorMin = new Vector2(0f, 0f);
+                scrollRt.anchorMax = new Vector2(1f, 1f);
+                scrollRt.offsetMin = new Vector2(190f, 52f);
+                scrollRt.offsetMax = new Vector2(-24f, -78f);
+            }
+            else
+            {
+                scrollRt.anchorMin = new Vector2(0f, 0f);
+                scrollRt.anchorMax = new Vector2(1f, 1f);
+                scrollRt.offsetMin = new Vector2(112f, 52f);
+                scrollRt.offsetMax = new Vector2(-16f, -54f);
+            }
+
+            var viewportGo = new GameObject("Viewport");
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewportRt = viewportGo.AddComponent<RectTransform>();
+            viewportRt.anchorMin = Vector2.zero;
+            viewportRt.anchorMax = Vector2.one;
+            viewportRt.offsetMin = viewportRt.offsetMax = Vector2.zero;
+            viewportGo.AddComponent<RectMask2D>();
+            scroll.viewport = viewportRt;
+
+            var contentGo = new GameObject("Content");
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            var contentRt = contentGo.AddComponent<RectTransform>();
+            contentRt.anchorMin = new Vector2(0f, 1f);
+            contentRt.anchorMax = new Vector2(1f, 1f);
+            contentRt.pivot = new Vector2(0.5f, 1f);
+            contentRt.anchoredPosition = Vector2.zero;
+            contentRt.sizeDelta = new Vector2(0f, 120f);
+            scroll.content = contentRt;
+
+            var body = MakeText(contentGo.transform, "Speech", fullScreen ? 22f : 19f, FontStyles.Normal,
+                Vector2.zero, new Vector2(0f, 120f));
+            body.rectTransform.anchorMin = new Vector2(0f, 1f);
+            body.rectTransform.anchorMax = new Vector2(1f, 1f);
+            body.rectTransform.pivot = new Vector2(0.5f, 1f);
+            body.rectTransform.offsetMin = Vector2.zero;
+            body.rectTransform.offsetMax = Vector2.zero;
+            body.textWrappingMode = TextWrappingModes.Normal;
+            body.overflowMode = TextOverflowModes.Overflow;
+            return body;
+        }
+
+        static void ResizeSpeechContent(TextMeshProUGUI body, ScrollRect scroll)
+        {
+            if (body == null || scroll?.content == null) return;
+            body.ForceMeshUpdate();
+            float h = Mathf.Max(80f, body.preferredHeight + 8f);
+            scroll.content.sizeDelta = new Vector2(0f, h);
+            var rt = body.rectTransform;
+            rt.sizeDelta = new Vector2(0f, h);
+        }
+
+        static TextMeshProUGUI MakeAnchoredText(
+            Transform parent,
+            string name,
+            float size,
+            FontStyles style,
+            (Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax) layout)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = size;
+            tmp.fontStyle = style;
+            tmp.alignment = TextAlignmentOptions.TopLeft;
+            tmp.color = Color.white;
+            tmp.textWrappingMode = TextWrappingModes.Normal;
+            tmp.overflowMode = TextOverflowModes.Ellipsis;
+            tmp.raycastTarget = false;
+            var rt = tmp.rectTransform;
+            rt.anchorMin = layout.anchorMin;
+            rt.anchorMax = layout.anchorMax;
+            rt.offsetMin = layout.offsetMin;
+            rt.offsetMax = layout.offsetMax;
+            rt.pivot = new Vector2(0f, 1f);
+            return tmp;
         }
 
         static TextMeshProUGUI MakeText(Transform parent, string name, float size, FontStyles style, Vector2 pos, Vector2 box)

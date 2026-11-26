@@ -542,6 +542,8 @@ namespace GameDevTV.RTS.Prologue
                 sb.AppendLine(ContractMessage);
             else if (PrologueStep >= PrologueData.PrologueSteps)
                 sb.AppendLine("Prologue complete. The contract is held.");
+            else
+                PrologueGuidance.AppendGuideBlock(sb, this);
 
             sb.AppendLine("COLONISTS");
             sb.Append(Colonists).Append(" people · ");
@@ -849,6 +851,7 @@ namespace GameDevTV.RTS.Prologue
             }
 
             bool crewWorking = ColonistsWorking;
+            bool processorProducedThisWeek = false;
             if (!crewWorking)
                 log.Add("Colonists stopped. Satisfaction is too low to work.");
 
@@ -896,6 +899,7 @@ namespace GameDevTV.RTS.Prologue
                     if (IceStock < info.IceConsumedPerWeek) { log.Add("Atmosphere Processor starved for ice"); continue; }
                     IceStock -= info.IceConsumedPerWeek;
                     Oxygen += info.OxygenProducedPerWeek;
+                    processorProducedThisWeek = true;
                     log.Add($"+{info.OxygenProducedPerWeek} air. Colonists ran the Atmosphere Processor.");
                 }
             }
@@ -904,7 +908,8 @@ namespace GameDevTV.RTS.Prologue
             int need = O2Need();
             int breathed = Math.Min(need, Oxygen);
             Oxygen -= breathed;
-            if (breathed < need) log.Add("AIR CRITICAL: not enough oxygen");
+            bool airCritical = breathed < need;
+            if (airCritical) log.Add("AIR CRITICAL: not enough oxygen");
 
             // 5) Shuttle
             if (!ShuttleLanded && ShuttleLandWeek >= 0 && Week + 1 >= ShuttleLandWeek)
@@ -927,11 +932,11 @@ namespace GameDevTV.RTS.Prologue
             // 8) Advance week
             Week++;
 
-            ApplySatisfaction(breathed < need);
-            ApplyFaith();
+            ApplySatisfaction(airCritical);
+            ApplyFaith(airCritical, processorProducedThisWeek);
             if (Satisfaction <= 0)
                 CancelContract("The corporation cancelled the contract. Colonist satisfaction is too low.");
-            else if (Faith <= 0)
+            else if (Faith <= 0 && !TryExtendContractForAirReserves(need, log))
                 CancelContract("The corporation lost faith in this mission and cancelled the contract.");
 
             if (ContractCancelled)
@@ -964,11 +969,17 @@ namespace GameDevTV.RTS.Prologue
             Satisfaction = Math.Clamp(Satisfaction, 0, 100);
         }
 
-        void ApplyFaith()
+        void ApplyFaith(bool airCritical, bool processorProducedThisWeek)
         {
             bool advanced = PrologueStep != stepMarked
                 || (PrologueStep < PrologueData.PrologueSteps && StepIsComplete(PrologueStep));
-            Faith += advanced ? PrologueData.StepAdvancedFaithGain : -PrologueData.QuietWeekFaithLoss;
+            if (advanced)
+                Faith += PrologueData.StepAdvancedFaithGain;
+            else if (HadSteadyWeek(airCritical, processorProducedThisWeek))
+                Faith += PrologueData.SteadyWeekFaithGain;
+            else
+                Faith -= PrologueData.QuietWeekFaithLoss;
+
             int window = PrologueData.DeadlinePressureWeeks;
             if (ShuttleLandWeek >= 0 && !ShuttleLanded
                 && ShuttleLandWeek - Week <= window
@@ -981,13 +992,36 @@ namespace GameDevTV.RTS.Prologue
             Faith = Math.Clamp(Faith, 0, 100);
         }
 
+        /// <summary>Weekly life-support win without a story beat — builds corporation faith back.</summary>
+        bool HadSteadyWeek(bool airCritical, bool processorProducedThisWeek)
+        {
+            if (!ColonistsWorking || airCritical) return false;
+            bool bedsOk = !ShuttleLanded || TotalBeds() >= Colonists;
+            if (!bedsOk) return false;
+            if (processorProducedThisWeek) return true;
+            return O2Runway() >= 2.0;
+        }
+
+        /// <summary>Enough stored air + working crew: auditor extends instead of cancelling at 0 Faith.</summary>
+        bool TryExtendContractForAirReserves(int weeklyNeed, List<string> log)
+        {
+            int reserve = PrologueData.AirReserveFaithExtensionThreshold(weeklyNeed);
+            if (Oxygen < reserve || Satisfaction < PrologueData.WorkThreshold)
+                return false;
+            Faith = PrologueData.FaithRecoveryFloor;
+            log.Add(
+                $"Corporation holds the contract: {Oxygen} air in reserve (target {reserve}). "
+                + $"Faith reset to {Faith} — keep life-support and storm objectives on track.");
+            return true;
+        }
+
         void CancelContract(string message)
         {
             ContractCancelled = true;
             ContractMessage = message;
         }
 
-        bool PowerBesideOxygen()
+        public bool PowerBesideOxygen()
         {
             int reach = 2;
             foreach (var oxygen in Board.Tiles)
@@ -1033,6 +1067,7 @@ namespace GameDevTV.RTS.Prologue
                                 PopulateFirstIceTiles();
                             Unlocked.Add(PrologueBuildingId.Aquifer);
                             PrologueStep = 1;
+                            log.Add(PrologueGuidance.StepAdvancedNarration(PrologueStep));
                             advanced = true;
                         }
                         break;
@@ -1041,6 +1076,7 @@ namespace GameDevTV.RTS.Prologue
                         {
                             Unlocked.Add(PrologueBuildingId.Oxygen);
                             PrologueStep = 2;
+                            log.Add(PrologueGuidance.StepAdvancedNarration(PrologueStep));
                             advanced = true;
                         }
                         break;
@@ -1051,6 +1087,7 @@ namespace GameDevTV.RTS.Prologue
                             if (ShuttleLandWeek < 0)
                                 ShuttleLandWeek = Week + PrologueData.PrologueShuttleWeeks;
                             PrologueStep = 3;
+                            log.Add(PrologueGuidance.StepAdvancedNarration(PrologueStep));
                             advanced = true;
                         }
                         break;
@@ -1058,6 +1095,7 @@ namespace GameDevTV.RTS.Prologue
                         if (StepIsComplete(3))
                         {
                             PrologueStep = 4;
+                            log.Add(PrologueGuidance.StepAdvancedNarration(PrologueStep));
                             // Ensure a second hidden ice pad exists for the drone objective.
                             PrologueController.Instance?.EnsureMinimumIceDeposits(2);
                             RefreshSecondIceTiles();
@@ -1077,6 +1115,7 @@ namespace GameDevTV.RTS.Prologue
                             if (StormLandWeek < 0)
                                 StormLandWeek = Week + PrologueData.PrologueStormWeeks;
                             PrologueStep = 5;
+                            log.Add(PrologueGuidance.StepAdvancedNarration(PrologueStep));
                             advanced = true;
                         }
                         break;
@@ -1085,6 +1124,7 @@ namespace GameDevTV.RTS.Prologue
                         {
                             DustStormActive = false;
                             PrologueStep = 6;
+                            log.Add(PrologueGuidance.StepAdvancedNarration(PrologueStep));
                             advanced = true;
                         }
                         break;
