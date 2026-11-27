@@ -1,0 +1,27 @@
+---
+description: Don't claim gameplay fixes without Play Mode + a real player harness (vertical slice).
+alwaysApply: true
+---
+
+# Player verify before "done"
+
+**Applies when** you change player-visible behavior: input, UI, survey, placement, cards, planet, buildings, lag/perf in Play.
+
+**Exempt:** docs-only, comments-only, pure refactors with no behavior change.
+
+## Checklist
+
+1. `unity status` — Editor **ready** (one instance; no second Editor / `unity test` batch loop).
+2. Run the **shortest harness** for what you touched:
+   - **Default E2E:** `SKIP_ENTER_PLAY=1 SKIP_RECOMPILE=1 ./tools/main-game-ui-playthrough.sh` (or `SKIP_BOOTSTRAP=1` to keep current run).
+   - **Input / survey dispatch / perf spikes:** `SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh`.
+   - **Acts legacy** (only if requested): `./tools/colony-acts-player-bot-cli.sh`.
+   - **Narrow manual:** Play Mode + real clicks; capture screenshot or step outcome.
+3. **Evidence** in the same turn — not `dotnet build` alone.
+4. Blocked? Say what blocked Play; don't claim fixed.
+
+**Not verification:** cheat instant-place, DevDemo grants, fake-board unit "playthroughs," compile-only.
+
+**Details / bootstrap / env vars:** [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) **§10.1**. Policy: [`docs/specs/2026-11-23-player-verification-policy.md`](../../docs/specs/2026-11-23-player-verification-policy.md).
+
+**Report:** one-line Play verify — what you did and what you saw.

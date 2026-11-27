@@ -210,11 +210,24 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
+                return;
+            }
             if (!started && PlanetGenerator.Instance != null)
                 BeginRun();
         }
 
-        private void HandlePlanetGenerated() => BeginRun();
+        private void HandlePlanetGenerated()
+        {
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
+                return;
+            }
+            BeginRun();
+        }
 
         private void HandleClimateChanged(Owner owner, float _)
         {
@@ -225,6 +238,12 @@ namespace GameDevTV.RTS.Player
 
         public void BeginRun()
         {
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
+                return;
+            }
+
             if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count == 0)
                 SectorManager.Instance.InitializeSectors();
 

@@ -13,5 +13,6 @@ MonoBehaviour:
   m_Name: OrbitalScanCard
   m_EditorClassIdentifier: 
   cardName: Orbital Scan
-  cardDescription: Deploy satellites to instantly explore and unlock the next sector for colonization.
+  cardDescription: Hire a company orbital pass. Costs energy. Pings the nearest unsurveyed ice with a direction from camp.
+  icon: {fileID: 21300000, guid: 3afcd0d4526d46119ecaedc78689c853, type: 3}
   scoutingType: 0

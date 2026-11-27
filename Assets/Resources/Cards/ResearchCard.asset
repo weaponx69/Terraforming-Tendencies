@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fd673de81d5428c9c3c2c59ecc0e844, type: 3}
+  m_Name: ResearchCard
+  m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Player.ResearchCardSO
+  cardName: Research
+  cardDescription: Start a research project. Costs colony weeks to unlock Tier-2
+    abilities (faster builds, longer power tubes).
+  icon: {fileID: 21300000, guid: 5f5d996d57cb4a7cad8d05b26078a7ec, type: 3}
+  materialsCost: 0
+  hazardEventPrefabs: []
+  disasterChance: 0
+  rarity: 0

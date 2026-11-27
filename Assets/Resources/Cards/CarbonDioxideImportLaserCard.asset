@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Carbon Dioxide Import Laser
   cardDescription: Imports CO₂ to thicken the atmosphere (Air tile). REQUIRES Atmosphere >= 0.10 atm.
+  icon: {fileID: 21300000, guid: 3dc827df66214649bd7bb865d460d756, type: 3}
   materialsCost: 150
   buildingToUnlock: {fileID: 11400000, guid: 94c1926e7b17af5299817655186c434b, type: 2}
   minTemperature: -9999.0

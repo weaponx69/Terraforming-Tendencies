@@ -12,18 +12,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82d784a53ab118875a8a86409a3bce3d, type: 3}
   m_Name: Planet 1 - Easy
   m_EditorClassIdentifier: MainGame::GameDevTV.RTS.Environment.PlanetConfig
-  MapWidth: 200
-  MapHeight: 200
-  NoiseScale: 75
-  HeightMultiplier: 12
-  ResourceCount: 40
+  MapWidth: 176
+  MapHeight: 176
+  NoiseScale: 28
+  HeightMultiplier: 24
+  TerrainSeed: 1042
+  LandingFlatRadius: 36
+  Heightmap: {fileID: 2800000, guid: 5f6e3f7f7ef71362aabb69450cd6d204, type: 3}
+  HeightAmplitude: 54
+  AlbedoMap: {fileID: 2800000, guid: 66699c6387450b35e95e9fdbb8b23fd8, type: 3}
+  NormalMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50601, type: 3}
+  OcclusionMap: {fileID: 0}
+  DetailAlbedoMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50602, type: 3}
+  DetailNormalMap: {fileID: 2800000, guid: a1b2c3d4e5f64789a0b1c2d3e4f50603, type: 3}
+  DetailTiling: 32
+  PlanetPatchDiameter: 2048
+  HorizonBodyRadiusMeters: 1737400
+  EnableHorizonCurvature: 0
+  ResourceCount: 52
   BaseDecayRate: 2
   ToxicityLevel: 0
   BiomassDrainRate: 0.2
   IntegrityDrainRate: 0.5
-  SectorsX: 3
-  SectorsY: 3
-  SectorOccupationRadius: 40
+  SectorsX: 4
+  SectorsY: 4
+  SectorOccupationRadius: 96
   EnvironmentDensity: 100
   EnvironmentPrefabs: []
   SurfaceFeatureDensity: 50
@@ -64,3 +77,7 @@ MonoBehaviour:
   - {fileID: 2281804471223176727, guid: 72cd382a2944ed14486d3a00a5e1cedc, type: 3}
   - {fileID: 2470480825251639189, guid: 5920905e7a5364c47864b79706cb5eca, type: 3}
   - {fileID: 1547757601392324, guid: 6f672a31584a6a748912a49c1dce2f0c, type: 3}
+  DenyMinerals: 0
+  DenyGas: 0
+  DenyIron: 0
+  DenyRegolith: 0

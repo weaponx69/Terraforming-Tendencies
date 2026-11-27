@@ -1,0 +1,41 @@
+---
+description: Main-thread FPS guardrails for the hex slice—spatial indexes, TMP, survey visuals, simulation loops. Apply when editing gameplay scripts.
+alwaysApply: true
+---
+
+# RTS performance budgets (1–7 FPS traps)
+
+High-volume hex strategy on a **single main thread**. Never reintroduce these patterns.
+
+## 1. Full-board spatial reset
+
+- **Don't:** Clear/rebuild `HiddenByCell` / `SectorNodesByCell` or `FindObjectsByType` inside movement/reveal loops.
+- **Do:** Boot-time `ApplyHiddenState()` in `MainGameResourceFog`. Mid-game = O(1) reads or local hex neighbors. No dynamic `InvalidateSpatialIndex()`.
+
+## 2. TextMeshPro canvas storms
+
+- **Don't:** Raw Unicode missing from LiberationSans SDF (`◀` `▶` `✓` `∞`) → `OnPreRenderCanvas` every frame.
+- **Do:** `MainGameUiText.SanitizeForTmp()`. ASCII substitutes. `MainGameHUD.Refresh` throttled (`HudRefreshMinInterval = 0.33f`).
+
+## 3. Synchronous survey / trail visuals
+
+- **Don't:** Light entire path batches or full texture commits on one confirm frame.
+- **Do:** Spread over **2–3 frames**; cap **5–10 cells/frame**. `MainGameSurveyMission`, `MainGamePathGroundOverlay` — `ApplyImmediate()` on confirm/drag-end, not full-board redraw.
+
+## 4. Unbounded time-lapse / construction loops
+
+- **Don't:** `TickAllFromTimeLapse` / week catch-up without per-frame caps while builds idle.
+- **Do:** `safetyCounter > 50` → break; defer to next frame. `MainGameTimeLapse`, `MainGameConstruction`.
+
+## Related in code
+
+- Hand rebuild: diff before `RebuildMainGameHand`; no `RefreshHandUnlocks` feedback loops (`MainGameController`, `CardDeckController`).
+- Haul / aquifer ice scans: **placement + completion only**, not every tick.
+
+## Verify perf claims
+
+```bash
+SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh
+```
+
+`maxDispatchSpikeMs` < **2.0**, ~**60 FPS**. Detail: [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) §10.1, [`docs/specs/2026-11-24-prologue-fps-budget.md`](../../docs/specs/2026-11-24-prologue-fps-budget.md).

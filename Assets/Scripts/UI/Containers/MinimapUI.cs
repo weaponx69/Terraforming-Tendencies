@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -24,6 +25,9 @@ namespace GameDevTV.RTS.UI.Containers
         private Color32[] pixels;
         private float mapW;
         private float mapH;
+        private float nextRebuildTime;
+        private const float RebuildIntervalSeconds = 0.2f;
+        private static bool prologueSuspended;
 
         private static readonly Color32 Ground = new(28, 32, 38, 255);
         private static readonly Color32 GridLine = new(48, 54, 64, 255);
@@ -209,7 +213,7 @@ namespace GameDevTV.RTS.UI.Containers
 
             panel = mountRt;
 
-            LiftMinimapAboveCardHand(container as RectTransform);
+            LayoutMinimapUnderMenuButton(container as RectTransform);
 
             // Drop fallback overlay canvas if we successfully mounted into the scene.
             Transform fallback = transform.Find("MinimapCanvas");
@@ -224,26 +228,42 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         /// <summary>
-        /// Card hand docks bottom-left (~220px tall). Pin the Minimap Container
-        /// above that strip on the left and give it a higher sorting canvas so
-        /// cards never cover it.
+        /// Dock the minimap under the scene Menu Button on the right (empty strip above the card hand).
         /// </summary>
-        private static void LiftMinimapAboveCardHand(RectTransform container)
+        private static void LayoutMinimapUnderMenuButton(RectTransform container)
         {
             if (container == null) return;
 
-            // Detach from Bottom Bar layout siblings if needed — keep under same canvas root.
-            // Position: bottom-left, raised above card dock.
-            const float handClearance = 350f; // card height (~220) + ~1" gap above hand
             const float mapSize = 200f;
-            const float leftPad = 16f;
+            const float gapBelowMenu = 12f;
 
-            container.anchorMin = new Vector2(0f, 0f);
-            container.anchorMax = new Vector2(0f, 0f);
-            container.pivot = new Vector2(0f, 0f);
-            container.sizeDelta = new Vector2(mapSize, mapSize);
-            container.anchoredPosition = new Vector2(leftPad, handClearance);
-            container.localScale = Vector3.one;
+            Transform menuContainer = FindTransformNamed("Menu Container");
+            Transform menuButton = FindTransformNamed("Menu Button");
+            if (menuContainer is RectTransform menuCr)
+            {
+                container.SetParent(menuCr, false);
+                container.anchorMin = new Vector2(0.5f, 1f);
+                container.anchorMax = new Vector2(0.5f, 1f);
+                container.pivot = new Vector2(0.5f, 1f);
+                container.sizeDelta = new Vector2(mapSize, mapSize);
+                float menuFoot = 100f;
+                if (menuButton is RectTransform btn)
+                    menuFoot = Mathf.Abs(btn.anchoredPosition.y) + btn.sizeDelta.y * 0.5f;
+                container.anchoredPosition = new Vector2(0f, -(menuFoot + gapBelowMenu));
+            }
+            else
+            {
+                container.anchorMin = new Vector2(1f, 0.5f);
+                container.anchorMax = new Vector2(1f, 0.5f);
+                container.pivot = new Vector2(1f, 1f);
+                container.sizeDelta = new Vector2(mapSize, mapSize);
+                container.anchoredPosition = new Vector2(-16f, 40f);
+            }
+
+            if (menuContainer != null && menuContainer.localScale.x < 0f)
+                container.localScale = new Vector3(-1f, 1f, 1f);
+            else
+                container.localScale = Vector3.one;
             container.SetAsLastSibling();
 
             // Ensure Background / Mask fill the container.
@@ -285,11 +305,11 @@ namespace GameDevTV.RTS.UI.Containers
             var panelGo = new GameObject("MinimapPanel", typeof(RectTransform));
             panelGo.transform.SetParent(canvasGo.transform, false);
             panel = panelGo.GetComponent<RectTransform>();
-            // Left — matches intended Minimap Container side until scene mount succeeds.
-            panel.anchorMin = new Vector2(0f, 0f);
-            panel.anchorMax = new Vector2(0f, 0f);
-            panel.pivot = new Vector2(0f, 0f);
-            panel.anchoredPosition = new Vector2(16f, 350f);
+            // Right — under Menu until scene mount succeeds.
+            panel.anchorMin = new Vector2(1f, 0.5f);
+            panel.anchorMax = new Vector2(1f, 0.5f);
+            panel.pivot = new Vector2(1f, 1f);
+            panel.anchoredPosition = new Vector2(-16f, 40f);
             panel.sizeDelta = new Vector2(200f, 200f);
 
             var frame = panelGo.AddComponent<Image>();
@@ -309,6 +329,16 @@ namespace GameDevTV.RTS.UI.Containers
             mapImage.texture = mapTex;
             var catcher = rawGo.AddComponent<MinimapClickCatcher>();
             catcher.Owner = this;
+        }
+
+        private static Transform FindTransformNamed(string objectName)
+        {
+            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (t != null && t.name == objectName)
+                    return t;
+            }
+            return null;
         }
 
         private static Transform FindMinimapContainer()
@@ -352,8 +382,23 @@ namespace GameDevTV.RTS.UI.Containers
             }
         }
 
+        /// <summary>MainGame uses code HUD — skip full-map CPU rebuild every frame.</summary>
+        public static void SetMainGameSuspended(bool suspended)
+        {
+            prologueSuspended = suspended;
+            if (suspended && Instance != null && Instance.panel != null)
+                Instance.panel.gameObject.SetActive(false);
+        }
+
         private void LateUpdate()
         {
+            if (prologueSuspended || MainGameController.IsActive)
+            {
+                if (panel != null && panel.gameObject.activeSelf)
+                    panel.gameObject.SetActive(false);
+                return;
+            }
+
             // Prefer scene Minimap Container once Bottom Bar is ready.
             if (mapImage != null && transform.Find("MinimapCanvas") != null)
                 TryMountIntoSceneContainer();
@@ -362,6 +407,10 @@ namespace GameDevTV.RTS.UI.Containers
             if (mapW <= 1f || mapH <= 1f)
                 RefreshMapBounds();
             if (mapW <= 1f || mapH <= 1f) return;
+
+            if (panel == null || !panel.gameObject.activeInHierarchy) return;
+            if (Time.unscaledTime < nextRebuildTime) return;
+            nextRebuildTime = Time.unscaledTime + RebuildIntervalSeconds;
 
             RebuildTexture();
         }

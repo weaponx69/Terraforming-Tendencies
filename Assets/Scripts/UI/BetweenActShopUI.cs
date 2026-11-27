@@ -103,7 +103,7 @@ namespace GameDevTV.RTS.UI
         private void MuteWorldMapLabels()
         {
             RestoreWorldMapLabels();
-            var labels = Object.FindObjectsByType<TMPro.TextMeshPro>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var labels = Object.FindObjectsByType<TMPro.TextMeshPro>(FindObjectsInactive.Exclude);
             for (int i = 0; i < labels.Length; i++)
             {
                 var tmp = labels[i];

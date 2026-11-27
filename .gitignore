@@ -101,3 +101,8 @@ crashlytics-build.properties
 # UnityCodeLama package
 /[Aa]ssets/UnityCodeLama/
 /[Aa]ssets/UnityCodeLama.meta
+
+# Agent harness output (local only) — not Summer/Godot; legacy path was Assets/.summer/
+.summer/
+Assets/.summer/
+Assets/Playtest/

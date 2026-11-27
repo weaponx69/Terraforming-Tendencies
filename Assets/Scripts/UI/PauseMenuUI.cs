@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Audio;
+using GameDevTV.RTS.MainGame;
 
 namespace GameDevTV.RTS.UI
 {
@@ -31,18 +33,25 @@ namespace GameDevTV.RTS.UI
         private Slider musicSlider;
         private Slider sfxSlider;
 
+        /// <summary>True when Research card opened pause for a project pick.</summary>
+        bool researchPickPending;
+        Transform researchLadderRoot;
+        readonly List<TextMeshProUGUI> researchRowLabels = new();
+        readonly List<Button> researchRowButtons = new();
+        readonly List<MainGameResearchId> researchRowIds = new();
+        TextMeshProUGUI researchHeaderLabel;
+        TextMeshProUGUI researchHintLabel;
+
         private void Awake()
         {
-            // Auto-hookup the HUD Menu Button if it exists in the scene
-            GameObject menuBtnGO = GameObject.Find("Menu Button");
-            if (menuBtnGO != null)
+            // The Menu button is saved inactive so it does not sit on screen before Play.
+            foreach (var candidate in Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
             {
-                Button mainBtn = menuBtnGO.GetComponent<Button>();
-                if (mainBtn != null)
-                {
-                    mainBtn.onClick.RemoveListener(TogglePause);
-                    mainBtn.onClick.AddListener(TogglePause);
-                }
+                if (candidate == null || candidate.gameObject.name != "Menu Button") continue;
+                candidate.gameObject.SetActive(true);
+                candidate.onClick.RemoveListener(TogglePause);
+                candidate.onClick.AddListener(TogglePause);
+                break;
             }
         }
 
@@ -85,6 +94,7 @@ namespace GameDevTV.RTS.UI
         {
             if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame)
             {
+                if (PlayerInput.PlacementGhostActive) return;
                 TogglePause();
             }
         }
@@ -94,8 +104,18 @@ namespace GameDevTV.RTS.UI
             isPaused = !isPaused;
 
             // Build sliders when opening — catches late UI / domain reload cases.
-            if (isPaused) EnsureVolumeControls();
-            
+            if (isPaused)
+            {
+                EnsureVolumeControls();
+                EnsureResearchLadder();
+                RefreshResearchLadder();
+            }
+            else
+            {
+                researchPickPending = false;
+                SetResearchLadderVisible(false);
+            }
+
             if (menuPanel != null)
                 menuPanel.SetActive(isPaused);
 
@@ -106,6 +126,258 @@ namespace GameDevTV.RTS.UI
 
             if (isPaused)
                 SyncVolumeSlidersFromAudio();
+        }
+
+        /// <summary>
+        /// Research card: open pause with the MainGame research ladder focused for a pick.
+        /// Card stays in hand until a locked project is begun (or Esc without picking).
+        /// </summary>
+        public void OpenResearchPick()
+        {
+            researchPickPending = true;
+            if (!isPaused)
+                TogglePause();
+            else
+            {
+                EnsureResearchLadder();
+                RefreshResearchLadder();
+            }
+            SetResearchLadderVisible(MainGameController.IsActive);
+        }
+
+        void EnsureResearchLadder()
+        {
+            if (!MainGameController.IsActive)
+            {
+                SetResearchLadderVisible(false);
+                return;
+            }
+
+            if (menuPanel == null) return;
+
+            // Prefer outer Content so the list is not clipped by the 300×400 Menu Panel box.
+            Transform host = menuPanel.transform;
+            Transform menuBox = menuPanel.transform.Find("Menu Panel");
+
+            if (researchLadderRoot == null)
+            {
+                var existing = host.Find("Research Ladder");
+                if (existing == null && menuBox != null)
+                    existing = menuBox.Find("Research Ladder");
+                if (existing != null)
+                {
+                    // Stale shell from a prior build without row caches — recreate.
+                    if (researchRowLabels.Count == 0)
+                    {
+                        DestroyImmediate(existing.gameObject);
+                        existing = null;
+                    }
+                    else
+                        researchLadderRoot = existing;
+                }
+            }
+
+            if (researchLadderRoot == null)
+                BuildResearchLadder(host, menuBox);
+
+            SetResearchLadderVisible(true);
+        }
+
+        void BuildResearchLadder(Transform host, Transform menuBox)
+        {
+            TMP_FontAsset font = null;
+            var fontHost = menuBox != null ? menuBox : host;
+            var existingTmp = fontHost.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (existingTmp != null) font = existingTmp.font;
+
+            var root = new GameObject("Research Ladder", typeof(RectTransform), typeof(Image));
+            root.transform.SetParent(host, false);
+            root.transform.SetAsLastSibling();
+            researchLadderRoot = root.transform;
+
+            var rootImg = root.GetComponent<Image>();
+            rootImg.color = new Color(0.05f, 0.07f, 0.1f, 0.94f);
+            rootImg.raycastTarget = true;
+
+            var rootRt = root.GetComponent<RectTransform>();
+            // Sit just right of the Menu Panel (center stack) when Content is the host.
+            rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
+            rootRt.pivot = new Vector2(0f, 0.5f);
+            rootRt.sizeDelta = new Vector2(280f, 320f);
+            rootRt.anchoredPosition = new Vector2(170f, 0f);
+            rootRt.localScale = Vector3.one;
+
+            var vlg = root.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 6f;
+            vlg.padding = new RectOffset(10, 10, 10, 10);
+            vlg.childAlignment = TextAnchor.UpperLeft;
+            vlg.childControlHeight = true;
+            vlg.childControlWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.childForceExpandWidth = true;
+
+            researchHeaderLabel = MakeResearchLabel(root.transform, "Header", font, 17f, FontStyles.Bold);
+            researchHeaderLabel.text = "Research";
+
+            researchHintLabel = MakeResearchLabel(root.transform, "Hint", font, 13f, FontStyles.Italic);
+            researchHintLabel.color = new Color(0.75f, 0.82f, 0.9f, 1f);
+
+            // Tier-1 baseline (always unlocked in MainGame).
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.None, isTier1: true);
+
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.FasterBuild, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.LongerPowerReach, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.ExtraScanType, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.ExtendedSurvey, isTier1: false);
+        }
+
+        void AddResearchStatusRow(Transform parent, TMP_FontAsset font, MainGameResearchId id, bool isTier1)
+        {
+            var row = new GameObject(isTier1 ? "Tier1" : id.ToString(), typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            var le = row.AddComponent<LayoutElement>();
+            le.minHeight = 36f;
+            le.preferredHeight = 40f;
+
+            var img = row.AddComponent<Image>();
+            img.color = new Color(0.1f, 0.12f, 0.16f, 0.95f);
+
+            var btn = row.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(0.18f, 0.28f, 0.4f, 1f);
+            colors.pressedColor = new Color(0.14f, 0.22f, 0.32f, 1f);
+            colors.disabledColor = new Color(0.1f, 0.12f, 0.16f, 0.95f);
+            btn.colors = colors;
+
+            var label = MakeResearchLabel(row.transform, "Label", font, 14f, FontStyles.Normal);
+            var labelRt = label.rectTransform;
+            labelRt.anchorMin = Vector2.zero;
+            labelRt.anchorMax = Vector2.one;
+            labelRt.offsetMin = new Vector2(8f, 2f);
+            labelRt.offsetMax = new Vector2(-8f, -2f);
+
+            researchRowLabels.Add(label);
+            researchRowButtons.Add(btn);
+            researchRowIds.Add(id);
+
+            int capture = researchRowIds.Count - 1;
+            btn.onClick.AddListener(() => OnResearchRowClicked(capture));
+        }
+
+        static TextMeshProUGUI MakeResearchLabel(
+            Transform parent, string name, TMP_FontAsset font, float size, FontStyles style)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            if (font != null) tmp.font = font;
+            tmp.fontSize = size;
+            tmp.fontStyle = style;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.raycastTarget = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.overflowMode = TextOverflowModes.Ellipsis;
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = size + 6f;
+            le.preferredHeight = size + 10f;
+            return tmp;
+        }
+
+        void SetResearchLadderVisible(bool visible)
+        {
+            if (researchLadderRoot != null)
+                researchLadderRoot.gameObject.SetActive(visible);
+        }
+
+        void RefreshResearchLadder()
+        {
+            if (!MainGameController.IsActive || researchLadderRoot == null)
+            {
+                SetResearchLadderVisible(false);
+                return;
+            }
+
+            SetResearchLadderVisible(true);
+            var research = MainGameController.Instance?.Colony?.Research;
+            if (research == null) return;
+
+            bool canStart = research.Active == MainGameResearchId.None;
+            if (researchHintLabel != null)
+            {
+                if (researchPickPending && canStart)
+                    researchHintLabel.text = "Pick a locked project to begin.";
+                else if (!canStart)
+                    researchHintLabel.text =
+                        $"In progress: {MainGameResearch.DisplayName(research.Active)} — {research.WeeksRemaining} wk left";
+                else
+                    researchHintLabel.text = "Tap a locked project to begin (no Active).";
+            }
+
+            for (int i = 0; i < researchRowIds.Count; i++)
+            {
+                var id = researchRowIds[i];
+                var label = researchRowLabels[i];
+                var btn = researchRowButtons[i];
+                if (label == null || btn == null) continue;
+
+                if (id == MainGameResearchId.None)
+                {
+                    // Tier-1 connected power — always lit.
+                    label.text = "Connected Power (Tier 1) — unlocked";
+                    label.color = new Color(0.55f, 0.95f, 0.65f, 1f);
+                    btn.interactable = false;
+                    continue;
+                }
+
+                int weeks = MainGameData.ResearchWeeks(id);
+                string name = MainGameResearch.DisplayName(id);
+
+                if (research.IsUnlocked(id))
+                {
+                    label.text = $"{name} — complete";
+                    label.color = new Color(0.55f, 0.95f, 0.65f, 1f);
+                    btn.interactable = false;
+                }
+                else if (research.Active == id)
+                {
+                    label.text = $"{name} — in progress ({research.WeeksRemaining} wk left)";
+                    label.color = new Color(0.95f, 0.85f, 0.4f, 1f);
+                    btn.interactable = false;
+                }
+                else
+                {
+                    label.text = $"{name} — {weeks} wk (locked)";
+                    label.color = new Color(0.7f, 0.75f, 0.85f, 1f);
+                    btn.interactable = canStart;
+                }
+            }
+        }
+
+        void OnResearchRowClicked(int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= researchRowIds.Count) return;
+            var id = researchRowIds[rowIndex];
+            if (id == MainGameResearchId.None) return;
+
+            var colony = MainGameController.Instance?.Colony;
+            if (colony?.Research == null) return;
+
+            if (!colony.Research.TryBegin(id, out var reason))
+            {
+                MainGameHUD.Instance?.ShowNote(new List<string> { reason ?? "Cannot research" });
+                RefreshResearchLadder();
+                return;
+            }
+
+            researchPickPending = false;
+            CardDeckController.Instance?.ConsumeResearchCardFromHand();
+            MainGameHUD.Instance?.ShowNote(new List<string>
+            {
+                $"Research started: {MainGameResearch.DisplayName(id)} ({MainGameData.ResearchWeeks(id)} wk)."
+            });
+            RefreshResearchLadder();
         }
 
         private void OnSaveClicked()

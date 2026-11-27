@@ -3,6 +3,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
@@ -26,7 +27,7 @@ namespace GameDevTV.RTS.UI.Containers
         [SerializeField] private UIActionButton[] actionButtons;
 
         [Header("Card Layout")]
-        [SerializeField] private Vector2 cardSize = new Vector2(158f, 220f);
+        [SerializeField] private Vector2 cardSize = new Vector2(196f, 286f);
         [SerializeField] private float cardSpacing = 14f;
         [SerializeField] private float bottomMargin = 16f;
         [SerializeField] private float leftMargin = 16f;
@@ -52,6 +53,36 @@ namespace GameDevTV.RTS.UI.Containers
         /// <summary>True while the pointer is over the hand strip (camera zoom should yield the wheel).</summary>
         public static bool IsPointerOverHandStrip =>
             instance != null && instance.isBuilt && instance.IsPointerOverHand();
+
+        /// <summary>Screen point (Unity, bottom-left origin) for an enabled hand card.</summary>
+        public static bool TryGetHandCardScreenPoint(string nameContains, out Vector2 screenBottomLeft)
+        {
+            screenBottomLeft = default;
+            if (instance == null || string.IsNullOrEmpty(nameContains)) return false;
+            return instance.TryGetHandCardScreenPointImpl(nameContains, out screenBottomLeft);
+        }
+
+        bool TryGetHandCardScreenPointImpl(string nameContains, out Vector2 screenBottomLeft)
+        {
+            screenBottomLeft = default;
+            if (actionButtons == null) return false;
+            var deck = CardDeckController.Instance;
+            if (deck == null) return false;
+
+            for (int i = 0; i < actionButtons.Length; i++)
+            {
+                var slot = actionButtons[i];
+                if (slot == null || !slot.IsActive) continue;
+                int handIndex = slot.HandIndexForPlaythrough;
+                if (handIndex < 0 || handIndex >= deck.Hand.Count) continue;
+                var card = deck.Hand[handIndex];
+                if (card == null || card.cardName == null) continue;
+                if (card.cardName.IndexOf(nameContains, System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                var rt = slot.GetComponent<RectTransform>();
+                return UiPlaythroughUtil.TryScreenCenter(rt, out screenBottomLeft);
+            }
+            return false;
+        }
 
         private void OnEnable()
         {
@@ -150,25 +181,42 @@ namespace GameDevTV.RTS.UI.Containers
             }
         }
 
+        static void CardFaceSize(out float width, out float height)
+        {
+            if (MainGameController.IsActive)
+            {
+                width = MainGameUiLayout.CardWidth;
+                height = MainGameUiLayout.CardHeight;
+            }
+            else
+            {
+                width = 196f;
+                height = 286f;
+            }
+        }
+
+        float HandCardSpacing() =>
+            MainGameController.IsActive ? MainGameUiLayout.CardSpacing : cardSpacing;
+
         private void ApplyPlayingCardLayout()
         {
-            float width = Mathf.Max(48f, cardSize.x);
-            float height = Mathf.Max(width * 1.25f, cardSize.y);
+            CardFaceSize(out float width, out float height);
+            float gap = HandCardSpacing();
 
             containerRt = transform.parent as RectTransform;
             if (containerRt == null) containerRt = cardsRt;
 
             // Dock container bottom-left with a fixed viewport size (scroll if more cards).
-            int padL = 8, padR = 8, padT = 6, padB = 6;
+            int padL = 6, padR = 6, padT = 4, padB = 4;
             viewportWidth = visibleCardCount * width
-                + Mathf.Max(0, visibleCardCount - 1) * cardSpacing
+                + Mathf.Max(0, visibleCardCount - 1) * gap
                 + padL + padR;
             float viewportHeight = height + padT + padB;
 
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
-            containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+            containerRt.anchoredPosition = new Vector2(leftMargin, EffectiveBottomMargin());
             containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, viewportWidth);
             containerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
             containerRt.SetAsLastSibling();
@@ -197,7 +245,7 @@ namespace GameDevTV.RTS.UI.Containers
             var hlg = GetComponent<HorizontalLayoutGroup>();
             if (hlg == null) hlg = gameObject.AddComponent<HorizontalLayoutGroup>();
             hlg.enabled = true;
-            hlg.spacing = cardSpacing;
+            hlg.spacing = gap;
             hlg.childAlignment = TextAnchor.MiddleLeft;
             hlg.childControlWidth = false;
             hlg.childControlHeight = false;
@@ -234,8 +282,8 @@ namespace GameDevTV.RTS.UI.Containers
                 Transform icon = slot.transform.Find("Icon");
                 if (icon is RectTransform iconRt)
                 {
-                    iconRt.anchorMin = new Vector2(0.08f, 0.28f);
-                    iconRt.anchorMax = new Vector2(0.92f, 0.70f);
+                    iconRt.anchorMin = new Vector2(0.10f, 0.34f);
+                    iconRt.anchorMax = new Vector2(0.90f, 0.68f);
                     iconRt.offsetMin = Vector2.zero;
                     iconRt.offsetMax = Vector2.zero;
                 }
@@ -248,8 +296,7 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (containerRt == null || cardsRt == null || actionButtons == null) return;
 
-            float width = Mathf.Max(48f, cardSize.x);
-            float height = Mathf.Max(width * 1.25f, cardSize.y);
+            CardFaceSize(out float width, out float height);
             var hlg = GetComponent<HorizontalLayoutGroup>();
             int leftPad = hlg != null ? hlg.padding.left : 8;
             int rightPad = hlg != null ? hlg.padding.right : 8;
@@ -273,16 +320,17 @@ namespace GameDevTV.RTS.UI.Containers
                 le.minHeight = height;
             }
 
+            float gap = HandCardSpacing();
             contentWidth = activeSlots <= 0
                 ? leftPad + rightPad
                 : activeSlots * width
-                  + Mathf.Max(0, activeSlots - 1) * cardSpacing
+                  + Mathf.Max(0, activeSlots - 1) * gap
                   + leftPad + rightPad;
 
             viewportWidth = Mathf.Min(
                 contentWidth,
                 visibleCardCount * width
-                + Mathf.Max(0, visibleCardCount - 1) * cardSpacing
+                + Mathf.Max(0, visibleCardCount - 1) * gap
                 + leftPad + rightPad);
 
             float viewportHeight = height + topPad + bottomPad;
@@ -291,7 +339,7 @@ namespace GameDevTV.RTS.UI.Containers
             containerRt.anchorMin = new Vector2(0f, 0f);
             containerRt.anchorMax = new Vector2(0f, 0f);
             containerRt.pivot = new Vector2(0f, 0f);
-            containerRt.anchoredPosition = new Vector2(leftMargin, bottomMargin);
+            containerRt.anchoredPosition = new Vector2(leftMargin, EffectiveBottomMargin());
 
             cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, contentWidth);
             cardsRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
@@ -301,6 +349,13 @@ namespace GameDevTV.RTS.UI.Containers
             LayoutRebuilder.ForceRebuildLayoutImmediate(cardsRt);
             // Layout rebuild can clobber the strip position — re-apply after.
             ApplyScrollOffset();
+        }
+
+        float EffectiveBottomMargin()
+        {
+            if (MainGameController.IsActive)
+                return MainGameUiLayout.CardBottomMargin;
+            return bottomMargin;
         }
 
         private void ClampScroll()
@@ -343,8 +398,11 @@ namespace GameDevTV.RTS.UI.Containers
 
             // Only rebuild when the hand actually changes — polling was fighting scroll
             // and recreating ScriptableObjects every half-second.
-            if (Time.frameCount % 30 == 0 && HandFingerprintChanged())
+            int handPoll = GameDevTV.RTS.MainGame.MainGameController.IsActive ? 120 : 30;
+            if (Time.frameCount % handPoll == 0 && HandFingerprintChanged())
                 RefreshBar();
+            else
+                RefreshPickedCards();
         }
 
         private void LateUpdate()
@@ -352,6 +410,21 @@ namespace GameDevTV.RTS.UI.Containers
             if (!Application.isPlaying) return;
             // Keep scroll sticky if any layout pass moved the strip this frame.
             ApplyScrollOffset();
+        }
+
+        private void RefreshPickedCards()
+        {
+            if (actionButtons == null) return;
+            int picked = GameDevTV.RTS.Player.PlayerInput.PickedHandIndex;
+            bool surveyLive = MainGameDroneScan.Instance != null
+                && MainGameDroneScan.Instance.ScanMode
+                && !MainGameDroneScan.Instance.IsFlying;
+            for (int i = 0; i < actionButtons.Length; i++)
+            {
+                var slot = actionButtons[i];
+                if (slot == null) continue;
+                slot.RefreshPicked(picked, surveyLive);
+            }
         }
 
         private void UpdateDockHoverGlow()
@@ -446,6 +519,7 @@ namespace GameDevTV.RTS.UI.Containers
             }
             var focus = SectorManager.Instance?.ActiveSector;
             fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
+            fingerprint = unchecked(fingerprint * 31 + MainGameMineralsOnHand());
 
             if (fingerprint == lastHandFingerprint && hand.Count == lastHandCount)
                 return false;
@@ -455,6 +529,13 @@ namespace GameDevTV.RTS.UI.Containers
             return true;
         }
 
+        public void ApplyMainGameCompactLayout()
+        {
+            if (!isBuilt) return;
+            ApplyPlayingCardLayout();
+            RefreshBar();
+        }
+
         public void RefreshBar()
         {
             if (!isBuilt || actionButtons == null) return;
@@ -462,6 +543,10 @@ namespace GameDevTV.RTS.UI.Containers
 
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
+
+            // MainGame hands are tiny — never leave the strip scrolled off-screen.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive && hand.Count <= 6)
+                scrollOffset = 0f;
 
             // Visible subset for the focused sector — real hand indices stay on the commands.
             var visible = new List<(BlueprintCardSO card, int handIndex)>(hand.Count);
@@ -479,6 +564,7 @@ namespace GameDevTV.RTS.UI.Containers
                 fingerprint = unchecked(fingerprint * 31 + (int)EntityId.ToULong(visible[i].card.GetEntityId()));
             var focus = SectorManager.Instance?.ActiveSector;
             fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
+            fingerprint = unchecked(fingerprint * 31 + MainGameMineralsOnHand());
             lastHandFingerprint = fingerprint;
 
             EnsureHandSlotCount(Mathf.Max(visible.Count, 1));
@@ -498,9 +584,11 @@ namespace GameDevTV.RTS.UI.Containers
                     if (card is UnlockBuildingCardSO unlockCard && unlockCard.buildingToUnlock != null)
                     {
                         var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
-                        buildCmd.Name = unlockCard.buildingToUnlock.Name;
                         buildCmd.Building = unlockCard.buildingToUnlock;
-                        buildCmd.Icon = unlockCard.buildingToUnlock.Icon;
+                        buildCmd.Name = string.IsNullOrEmpty(unlockCard.cardName)
+                            ? unlockCard.buildingToUnlock.Name
+                            : unlockCard.cardName;
+                        buildCmd.Icon = BlueprintCardIcon.Resolve(unlockCard);
                         buildCmd.Slot = i;
                         buildCmd.HandIndex = cardIndex;
                         buildCmd.GhostPrefab = FindGhostPrefabForBuilding(unlockCard.buildingToUnlock);
@@ -509,26 +597,37 @@ namespace GameDevTV.RTS.UI.Containers
                         {
                             PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
                         }, sectorGoal, unlockCard.GetMaterialsPlayCost());
+                        ApplyMainGameMineralLock(actionButtons[i], card);
+                        actionButtons[i].BindSlot(cardIndex, false);
                     }
                     else
                     {
                         var playCmd = ScriptableObject.CreateInstance<PlayCardCommand>();
                         playCmd.Name = card.cardName;
-                        Sprite cardIcon = card.icon;
-                        if (cardIcon == null && card is SpawnUnitCardSO spawnCard && spawnCard.unitPrefab != null)
-                        {
-                            var unit = spawnCard.unitPrefab.GetComponent<AbstractUnit>();
-                            if (unit != null) cardIcon = unit.Icon;
-                        }
-                        playCmd.Icon = cardIcon;
+                        playCmd.Icon = BlueprintCardIcon.Resolve(card);
                         playCmd.Slot = i;
                         playCmd.HandIndex = cardIndex;
                         playCmd.MaterialsCost = card.GetMaterialsPlayCost();
 
+                        int capturedIndex = cardIndex;
+                        var capturedCard = card;
                         actionButtons[i].EnableFor(playCmd, null, () =>
                         {
+                            // MainGame Survey Team: play immediately even while time is paused.
+                            // PlayerInput.ActivateAction used to swallow PlayCard at timeScale=0.
+                            if (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                                && capturedCard is ScoutingCardSO
+                                && CardDeckController.Instance != null)
+                            {
+                                CardDeckController.Instance.PlayCard(capturedIndex);
+                                return;
+                            }
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
                         }, sectorGoal, playCmd.MaterialsCost);
+                        ApplyMainGameMineralLock(actionButtons[i], card);
+                        bool survey = card is ScoutingCardSO scout
+                            && scout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone;
+                        actionButtons[i].BindSlot(cardIndex, survey);
                     }
                 }
                 else
@@ -538,6 +637,7 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             FitLayoutToActiveCards();
+            RefreshPickedCards();
         }
 
         /// <summary>
@@ -567,12 +667,94 @@ namespace GameDevTV.RTS.UI.Containers
             ApplyPlayingCardLayout();
         }
 
-        private void PlayBuildingCard(int cardIndex, BuildingSO building)
+        static int MainGameMineralsOnHand()
+        {
+            var colony = GameDevTV.RTS.MainGame.MainGameController.Instance?.Colony;
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive || colony == null) return 0;
+            return colony.GetStock(GameDevTV.RTS.MainGame.MainGameResourceId.Minerals);
+        }
+
+        static void ApplyMainGameMineralLock(UIActionButton button, BlueprintCardSO card)
+        {
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive || button == null) return;
+            int cost = GameDevTV.RTS.MainGame.MainGameCardMap.MineralCost(card);
+            button.ApplyMainGameMinerals(cost, MainGameMineralsOnHand());
+        }
+
+#if UNITY_EDITOR
+        /// <summary>CLI bot: start placement ghost without UI click (works when button is non-interactable).</summary>
+        public static bool EditorPlaytestSelectHandCard(string nameContains)
+        {
+            if (string.IsNullOrEmpty(nameContains) || CardDeckController.Instance == null) return false;
+            var hand = CardDeckController.Instance.Hand;
+            for (int i = 0; i < hand.Count; i++)
+            {
+                var card = hand[i];
+                if (card == null) continue;
+                string cardName = card.cardName ?? card.name ?? "";
+                bool match = cardName.IndexOf(nameContains, System.StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!match && card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
+                {
+                    string b = unlock.buildingToUnlock.Name ?? "";
+                    match = b.IndexOf(nameContains, System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || HandCardMatchesStepAlias(nameContains, unlock.buildingToUnlock.Name);
+                }
+                if (!match && card is ScoutingCardSO)
+                    match = nameContains.IndexOf("Survey", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!match) continue;
+
+                if (card is UnlockBuildingCardSO build && build.buildingToUnlock != null)
+                {
+                    instance?.PlayBuildingCard(i, build.buildingToUnlock);
+                    return GameDevTV.RTS.Player.PlayerInput.PlacementGhostActive;
+                }
+
+                if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                {
+                    CardDeckController.Instance.PlayCard(i);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static bool HandCardMatchesStepAlias(string stepKey, string buildingName)
+        {
+            if (string.IsNullOrEmpty(buildingName)) return false;
+            if (stepKey.IndexOf("Atmosphere", System.StringComparison.OrdinalIgnoreCase) >= 0
+                && (buildingName.IndexOf("Atmosphere Processor", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || buildingName.IndexOf("Oxygen Processor", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                return true;
+            if ((stepKey.IndexOf("Windmill", System.StringComparison.OrdinalIgnoreCase) >= 0
+                 || stepKey.IndexOf("Wind", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                && (buildingName.IndexOf("Wind", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || buildingName.IndexOf("Windmill", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                return true;
+            return false;
+        }
+#endif
+
+        public void PlayBuildingCard(int cardIndex, BuildingSO building)
         {
             if (building == null) return;
 
+            // MainGame places via ice-range Preview — skip Acts power / materials / geology click gates.
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
+            if (prologue)
+            {
+                int cost = GameDevTV.RTS.MainGame.MainGameCardMap.MineralCost(building);
+                int have = MainGameMineralsOnHand();
+                if (cost > 0 && have < cost)
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        $"Need {cost} materials to build {building.Name} (have {have}).",
+                        ResolveErrorHintPosition());
+                    return;
+                }
+            }
             bool colonyActs = ColonyActManager.Instance != null;
-            if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(building, owner))
+            if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
                 float used = PowerGridManager.GetBoardPowerUpkeep(owner);
@@ -587,27 +769,30 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            int matCost = ReservedSiteBuildUtility.GetMaterialsCost(building);
-            int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
-            if (matCost > 0 && haveMats < matCost)
+            if (!prologue)
             {
-                ExplorationManager.NotifyPlacementFailed(
-                    $"Need {matCost} Materials to place {building.Name} (have {haveMats}).",
-                    ResolveErrorHintPosition());
-                return;
+                int matCost = ReservedSiteBuildUtility.GetMaterialsCost(building);
+                int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
+                if (matCost > 0 && haveMats < matCost)
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        $"Need {matCost} Materials to place {building.Name} (have {haveMats}).",
+                        ResolveErrorHintPosition());
+                    return;
+                }
+
+                // Geology-gated cards: must already have a matching sector available.
+                if (DiscoverySystem.TryGetRequiredSectorFeature(building, out var needFeature)
+                    && !DiscoverySystem.IsSectorFeatureDiscovered(needFeature))
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        $"Discover a {DiscoverySystem.DescribeSectorFeature(needFeature)} sector before placing {building.Name}.",
+                        ResolveErrorHintPosition());
+                    return;
+                }
             }
 
-            // Geology-gated cards: must already have a matching sector available.
-            if (DiscoverySystem.TryGetRequiredSectorFeature(building, out var needFeature)
-                && !DiscoverySystem.IsSectorFeatureDiscovered(needFeature))
-            {
-                ExplorationManager.NotifyPlacementFailed(
-                    $"Discover a {DiscoverySystem.DescribeSectorFeature(needFeature)} sector before placing {building.Name}.",
-                    ResolveErrorHintPosition());
-                return;
-            }
-
-            if (ColonyActManager.Instance != null)
+            if (!prologue && ColonyActManager.Instance != null)
             {
                 int weekCost = CardDeckController.GetWeekCost(building);
                 if (weekCost > ColonyActManager.Instance.WeeksRemaining)
@@ -631,37 +816,17 @@ namespace GameDevTV.RTS.UI.Containers
                 return;
             }
 
-            // Mines: auto-build on a matching discovered deposit — no free-ground ghost.
+            // Mines: player ghost-places onto a discovered deposit (no auto-build).
             if (BuildingSiteRegistry.IsMineBuilding(building))
             {
                 if (!DiscoverySystem.HasDiscoveredMineDeposit(building))
                 {
                     DiscoverySystem.TryGetMineResourceType(building, out string type);
                     ExplorationManager.NotifyPlacementFailed(
-                        $"No discovered {type ?? "resource"} deposit yet. Explore / discover mines before placing {building.Name}.",
+                        $"No discovered {type ?? "resource"} deposit yet. Survey first, then place {building.Name} on that pad.",
                         ResolveErrorHintPosition());
                     return;
                 }
-
-                if (!DiscoverySystem.TryGetAutoMinePlacement(building, out Vector3 minePos, out string failReason))
-                {
-                    ExplorationManager.NotifyPlacementFailed(
-                        failReason ?? $"No free {building.Name} deposit tile.",
-                        ResolveErrorHintPosition());
-                    return;
-                }
-
-                var autoCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();
-                autoCmd.Name = building.Name;
-                autoCmd.Building = building;
-                autoCmd.Icon = building.Icon;
-                autoCmd.HandIndex = cardIndex;
-                autoCmd.GhostPrefab = FindGhostPrefabForBuilding(building);
-
-                var hit = new RaycastHit { point = minePos };
-                // No UCC hub — mine cards place with an owner-scoped context.
-                autoCmd.Handle(new CommandContext(owner, null, hit));
-                return;
             }
 
             var buildCmd = ScriptableObject.CreateInstance<BuildBuildingCommand>();

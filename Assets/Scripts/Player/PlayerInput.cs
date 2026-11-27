@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
@@ -6,6 +7,7 @@ using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Audio;
 using Unity.Cinemachine;
+using Unity.Cinemachine.TargetTracking;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Linq;
@@ -13,7 +15,9 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.LowLevel;
 using GameDevTV.RTS.Utilities;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Containers;
+using GameDevTV.RTS.MainGame;
 using TMPro;
 
 namespace GameDevTV.RTS.Player
@@ -43,6 +47,8 @@ namespace GameDevTV.RTS.Player
         private Color joinedTileFresnelColor = new (0.4f, 4f, 1.2f, 2);
 
         private Vector2 startingMousePosition;
+        // World XZ velocity left over from a middle-mouse flick (globe spin).
+        private Vector3 globeSpinVelocity;
 
         private BaseCommand activeCommand;
         private List<ISelectable> commandTargetUnits = new(12);
@@ -61,6 +67,7 @@ namespace GameDevTV.RTS.Player
         private Vector2Int? lastComboPreviewCell;
         private BuildingSO lastComboPreviewBuilding;
         private Vector2Int? tileGhostStickyCell;
+        string placementCaption;
         private int lastJoinCount = -1;
         private bool lastGhostRestrictionsPass = true;
         private int restrictionAgreeFrames;
@@ -76,6 +83,9 @@ namespace GameDevTV.RTS.Player
         private float rotationStartTime;
         private Vector3 startingFollowOffset;
         private float targetZoomDistance;
+        /// <summary>Smoothed altitude for MainGame zoom + tilt (scroll only moves <see cref="targetZoomDistance"/>).</summary>
+        float smoothedZoomDistance;
+        Vector3 mainGameOrbitBack = new(0f, 0f, -1f);
         private float maxRotationAmount;
         private HashSet<AbstractUnit> aliveUnits = new(100);
         private HashSet<AbstractUnit> addedUnits = new(24);
@@ -90,15 +100,242 @@ namespace GameDevTV.RTS.Player
 
         public static PlayerInput Instance { get; private set; }
 
+        /// <summary>
+        /// MainGame.unity is intentionally minimal; ensure gameplay input + Cinemachine on the main camera.
+        /// </summary>
+        /// <summary>Default Unity camera pose when Cinemachine never took over.</summary>
+        public static bool IsGameplayCameraAtDefaultPose()
+        {
+            var cam = Instance != null ? Instance.GameplayCamera : Camera.main;
+            if (cam == null) return true;
+            Vector3 p = cam.transform.position;
+            return p.x * p.x + (p.z + 10f) * (p.z + 10f) < 4f && p.y < 2.5f;
+        }
+
+        /// <summary>Split CM stack and wire follow — no recenter (safe every frame).</summary>
+        public static void EnsureMainGameCameraRigOnly()
+        {
+            if (!Application.isPlaying) return;
+            EnsureOnMainCameraForSlice();
+        }
+
+        public static void EnsureOnMainCameraForSlice()
+        {
+            if (!Application.isPlaying) return;
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
+                {
+                    if (c != null && c.CompareTag("MainCamera"))
+                    {
+                        cam = c;
+                        break;
+                    }
+                }
+            }
+
+            if (cam == null) return;
+
+            if (cam.GetComponent<PlayerInput>() == null)
+            {
+                cam.gameObject.AddComponent<PlayerInput>();
+                Debug.LogWarning("[PlayerInput] MainGame slice: added PlayerInput to Main Camera (save MainGame.unity to persist).");
+            }
+
+            if (!cam.TryGetComponent<CinemachineBrain>(out _))
+                cam.gameObject.AddComponent<CinemachineBrain>();
+
+            SplitVirtualCameraOffOutputCamera(cam);
+        }
+
+        /// <summary>After planet boot when PlayerInput was created late or scene camera was never centered.</summary>
+        public void RefreshMainGameCameraAfterPlanet()
+        {
+            Camera output = playerCamera != null ? playerCamera : Camera.main;
+            if (output != null)
+            {
+                if (!output.TryGetComponent<CinemachineBrain>(out _))
+                    output.gameObject.AddComponent<CinemachineBrain>();
+                SplitVirtualCameraOffOutputCamera(output);
+            }
+
+            EnsureCinemachineCameraReference();
+            EnsureCameraTargetExists();
+            EnsureCinemachineFollowComponent();
+            EnsureCinemachineAimComponent();
+            WireCinemachineTargets();
+            ApplyInitialFollowOffset();
+            bool mainGameSlice = MainGameController.IsActive || MainGameController.IsMainGamePlayScene();
+            if (!mainGameSlice)
+            {
+                hasCameraBeenFocused = false;
+                CenterCameraOnMap();
+            }
+            if (mainGameSlice)
+            {
+                ApplyMainGameDefaultZoom();
+                mainGameOrbitBack = Vector3.back;
+                RefreshMainGameOrbitHeadingFromCamera();
+                SyncMainGameClipPlanes();
+            }
+        }
+
+        /// <summary>True while a building card ghost is on the map. Escape cancels it instead of opening pause.</summary>
+        public static bool PlacementGhostActive { get; private set; }
+
+        /// <summary>Hand slot armed for placement, or -1 when no card is picked.</summary>
+        public static int PickedHandIndex
+        {
+            get
+            {
+                if (Instance == null) return -1;
+                if (Instance.activeCommand is BuildBuildingCommand building && building.HandIndex >= 0)
+                    return building.HandIndex;
+                if (Instance.activeCommand is PlayCardCommand play && play.HandIndex >= 0)
+                    return play.HandIndex;
+                return -1;
+            }
+        }
+
+        /// <summary>The camera the player looks through. Camera.main can be the fog camera.</summary>
+        public Camera GameplayCamera => playerCamera;
+
         /// <summary>Pan the follow target over a world point (keeps current camera height).</summary>
         public static void FocusCameraOnWorldPosition(Vector3 worldPosition)
         {
             if (Instance == null || Instance.cameraTarget == null) return;
             worldPosition.y = Instance.cameraTarget.position.y;
             Instance.cameraTarget.position = worldPosition;
-            Instance.currentHex?.SetHighlighted(false);
-            Instance.currentHex = HexGridManager.Instance?.GetNearestHex(worldPosition);
-            Instance.currentHex?.SetHighlighted(true);
+            Instance.FinishCameraFocus(worldPosition);
+        }
+
+        /// <summary>Opening / camp reset — pan focus to the Command Post pad and snap tactical view.</summary>
+        public void FrameMainGameStartOnCamp(Vector3 campWorld)
+        {
+            if (cameraTarget == null)
+                EnsureCameraTargetExists();
+            Vector3 framePoint = campWorld;
+            framePoint.y = ColonyTileGrid.SampleGroundY(campWorld) + 2.8f;
+            SetCameraFocusWorldPosition(campWorld);
+            hasCameraBeenFocused = true;
+            mainGameOrbitBack = Vector3.back;
+            ApplyMainGameDefaultZoom();
+            float minZ = MainGameMinZoomDistance();
+            float openZoom = minZ + (ResolveMaxZoomDistance() - minZ) * 0.28f;
+            targetZoomDistance = Mathf.Clamp(openZoom, minZ, PlaytestMaxZoom);
+            smoothedZoomDistance = targetZoomDistance;
+            mainGameBootCampFrameUntil = Time.unscaledTime + 20f;
+            mainGameBootCampWorld = framePoint;
+            mainGameHandCardFrameUntil = 0f;
+            if (MainGameDirectCamera)
+            {
+                SyncMainGameDirectCameraPose();
+                NudgeWorldPointToScreenCenter(framePoint, maxPasses: 8, placementFraming: true);
+            }
+        }
+
+        /// <summary>Hand card armed — pan focus and keep the play site in the visible frame (MainGame).</summary>
+        public static void FlyHandCardToPlaySite(Vector3 world, float durationSeconds = 1.15f)
+        {
+            if (Instance == null) return;
+            Instance.mainGameBootCampFrameUntil = 0f;
+            Instance.mainGameHandCardFrameWorld = world;
+            Instance.mainGameHandCardFrameUntil = Time.unscaledTime + durationSeconds + 45f;
+            float minZ = Instance.MainGameMinZoomDistance();
+            float placementZoom = minZ + (Instance.ResolveMaxZoomDistance() - minZ) * 0.32f;
+            if (Instance.smoothedZoomDistance > placementZoom + 2f)
+            {
+                Instance.targetZoomDistance = placementZoom;
+                Instance.smoothedZoomDistance = placementZoom;
+            }
+
+            FlyCameraToWorldPosition(world, durationSeconds);
+        }
+
+        /// <summary>Iteratively pan until <paramref name="world"/> sits near screen center (boot / card fly).</summary>
+        void NudgeWorldPointToScreenCenter(Vector3 world, int maxPasses = 3, bool placementFraming = false)
+        {
+            if (playerCamera == null || cameraTarget == null) return;
+            float panScale = MiddleMousePanScale();
+            float pixelGain = placementFraming ? 0.0038f : 0.0018f;
+            float settle = placementFraming ? 18f : 12f;
+            for (int i = 0; i < maxPasses; i++)
+            {
+                SyncMainGameDirectCameraPose();
+                Vector3 screen = playerCamera.WorldToScreenPoint(world);
+                if (screen.z < 0.5f) break;
+                float dx = Screen.width * 0.5f - screen.x;
+                float dy = Screen.height * 0.5f - screen.y;
+                if (Mathf.Abs(dx) < settle && Mathf.Abs(dy) < settle) break;
+                Vector2 pan = new Vector2(dx, dy);
+                if (pan.sqrMagnitude > 1f)
+                {
+                    float urgency = placementFraming
+                        ? Mathf.Clamp(Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) / 180f, 1f, 3.5f)
+                        : 1f;
+                    Vector3 delta = GlobePanAxes(pan, panScale * pixelGain * urgency);
+                    PanCameraFocus(delta);
+                }
+            }
+
+            SyncMainGameDirectCameraPose();
+        }
+
+        float mainGameBootCampFrameUntil;
+        Vector3 mainGameBootCampWorld;
+        float mainGameHandCardFrameUntil;
+        Vector3 mainGameHandCardFrameWorld;
+
+        /// <summary>Smooth pan the gameplay camera toward a world XZ point (MainGame survey / scan objectives).</summary>
+        public static void FlyCameraToWorldPosition(Vector3 worldPosition, float durationSeconds = 1.35f)
+        {
+            if (Instance == null || Instance.cameraTarget == null) return;
+            Instance.BeginCameraFly(worldPosition, durationSeconds);
+        }
+
+        Coroutine activeCameraFly;
+
+        void BeginCameraFly(Vector3 worldPosition, float durationSeconds)
+        {
+            if (activeCameraFly != null)
+                StopCoroutine(activeCameraFly);
+            activeCameraFly = StartCoroutine(CameraFlyRoutine(worldPosition, durationSeconds));
+        }
+
+        IEnumerator CameraFlyRoutine(Vector3 targetWorld, float durationSeconds)
+        {
+            Vector3 start = cameraTarget.position;
+            targetWorld.y = start.y;
+            durationSeconds = Mathf.Max(0.08f, durationSeconds);
+            float elapsed = 0f;
+            while (elapsed < durationSeconds)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / durationSeconds);
+                float eased = t * t * (3f - 2f * t);
+                cameraTarget.position = Vector3.Lerp(start, targetWorld, eased);
+                yield return null;
+            }
+
+            cameraTarget.position = targetWorld;
+            FinishCameraFocus(targetWorld);
+            if (MainGameDirectCamera)
+            {
+                SyncMainGameDirectCameraPose();
+                NudgeWorldPointToScreenCenter(targetWorld, maxPasses: 6, placementFraming: true);
+            }
+
+            activeCameraFly = null;
+        }
+
+        void FinishCameraFocus(Vector3 worldPosition)
+        {
+            currentHex?.SetHighlighted(false);
+            currentHex = HexGridManager.Instance?.GetHexForHover(worldPosition);
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                currentHex?.SetHighlighted(true);
         }
 
         /// <summary>Current camera follow target on the map (XZ focus point).</summary>
@@ -106,6 +343,238 @@ namespace GameDevTV.RTS.Player
         {
             if (Instance?.cameraTarget != null) return Instance.cameraTarget.position;
             return Vector3.zero;
+        }
+
+        public float PlaytestZoomDistance =>
+            cinemachineFollow != null ? cinemachineFollow.FollowOffset.y : targetZoomDistance;
+
+        public float PlaytestMinZoom =>
+            MainGameController.IsActive || MainGameController.IsMainGamePlayScene()
+                ? MainGameMinZoomDistance()
+                : cameraConfig != null ? cameraConfig.MinZoomDistance : 7.5f;
+
+        public float PlaytestMaxZoom => ResolveMaxZoomDistance();
+
+        bool followOffsetInitialized;
+
+        static bool MainGameDirectCamera =>
+            MainGameController.IsActive || MainGameController.IsMainGamePlayScene();
+
+        float MainGameZoomIn01()
+        {
+            float minY = MainGameMinZoomDistance();
+            float maxY = PlaytestMaxZoom;
+            float h = Mathf.Clamp(smoothedZoomDistance, minY, maxY);
+            return 1f - Mathf.InverseLerp(minY, maxY, h);
+        }
+
+        /// <summary>
+        /// MainGame orbit: camera sits <paramref name="slantRange"/> from focus on a ray tilted from world-up.
+        /// Zoomed out: higher isometric tilt. Zoomed in: lower but still oblique so the horizon stays in frame.
+        /// </summary>
+        void MainGameOrbitBasis(float slantRange, out float lift, out float pullBack, out float tiltFromNadirDeg)
+        {
+            float minY = MainGameMinZoomDistance();
+            float maxY = PlaytestMaxZoom;
+            float dist = Mathf.Clamp(slantRange, minY, maxY);
+            float zoomIn01 = 1f - Mathf.InverseLerp(minY, maxY, dist);
+            const float tiltFarDeg = 48f;
+            const float tiltNearDeg = 16f;
+            tiltFromNadirDeg = Mathf.Lerp(tiltFarDeg, tiltNearDeg, zoomIn01);
+            float rad = tiltFromNadirDeg * Mathf.Deg2Rad;
+            float closeMul = Mathf.Lerp(1f, 0.38f, zoomIn01);
+            float liftSlant = dist * Mathf.Cos(rad) * closeMul;
+            pullBack = dist * Mathf.Sin(rad) * closeMul;
+            float eyeBlend = Mathf.SmoothStep(0f, 1f, (zoomIn01 - 0.08f) / 0.92f);
+            lift = Mathf.Lerp(liftSlant, MainGameMinEyeHeightMeters, eyeBlend);
+            if (eyeBlend > 0.92f)
+                pullBack = Mathf.Lerp(pullBack, 0.35f, (eyeBlend - 0.92f) / 0.08f);
+        }
+
+        void MainGameOrbitBasis(out float lift, out float pullBack, out float tiltFromNadirDeg) =>
+            MainGameOrbitBasis(smoothedZoomDistance, out lift, out pullBack, out tiltFromNadirDeg);
+
+        Vector3 ComputeMainGameZoomFollowOffset(float height)
+        {
+            MainGameOrbitBasis(height, out float lift, out float pull, out _);
+            float zSign = startingFollowOffset.z < -0.01f ? -1f : 1f;
+            if (Mathf.Abs(startingFollowOffset.z) < 0.01f) zSign = -1f;
+            return new Vector3(0f, lift, zSign * pull);
+        }
+
+        /// <summary>Scroll floor in main game — pairs with <see cref="MainGameMinEyeHeightMeters"/> at full zoom-in.</summary>
+        const float MainGameMinEyeHeightMeters = 1f;
+        const float MainGameSlantZoomFloor = 1f;
+
+        float MainGameMinZoomDistance()
+        {
+            float cfg = cameraConfig != null ? cameraConfig.MinZoomDistance : 7.5f;
+            if (!MainGameController.IsActive && !MainGameController.IsMainGamePlayScene()) return cfg;
+            return Mathf.Min(cfg, MainGameSlantZoomFloor);
+        }
+
+        /// <summary>MainGame orbit slant range (scroll zoom).</summary>
+        public float MainGameSlantZoom => smoothedZoomDistance;
+
+        /// <summary>
+        /// Tactical zoom: near clip must shrink when close or the ground plane is culled (clear color = "white void").
+        /// Cinemachine Brain copies <see cref="CinemachineCamera.Lens"/> every frame — set the vcam, not only the output Camera.
+        /// </summary>
+        void SyncMainGameClipPlanes()
+        {
+            if (!MainGameController.IsActive && !MainGameController.IsMainGamePlayScene()) return;
+
+            float alt = Mathf.Max(smoothedZoomDistance, targetZoomDistance, PlaytestZoomDistance);
+            float minZ = MainGameMinZoomDistance();
+            float maxZ = Mathf.Max(minZ + 1f, PlaytestMaxZoom);
+            float zoomIn01 = 1f - Mathf.InverseLerp(minZ, maxZ, alt);
+
+            // Never pin near clip at 0.02 when zoomed out — that was washing the whole frame.
+            float near = Mathf.Lerp(0.85f, 0.01f, zoomIn01);
+            const float far = 6000f;
+
+            if (cinemachineCamera != null)
+            {
+                var lens = cinemachineCamera.Lens;
+                lens.NearClipPlane = near;
+                lens.FarClipPlane = far;
+                cinemachineCamera.Lens = lens;
+            }
+
+            Camera cam = playerCamera != null ? playerCamera : Camera.main;
+            if (cam == null) return;
+
+            cam.nearClipPlane = near;
+            cam.farClipPlane = far;
+            cam.backgroundColor = new Color(0.48f, 0.42f, 0.36f, 1f);
+        }
+
+        void LateUpdate()
+        {
+            SyncMainGameDirectCameraMode();
+            if (MainGameDirectCamera)
+            {
+                SyncMainGameDirectCameraPose();
+                if (mainGameBootCampFrameUntil > Time.unscaledTime && mainGameBootCampWorld != default)
+                    NudgeWorldPointToScreenCenter(mainGameBootCampWorld, maxPasses: 2, placementFraming: true);
+                else if ((mainGameHandCardFrameUntil > Time.unscaledTime || PlacementGhostActive)
+                         && mainGameHandCardFrameWorld != default)
+                    NudgeWorldPointToScreenCenter(mainGameHandCardFrameWorld, maxPasses: 2, placementFraming: true);
+            }
+            SyncMainGameClipPlanes();
+        }
+
+        void SyncMainGameDirectCameraMode()
+        {
+            if (playerCamera == null) return;
+            bool direct = MainGameDirectCamera;
+            if (playerCamera.TryGetComponent<CinemachineBrain>(out var brain))
+                brain.enabled = !direct;
+            if (cinemachineCamera != null)
+                cinemachineCamera.enabled = !direct;
+        }
+
+        void SyncMainGameDirectCameraPose()
+        {
+            if (playerCamera == null || cameraTarget == null) return;
+
+            MainGameOrbitBasis(out float lift, out float pull, out _);
+            float zoomIn01 = MainGameZoomIn01();
+
+            Vector3 back = mainGameOrbitBack;
+            back.y = 0f;
+            if (back.sqrMagnitude < 0.0001f)
+                back = Vector3.back;
+            else
+                back.Normalize();
+
+            // Zoom in: raise look target and camera so the horizon stays above the colony pad.
+            Vector3 anchor = cameraTarget.position;
+            bool bootCampCenter = mainGameBootCampFrameUntil > Time.unscaledTime;
+            bool handCardCenter = mainGameHandCardFrameUntil > Time.unscaledTime
+                                    || (PlacementGhostActive && MainGameController.IsActive);
+            bool centerOnPad = bootCampCenter || handCardCenter;
+            float eyeLift = centerOnPad
+                ? 0f
+                : Mathf.Lerp(0f, 22f, zoomIn01) * Mathf.Clamp01(1f - zoomIn01);
+            Vector3 camPos = anchor + Vector3.up * (lift + eyeLift) - back * pull;
+            Vector3 lookAt = centerOnPad
+                ? anchor + Vector3.up * (bootCampCenter ? 0.2f : 0.75f)
+                : anchor + back * Mathf.Lerp(6f, 48f, zoomIn01) + Vector3.up * Mathf.Lerp(0.5f, 4f, zoomIn01);
+            Vector3 look = lookAt - camPos;
+            if (look.sqrMagnitude < 0.0001f)
+                look = -back + Vector3.down * 0.12f;
+            playerCamera.transform.SetPositionAndRotation(
+                camPos,
+                Quaternion.LookRotation(look, Vector3.up));
+
+            if (cinemachineFollow != null)
+                cinemachineFollow.FollowOffset = new Vector3(0f, lift, -pull);
+        }
+
+        void RefreshMainGameOrbitHeadingFromCamera()
+        {
+            if (playerCamera == null) return;
+            Vector3 f = playerCamera.transform.forward;
+            f.y = 0f;
+            if (f.sqrMagnitude > 0.01f)
+                mainGameOrbitBack = f.normalized;
+        }
+
+        public void PlaytestSetZoomDistance(float y)
+        {
+            float minZ = MainGameDirectCamera
+                ? MainGameMinZoomDistance()
+                : cameraConfig != null ? cameraConfig.MinZoomDistance : 7.5f;
+            targetZoomDistance = Mathf.Clamp(y, minZ, PlaytestMaxZoom);
+            smoothedZoomDistance = targetZoomDistance;
+            if (MainGameDirectCamera)
+                SyncMainGameDirectCameraPose();
+            else if (cinemachineFollow != null)
+                cinemachineFollow.FollowOffset = new Vector3(
+                    cinemachineFollow.FollowOffset.x,
+                    targetZoomDistance,
+                    cinemachineFollow.FollowOffset.z);
+        }
+
+        public void ApplyMainGameDefaultZoom()
+        {
+            if (cinemachineFollow == null) return;
+            float factor = MainGameDefaultZoomFactor();
+            targetZoomDistance = startingFollowOffset.y * factor;
+            smoothedZoomDistance = targetZoomDistance;
+            cinemachineFollow.FollowOffset = ComputeMainGameZoomFollowOffset(targetZoomDistance);
+        }
+
+        static float PlanetPatchScale()
+        {
+            const float baselinePatch = 1024f;
+            var config = GameDevTV.RTS.Environment.PlanetGenerator.Instance?.Config;
+            if (config == null || config.PlanetPatchDiameter < 1f) return 1f;
+            return Mathf.Max(1f, config.PlanetPatchDiameter / baselinePatch);
+        }
+
+        float MainGameDefaultZoomFactor()
+        {
+            const float baseFactor = 0.62f;
+            float scale = PlanetPatchScale();
+            return baseFactor * Mathf.Lerp(1f, 1.15f, scale - 1f);
+        }
+
+        float ResolveMaxZoomDistance()
+        {
+            float sceneMax = startingFollowOffset.y > 0.01f ? startingFollowOffset.y * 4f : 120f;
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive) return sceneMax;
+            var config = GameDevTV.RTS.Environment.PlanetGenerator.Instance?.Config;
+            if (config != null && config.PlanetPatchDiameter > 1f)
+            {
+                float patch = config.PlanetPatchDiameter;
+                // Tactical cap: ~half the patch — see several sectors, not the whole torus tile.
+                float tacticalMax = patch * 0.56f;
+                float floor = Mathf.Max(sceneMax, patch * 0.22f);
+                return Mathf.Clamp(Mathf.Max(sceneMax, floor), PlaytestMinZoom + 2f, tacticalMax);
+            }
+            return sceneMax;
         }
 
         private void Awake()
@@ -117,9 +586,14 @@ namespace GameDevTV.RTS.Player
             HexGridManager.SetHighlightTrace(highlightTrace);
 
             if (playerCamera == null)
-            {
                 playerCamera = GetComponent<Camera>();
-            }
+
+            if (playerCamera != null && !playerCamera.TryGetComponent<CinemachineBrain>(out _))
+                playerCamera.gameObject.AddComponent<CinemachineBrain>();
+            if (playerCamera != null)
+                SplitVirtualCameraOffOutputCamera(playerCamera);
+
+            EnsureCinemachineCameraReference();
 
             if (cameraTarget != null)
             {
@@ -133,22 +607,9 @@ namespace GameDevTV.RTS.Player
             lastMousePosition = Mouse.current.position.ReadValue();
             hasMouseMoved = false;
 
-            if (!cinemachineCamera.TryGetComponent(out cinemachineFollow))
-            {
-                Debug.LogError("Cinemachine Camera did not have CinemachineFollow. Zoom functionality will not work!");
-            }
-            else
-            {
-                startingFollowOffset = cinemachineFollow.FollowOffset;
-                // Start a bit more zoomed out than the scene default follow height.
-                const float startZoomOutFactor = 1.75f;
-                targetZoomDistance = startingFollowOffset.y * startZoomOutFactor;
-                cinemachineFollow.FollowOffset = new Vector3(
-                    startingFollowOffset.x,
-                    targetZoomDistance,
-                    startingFollowOffset.z * startZoomOutFactor);
-                maxRotationAmount = Mathf.Abs(cinemachineFollow.FollowOffset.z);
-            }
+            EnsureCinemachineFollowComponent();
+            EnsureCinemachineAimComponent();
+            ApplyInitialFollowOffset();
 
             Bus<UnitSelectedEvent>.OnEvent[Owner.Player1] += HandleUnitSelected;
             Bus<UnitDeselectedEvent>.OnEvent[Owner.Player1] += HandleUnitDeselected;
@@ -163,9 +624,14 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
+            if (playerCamera != null)
+                SplitVirtualCameraOffOutputCamera(playerCamera);
+            EnsureCinemachineCameraReference();
+            EnsureCameraTargetExists();
+
             // FORCE re-find the Camera Target to overwrite any corrupted serialization
             // caused by changing the variable type from Rigidbody to Transform!
-            var camTargetObj = GameObject.Find("Camera Target");
+            var camTargetObj = FindCameraTargetObject();
             if (camTargetObj != null)
             {
                 cameraTarget = camTargetObj.transform;
@@ -189,11 +655,15 @@ namespace GameDevTV.RTS.Player
                     col.enabled = false;
                 }
             }
+            else if (cinemachineCamera != null && cinemachineCamera.Follow != null)
+            {
+                cameraTarget = cinemachineCamera.Follow;
+                Debug.Log($"[PlayerInput] Using Cinemachine Follow as camera target: {cameraTarget.name}");
+            }
             else
             {
                 Debug.LogError("[PlayerInput] 'Camera Target' GameObject could not be found! Panning will not work!");
-                // Create a fallback Camera Target if it doesn't exist
-                GameObject fallbackTarget = new GameObject("Camera Target");
+                GameObject fallbackTarget = new GameObject("Camera Target (Runtime)");
                 fallbackTarget.transform.position = new Vector3(0, 10, 0);
                 cameraTarget = fallbackTarget.transform;
                 Debug.Log($"[PlayerInput] Created fallback Camera Target at position {cameraTarget.position}");
@@ -226,17 +696,20 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            EnsureCinemachineFollowComponent();
+            EnsureCinemachineAimComponent();
+            ApplyInitialFollowOffset();
+
             // Critical Failsafe 2: Ensure the Cinemachine Camera is actually following the Camera Target!
             if (cinemachineCamera != null && cameraTarget != null)
             {
                 Debug.Log($"[PlayerInput] CinemachineCamera: {cinemachineCamera}, cameraTarget: {cameraTarget}");
                 Debug.Log($"[PlayerInput] CinemachineCamera.Follow: {cinemachineCamera.Follow}, cameraTarget.name: {cameraTarget.name}");
                 
-                if (cinemachineCamera.Follow == null || cinemachineCamera.Follow != cameraTarget)
+                if (cinemachineCamera.Follow != cameraTarget)
                 {
-                    Debug.LogWarning($"[PlayerInput] CinemachineCamera.Follow is null or doesn't match cameraTarget. Setting Follow to cameraTarget.");
-                    cinemachineCamera.Follow = cameraTarget;
-                    Debug.LogWarning("[PlayerInput] Repaired broken Cinemachine Camera! It was not following the Camera Target.");
+                    WireCinemachineTargets();
+                    Debug.LogWarning("[PlayerInput] Wired Cinemachine Follow + LookAt to Camera Target.");
                 }
                 else
                 {
@@ -258,6 +731,9 @@ namespace GameDevTV.RTS.Player
             {
                 Debug.Log($"[PlayerInput] CameraConfig initialized with MousePanSpeed={cameraConfig.MousePanSpeed}, KeyboardPanSpeed={cameraConfig.KeyboardPanSpeed}, ZoomSpeed={cameraConfig.ZoomSpeed}");
             }
+
+            CoalesceCameraTargets();
+            SyncCinemachineFollowTarget();
 
             globalCommander = FindAnyObjectByType<GlobalCommander>();
             Debug.Log($"[PlayerInput] Start() completed. cameraTarget={cameraTarget}, cameraConfig={cameraConfig}, cinemachineCamera={cinemachineCamera}");
@@ -282,6 +758,233 @@ namespace GameDevTV.RTS.Player
         private bool hasCameraBeenFocused = false;
         private bool hasCameraSnappedToCommandPost = false;
 
+        static GameObject FindCameraTargetObject()
+        {
+            var named = GameObject.Find("Camera Target");
+            if (named != null) return named;
+            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (t.name == "Camera Target") return t.gameObject;
+            }
+            return null;
+        }
+
+        void CoalesceCameraTargets()
+        {
+            Transform keep = cameraTarget;
+            if (cinemachineCamera != null && cinemachineCamera.Follow != null)
+                keep = cinemachineCamera.Follow;
+            if (keep == null) return;
+
+            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (t == keep) continue;
+                if (t.name != "Camera Target" && t.name != "Camera Target (Runtime)") continue;
+                if (Application.isPlaying)
+                    Destroy(t.gameObject);
+                else
+                    DestroyImmediate(t.gameObject);
+            }
+
+            cameraTarget = keep;
+        }
+
+        void EnsureCinemachineCameraReference()
+        {
+            if (cinemachineCamera != null)
+            {
+                if (cinemachineCamera.gameObject.TryGetComponent<Camera>(out _))
+                {
+                    cinemachineCamera = null;
+                    if (playerCamera != null)
+                        SplitVirtualCameraOffOutputCamera(playerCamera);
+                    else if (Camera.main != null)
+                        SplitVirtualCameraOffOutputCamera(Camera.main);
+                }
+                else
+                    return;
+            }
+
+            cinemachineCamera = null;
+            foreach (var v in Object.FindObjectsByType<CinemachineCamera>(FindObjectsInactive.Include))
+            {
+                if (v == null || v.gameObject.TryGetComponent<Camera>(out _)) continue;
+                cinemachineCamera = v;
+                return;
+            }
+        }
+
+        /// <summary>
+        /// CM3: output Camera + Brain only. Virtual camera components on the same GO can blank the Game view.
+        /// </summary>
+        static void SplitVirtualCameraOffOutputCamera(Camera output)
+        {
+            if (output == null) return;
+            if (!output.TryGetComponent<CinemachineCamera>(out var stackedVcam)) return;
+
+            Transform follow = stackedVcam.Follow;
+            Transform lookAt = stackedVcam.LookAt;
+            var followOnOutput = output.GetComponent<CinemachineFollow>();
+            Vector3 followOffset = followOnOutput != null
+                ? followOnOutput.FollowOffset
+                : new Vector3(0f, 22f, -26f);
+
+            var vcamGo = GameObject.Find("MainGame Virtual Camera");
+            if (vcamGo == null)
+            {
+                vcamGo = new GameObject("MainGame Virtual Camera");
+                vcamGo.transform.SetParent(output.transform.parent, false);
+            }
+
+            if (vcamGo.GetComponent<Camera>() != null)
+            {
+                Debug.LogError("[PlayerInput] MainGame Virtual Camera must not host a Camera component.");
+                return;
+            }
+
+            var vcam = vcamGo.GetComponent<CinemachineCamera>();
+            if (vcam == null) vcam = vcamGo.AddComponent<CinemachineCamera>();
+            vcam.Follow = follow;
+            vcam.LookAt = lookAt;
+
+            var followComp = vcamGo.GetComponent<CinemachineFollow>();
+            if (followComp == null) followComp = vcamGo.AddComponent<CinemachineFollow>();
+            followComp.FollowOffset = followOffset;
+            followComp.TrackerSettings.BindingMode = BindingMode.LockToTargetWithWorldUp;
+            followComp.TrackerSettings.PositionDamping = Vector3.zero;
+
+            if (!vcamGo.TryGetComponent<CinemachineHardLookAt>(out _))
+                vcamGo.AddComponent<CinemachineHardLookAt>();
+
+            Object.Destroy(stackedVcam);
+            if (followOnOutput != null) Object.Destroy(followOnOutput);
+            var aimOnOutput = output.GetComponent<CinemachineHardLookAt>();
+            if (aimOnOutput != null) Object.Destroy(aimOnOutput);
+
+            if (Instance != null)
+            {
+                Instance.cinemachineCamera = vcam;
+                Instance.cinemachineFollow = followComp;
+            }
+
+            Debug.LogWarning("[PlayerInput] Moved Cinemachine virtual camera off Main Camera (Brain stays on output).");
+        }
+
+        void WireCinemachineTargets()
+        {
+            if (cinemachineCamera == null || cameraTarget == null) return;
+            cinemachineCamera.Follow = cameraTarget;
+            cinemachineCamera.LookAt = cameraTarget;
+        }
+
+        void SyncCinemachineFollowTarget() => WireCinemachineTargets();
+
+        Transform GetCameraFollowTransform()
+        {
+            if (cameraTarget != null)
+                return cameraTarget;
+            if (cinemachineCamera != null && cinemachineCamera.Follow != null)
+            {
+                cameraTarget = cinemachineCamera.Follow;
+                return cinemachineCamera.Follow;
+            }
+            return null;
+        }
+
+        void SetCameraFocusWorldPosition(Vector3 worldPosition)
+        {
+            var t = GetCameraFollowTransform();
+            if (t == null) return;
+            if (t.TryGetComponent<Rigidbody>(out var rb))
+            {
+                rb.isKinematic = true;
+                rb.position = worldPosition;
+            }
+            t.position = worldPosition;
+            SyncCinemachineFollowTarget();
+        }
+
+        void PanCameraFocus(Vector3 worldDelta)
+        {
+            var t = GetCameraFollowTransform();
+            if (t == null) return;
+            Vector3 pos = t.position + worldDelta;
+            pos.y = t.position.y;
+            SetCameraFocusWorldPosition(WrapCameraOnPlanet(pos));
+            if (MainGameDirectCamera)
+                RefreshMainGameOrbitHeadingFromCamera();
+        }
+
+        void EnsureCameraTargetExists()
+        {
+            var existing = FindCameraTargetObject();
+            if (existing != null)
+            {
+                cameraTarget = existing.transform;
+                return;
+            }
+
+            Vector3 pos = new Vector3(0f, 2f, 0f);
+            var planet = PlanetGenerator.Instance;
+            if (planet != null)
+            {
+                if (planet.HasGenerated)
+                    pos = planet.StartingAreaCenter;
+                else if (planet.TryGetPatchWorldSize(out float w, out float h))
+                    pos = new Vector3(w * 0.5f, 2f, h * 0.5f);
+            }
+
+            pos.y = Mathf.Max(1.5f, pos.y);
+            var go = new GameObject("Camera Target");
+            go.transform.position = pos;
+            cameraTarget = go.transform;
+            Debug.LogWarning($"[PlayerInput] Created scene Camera Target at {pos} (save MainGame.unity to keep it).");
+        }
+
+        void EnsureCinemachineFollowComponent()
+        {
+            if (cinemachineCamera == null) return;
+            if (!cinemachineCamera.TryGetComponent(out cinemachineFollow))
+            {
+                cinemachineFollow = cinemachineCamera.gameObject.AddComponent<CinemachineFollow>();
+                Debug.LogWarning("[PlayerInput] Added missing CinemachineFollow on Main Camera — zoom/pan restored.");
+            }
+
+            cinemachineFollow.TrackerSettings.BindingMode = BindingMode.LockToTargetWithWorldUp;
+            cinemachineFollow.TrackerSettings.PositionDamping = Vector3.zero;
+        }
+
+        void EnsureCinemachineAimComponent()
+        {
+            if (cinemachineCamera == null) return;
+            if (!cinemachineCamera.TryGetComponent<CinemachineHardLookAt>(out _))
+                cinemachineCamera.gameObject.AddComponent<CinemachineHardLookAt>();
+        }
+
+        void ApplyInitialFollowOffset()
+        {
+            if (cinemachineFollow == null || followOffsetInitialized) return;
+            if (startingFollowOffset.sqrMagnitude < 0.01f)
+            {
+                startingFollowOffset = cinemachineFollow.FollowOffset;
+                if (startingFollowOffset.sqrMagnitude < 0.01f)
+                    startingFollowOffset = new Vector3(0f, 22f, -26f);
+            }
+
+            bool mainGameTilt = MainGameController.IsActive || MainGameController.IsMainGamePlayScene();
+            float startZoomOutFactor = mainGameTilt ? MainGameDefaultZoomFactor() : 1.75f;
+            targetZoomDistance = startingFollowOffset.y * startZoomOutFactor;
+            smoothedZoomDistance = targetZoomDistance;
+            cinemachineFollow.FollowOffset = mainGameTilt
+                ? ComputeMainGameZoomFollowOffset(targetZoomDistance)
+                : new Vector3(
+                    startingFollowOffset.x,
+                    targetZoomDistance,
+                    startingFollowOffset.z * startZoomOutFactor);
+            maxRotationAmount = Mathf.Max(Mathf.Abs(cinemachineFollow.FollowOffset.z), 8f);
+            followOffsetInitialized = true;
+        }
+
         private void CenterCameraOnMap()
         {
             if (cameraTarget == null) return;
@@ -292,6 +995,17 @@ namespace GameDevTV.RTS.Player
             if (planetGenerator != null && planetGenerator.HasGenerated)
             {
                 Vector3 startingPosition = planetGenerator.StartingAreaCenter;
+                if ((MainGameController.IsActive || MainGameController.IsMainGamePlayScene())
+                    && GameDevTV.RTS.MainGame.LandingSiteResourceLayout.TryGetActiveLandingWorld(out Vector3 landing))
+                {
+                    startingPosition = landing;
+                }
+                else if (MainGameController.IsActive
+                    && startingPosition.sqrMagnitude < 64f
+                    && planetGenerator.TryGetPatchWorldSize(out float patchW, out float patchH))
+                {
+                    startingPosition = new Vector3(patchW * 0.5f, 0f, patchH * 0.5f);
+                }
                 MoveToStartingHex(startingPosition);
                 hasCameraBeenFocused = true;
                 return;
@@ -328,8 +1042,9 @@ namespace GameDevTV.RTS.Player
             targetPosition.y = cameraTarget.position.y;
             cameraTarget.position = targetPosition;
             currentHex?.SetHighlighted(false);
-            currentHex = HexGridManager.Instance?.GetNearestHex(cameraTarget.position);
-            currentHex?.SetHighlighted(true);
+            currentHex = HexGridManager.Instance?.GetHexForHover(cameraTarget.position);
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                currentHex?.SetHighlighted(true);
         }
 
         private void OnDestroy()
@@ -445,6 +1160,9 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
+            if (CardPlayCameraGuide.TryFlyToHandCardPlaySite(evt.Command))
+                hasCameraBeenFocused = true;
+
             // if this thing does not require a click to activate...
             // Should probably say requires placement click to activate
             if (!activeCommand.RequiresClickToActivate)
@@ -465,6 +1183,13 @@ namespace GameDevTV.RTS.Player
                 {
                     ghostInstance = Instantiate(prefabToInstantiate);
                     ghostInstance.name = "Ghost_" + prefabToInstantiate.name;
+                    PlacementGhostActive = true;
+                    foreach (var indicator in ghostInstance.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (indicator != null
+                            && indicator.name.IndexOf("Selection Indicator", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                            indicator.gameObject.SetActive(false);
+                    }
 
                     if (ghostInstance.TryGetComponent(out BaseBuilding bb))
                     {
@@ -521,9 +1246,11 @@ namespace GameDevTV.RTS.Player
             BuildingSiteSelectionController.ActivatePendingMarkersIfNeeded();
             HandleSiteSelectionCancel();
 
+            SyncCinemachineFollowTarget();
             InitializeCurrentHex();
             HandleHexHover();
             HandlePanning();
+            HandleMainGameScrollPan();
             HandleZooming();
             HandleRotation();
             HandleGhost();
@@ -531,14 +1258,23 @@ namespace GameDevTV.RTS.Player
             HandleDragSelect();
             HandleBasePaging();
             HandleDemolishHotkey();
+            HandleMainGameChromeHotkey();
             HandleCheats();
+        }
+
+        void HandleMainGameChromeHotkey()
+        {
+            if (!MainGameController.IsActive || Keyboard.current == null) return;
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null) return;
+            if (!Keyboard.current.hKey.wasPressedThisFrame) return;
+            MainGameHUD.Instance?.ToggleChromeRetracted();
         }
 
         /// <summary>Select a building, then Delete/Backspace to scrap it for Materials refund.</summary>
         private void HandleDemolishHotkey()
         {
             if (Keyboard.current == null) return;
-            if (Time.timeScale <= 0.01f) return;
+            if (Time.timeScale <= 0.01f && !MainGameController.IsActive) return;
             bool pressed = Keyboard.current.deleteKey.wasPressedThisFrame
                 || Keyboard.current.backspaceKey.wasPressedThisFrame;
             if (!pressed) return;
@@ -662,6 +1398,21 @@ namespace GameDevTV.RTS.Player
             }
         }
 
+        static bool IsTerrainWrapCopyCollider(Collider collider)
+        {
+            if (collider == null) return false;
+            Transform t = collider.transform;
+            while (t != null)
+            {
+                string n = t.name;
+                if (n.StartsWith("Terrain Ghost", System.StringComparison.Ordinal)
+                    || n.StartsWith("BakeMesh", System.StringComparison.Ordinal))
+                    return true;
+                t = t.parent;
+            }
+            return false;
+        }
+
         private static bool ShouldIgnoreSelectionHit(Collider collider)
         {
             if (collider == null) return true;
@@ -684,8 +1435,7 @@ namespace GameDevTV.RTS.Player
 
             if (Keyboard.current.escapeKey.wasReleasedThisFrame)
             {
-                ClearGhostVisuals();
-                activeCommand = null;
+                CancelPlacement();
                 return;
             }
 
@@ -714,21 +1464,44 @@ namespace GameDevTV.RTS.Player
             else if (cardTilePlace)
             {
                 Vector2Int? previousSticky = tileGhostStickyCell;
-                hitPos = ColonyTileGrid.SnapForPlacement(
-                    hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
-
-                // Mines lock to the matching discovered deposit tile (not free ground).
+                // Mines lock to the deposit under the cursor before occupied-cell push.
+                // The push was kicking the laser off the ghost's pad, then the short snap
+                // could not reach back, so every click said it could not be placed.
+                Vector3 mineSnap = hitPos.Value;
+                Vector2Int mineCell = default;
+                bool mineLocked = false;
                 if (activeCommand is BuildBuildingCommand mineBbc
-                    && BuildingSiteRegistry.IsMineBuilding(mineBbc.Building)
-                    && DiscoverySystem.TrySnapToMineDeposit(
-                        mineBbc.Building, hitPos.Value, out Vector3 mineSnap, out Vector2Int mineCell))
+                    && BuildingSiteRegistry.IsMineBuilding(mineBbc.Building))
+                {
+                    mineLocked = DiscoverySystem.TrySnapToMineDeposit(
+                        mineBbc.Building, hitPos.Value, out mineSnap, out mineCell);
+                    if (!mineLocked)
+                    {
+                        Vector3? aimed = RaycastActionPoint();
+                        if (aimed.HasValue)
+                        {
+                            mineLocked = DiscoverySystem.TrySnapToMineDeposit(
+                                mineBbc.Building, aimed.Value, out mineSnap, out mineCell);
+                        }
+                    }
+                }
+                if (mineLocked)
                 {
                     hitPos = mineSnap;
                     tileGhostStickyCell = mineCell;
                     joinCount = ColonyTileGrid.CountOrthogonalNeighbors(mineCell, Owner.Player1);
                 }
+                else
+                {
+                    hitPos = ColonyTileGrid.SnapForPlacement(
+                        hitPos.Value, Owner.Player1, ref tileGhostStickyCell, out joinCount);
+                }
+
                 // Aquifers / feature tiles: soft-snap toward their geology sector when nearby.
-                else if (activeCommand is BuildBuildingCommand featureBbc
+                // MainGame places by ice range instead — do not yank the ghost to a WaterDeposit sector.
+                if (!mineLocked
+                    && !MainGameController.IsActive
+                    && activeCommand is BuildBuildingCommand featureBbc
                     && DiscoverySystem.TryGetRequiredSectorFeature(featureBbc.Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(featureBbc.Building, hitPos.Value)
                     && DiscoverySystem.TryGetAutoFeaturePlacement(
@@ -752,22 +1525,66 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
+            Vector3 snapTarget = ColonyTileGrid.ApplyGroundY(hitPos.Value);
+            if (MainGameController.IsActive
+                && cardTilePlace
+                && activeCommand is BuildBuildingCommand prologueSnapBbc
+                && prologueSnapBbc.Building != null
+                && MainGameController.Instance != null
+                && MainGameController.Instance.Colony is { } prologueColony
+                && MainGameCardMap.TryGetMainGameId(prologueSnapBbc.Building, out var prologueSnapId)
+                && prologueSnapId != MainGameBuildingId.CommandPost)
             {
-                agentTypeID = 0,
-                areaMask = UnityEngine.AI.NavMesh.AllAreas
-            };
-            if (UnityEngine.AI.NavMesh.SamplePosition(hitPos.Value, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
-            {
-                if (cardTilePlace)
-                    hitPos = new Vector3(hitPos.Value.x, navHit.position.y, hitPos.Value.z);
-                else
-                    hitPos = navHit.position;
+                float snapRadius = ColonyTileGrid.TileSize * 1.85f;
+                if (MainGameRevealGhostPad.TryGetPadNear(snapTarget, snapRadius, out int suggestPad, out _)
+                    && prologueColony.Preview(suggestPad, prologueSnapId, out _)
+                    && MainGameController.Instance.TryGetCell(suggestPad, out Vector2Int suggestCell))
+                {
+                    tileGhostStickyCell = suggestCell;
+                    snapTarget = ColonyTileGrid.CellToWorldOnHighestGround(suggestCell);
+                    joinCount = ColonyTileGrid.CountOrthogonalNeighbors(suggestCell, Owner.Player1);
+                }
             }
 
-            Vector3 snapTarget = hitPos.Value;
+            if (MainGameController.IsActive
+                && cardTilePlace
+                && activeCommand is BuildBuildingCommand aquiferBbc
+                && aquiferBbc.Building != null
+                && aquiferBbc.Building.Name.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
+                && MainGameController.Instance != null
+                && MainGameController.Instance.Colony is { } aquiferColony
+                && MainGameCardMap.TryGetMainGameId(aquiferBbc.Building, out var aquiferId)
+                && aquiferId == MainGameBuildingId.Aquifer)
+            {
+                if (MainGameController.Instance.TryGetTileIndex(snapTarget, out int aquiferSnapTile))
+                {
+                    var snapPad = aquiferColony.Board.At(aquiferSnapTile);
+                    bool onIceHex = snapPad.Feature == MainGameFeature.Ice || snapPad.Feature == MainGameFeature.Glacier;
+                    bool legalHere = !onIceHex && aquiferColony.CanPlaceAquiferPad(aquiferSnapTile)
+                        && aquiferColony.Preview(aquiferSnapTile, MainGameBuildingId.Aquifer, out _);
+                    if (!legalHere)
+                    {
+                        int iceAnchor = onIceHex
+                            ? aquiferSnapTile
+                            : aquiferColony.NearestRevealedIceTile(aquiferSnapTile);
+                        if (iceAnchor >= 0
+                            && aquiferColony.TryFindAquiferPadNearIce(iceAnchor, out int padTile)
+                            && MainGameController.Instance.TryGetCell(padTile, out Vector2Int padCell))
+                        {
+                            snapTarget = ColonyTileGrid.CellToWorldOnHighestGround(padCell);
+                            tileGhostStickyCell = padCell;
+                            joinCount = ColonyTileGrid.CountOrthogonalNeighbors(padCell, Owner.Player1);
+                        }
+                    }
+                }
+            }
+
+            if (MainGameController.IsActive && tileGhostStickyCell.HasValue)
+                snapTarget = ColonyTileGrid.CellToWorldOnHighestGround(tileGhostStickyCell.Value);
+
             // Hard snap to the cell — lerp made occupancy thrash look like a strobing animation.
             ghostInstance.transform.position = snapTarget;
+            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(ghostInstance, 0.04f);
             UpdateTileFootprint(snapTarget, cardTilePlace, joinCount);
 
             bool allRestrictionsPass;
@@ -776,7 +1593,8 @@ namespace GameDevTV.RTS.Player
             else
                 allRestrictionsPass = activeCommand.AllRestrictionsPass(snapTarget);
             bool colonyActs = ColonyActManager.Instance != null;
-            if (cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
+            if (!MainGameController.IsActive
+                && cardTilePlace && !colonyActs && activeCommand is BuildBuildingCommand powerBbc
                 && !PowerGridManager.CanPlayBuildingForPower(powerBbc.Building, Owner.Player1))
             {
                 allRestrictionsPass = false;
@@ -799,7 +1617,10 @@ namespace GameDevTV.RTS.Player
             {
                 allRestrictionsPass = false;
             }
-            if (cardTilePlace && activeCommand is BuildBuildingCommand depositReserveBbc
+            // MainGame: ice-range / Preview owns placement — do not apply Acts deposit / geology gates.
+            bool prologueGates = MainGameController.IsActive;
+            if (!prologueGates
+                && cardTilePlace && activeCommand is BuildBuildingCommand depositReserveBbc
                 && !BuildingSiteRegistry.IsMineBuilding(depositReserveBbc.Building)
                 && !BuildingSiteRegistry.IsCommandPostBuilding(depositReserveBbc.Building)
                 && DiscoverySystem.IsOnAnyMineableDeposit(snapTarget))
@@ -808,17 +1629,20 @@ namespace GameDevTV.RTS.Player
             }
             if (cardTilePlace && activeCommand is BuildBuildingCommand centerReserveBbc
                 && !BuildingSiteRegistry.IsCommandPostBuilding(centerReserveBbc.Building)
+                && !(prologueGates && BuildingSiteRegistry.IsMineBuilding(centerReserveBbc.Building))
                 && SectorColonization.IsReservedCommandPostTile(snapTarget))
             {
                 allRestrictionsPass = false;
             }
-            if (cardTilePlace && activeCommand is BuildBuildingCommand featureGateBbc
+            if (!prologueGates
+                && cardTilePlace && activeCommand is BuildBuildingCommand featureGateBbc
                 && DiscoverySystem.TryGetRequiredSectorFeature(featureGateBbc.Building, out _)
                 && !DiscoverySystem.IsOnRequiredSectorFeature(featureGateBbc.Building, snapTarget))
             {
                 allRestrictionsPass = false;
             }
-            if (cardTilePlace && activeCommand is BuildBuildingCommand matBbc
+            if (!MainGameController.IsActive
+                && cardTilePlace && activeCommand is BuildBuildingCommand matBbc
                 && matBbc.Building != null)
             {
                 int need = ReservedSiteBuildUtility.GetMaterialsCost(matBbc.Building);
@@ -827,8 +1651,35 @@ namespace GameDevTV.RTS.Player
                     allRestrictionsPass = false;
             }
 
-            // Hysteresis so NavMesh / overlap edge cases don't strobe red/blue every frame.
-            if (allRestrictionsPass == displayedRestrictionsPass)
+            // MainGame: Unreal placement rules replace Acts geology / materials gates.
+            if (MainGameController.IsActive
+                && cardTilePlace
+                && activeCommand is BuildBuildingCommand prologueBbc
+                && MainGameController.Instance != null)
+            {
+                var colony = MainGameController.Instance.Colony;
+                if (BuildingSiteRegistry.IsMineBuilding(prologueBbc.Building))
+                {
+                    bool onPad = DiscoverySystem.IsOnDiscoveredMineDeposit(prologueBbc.Building, snapTarget);
+                    bool paid = colony.GetStock(MainGameResourceId.Minerals) >= MainGameData.MineMineralCost;
+                    allRestrictionsPass = onPad && paid;
+                }
+                else if (MainGameCardMap.TryGetMainGameId(prologueBbc.Building, out var prologueId)
+                         && prologueId != MainGameBuildingId.CommandPost
+                         && MainGameController.Instance.TryGetTileIndex(snapTarget, out int prologueTile))
+                {
+                    allRestrictionsPass = colony.Preview(prologueTile, prologueId, out _);
+                }
+                placementCaption = MainGamePlacementCaption(prologueBbc, snapTarget, allRestrictionsPass);
+            }
+
+            // MainGame copy has to match the click on this frame. Acts overlap can still wait a few frames.
+            if (MainGameController.IsActive)
+            {
+                displayedRestrictionsPass = allRestrictionsPass;
+                restrictionAgreeFrames = 0;
+            }
+            else if (allRestrictionsPass == displayedRestrictionsPass)
             {
                 restrictionAgreeFrames = RestrictionHysteresisFrames;
             }
@@ -876,17 +1727,73 @@ namespace GameDevTV.RTS.Player
             return null;
         }
 
-        /// <summary>
-        /// Ground pick that ignores buildings so hovering near existing tiles does not thrash the snap cell.
-        /// </summary>
-        private Vector3? RaycastGroundForTileGhost()
+        /// <summary>The same first hit the click uses, so a mine aimed at its deposit ghost snaps to that pad.</summary>
+        private Vector3? RaycastActionPoint()
         {
+            if (playerCamera == null) return null;
+            Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(cameraRay, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
+                return hit.point;
+            return null;
+        }
+
+        string MainGamePlacementCaption(BuildBuildingCommand bbc, Vector3 snap, bool legal)
+        {
+            var colony = MainGameController.Instance?.Colony;
+            if (colony == null || bbc?.Building == null)
+                return legal ? "Can build." : "Can't place here.";
+
+            int have = colony.GetStock(MainGameResourceId.Minerals);
+            if (BuildingSiteRegistry.IsMineBuilding(bbc.Building))
+            {
+                DiscoverySystem.TryGetMineResourceType(bbc.Building, out string type);
+                string kind = string.IsNullOrEmpty(type) ? "resource" : type;
+                int cost = MainGameData.MineMineralCost;
+                if (!DiscoverySystem.HasDiscoveredMineDeposit(bbc.Building))
+                    return $"Survey a {kind} deposit before building this.";
+                if (!DiscoverySystem.IsOnDiscoveredMineDeposit(bbc.Building, snap))
+                    return $"Aim at a surveyed {kind} deposit.";
+                if (have < cost)
+                    return $"Need {cost} materials (have {have}).";
+                return $"Can build · {cost} materials (have {have}).";
+            }
+
+            if (MainGameCardMap.TryGetMainGameId(bbc.Building, out var id)
+                && id != MainGameBuildingId.CommandPost
+                && MainGameController.Instance.TryGetTileIndex(snap, out int tile))
+            {
+                if (!colony.Preview(tile, id, out string reason))
+                {
+                    if (id == MainGameBuildingId.Aquifer
+                        && colony.Board.At(tile).Feature is MainGameFeature.Ice or MainGameFeature.Glacier)
+                        return "Drill goes on the flat hex beside the ice — follow the blue build ghost.";
+                    return string.IsNullOrEmpty(reason) ? "Can't place here." : reason;
+                }
+                int cost = MainGameData.MineralCost(id);
+                int weeks = MainGameData.Get(id).BuildWeeks + MainGameData.HaulWeeks(colony.SupplyDistance(tile));
+                if (cost <= 0)
+                    return weeks > 0 ? $"Can build · {weeks} wk." : "Can build.";
+                return $"Can build · {cost} materials (have {have}) · {weeks} wk.";
+            }
+
+            return legal ? "Can build." : "Can't place here.";
+        }
+
+        /// <summary>Ground under cursor — same ray path for hover, ghost, and placement.</summary>
+        bool TryRaycastGroundUnderCursor(out Vector3 ground)
+        {
+            ground = default;
+            if (playerCamera == null || Mouse.current == null) return false;
+
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-            if (Physics.Raycast(cameraRay, out RaycastHit floorHit, float.MaxValue, floorLayers))
-                return floorHit.point;
+            if (Physics.Raycast(cameraRay, out RaycastHit floorHit, float.MaxValue, floorLayers, QueryTriggerInteraction.Ignore))
+            {
+                ground = floorHit.point;
+                return true;
+            }
 
-            int count = Physics.RaycastNonAlloc(cameraRay, ghostRayHits, float.MaxValue);
+            int count = Physics.RaycastNonAlloc(cameraRay, ghostRayHits, float.MaxValue, ~0, QueryTriggerInteraction.Ignore);
             float bestDist = float.MaxValue;
             Vector3? best = null;
             for (int i = 0; i < count; i++)
@@ -894,6 +1801,7 @@ namespace GameDevTV.RTS.Player
                 var h = ghostRayHits[i];
                 if (h.collider == null) continue;
                 if (ShouldIgnoreSelectionHit(h.collider)) continue;
+                if (IsTerrainWrapCopyCollider(h.collider)) continue;
                 if (h.collider.GetComponentInParent<BaseBuilding>() != null) continue;
                 if (h.distance < bestDist)
                 {
@@ -902,14 +1810,30 @@ namespace GameDevTV.RTS.Player
                 }
             }
 
-            if (best.HasValue) return best;
+            if (best.HasValue)
+            {
+                ground = best.Value;
+                return true;
+            }
 
-            // Stable fallback: horizontal plane at last ghost height / camera focus.
             float y = ghostInstance != null ? ghostInstance.transform.position.y : GetCameraFocusPosition().y;
             var plane = new Plane(Vector3.up, new Vector3(0f, y, 0f));
             if (plane.Raycast(cameraRay, out float enter))
-                return cameraRay.GetPoint(enter);
+            {
+                ground = cameraRay.GetPoint(enter);
+                return true;
+            }
 
+            return false;
+        }
+
+        /// <summary>
+        /// Ground pick that ignores buildings so hovering near existing tiles does not thrash the snap cell.
+        /// </summary>
+        private Vector3? RaycastGroundForTileGhost()
+        {
+            if (TryRaycastGroundUnderCursor(out Vector3 ground))
+                return ground;
             return null;
         }
 
@@ -1160,7 +2084,7 @@ namespace GameDevTV.RTS.Player
             tmp.fontStyle = FontStyles.Normal;
             tmp.fontSize = 18f;
             tmp.fontWeight = FontWeight.Regular;
-            tmp.enableWordWrapping = true;
+            tmp.textWrappingMode = TextWrappingModes.Normal;
             tmp.overflowMode = TextOverflowModes.Overflow;
             tmp.lineSpacing = 2f;
             tmp.characterSpacing = 0f;
@@ -1176,7 +2100,7 @@ namespace GameDevTV.RTS.Player
             tmp.fontStyle = FontStyles.Normal;
             tmp.fontSize = 18f;
             tmp.fontWeight = FontWeight.Regular;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Ellipsis;
             tmp.raycastTarget = false;
             tmp.outlineWidth = 0f;
@@ -1231,6 +2155,15 @@ namespace GameDevTV.RTS.Player
             comboSummaryLabel.gameObject.SetActive(true);
             // Sit above the ghost; link chips sit lower on neighbors.
             comboSummaryWorldPos = snapPos + Vector3.up * 5.5f;
+            if (MainGameController.IsActive && !string.IsNullOrEmpty(placementCaption))
+            {
+                comboSummaryLabel.text = placementCaption;
+                comboSummaryLabel.color = legal
+                    ? new Color(0.75f, 1f, 0.82f, 1f)
+                    : new Color(1f, 0.55f, 0.45f, 1f);
+                UpdateComboLabelScreens();
+                return;
+            }
             if (!legal)
             {
                 comboSummaryLabel.text = "Can't place";
@@ -1477,14 +2410,33 @@ namespace GameDevTV.RTS.Player
             ClearJoinLines();
             ClearComboHalo();
             tileGhostStickyCell = null;
+            placementCaption = null;
             lastJoinCount = -1;
             restrictionAgreeFrames = 0;
             displayedRestrictionsPass = true;
             lastGhostRestrictionsPass = true;
+            PlacementGhostActive = false;
+            mainGameHandCardFrameUntil = 0f;
+        }
+
+        private void CancelPlacement()
+        {
+            ClearGhostVisuals();
+            activeCommand = null;
+            commandTargetUnits.Clear();
         }
 
         private void HandleDragSelect()
         {
+            if (MainGameController.IsActive
+                && !PlacementGhostActive
+                && MainGameDroneScan.Instance != null
+                && !MainGameDroneScan.Instance.IsFlying
+                && (MainGameDroneScan.Instance.ScanMode || MainGameDroneScan.Instance.AwaitingMarkPick))
+            {
+                return;
+            }
+
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
                 HandleMouseDown();
@@ -1562,7 +2514,7 @@ namespace GameDevTV.RTS.Player
             }
             startingMousePosition = Mouse.current.position.ReadValue();
             addedUnits.Clear();
-            wasMouseDownOnUI = EventSystem.current.IsPointerOverGameObject();
+            wasMouseDownOnUI = UiPlaythroughUtil.PointerBlocksWorldInteraction();
         }
 
         private void DeselectAllUnits()
@@ -1595,6 +2547,15 @@ namespace GameDevTV.RTS.Player
 
         private void HandleRightClick()
         {
+            if (MainGameController.IsActive
+                && GameDevTV.RTS.Environment.PlanetHorizonFromZoom.PlanetoidView)
+                return;
+            if (Mouse.current.rightButton.wasReleasedThisFrame && (ghostInstance != null || PlacementGhostActive))
+            {
+                CancelPlacement();
+                return;
+            }
+
             if (Mouse.current.rightButton.wasReleasedThisFrame)
             {
                 // Draft / pause overlays use full-screen raycast blockers. Without this check,
@@ -1737,6 +2698,10 @@ namespace GameDevTV.RTS.Player
         {
             if (playerCamera == null) { return ; }
 
+            if (MainGameController.IsActive
+                && GameDevTV.RTS.Environment.PlanetHorizonFromZoom.PlanetoidView)
+                return;
+
             Ray cameraRay = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
             if (BuildingSiteSelectionController.IsSelecting)
@@ -1760,7 +2725,7 @@ namespace GameDevTV.RTS.Player
                 return;
             }
 
-            if (EventSystem.current.IsPointerOverGameObject()) { return; }
+            if (UiPlaythroughUtil.PointerBlocksWorldInteraction()) return;
 
             if (activeCommand == null)
             {
@@ -1800,7 +2765,7 @@ namespace GameDevTV.RTS.Player
                 }
             }
             else if (activeCommand != null
-                && !EventSystem.current.IsPointerOverGameObject())
+                && !UiPlaythroughUtil.PointerBlocksWorldInteraction())
             {
                 if (Physics.Raycast(cameraRay, out RaycastHit hitAction, float.MaxValue, interactableLayers | floorLayers))
                 {
@@ -1826,23 +2791,47 @@ namespace GameDevTV.RTS.Player
 
         private void ActivateAction(RaycastHit hit)
         {
-            if (Time.timeScale <= 0.01f)
+            var prologue = MainGameController.Instance;
+            if (prologue != null && prologue.Colony != null && prologue.Colony.ContractCancelled)
+            {
+                ExplorationManager.NotifyPlacementFailed(
+                    "The corporation cancelled the contract. The mission is over.",
+                    hit.point);
+                return;
+            }
+
+            // MainGame boots paused (timeScale=0). Survey + MainGame hand tile places must still work.
+            bool prologueHandPlace = MainGameController.IsActive
+                && activeCommand is BuildBuildingCommand prologueBbc
+                && prologueBbc.HandIndex >= 0;
+            bool allowWhilePaused = prologueHandPlace
+                                    || activeCommand is PlayCardCommand
+                                    || (activeCommand != null && !activeCommand.RequiresClickToActivate
+                                        && activeCommand is not BuildBuildingCommand);
+            if (Time.timeScale <= 0.01f && !allowWhilePaused)
             {
                 if (activeCommand is BuildBuildingCommand pausedBbc && pausedBbc.HandIndex >= 0)
                 {
                     ExplorationManager.NotifyPlacementFailed(
-                        "Game is paused — dismiss the overlay before placing tiles.",
+                        "Game is paused — hit 1x (or Space) before placing tiles.",
                         hit.point);
                 }
                 else
                 {
-                    Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Dismiss any draft/summary overlay first.");
+                    Debug.LogWarning("[PlayerInput] Command ignored — game is paused (Time.timeScale=0). Hit 1x or Space first.");
                 }
                 return;
             }
 
             // Commit the cell the ghost/footprint was showing — not a fresh noisy ray hit.
             bool cardTilePlace = activeCommand is BuildBuildingCommand placeCmd && placeCmd.HandIndex >= 0;
+            if (cardTilePlace && MainGameController.IsActive && !displayedRestrictionsPass)
+            {
+                ExplorationManager.NotifyPlacementFailed(
+                    string.IsNullOrEmpty(placementCaption) ? "Can't place here." : placementCaption,
+                    hit.point);
+                return;
+            }
             if (cardTilePlace)
             {
                 var placeBbc = (BuildBuildingCommand)activeCommand;
@@ -1882,15 +2871,6 @@ namespace GameDevTV.RTS.Player
                 if (UnityEngine.AI.NavMesh.SamplePosition(placePoint, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
                     placePoint = new Vector3(placePoint.x, navHit.position.y, placePoint.z);
 
-                if (activeCommand is BuildBuildingCommand placeMine
-                    && BuildingSiteRegistry.IsMineBuilding(placeMine.Building)
-                    && DiscoverySystem.TrySnapToMineDeposit(
-                        placeMine.Building, placePoint, out Vector3 minePlace, out Vector2Int mineCell))
-                {
-                    placePoint = new Vector3(minePlace.x, placePoint.y, minePlace.z);
-                    tileGhostStickyCell = mineCell;
-                }
-
                 hit.point = placePoint;
             }
 
@@ -1925,21 +2905,65 @@ namespace GameDevTV.RTS.Player
             if (abstractCommandables.Count == 0)
             {
                 CommandContext ownerContext = new(Owner.Player1, null, hit);
-                if (activeCommand.CanHandle(ownerContext))
+                // Validate before committing MainGame sim occupancy (avoids stuck pads).
+                if (!activeCommand.CanHandle(ownerContext))
                 {
-                    activeCommand.Handle(ownerContext);
+                    if (activeCommand is BuildBuildingCommand failedPlace)
+                    {
+                        string reason = failedPlace.ExplainCardPlacementFailure(hit.point, Owner.Player1)
+                            ?? $"Can't place {failedPlace.Building?.Name ?? "this tile"} here.";
+                        ExplorationManager.NotifyPlacementFailed(reason, hit.point);
+                    }
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"[PlayerInput] Command '{activeCommand.name}' cannot run (no unit selected / invalid target).");
+                    }
+                    activeCommand = null;
+                    commandTargetUnits.Clear();
+                    return;
                 }
-                else if (activeCommand is BuildBuildingCommand failedPlace)
+
+                // MainGame sim: pay minerals + queue build weeks before the Unity spawn.
+                if (MainGameController.IsActive
+                    && activeCommand is BuildBuildingCommand prologuePlace
+                    && MainGameController.Instance != null)
                 {
-                    string reason = failedPlace.ExplainCardPlacementFailure(hit.point, Owner.Player1)
-                        ?? $"Can't place {failedPlace.Building?.Name ?? "this tile"} here.";
-                    ExplorationManager.NotifyPlacementFailed(reason, hit.point);
+                    var colony = MainGameController.Instance.Colony;
+                    if (BuildingSiteRegistry.IsMineBuilding(prologuePlace.Building))
+                    {
+                        if (!colony.TrySpendStock(MainGameResourceId.Minerals, MainGameData.MineMineralCost))
+                        {
+                            ExplorationManager.NotifyPlacementFailed(
+                                $"Need {MainGameData.MineMineralCost} materials to place {prologuePlace.Building.Name} " +
+                                $"(have {colony.GetStock(MainGameResourceId.Minerals)}).",
+                                hit.point);
+                            activeCommand = null;
+                            commandTargetUnits.Clear();
+                            return;
+                        }
+                    }
+                    else if (MainGameCardMap.TryGetMainGameId(prologuePlace.Building, out var placeId)
+                             && placeId != MainGameBuildingId.CommandPost
+                             && MainGameController.Instance.TryGetTileIndex(hit.point, out int placeTile))
+                    {
+                        if (!colony.TryPlace(placeTile, placeId, out string prologueReason))
+                        {
+                            ExplorationManager.NotifyPlacementFailed(
+                                string.IsNullOrEmpty(prologueReason)
+                                    ? "MainGame: can't place here."
+                                    : prologueReason,
+                                hit.point);
+                            activeCommand = null;
+                            commandTargetUnits.Clear();
+                            return;
+                        }
+                        MainGameController.Instance.RefreshHandUnlocks();
+                    }
                 }
-                else
-                {
-                    Debug.LogWarning(
-                        $"[PlayerInput] Command '{activeCommand.name}' cannot run (no unit selected / invalid target).");
-                }
+
+                activeCommand.Handle(ownerContext);
+                AudioManager.Instance?.PlayPlaceClickSound();
 
                 activeCommand = null;
                 commandTargetUnits.Clear();
@@ -1993,15 +3017,51 @@ namespace GameDevTV.RTS.Player
 
         private void HandleRotation()
         {
-            // Full 360-degree free rotation using Middle Mouse Button
-            if (cameraTarget != null && Mouse.current.middleButton.isPressed)
+            // Middle-mouse drag grabs the ground. Releasing a flick keeps the view coasting
+            // like spinning a globe, then friction settles it.
+            if (cameraTarget != null && Mouse.current != null)
             {
-                float rotationInput = Mouse.current.delta.x.ReadValue();
-                float rotationSpeed = cameraConfig.RotationSpeed * 0.2f; 
-                cameraTarget.transform.Rotate(Vector3.up, rotationInput * rotationSpeed, Space.World);
+                float dt = Mathf.Max(Time.unscaledDeltaTime, 0.0001f);
+                bool globePanAllowed = !GameDevTV.RTS.MainGame.MainGameController.IsActive
+                    || !PointerOverGameplayHud();
+                if (Mouse.current.middleButton.wasPressedThisFrame)
+                    globeSpinVelocity = Vector3.zero;
+
+                if (globePanAllowed && Mouse.current.middleButton.isPressed)
+                {
+                    Vector2 delta = Mouse.current.delta.ReadValue();
+                    if (delta.sqrMagnitude > 0.0001f)
+                    {
+                        float panScale = MiddleMousePanScale();
+                        Vector3 move = GlobePanAxes(delta, panScale);
+                        PanCameraFocus(move);
+                        Vector3 instant = move / dt;
+                        const float maxSpin = 110f;
+                        if (instant.sqrMagnitude > maxSpin * maxSpin)
+                            instant = instant.normalized * maxSpin;
+                        globeSpinVelocity = Vector3.Lerp(globeSpinVelocity, instant, 0.58f);
+                    }
+                    else
+                    {
+                        globeSpinVelocity = Vector3.Lerp(globeSpinVelocity, Vector3.zero, 0.2f);
+                    }
+                }
+                else if (globeSpinVelocity.sqrMagnitude > 0.02f)
+                {
+                    PanCameraFocus(globeSpinVelocity * dt);
+                    globeSpinVelocity *= Mathf.Exp(-1.55f * dt);
+                }
+                else
+                {
+                    globeSpinVelocity = Vector3.zero;
+                }
             }
 
             if (cinemachineFollow == null) return;
+
+            // MainGame zoom owns FollowOffset (height + tilt). Legacy page-up/down slerp was snapping Z every frame.
+            if (MainGameController.IsActive || MainGameController.IsMainGamePlayScene())
+                return;
 
             if (ShouldSetRotationStartTime())
             {
@@ -2044,6 +3104,49 @@ namespace GameDevTV.RTS.Player
             );
         }
 
+        /// <summary>Pixels → world units for middle-mouse grab pan; scales with zoom so tiny drags nudge the view.</summary>
+        float MiddleMousePanScale()
+        {
+            float zoom = cinemachineFollow != null ? cinemachineFollow.FollowOffset.y : 40f;
+            float maxZoomFactor = 1.15f;
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                var planet = GameDevTV.RTS.Environment.PlanetGenerator.Instance;
+                if (planet != null && planet.TryGetPatchWorldSize(out float patchW, out _)
+                    && patchW > 256f)
+                    maxZoomFactor = Mathf.Clamp(Mathf.Sqrt(patchW / 512f) * 2.2f, 1.15f, 5.5f);
+            }
+
+            float zoomFactor = Mathf.Clamp(zoom / 38f, 0.4f, maxZoomFactor);
+            float config = Mathf.Max(0.05f, cameraConfig != null ? cameraConfig.MousePanSpeed : 5f);
+            const float basePerPixel = 0.024f;
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                return basePerPixel * zoomFactor * 1.08f;
+            return basePerPixel * zoomFactor * Mathf.Clamp(config / 5f, 0.5f, 1.25f);
+        }
+
+        /// <summary>Wrap focus on the repeating planet so fling pan does not run into void at map edges.</summary>
+        Vector3 WrapCameraOnPlanet(Vector3 worldPos)
+        {
+            var planet = GameDevTV.RTS.Environment.PlanetGenerator.Instance;
+            return planet != null ? planet.WrapWorldOnPatch(worldPos) : worldPos;
+        }
+
+        Vector3 GlobePanAxes(Vector2 delta, float panScale)
+        {
+            Transform basis = playerCamera != null ? playerCamera.transform : cameraTarget;
+            Vector3 right = basis.right;
+            right.y = 0f;
+            if (right.sqrMagnitude < 0.0001f) right = Vector3.right;
+            else right.Normalize();
+            Vector3 forward = basis.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
+            else forward.Normalize();
+            // Invert so dragging feels like grabbing the ground.
+            return (-right * delta.x - forward * delta.y) * panScale;
+        }
+
         private bool ShouldSetRotationStartTime()
         {
             return Keyboard.current.pageUpKey.wasPressedThisFrame
@@ -2056,21 +3159,23 @@ namespace GameDevTV.RTS.Player
         {
             if (cinemachineFollow == null) return;
 
+            float minZoom = MainGameController.IsActive ? MainGameMinZoomDistance() : cameraConfig.MinZoomDistance;
+
             // Hand strip / Colony Acts own the wheel while hovered — don't zoom the camera.
             bool uiOwnsWheel = BottomBarActionsUI.IsPointerOverHandStrip
                 || ActiveObjectivesUI.IsPointerOverActsPanel;
 
-            // Mouse scroll zoom
+            // Mouse scroll zoom (vertical only — horizontal / Shift+vertical pan in HandleMainGameScrollPan).
+            bool shiftScrollPan = Keyboard.current != null && Keyboard.current.shiftKey.isPressed
+                && Mathf.Abs(Mouse.current.scroll.y.ReadValue()) > 0.01f;
             float scroll = Mouse.current.scroll.y.ReadValue();
-            if (!uiOwnsWheel && Mathf.Abs(scroll) > 0.01f)
+            if (!uiOwnsWheel && !shiftScrollPan && Mathf.Abs(scroll) > 0.01f)
             {
                 // Normalize scroll to get consistent zoom speeds across all operating systems and mice
                 float scrollSign = Mathf.Sign(scroll);
                 
                 // Invert scroll so scrolling up zooms in. A fixed step of 2.0 units per notch times ZoomSpeed
                 targetZoomDistance -= scrollSign * cameraConfig.ZoomSpeed * 2.0f;
-                // Clamp distance to keep from zooming through the floor or too far out
-                targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 4f);
             }
             
             // Keyboard zoom (Page Up/Page Down) for CLI testing
@@ -2083,20 +3188,29 @@ namespace GameDevTV.RTS.Player
                 targetZoomDistance += cameraConfig.ZoomSpeed * Time.deltaTime * 10f;
             }
             
-            // Clamp distance to keep from zooming through the floor or too far out
-            targetZoomDistance = Mathf.Clamp(targetZoomDistance, cameraConfig.MinZoomDistance, startingFollowOffset.y * 4f);
+            targetZoomDistance = Mathf.Clamp(targetZoomDistance, minZoom, ResolveMaxZoomDistance());
 
-            Vector3 targetFollowOffset = new Vector3(
-                cinemachineFollow.FollowOffset.x,
-                targetZoomDistance,
-                cinemachineFollow.FollowOffset.z
-            );
-
-            cinemachineFollow.FollowOffset = Vector3.Lerp(
-                cinemachineFollow.FollowOffset,
-                targetFollowOffset,
-                Time.unscaledDeltaTime * 10f
-            );
+            bool mainGameZoom = MainGameController.IsActive || MainGameController.IsMainGamePlayScene();
+            if (mainGameZoom)
+            {
+                const float zoomSmooth = 10f;
+                smoothedZoomDistance = Mathf.Lerp(
+                    smoothedZoomDistance,
+                    targetZoomDistance,
+                    Time.unscaledDeltaTime * zoomSmooth);
+            }
+            else
+            {
+                smoothedZoomDistance = targetZoomDistance;
+                Vector3 targetFollowOffset = new Vector3(
+                    cinemachineFollow.FollowOffset.x,
+                    targetZoomDistance,
+                    cinemachineFollow.FollowOffset.z);
+                cinemachineFollow.FollowOffset = Vector3.Lerp(
+                    cinemachineFollow.FollowOffset,
+                    targetFollowOffset,
+                    Time.unscaledDeltaTime * 10f);
+            }
         }
 
         private bool ShouldSetZoomStartTime()
@@ -2107,7 +3221,22 @@ namespace GameDevTV.RTS.Player
 
         private void HandlePanning()
         {
-            if (cameraTarget == null || HexGridManager.Instance == null)
+            if (MainGameController.IsActive)
+            {
+                if (cameraTarget == null)
+                    EnsureCameraTargetExists();
+                WireCinemachineTargets();
+            }
+
+            if (GetCameraFollowTransform() == null) return;
+
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                HandleMainGameContinuousPan();
+                return;
+            }
+
+            if (HexGridManager.Instance == null)
             {
                 if (highlightTrace) Debug.LogWarning($"[HexHighlight] Keyboard update skipped: cameraTarget={cameraTarget}, grid={HexGridManager.Instance}");
                 return;
@@ -2137,30 +3266,87 @@ namespace GameDevTV.RTS.Player
 
             Vector3 destinationPosition = currentHex.WorldPosition;
             destinationPosition.y = cameraTarget.position.y;
-            cameraTarget.position = destinationPosition;
+            cameraTarget.position = WrapCameraOnPlanet(destinationPosition);
             AudioManager.Instance.PlayHexHoverSound();
             if (highlightTrace) Debug.Log($"[HexHighlight] Keyboard moved {direction}: {currentHex.HexCoordinates} at {destinationPosition}");
+        }
+
+        static bool PointerOverGameplayHud()
+        {
+            if (BottomBarActionsUI.IsPointerOverHandStrip) return true;
+            if (MainGameHUD.Instance != null && MainGameHUD.Instance.BriefingBlocksClicks) return true;
+            if (EventSystem.current == null) return false;
+            return EventSystem.current.IsPointerOverGameObject();
+        }
+
+        /// <summary>Hold WASD / arrows — smooth pan across the full torus patch (MainGame).</summary>
+        void HandleMainGameContinuousPan()
+        {
+            if (GetCameraFollowTransform() == null) return;
+            if (PointerOverGameplayHud()) return;
+
+            Vector2 move = Vector2.zero;
+            if (Keyboard.current != null)
+                move += GetKeyboardMoveAmount();
+            // MainGame: edge-pan off — EdgePanSize (550px) swallows the hand strip and feels like "mouse pans the map".
+            if (move.sqrMagnitude < 0.0001f) return;
+
+            float scale = MiddleMousePanScale() * Time.unscaledDeltaTime * 16f;
+            Vector3 delta = GlobePanAxes(move, scale);
+            PanCameraFocus(delta);
+        }
+
+        /// <summary>Trackpad horizontal scroll + Shift+vertical scroll pan (MainGame), same torus wrap as middle-mouse.</summary>
+        void HandleMainGameScrollPan()
+        {
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive || cameraTarget == null || Mouse.current == null)
+                return;
+
+            bool uiOwnsWheel = BottomBarActionsUI.IsPointerOverHandStrip
+                || ActiveObjectivesUI.IsPointerOverActsPanel;
+            if (uiOwnsWheel) return;
+
+            Vector2 scroll = Mouse.current.scroll.ReadValue();
+            if (scroll.sqrMagnitude < 0.01f) return;
+
+            Vector2 pan = Vector2.zero;
+            if (Mathf.Abs(scroll.x) > 0.01f)
+                pan.x += scroll.x;
+            if (Keyboard.current != null && Keyboard.current.shiftKey.isPressed && Mathf.Abs(scroll.y) > 0.01f)
+                pan.y += scroll.y;
+
+            if (pan.sqrMagnitude < 0.0001f) return;
+
+            float scale = MiddleMousePanScale() * 0.42f;
+            Vector3 delta = GlobePanAxes(pan, scale);
+            PanCameraFocus(delta);
         }
 
         private void HandleHexHover()
         {
             if (playerCamera == null || HexGridManager.Instance == null || Mouse.current == null) return;
 
+            // While grabbing or coasting the globe, skip hover rays — pan should stay cheap.
+            if (Mouse.current.middleButton.isPressed || globeSpinVelocity.sqrMagnitude > 1.5f)
+            {
+                if (hoveredHex != null)
+                {
+                    hoveredHex.SetHovered(false);
+                    hoveredHex = null;
+                }
+                return;
+            }
+
+            // Ground pick is one Physics ray + O(1) cell lookup — skip when the mouse did not move.
+            Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+            if (hoveredHex != null && mouseDelta.sqrMagnitude < 0.25f)
+                return;
+
             HexGridManager.HexTile nextHoveredHex = null;
-            Ray ray = playerCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
-            if (Physics.Raycast(ray, out RaycastHit hit, float.MaxValue, floorLayers, QueryTriggerInteraction.Ignore))
+            if (TryRaycastGroundUnderCursor(out Vector3 ground))
             {
-                nextHoveredHex = HexGridManager.Instance.GetNearestRevealedHex(hit.point);
-                if (highlightTrace) Debug.Log($"[HexHighlight] Hover floor hit: point={hit.point}, collider={hit.collider.name}, mask={floorLayers.value}");
-            }
-            else if (Physics.Raycast(ray, out hit, float.MaxValue, ~0, QueryTriggerInteraction.Ignore))
-            {
-                nextHoveredHex = HexGridManager.Instance.GetNearestRevealedHex(hit.point);
-                if (highlightTrace) Debug.Log($"[HexHighlight] Hover fallback hit: point={hit.point}, collider={hit.collider.name}");
-            }
-            else if (highlightTrace)
-            {
-                Debug.Log("[HexHighlight] Hover ray missed floor and fallback geometry.");
+                Vector2 screen = Mouse.current.position.ReadValue();
+                nextHoveredHex = HexGridManager.Instance.GetHexForHover(ground, playerCamera, screen);
             }
 
             if (nextHoveredHex == hoveredHex) return;
@@ -2175,8 +3361,15 @@ namespace GameDevTV.RTS.Player
         {
             if (currentHex != null || cameraTarget == null || HexGridManager.Instance == null) return;
 
-            currentHex = HexGridManager.Instance.GetNearestHex(cameraTarget.position);
+            currentHex = HexGridManager.Instance.GetHexForHover(cameraTarget.position);
             if (highlightTrace) Debug.Log($"[HexHighlight] Current tile initialized at camera {cameraTarget.position}: {currentHex?.HexCoordinates.ToString() ?? "NULL"}");
+            // MainGame: hex outlines only appear under the cursor — don't pin a permanent selection ring.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                currentHex?.SetHighlighted(false);
+                HexGridManager.Instance.RefreshAllOutlineVisibility();
+                return;
+            }
             currentHex?.SetHighlighted(true);
         }
 
@@ -2201,6 +3394,10 @@ namespace GameDevTV.RTS.Player
         {
             Vector2 moveAmount = Vector2.zero;
 
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                || GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene())
+                return moveAmount;
+
             if (!Application.isFocused)
             {
                 return moveAmount;
@@ -2218,26 +3415,14 @@ namespace GameDevTV.RTS.Player
             }
             
             if (mousePosition.x <= cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near left edge");
                 moveAmount.x -= cameraConfig.MousePanSpeed;
-            }
             else if (mousePosition.x >= screenWidth - cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near right edge");
                 moveAmount.x += cameraConfig.MousePanSpeed;
-            }
-            
+
             if (mousePosition.y >= screenHeight - cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near top edge");
                 moveAmount.y += cameraConfig.MousePanSpeed;
-            }
             else if (mousePosition.y <= cameraConfig.EdgePanSize)
-            {
-                Debug.Log("[PlayerInput] Mouse near bottom edge");
                 moveAmount.y -= cameraConfig.MousePanSpeed;
-            }
             
             return moveAmount;
         }
@@ -2265,5 +3450,78 @@ namespace GameDevTV.RTS.Player
             
             return moveAmount;
         }
+
+#if UNITY_EDITOR
+        public void PlaytestCancelPlacement() => CancelPlacement();
+
+        /// <summary>CLI playthrough: place the active card ghost at a board tile (mines need deposit pads).</summary>
+        public bool EditorPlaytestPlaceAtTile(int tileIndex)
+        {
+            if (!PlacementGhostActive || activeCommand == null) return false;
+            var ctrl = GameDevTV.RTS.MainGame.MainGameController.Instance;
+            if (ctrl == null || !ctrl.TryGetCell(tileIndex, out Vector2Int cell)) return false;
+            // Match human play: commit the cell the ghost shows, not a re-snap from raw world pos.
+            tileGhostStickyCell = cell;
+            Vector3 world = ColonyTileGrid.CellToWorldOnGround(cell);
+            world = ColonyTileGrid.ApplyGroundY(world);
+            // Bot does not run ghost tint each frame — refresh MainGame Preview so ActivateAction can commit.
+            if (activeCommand is BuildBuildingCommand playBbc)
+            {
+                var colony = ctrl.Colony;
+                if (BuildingSiteRegistry.IsMineBuilding(playBbc.Building))
+                {
+                    bool onPad = DiscoverySystem.IsOnDiscoveredMineDeposit(playBbc.Building, world);
+                    bool paid = colony.GetStock(MainGameResourceId.Minerals) >= MainGameData.MineMineralCost;
+                    displayedRestrictionsPass = onPad && paid;
+                }
+                else if (MainGameCardMap.TryGetMainGameId(playBbc.Building, out var playId)
+                         && playId != MainGameBuildingId.CommandPost
+                         && ctrl.TryGetTileIndex(world, out int playTile))
+                {
+                    displayedRestrictionsPass = colony.Preview(playTile, playId, out string reason);
+                    placementCaption = displayedRestrictionsPass ? "" : reason;
+                }
+                restrictionAgreeFrames = RestrictionHysteresisFrames;
+            }
+            var hit = new RaycastHit
+            {
+                point = world,
+                normal = Vector3.up,
+                distance = 0f
+            };
+            ActivateAction(hit);
+            return !PlacementGhostActive;
+        }
+
+        /// <summary>CLI playthrough: place the active card ghost at a Game-view screen point.</summary>
+        public bool EditorPlaytestPlaceAtScreen(Vector2 screenBottomLeft)
+        {
+            if (!PlacementGhostActive || activeCommand == null || playerCamera == null) return false;
+            if (TryGetPlaytestPlacementTile(out int tile) && EditorPlaytestPlaceAtTile(tile))
+                return !PlacementGhostActive;
+            Ray ray = playerCamera.ScreenPointToRay(new Vector3(screenBottomLeft.x, screenBottomLeft.y, 0f));
+            if (Physics.Raycast(ray, out RaycastHit hit, float.MaxValue, interactableLayers | floorLayers))
+            {
+                ActivateAction(hit);
+                return true;
+            }
+
+            if (Physics.Raycast(ray, out hit, float.MaxValue))
+            {
+                ActivateAction(hit);
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool TryGetPlaytestPlacementTile(out int tileIndex)
+        {
+            tileIndex = -1;
+            if (Instance?.activeCommand is not BuildBuildingCommand bbc || bbc.Building == null)
+                return false;
+            return CardPlayCameraGuide.TryGetMainGamePlacementTile(bbc.Building, out tileIndex);
+        }
+#endif
     }
 }

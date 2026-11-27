@@ -391,18 +391,8 @@ namespace GameDevTV.RTS.Units
             // ── Start construction ────────────────────────────────────
             CurrentState = State.Building;
             building.StartBuilding(worker);
+            ConstructionScaffold.Ensure(building.transform);
 
-            // Rise-from-ground animation
-            Renderer buildingRenderer = building.MainRenderer;
-            Vector3 endPosition = building.transform.position;
-            Vector3 startPosition = endPosition;
-            if (buildingRenderer != null)
-            {
-                startPosition = endPosition - Vector3.up * buildingRenderer.bounds.size.y;
-                buildingRenderer.transform.position = startPosition;
-            }
-
-            float startTime = building.Progress.StartTime;
             float targetHealth = 0f;
             float elapsedTime = 0f;
 
@@ -425,9 +415,6 @@ namespace GameDevTV.RTS.Units
                     targetHealth -= healAmount;
                 }
 
-                if (buildingRenderer != null)
-                    buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalizedTime);
-
                 if (normalizedTime >= 1f) break;
                 yield return null;
             }
@@ -435,13 +422,7 @@ namespace GameDevTV.RTS.Units
             // ── Complete construction ─────────────────────────────────
             if (building != null)
             {
-                // Rise animation moves the mesh renderer; restore it under the root,
-                // then pin the whole building to terrain so themed pads never float.
-                if (buildingRenderer != null && buildingRenderer.transform != building.transform)
-                {
-                    buildingRenderer.transform.localPosition = Vector3.zero;
-                }
-
+                ConstructionScaffold.Clear(building.transform);
                 building.enabled = true;
                 building.CompleteConstruction();
                 ReservedSiteBuildUtility.GroundBuilding(building);

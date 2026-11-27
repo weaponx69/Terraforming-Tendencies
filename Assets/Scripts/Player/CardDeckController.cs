@@ -10,6 +10,7 @@ using GameDevTV.RTS.Events;
 using GameDevTV.RTS.UI.Containers;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Utilities;
+using GameDevTV.RTS.MainGame;
 
 namespace GameDevTV.RTS.Player
 {
@@ -47,6 +48,9 @@ namespace GameDevTV.RTS.Player
         public static bool IsCardRelevantInFocusedSector(BlueprintCardSO card)
         {
             if (card == null) return false;
+            // MainGame hand is already filtered to the guided unlocks — never hide those cards.
+            if (MainGameController.IsActive || MainGameController.IsMainGamePlayScene()) return true;
+
             var sector = SectorManager.Instance?.ActiveSector;
             if (sector == null) return true;
 
@@ -523,6 +527,8 @@ namespace GameDevTV.RTS.Player
 
         private void EnsureBootstrapUnlockInHand(string nameContains)
         {
+            if (MainGameController.IsActive) return;
+
             bool Match(BlueprintCardSO c) => MatchesBootstrapUnlock(c, nameContains);
 
             if (hand.Any(Match)) return;
@@ -592,6 +598,14 @@ namespace GameDevTV.RTS.Player
 
             InitializeDrawPile();
 
+            if (MainGameController.IsActive)
+            {
+                RebuildMainGameHand(MainGameController.Instance != null
+                    ? MainGameController.Instance.Colony
+                    : null);
+                return;
+            }
+
             // 1. Clear the hand
             hand.Clear();
 
@@ -650,6 +664,203 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>
+        /// MainGame hand = scan card (when needed) + unlocked Unreal-mapped buildings only.
+        /// </summary>
+        /// <returns>True when the seated hand actually changed.</returns>
+        public bool RebuildMainGameHand(MainGameColony colony)
+        {
+            if (masterDeck.Count == 0)
+                InitializeDrawPile();
+
+            var next = BuildMainGameHandList(colony);
+            if (MainGameHandSequenceEqual(hand, next))
+                return false;
+
+            hand.Clear();
+            hand.AddRange(next);
+
+            Debug.Log($"[CardDeckController] MainGame hand ({hand.Count}): " +
+                      string.Join(", ", hand.ConvertAll(c => c != null ? c.cardName : "?")));
+
+            MainGameController.ignoreNextDeckChanged = true;
+            try
+            {
+                OnHandChanged?.Invoke();
+            }
+            finally
+            {
+                MainGameController.ignoreNextDeckChanged = false;
+            }
+
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return true;
+        }
+
+        static bool MainGameHandSequenceEqual(IReadOnlyList<BlueprintCardSO> a, IReadOnlyList<BlueprintCardSO> b)
+        {
+            if (a == null || b == null) return a == b;
+            if (a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (!ReferenceEquals(a[i], b[i])) return false;
+            }
+            return true;
+        }
+
+        List<BlueprintCardSO> BuildMainGameHandList(MainGameColony colony)
+        {
+            var next = new List<BlueprintCardSO>();
+
+            HashSet<MainGameBuildingId> unlocked = colony != null
+                ? colony.Unlocked
+                : new HashSet<MainGameBuildingId>();
+            bool cancelled = colony != null && colony.ContractCancelled;
+            bool surveying = MainGameSurveyMission.Instance != null && MainGameSurveyMission.Instance.IsSearching;
+
+            // Survey stays in the hand for exploration whenever the team is free.
+            // It used to leave after step 0, so players could not paint more trails.
+            if (!cancelled && !surveying)
+            {
+                BlueprintCardSO scan = null;
+                foreach (var c in masterDeck)
+                {
+                    if (c is ScoutingCardSO scout
+                        && scout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone)
+                    {
+                        scan = c;
+                        break;
+                    }
+                }
+                if (scan == null)
+                {
+                    try { scan = EnsureStarterCard<ScoutingCardSO>("Cards/SurveyDroneCard"); }
+                    catch (Exception ex) { Debug.LogWarning($"[CardDeckController] MainGame Survey Team card missing: {ex.Message}"); }
+                }
+                if (scan != null) next.Add(scan);
+            }
+
+            // Company Orbital Scan: paid ping toward unrevealed ice when the team is free.
+            if (!cancelled && !surveying && colony != null && colony.HasUnrevealedTargets())
+            {
+                BlueprintCardSO orbital = null;
+                foreach (var c in masterDeck)
+                {
+                    if (c is ScoutingCardSO scout
+                        && scout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    {
+                        orbital = c;
+                        break;
+                    }
+                }
+                if (orbital == null)
+                {
+                    try { orbital = EnsureStarterCard<ScoutingCardSO>("Cards/OrbitalScanCard"); }
+                    catch (Exception ex) { Debug.LogWarning($"[CardDeckController] MainGame Orbital Scan card missing: {ex.Message}"); }
+                }
+                if (orbital != null && !next.Contains(orbital))
+                    next.Add(orbital);
+            }
+
+            // Research: seat when no project is active and at least one Tier-2 id is still locked.
+            if (!cancelled
+                && colony?.Research != null
+                && colony.Research.Active == MainGameResearchId.None
+                && colony.Research.HasLockedProject())
+            {
+                BlueprintCardSO research = null;
+                foreach (var c in masterDeck)
+                {
+                    if (c is ResearchCardSO)
+                    {
+                        research = c;
+                        break;
+                    }
+                }
+                if (research == null)
+                {
+                    try { research = EnsureStarterCard<ResearchCardSO>("Cards/ResearchCard"); }
+                    catch (Exception ex) { Debug.LogWarning($"[CardDeckController] MainGame Research card missing: {ex.Message}"); }
+                }
+                if (research != null && !next.Contains(research))
+                    next.Add(research);
+            }
+
+            foreach (MainGameBuildingId id in unlocked)
+            {
+                if (id == MainGameBuildingId.None || id == MainGameBuildingId.CommandPost) continue;
+                BlueprintCardSO match = FindMainGameCard(id);
+                if (match != null && !next.Contains(match))
+                    next.Add(match);
+            }
+
+            // Typed mines for Survey-uncovered deposits (individual resources).
+            if (colony != null)
+            {
+                foreach (var res in colony.KnownResources)
+                {
+                    BlueprintCardSO mine = FindMainGameMineCard(res);
+                    if (mine is UnlockBuildingCardSO unlockMine && unlockMine.buildingToUnlock != null)
+                        BlueprintDraftManager.RegisterBuildingSO(unlockMine.buildingToUnlock);
+                    if (mine != null && !next.Contains(mine))
+                        next.Add(mine);
+                }
+            }
+
+            return next;
+        }
+
+        BlueprintCardSO FindMainGameMineCard(MainGameResourceId resource)
+        {
+            string want = MainGameResourceIdUtil.ToTypeName(resource);
+            foreach (var c in masterDeck)
+            {
+                if (c is not UnlockBuildingCardSO unlock || unlock.buildingToUnlock == null) continue;
+                if (!DiscoverySystem.TryGetMineResourceType(unlock.buildingToUnlock, out string type)) continue;
+                if (string.Equals(type, want, StringComparison.OrdinalIgnoreCase))
+                    return c;
+            }
+
+            return resource switch
+            {
+                MainGameResourceId.Minerals => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/DeepCoreMiningLaserCard"),
+                MainGameResourceId.Regolith => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/BasaltStripMineCard"),
+                MainGameResourceId.Gas => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/GasWellCard"),
+                MainGameResourceId.Iron => EnsureStarterCardSafe<UnlockBuildingCardSO>("Cards/IronOreExtractorCard"),
+                _ => null
+            };
+        }
+
+        T EnsureStarterCardSafe<T>(string resourcePath) where T : BlueprintCardSO
+        {
+            try { return EnsureStarterCard<T>(resourcePath); }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[CardDeckController] MainGame mine card missing at {resourcePath}: {ex.Message}");
+                return null;
+            }
+        }
+
+        BlueprintCardSO FindMainGameCard(MainGameBuildingId id)
+        {
+            foreach (var c in masterDeck)
+            {
+                if (MainGameCardMap.TryGetMainGameId(c, out var mapped) && mapped == id)
+                    return c;
+            }
+
+            // Resource fallbacks by known asset paths
+            return id switch
+            {
+                MainGameBuildingId.Aquifer => EnsureStarterCard<UnlockBuildingCardSO>("Cards/WaterIceAquiferCard"),
+                MainGameBuildingId.Oxygen => EnsureStarterCard<UnlockBuildingCardSO>("Cards/OxygenProcessorCard"),
+                MainGameBuildingId.Solar => EnsureStarterCard<UnlockBuildingCardSO>("Cards/SolarPanelCard"),
+                MainGameBuildingId.Habitat => EnsureStarterCard<UnlockBuildingCardSO>("Cards/HabitatCard"),
+                MainGameBuildingId.WindTurbine => EnsureStarterCard<UnlockBuildingCardSO>("Cards/GeothermalGeneratorCard"),
+                _ => null
+            };
+        }
+
+        /// <summary>
         /// After a reserved-site build already succeeded, consume the hand card without
         /// re-checking CanApply (the pad is now occupied so CanApply would fail).
         /// Still runs Apply() so unlocks/hazards register.
@@ -700,6 +911,14 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void RefreshHand()
         {
+            if (MainGameController.IsActive)
+            {
+                RebuildMainGameHand(MainGameController.Instance != null
+                    ? MainGameController.Instance.Colony
+                    : null);
+                return;
+            }
+
             var before = hand.ToArray();
             DiscardUnplayableFromHand();
             EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
@@ -723,6 +942,14 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         public void FillHand()
         {
+            if (MainGameController.IsActive)
+            {
+                RebuildMainGameHand(MainGameController.Instance != null
+                    ? MainGameController.Instance.Colony
+                    : null);
+                return;
+            }
+
             StripUndiscoveredGeologicalCardsFromHand();
             StripExcludedColonyCardsFromHand();
             EnsureSolarPrereqInHand(); // keeps a power generator seated (Solar / Geothermal / …)
@@ -834,6 +1061,9 @@ namespace GameDevTV.RTS.Player
         /// </summary>
         private void EnsureSolarPrereqInHand()
         {
+            // MainGame owns the hand — never inject Acts bootstrap cards into it.
+            if (MainGameController.IsActive) return;
+
             if (IsPowerGeneratorUnlockCardInHand()) return;
             EnsureBootstrapUnlockInHand("Solar");
             if (IsPowerGeneratorUnlockCardInHand()) return;
@@ -916,7 +1146,7 @@ namespace GameDevTV.RTS.Player
                 "TEMPERATURE" => "GHG Factory",
                 "ATMOSPHERE" => "Atmospheric Condenser",
                 "WATER" => "Water Ice Aquifer",
-                "OXYGEN" => "Oxygen Processor",
+                "OXYGEN" => "Atmosphere Processor",
                 "MATERIALS" => "Deep-Core Mining Laser",
                 "POPULATION" => "Subterranean Apartment",
                 _ => null
@@ -1248,6 +1478,62 @@ namespace GameDevTV.RTS.Player
             if (hand[handIndex] == null) return;
 
             BlueprintCardSO played = hand[handIndex];
+
+            // MainGame Survey Team / Orbital Scan / Research — bypass sector unlock gates.
+            if (MainGameController.IsActive
+                && played is ScoutingCardSO prologueScout
+                && (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan
+                    || prologueScout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone))
+            {
+                if (!played.CanApply())
+                {
+                    if (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                    {
+                        int cost = MainGameData.OrbitalScanEnergyCost;
+                        int have = MainGameController.Instance?.Colony?.Energy ?? 0;
+                        ExplorationManager.NotifyPlacementFailed(
+                            $"Orbital Scan needs {cost} energy (have {have}).",
+                            Camera.main != null ? Camera.main.transform.position : Vector3.zero);
+                    }
+                    return;
+                }
+                played.Apply();
+                // Survey stays in hand until paint ✓. Orbital Scan is a one-shot hire.
+                if (prologueScout.scoutingType == ScoutingCardSO.ScoutingType.OrbitalScan)
+                {
+                    hand.RemoveAt(handIndex);
+                    discardPile.Add(played);
+                    RebuildMainGameHand(MainGameController.Instance?.Colony);
+                }
+                Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+                OnHandChanged?.Invoke();
+                return;
+            }
+
+            if (MainGameController.IsActive && played is ResearchCardSO)
+            {
+                if (!played.CanApply())
+                {
+                    ExplorationManager.NotifyPlacementFailed(
+                        "Research already underway or nothing left to unlock.",
+                        Camera.main != null ? Camera.main.transform.position : Vector3.zero);
+                    return;
+                }
+                // Opens pause ladder pick; card stays until a project is begun
+                // (ConsumeResearchCardFromHand) or auto-pick fallback already started one.
+                played.Apply();
+                var research = MainGameController.Instance?.Colony?.Research;
+                if (research != null && research.Active != MainGameResearchId.None)
+                {
+                    hand.RemoveAt(handIndex);
+                    discardPile.Add(played);
+                    RebuildMainGameHand(MainGameController.Instance?.Colony);
+                    Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+                    OnHandChanged?.Invoke();
+                }
+                return;
+            }
+
             if (!played.IsGateMet())
             {
                 string reason = $"Cannot play '{played.cardName}' yet — requirements not met.";
@@ -1407,6 +1693,64 @@ namespace GameDevTV.RTS.Player
             }
 
             return -1;
+        }
+
+        /// <summary>
+        /// MainGame Survey Team: discard the survey card when paint ✓ confirms the search job.
+        /// </summary>
+        public bool ConsumeMainGameSurveyCard()
+        {
+            if (!MainGameController.IsActive) return false;
+            int idx = FindExplorationScoutingCardIndex();
+            if (idx < 0) return false;
+
+            BlueprintCardSO played = hand[idx];
+            hand.RemoveAt(idx);
+            discardPile.Add(played);
+            // Rebuild guided hand — never FillHand (that pulls Acts clutter).
+            if (MainGameController.Instance != null)
+                RebuildMainGameHand(MainGameController.Instance.Colony);
+            else
+                OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return true;
+        }
+
+        /// <summary>
+        /// MainGame Research: discard the research hire after a pause-ladder project begins.
+        /// Safe no-op when the card is not in hand (begin from Esc pause without playing it).
+        /// </summary>
+        public bool ConsumeResearchCardFromHand()
+        {
+            if (!MainGameController.IsActive) return false;
+            int idx = -1;
+            for (int i = 0; i < hand.Count; i++)
+            {
+                if (hand[i] is ResearchCardSO)
+                {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx < 0)
+            {
+                // Still refresh seating so the hire leaves once Active is set.
+                if (MainGameController.Instance != null)
+                    RebuildMainGameHand(MainGameController.Instance.Colony);
+                else
+                    OnHandChanged?.Invoke();
+                return false;
+            }
+
+            BlueprintCardSO played = hand[idx];
+            hand.RemoveAt(idx);
+            discardPile.Add(played);
+            if (MainGameController.Instance != null)
+                RebuildMainGameHand(MainGameController.Instance.Colony);
+            else
+                OnHandChanged?.Invoke();
+            Bus<UpgradeResearchedEvent>.Raise(Owner.Player1, new UpgradeResearchedEvent(Owner.Player1, null));
+            return true;
         }
 
         // ── Draft UI (disabled) ──────────────────────────────────────────────
@@ -1635,7 +1979,7 @@ namespace GameDevTV.RTS.Player
         public static int GetWeekCost(BlueprintCardSO card)
         {
             if (card == null) return 1;
-            if (card is ScoutingCardSO) return 0;
+            if (card is ScoutingCardSO || card is ResearchCardSO) return 0;
 
             if (card is UnlockBuildingCardSO unlock && unlock.buildingToUnlock != null)
                 return GetWeekCost(unlock.buildingToUnlock);

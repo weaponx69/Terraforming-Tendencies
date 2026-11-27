@@ -8,11 +8,11 @@ using GameDevTV.RTS.Units;
 using UnityEngine;
 using TMPro;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.MainGame;
 using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI
 {
-    [ExecuteAlways]
     public class RuntimeUI : MonoBehaviour
     {
         [SerializeField] private TextMeshProUGUI materialsLabelText;
@@ -230,8 +230,8 @@ namespace GameDevTV.RTS.UI
                     Destroy(actionsContainer.gameObject);
                 }
 
-                // Debug/layout: make Center Container bounds obvious over the world.
-                EnsureOpaqueBoxAround(FindChildRecursive(bottomBar, "Center Container"));
+                // Do NOT paint an opaque debug plate over Center Container — it covers the
+                // map and reads as "UI scrolled off screen" during MainGame playtests.
 
                 // Leave the lower-left corner for the card hand — shove selection info right.
                 ShiftBuildingSelectedPanelRight(bottomBar);
@@ -326,6 +326,10 @@ namespace GameDevTV.RTS.UI
 
         private void Awake()
         {
+            // MainGame HUD is built in code at play. Do not paint or recreate the old
+            // Acts bars while the editor is idle — they used to sit on screen before Play.
+            if (!Application.isPlaying) return;
+
             Transform objectivesPanelT = FindChildRecursive(transform, "Active Objectives Panel");
             if (objectivesPanelT == null)
             {
@@ -721,9 +725,26 @@ namespace GameDevTV.RTS.UI
             RefreshUI();
         }
 
+        static bool prologueChromeHiddenOnce;
+
         private void Update()
         {
             if (!Application.isPlaying) return;
+
+            // MainGame owns the top of the screen — hide Acts resource chrome so it
+            // cannot overlap / scroll the MainGame objective off-screen.
+            if (MainGameController.IsActive)
+            {
+                if (!prologueChromeHiddenOnce)
+                {
+                    prologueChromeHiddenOnce = true;
+                    HideActsResourceChrome();
+                }
+                return;
+            }
+
+            prologueChromeHiddenOnce = false;
+
             UpdateSectorsUI();
             if (!layoutRebuilt)
             {
@@ -731,6 +752,35 @@ namespace GameDevTV.RTS.UI
                 RebuildLayouts();
                 ApplyHudReadability();
             }
+        }
+
+        void HideActsResourceChrome()
+        {
+            Transform root = transform;
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas != null) root = canvas.transform;
+
+            // Whole chrome strips — not just metric leaves (Supplies Bar holds Materials/O2/…).
+            string[] panels =
+            {
+                "Top Resource Bar", "Supplies Bar", "Active Objectives Panel", "Weeks Left Panel",
+                "Generation Summary UI Controller", "Foundry Starvation UI", "Expansion Proposal UI",
+                "Center Container"
+            };
+            foreach (string name in panels)
+            {
+                Transform t = root.Find(name) ?? FindChildRecursive(root, name);
+                if (t != null && t.gameObject.activeSelf)
+                    t.gameObject.SetActive(false);
+            }
+
+            // Kill leftover debug opaque plates under Bottom Bar / Center Container.
+            Transform debugBox = FindChildRecursive(root, "Center Container Debug Box");
+            if (debugBox != null)
+                UnityEngine.Object.Destroy(debugBox.gameObject);
+
+            if (populationText != null && populationText.gameObject.activeSelf)
+                populationText.gameObject.SetActive(false);
         }
 
         private void RebuildLayouts()
@@ -758,6 +808,12 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void ApplyHudReadability()
         {
+            if (MainGameController.IsActive)
+            {
+                HideActsResourceChrome();
+                return;
+            }
+
             EnsureTopResourceBar();
 
             StyleMetric(materialsLabelText, materialsValueText, null, "Materials");
@@ -904,6 +960,8 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void EnsureMaterialsMetricVisible()
         {
+            if (MainGameController.IsActive) return;
+
             if (materialsLabelText == null || materialsValueText == null)
             {
                 FindAndLinkUI("Minerals Container", ref materialsLabelText, ref materialsValueText,

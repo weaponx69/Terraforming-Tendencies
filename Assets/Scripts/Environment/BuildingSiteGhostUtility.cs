@@ -25,7 +25,7 @@ namespace GameDevTV.RTS.Environment
                 BuildingSiteKind.Solar => BlueprintDraftManager.GetBuildingSOByName("Solar Panel"),
                 BuildingSiteKind.Mine => ResolveMineBuilding(site),
                 // Default paired-pad preview is Oxygen Processor — the bootstrap consumer building.
-                BuildingSiteKind.PairedBuilding => BlueprintDraftManager.GetBuildingSOByName("Oxygen Processor"),
+                BuildingSiteKind.PairedBuilding => BlueprintDraftManager.GetBuildingSOByName("Atmosphere Processor"),
                 _ => null
             };
         }
@@ -51,14 +51,34 @@ namespace GameDevTV.RTS.Environment
         {
             string buildingName = site.LinkedResourceType switch
             {
-                SectorNode.NodeType.Gas => "GHG Factory",
-                SectorNode.NodeType.Iron => "Deep Core Mining Laser",
+                SectorNode.NodeType.Gas => "Gas Well",
+                SectorNode.NodeType.Iron => "Iron Ore Extractor",
                 SectorNode.NodeType.Regolith => "Basalt Strip-Mine",
-                _ => "Deep Core Mining Laser"
+                _ => "Deep-Core Mining Laser"
+            };
+
+            string cardPath = site.LinkedResourceType switch
+            {
+                SectorNode.NodeType.Gas => "Cards/GasWellCard",
+                SectorNode.NodeType.Iron => "Cards/IronOreExtractorCard",
+                SectorNode.NodeType.Regolith => "Cards/BasaltStripMineCard",
+                _ => "Cards/DeepCoreMiningLaserCard"
             };
 
             BuildingSO building = BlueprintDraftManager.GetBuildingSOByName(buildingName);
-            return building ?? BlueprintDraftManager.GetBuildingSOByName("Deep Core Mining Laser");
+            if (building == null)
+            {
+                var card = Resources.Load<UnlockBuildingCardSO>(cardPath);
+                if (card?.buildingToUnlock != null)
+                {
+                    BlueprintDraftManager.RegisterBuildingSO(card.buildingToUnlock);
+                    building = card.buildingToUnlock;
+                }
+            }
+
+            return building
+                ?? BlueprintDraftManager.GetBuildingSOByName("Deep-Core Mining Laser")
+                ?? BlueprintDraftManager.GetBuildingSOByName("Deep Core Mining Laser");
         }
     }
 }

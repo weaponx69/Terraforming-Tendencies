@@ -330,7 +330,7 @@ if (SectorManager.Instance != null)
                 items.Add(new PackageItem { Name = "Worker", Type = PackageItemType.Worker, Cost = CostOf(workerSO) });
 
             for (int i = 0; i < packageOxygen; i++)
-                items.Add(new PackageItem { Name = "Oxygen Processor", Type = PackageItemType.OxygenProcessor, Cost = CostOf(oxygenProcessorSO) });
+                items.Add(new PackageItem { Name = "Atmosphere Processor", Type = PackageItemType.OxygenProcessor, Cost = CostOf(oxygenProcessorSO) });
             return items;
         }
 

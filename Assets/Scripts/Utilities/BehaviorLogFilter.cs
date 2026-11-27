@@ -16,7 +16,7 @@ namespace GameDevTV.RTS.Utilities
     /// impossible to bind before the first tick).
     ///
     /// Additionally, Unity 6 background services occasionally throw "Curl error 3: URL rejected",
-    /// which is a harmless telemetry/AI-assistant artifact.
+    /// and the AI Assistant package logs conversation-refresh failures when the service is unused.
     ///
     /// Since these messages are known-harmless and spam the console, this installs a
     /// lightweight log handler that drops them and forwards everything else untouched.
@@ -31,6 +31,7 @@ namespace GameDevTV.RTS.Utilities
         {
             "SetAnimatorBoolAction: No Animator set.",
             "Curl error 3: URL rejected",
+            "An error has occurred in AI Assistant",
             "Resolve of invalid GC handle",
             "ScriptableSingleton already exists",
             "Assertion failed on expression: '!m_MonoReference.HasTarget()'",

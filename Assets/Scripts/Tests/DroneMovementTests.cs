@@ -105,6 +105,7 @@ namespace GameDevTV.RTS.Tests
             Object.DestroyImmediate(agentObj);
         }
 
+        [Ignore("Air units and the FlyZone bake are retired.")]
         [UnityTest]
         public IEnumerator AirAgent_WhenTargetSet_MovesToDestination()
         {
@@ -157,6 +158,7 @@ namespace GameDevTV.RTS.Tests
             Object.DestroyImmediate(agentObj);
         }
 
+        [Ignore("Air units and the FlyZone bake are retired.")]
         [UnityTest]
         public IEnumerator AirAgent_SpawnedAtGround_WhenWarpedAndTargetSet_MovesToDestination()
         {
@@ -221,6 +223,7 @@ namespace GameDevTV.RTS.Tests
             Object.DestroyImmediate(agentObj);
         }
 
+        [Ignore("Air units and the FlyZone bake are retired.")]
         [UnityTest]
         public IEnumerator AirAgent_WhenSpawningWithDisabledAgent_IsSuccessfullyEnabledAndMoves()
         {

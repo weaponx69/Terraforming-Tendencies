@@ -1,5 +1,7 @@
 using UnityEngine;
 using GameDevTV.RTS.Units;
+using GameDevTV.RTS.MainGame;
+using GameDevTV.RTS.UI;
 
 namespace GameDevTV.RTS.Player
 {
@@ -15,6 +17,11 @@ namespace GameDevTV.RTS.Player
     
             public ScoutingType scoutingType;
             public int materialsAmount = 0;
+
+            [Tooltip("MainGame Survey Team: max tiles you can paint before ✓.")]
+            public int surveyTileBudget = MainGameSurveyMission.DefaultTileBudget;
+            [Tooltip("MainGame Survey Team: colony days to search a trail of surveyTileBudget hexes (scales with path length after ✓).")]
+            public int surveyDays = MainGameSurveyMission.DefaultDays;
     
             public override string GetCardGoal()
             {
@@ -30,6 +37,16 @@ namespace GameDevTV.RTS.Player
     
             public override bool CanApply()
             {
+                if (MainGameController.IsActive && scoutingType == ScoutingType.SurveyDrone)
+                    return true;
+                if (MainGameController.IsActive && scoutingType == ScoutingType.OrbitalScan)
+                {
+                    var colony = MainGameController.Instance?.Colony;
+                    if (colony == null || !colony.HasUnrevealedTargets()) return false;
+                    return colony.HasUnrevealedTargets()
+                           && colony.Energy >= MainGameData.OrbitalScanEnergyCost;
+                }
+
                 if (!IsGateMet()) return false;
                 if (!CanAffordMaterials()) return false;
 
@@ -53,6 +70,11 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
+                if (MainGameController.IsActive && scoutingType == ScoutingType.SurveyDrone)
+                    return 0;
+                if (MainGameController.IsActive && scoutingType == ScoutingType.OrbitalScan)
+                    return 0;
+
                 if (MaterialsCost > 0) return MaterialsCost;
                 return scoutingType switch
                 {
@@ -66,6 +88,37 @@ namespace GameDevTV.RTS.Player
 
             public override void Apply()
             {
+                if (MainGameController.IsActive && scoutingType == ScoutingType.SurveyDrone)
+                {
+                    int tiles = surveyTileBudget > 0 ? surveyTileBudget : MainGameSurveyMission.DefaultTileBudget;
+                    int days = surveyDays > 0 ? surveyDays : MainGameSurveyMission.DefaultDays;
+                    var mission = MainGameSurveyMission.Instance
+                                  ?? new GameObject("MainGameSurveyMission").AddComponent<MainGameSurveyMission>();
+                    mission.BeginFromCard(tiles, days);
+                    // Survey Team only: no camera fly — .cursor/rules/survey-team-no-camera-fly.mdc
+                    MainGameIceMarkers.Instance?.EnsureMarkersForActiveObjectives();
+                    Debug.Log($"[MainGame] Survey Team card → pick a ?, paint up to {tiles} tiles / {days} days.");
+                    return;
+                }
+                if (MainGameController.IsActive && scoutingType == ScoutingType.OrbitalScan)
+                {
+                    var colony = MainGameController.Instance?.Colony;
+                    if (colony == null || !colony.HasUnrevealedTargets()) return;
+                    int cost = MainGameData.OrbitalScanEnergyCost;
+                    if (!colony.TrySpendEnergy(cost)) return;
+                    string ping = MainGameIceMarkers.Instance != null
+                        ? MainGameIceMarkers.Instance.PingNearestTarget()
+                        : "No survey target.";
+                    MainGameIceMarkers.Instance?.FlyCameraToNearestSurveyTarget(pulseMarker: false);
+                    MainGameHUD.Instance?.ShowNote(new System.Collections.Generic.List<string>
+                    {
+                        $"Orbital Scan (−{cost} energy).",
+                        ping
+                    });
+                    MainGameController.Instance?.RefreshHandUnlocks();
+                    return;
+                }
+
                 var explorationMgr = Environment.ExplorationManager.Instance;
     
                 switch (scoutingType)
@@ -118,6 +171,11 @@ namespace GameDevTV.RTS.Player
             {
                 if (scoutingType == ScoutingType.EmergencyCaches) return true;
                 if (scoutingType == ScoutingType.PipelineBoost) return true;
+
+                // MainGame Survey Team / Orbital Scan do not use sector unlock gates.
+                if (MainGameController.IsActive
+                    && (scoutingType == ScoutingType.OrbitalScan || scoutingType == ScoutingType.SurveyDrone))
+                    return true;
 
                 var sectorMgr = Environment.SectorManager.Instance;
                 if (sectorMgr == null) return false;

@@ -80,10 +80,9 @@ namespace GameDevTV.RTS.Units
             bool isGhostPreview = this is BaseBuilding building &&
                                   building.Progress.State == BuildingProgress.BuildingState.Paused;
 
-            if (!isGhostPreview && GameDevTV.RTS.Environment.PlanetGenerator.Instance != null)
-            {
-                GameDevTV.RTS.Environment.PlanetGenerator.Instance.ApplyCurvedWorldShader(gameObject);
-            }
+            var planet = GameDevTV.RTS.Environment.PlanetGenerator.Instance;
+            if (!isGhostPreview && planet?.Config != null && planet.Config.EnableHorizonCurvature)
+                planet.ApplyCurvedWorldShader(gameObject);
 
             EnsureSelectionIndicatorRing();
 

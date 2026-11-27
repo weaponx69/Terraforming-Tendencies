@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 
@@ -54,10 +55,79 @@ namespace GameDevTV.RTS.Player
             return new Vector3(x, y, z);
         }
 
+        /// <summary>Cell center with Y from planet Terrain (or 0 if none).</summary>
+        public static Vector3 CellToWorldOnGround(Vector2Int cell)
+        {
+            Vector3 p = CellToWorld(cell, 0f);
+            p.y = SampleGroundY(p);
+            return p;
+        }
+
+        /// <summary>Hex center Y from highest ground sample in the cell (slopes / hill pads).</summary>
+        public static Vector3 CellToWorldOnHighestGround(Vector2Int cell)
+        {
+            Vector3 center = CellToWorld(cell, 0f);
+            center.y = HighestGroundYInCell(cell);
+            return center;
+        }
+
+        /// <summary>Max terrain Y sampled across the hex (center + inner + rim).</summary>
+        public static float HighestGroundYInCell(Vector2Int cell)
+        {
+            Vector3 center = CellToWorld(cell, 0f);
+            float y = SampleGroundY(center);
+            SampleHexRingY(center, TileSize * 0.42f, ref y);
+            SampleHexRingY(center, TileSize * 0.88f, ref y);
+            return y;
+        }
+
+        /// <summary>Peak − valley inside the hex — used to avoid hillside build suggests.</summary>
+        public static float HexLocalSlopeMeters(Vector2Int cell)
+        {
+            Vector3 center = CellToWorld(cell, 0f);
+            float minY = SampleGroundY(center);
+            float maxY = minY;
+            AccumulateHexRingSlope(center, TileSize * 0.42f, ref minY, ref maxY);
+            AccumulateHexRingSlope(center, TileSize * 0.88f, ref minY, ref maxY);
+            return maxY - minY;
+        }
+
+        static void SampleHexRingY(Vector3 center, float radius, ref float maxY)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI / 3f;
+                var sample = center + new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
+                maxY = Mathf.Max(maxY, SampleGroundY(sample));
+            }
+        }
+
+        static void AccumulateHexRingSlope(Vector3 center, float radius, ref float minY, ref float maxY)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI / 3f;
+                var sample = center + new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
+                float sy = SampleGroundY(sample);
+                minY = Mathf.Min(minY, sy);
+                maxY = Mathf.Max(maxY, sy);
+            }
+        }
+
+        public static float SampleGroundY(Vector3 worldPos)
+        {
+            if (PlanetGenerator.Instance != null)
+                return PlanetGenerator.Instance.SampleGroundY(worldPos);
+            return worldPos.y;
+        }
+
         public static Vector3 SnapToTile(Vector3 world)
         {
             Vector2Int cell = WorldToCell(world);
-            return CellToWorld(cell, world.y);
+            Vector3 p = CellToWorld(cell, world.y);
+            if (PlanetGenerator.Instance != null)
+                p.y = PlanetGenerator.Instance.SampleGroundY(p);
+            return p;
         }
 
         public static float HorizontalDistSq(Vector3 a, Vector3 b)
@@ -125,7 +195,14 @@ namespace GameDevTV.RTS.Player
 
             stickyCell = chosen;
             joinCount = CountOrthogonalNeighbors(chosen, occupied);
-            return CellToWorld(chosen, rawWorld.y);
+            return CellToWorldOnGround(chosen);
+        }
+
+        /// <summary>Keep XZ, set Y from planet height field (mesh / SampleGroundY).</summary>
+        public static Vector3 ApplyGroundY(Vector3 world)
+        {
+            world.y = SampleGroundY(world);
+            return world;
         }
 
         /// <summary>Stateless snap for final place / CanHandle (no hysteresis).</summary>
@@ -220,8 +297,17 @@ namespace GameDevTV.RTS.Player
             return new Vector2Int(qi, ri);
         }
 
+        static int occupiedCellsFrame = -1;
+        static Owner occupiedCellsOwner;
+        static HashSet<Vector2Int> occupiedCellsCache;
+
         public static HashSet<Vector2Int> GetOccupiedCells(Owner owner)
         {
+            if (occupiedCellsCache != null
+                && occupiedCellsOwner == owner
+                && occupiedCellsFrame == Time.frameCount)
+                return occupiedCellsCache;
+
             var set = new HashSet<Vector2Int>();
             foreach (var b in BaseBuilding.ActiveBuildings)
             {
@@ -237,6 +323,9 @@ namespace GameDevTV.RTS.Player
                     continue;
                 set.Add(WorldToCell(b.transform.position));
             }
+            occupiedCellsFrame = Time.frameCount;
+            occupiedCellsOwner = owner;
+            occupiedCellsCache = set;
             return set;
         }
 

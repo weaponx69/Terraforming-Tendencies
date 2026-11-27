@@ -6,8 +6,8 @@ using UnityEngine;
 namespace GameDevTV.RTS.Environment
 {
     /// <summary>
-    /// Outside Colony Acts: ticks climate each frame (rates per-second).
-    /// During Colony Acts: idle — <see cref="ColonyActManager.SpendWeeks"/> applies per-week generation.
+    /// Climate diagnostics; simulation ticks run on <see cref="BuildingManager"/> (0.5s).
+    /// During Colony Acts: <see cref="ColonyActManager.SpendWeeks"/> applies per-week generation.
     /// </summary>
     public class ClimateGenerationTicker : MonoBehaviour
     {
@@ -41,24 +41,10 @@ namespace GameDevTV.RTS.Environment
             if (Instance == this) Instance = null;
         }
 
-        private void Update()
+        /// <summary>Called from <see cref="BuildingManager"/> on the throttled simulation interval.</summary>
+        public void OnBuildingSimulationTick(float dt)
         {
-            // Colony Acts: climate advances on week spend only (see ColonyActManager.SpendWeeks).
-            if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
-                return;
-
-            float dt = Time.deltaTime;
             if (dt <= 0f) return;
-
-            var buildings = BaseBuilding.ActiveBuildings;
-            if (buildings == null) return;
-
-            for (int i = 0; i < buildings.Count; i++)
-            {
-                BaseBuilding building = buildings[i];
-                if (building == null) continue;
-                building.TickClimateGeneration(dt);
-            }
 
             if (Time.time >= nextDiagTime)
             {

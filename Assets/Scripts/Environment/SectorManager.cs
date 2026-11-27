@@ -11,6 +11,22 @@ namespace GameDevTV.RTS.Environment
     {
         public static SectorManager Instance { get; private set; }
 
+        /// <summary>MainGame.unity ships without this component — create at runtime so deposits/? can spawn.</summary>
+        public static void EnsureExists()
+        {
+            if (Instance != null) return;
+            var existing = UnityEngine.Object.FindAnyObjectByType<SectorManager>(FindObjectsInactive.Include);
+            if (existing != null)
+            {
+                Instance = existing;
+                return;
+            }
+
+            var go = new GameObject("SectorManager");
+            go.AddComponent<SectorManager>();
+            Debug.LogWarning("[SectorManager] Created at runtime (add to MainGame.unity to persist).");
+        }
+
         public enum SectorFeature { None, Volcano, FaultLine, LavaTube, WaterDeposit, Glacier }
 
         [System.Serializable]
@@ -233,15 +249,21 @@ namespace GameDevTV.RTS.Environment
             {
                 BeginTerraformingOn(Sectors[0]);
 
-                // Force-discover Minerals and Gas types so the player can bootstrap.
-                DiscoverySystem.RevealResourceType("Minerals");
-                DiscoverySystem.RevealResourceType("Gas");
+                // MainGame: deposits stay "?" until Survey Team uncovers them.
+                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>() != null
+                                   || GameDevTV.RTS.MainGame.MainGameController.IsActive;
+                if (!prologueRun)
+                {
+                    // Force-discover Minerals and Gas types so the player can bootstrap (Acts).
+                    DiscoverySystem.RevealResourceType("Minerals");
+                    DiscoverySystem.RevealResourceType("Gas");
 
-                // FoW retired — geology features are known so Aquifers lock to WaterDeposit and Subglacial to Glacier.
-                foreach (var sector in Sectors)
-                    DiscoverySystem.RevealFeaturesForSector(sector);
+                    // FoW retired — geology features are known so Aquifers lock to WaterDeposit and Subglacial to Glacier.
+                    foreach (var sector in Sectors)
+                        DiscoverySystem.RevealFeaturesForSector(sector);
 
-                DiscoverStartingSectorResources();
+                    DiscoverStartingSectorResources();
+                }
                 UpdateSectorBorders();
                 OnSectorUnlocked?.Invoke();
             }
@@ -380,6 +402,8 @@ namespace GameDevTV.RTS.Environment
         public void DiscoverResourcesInUnlockedSectors() => DiscoverStartingSectorResources();
 
         private bool hasDoneStartingDiscovery = false;
+        float nextOccupancyPoll;
+        int lastOccupancyBuildingCount = -1;
 
         private void Update()
         {
@@ -387,13 +411,32 @@ namespace GameDevTV.RTS.Environment
             {
                 InitializeSectors();
             }
-            UpdateOccupancy();
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
+            int bCount = BaseBuilding.ActiveBuildings?.Count ?? 0;
+            if (prologue)
+            {
+                if (Time.unscaledTime >= nextOccupancyPoll || bCount != lastOccupancyBuildingCount)
+                {
+                    nextOccupancyPoll = Time.unscaledTime + 0.5f;
+                    lastOccupancyBuildingCount = bCount;
+                    UpdateOccupancy();
+                }
+            }
+            else
+            {
+                UpdateOccupancy();
+            }
 
             if (!hasDoneStartingDiscovery && Sectors.Count > 0 && Time.timeSinceLevelLoad > 0.1f)
             {
                 hasDoneStartingDiscovery = true;
-                DiscoverResourcesInUnlockedSectors();
-                Debug.Log("[SectorManager] Completed deferred starting resource discovery (Sector 0).");
+                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>() != null
+                                   || GameDevTV.RTS.MainGame.MainGameController.IsActive;
+                if (!prologueRun)
+                {
+                    DiscoverResourcesInUnlockedSectors();
+                    Debug.Log("[SectorManager] Completed deferred starting resource discovery (Sector 0).");
+                }
             }
         }
 
@@ -688,64 +731,7 @@ namespace GameDevTV.RTS.Environment
             }
             borderInstances.Clear();
 
-            if (secW <= 0f || secH <= 0f) return;
-
-            // Create borders for unlocked sectors
-            for (int i = 0; i < Sectors.Count; i++)
-            {
-                var sector = Sectors[i];
-                if (sector == null || sector.IsLocked) continue;
-
-                GameObject borderGo = new GameObject("SectorBorder_" + i);
-                borderGo.transform.SetParent(transform);
-                borderInstances.Add(borderGo);
-
-                LineRenderer line = borderGo.AddComponent<LineRenderer>();
-                line.positionCount = 5;
-                line.startWidth = 0.6f;
-                line.endWidth = 0.6f;
-                
-                // Cyan sci-fi holographic style color
-                Color cyanColor = new Color(0f, 0.9f, 0.9f, 0.8f);
-                line.startColor = cyanColor;
-                line.endColor = cyanColor;
-
-                // Simple additive/sprite shader
-                Shader defaultShader = Shader.Find("Sprites/Default");
-                if (defaultShader != null)
-                {
-                    line.material = new Material(defaultShader);
-                }
-
-                line.useWorldSpace = true;
-                line.loop = true;
-
-                // Compute corner coordinates
-                float minX = sector.Center.x - secW / 2f;
-                float maxX = sector.Center.x + secW / 2f;
-                float minZ = sector.Center.z - secH / 2f;
-                float maxZ = sector.Center.z + secH / 2f;
-
-                Vector3[] corners = new Vector3[5];
-                corners[0] = new Vector3(minX, 0f, minZ);
-                corners[1] = new Vector3(maxX, 0f, minZ);
-                corners[2] = new Vector3(maxX, 0f, maxZ);
-                corners[3] = new Vector3(minX, 0f, maxZ);
-                corners[4] = new Vector3(minX, 0f, minZ);
-
-                // Sample heights to stick the lines to the terrain
-                for (int j = 0; j < 5; j++)
-                {
-                    float y = 0.5f; // fallback slightly above zero
-                    if (Physics.Raycast(new Vector3(corners[j].x, 100f, corners[j].z), Vector3.down, out RaycastHit hit, 200f, LayerMask.GetMask("Default", "Terrain")))
-                    {
-                        y = hit.point.y + 0.2f; // float slightly above ground to prevent z-fighting
-                    }
-                    corners[j].y = y;
-                }
-
-                line.SetPositions(corners);
-            }
+            // Sector rectangles read as seams on the continuous planet. Borders stay off.
         }
 
         private void OnDrawGizmos()

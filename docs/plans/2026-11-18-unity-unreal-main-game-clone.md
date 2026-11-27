@@ -1,0 +1,920 @@
+# Unity Unreal MainGame Clone Implementation Plan
+
+> **For agentic workers:** implement this plan task-by-task, in order, checking off each step as it lands. Steps use checkbox (`- [ ]`) syntax for tracking. Dispatch a fresh subagent per task where the tasks are independent (see dispatching-parallel-agents), otherwise execute inline with a review checkpoint after each task.
+
+**Goal:** Replace Colony Acts as Unity’s default run with an Unreal-faithful MainGame: End Week, O2/beds/power, drone find-ice, guided unlocks, dust storm — flat hex.
+
+**Architecture:** Pure C# colony sim (`MainGameColony`) ports Unreal `FTTColony` MainGame rules; a thin `MainGameController` MonoBehaviour wires hex board, cards, HUD, and End Week. Colony Acts is disabled at boot, not deleted. Construction for v1 uses Unreal build-weeks without Steel/Concrete (documented delta).
+
+**Tech Stack:** Unity C#, NUnit EditMode tests under `Assets/Scripts/Tests/`, existing hex/`ColonyTileGrid`/`PlayerInput`, UGUI/TMP HUD, live Editor via `unity command eval` only (no second Editor / `unity test`).
+
+**Spec:** [`docs/specs/2026-11-18-unity-unreal-prologue-clone-design.md`](../specs/2026-11-18-unity-unreal-prologue-clone-design.md)  
+**Unreal source:** `~/Documents/Unreal Projects/TerraformTendencies/Source/TerraformTendencies/TT/`
+
+---
+
+## File map
+
+| File | Responsibility |
+| --- | --- |
+| `Assets/Scripts/MainGame/MainGameData.cs` | Constants (O2, shuttle, storm, harvest range, building defs) |
+| `Assets/Scripts/MainGame/MainGameBuildingId.cs` | Enum / string ids: aquifer, oxygen, solar, habitat, wind_turbine |
+| `Assets/Scripts/MainGame/MainGameColony.cs` | Pure sim: week tick, O2, beds, power, sites, prologue step, place preview |
+| `Assets/Scripts/MainGame/MainGameBoardState.cs` | Tile cells: feature, deposit left, revealed, building id, site |
+| `Assets/Scripts/MainGame/MainGameController.cs` | Scene singleton: start prologue, sync visuals, End Week, card unlocks |
+| `Assets/Scripts/MainGame/MainGameDroneScan.cs` | Paint-path reveal from lit ground (step 0 / 4) |
+| `Assets/Scripts/UI/MainGameHUD.cs` | Objective, Coming up, AIR, End Week, week report |
+| `Assets/Scripts/Tests/MainGameColonyTests.cs` | EditMode tests for sim (no Play Mode required) |
+| `PROJECT_KNOWLEDGE.md` | §0 rewritten: MainGame is run model; Colony Acts archived |
+| Modify: `ColonyActManager.cs` / scene boot | Do not `BeginRun` when MainGame mode is default |
+| Modify: `CardDeckController.cs` | MainGame hand = unlocked set only |
+| Modify: `PlayerInput.cs` | Placement reasons from `MainGameColony.Preview` |
+
+**Documented rule delta (v1):** No Steel/Concrete stockpile or builder pool. Build weeks = Unreal table weeks; sites complete after N End Weeks. Full goods/builders port is a follow-on task after MainGame ships.
+
+---
+
+### Task 1: MainGame data + board types
+
+**Files:**
+- Create: `Assets/Scripts/MainGame/MainGameBuildingId.cs`
+- Create: `Assets/Scripts/MainGame/MainGameData.cs`
+- Create: `Assets/Scripts/MainGame/MainGameBoardState.cs`
+- Test: `Assets/Scripts/Tests/MainGameColonyTests.cs` (scaffold)
+
+- [ ] **Step 1: Write failing test for constants / building lookup**
+
+```csharp
+// Assets/Scripts/Tests/MainGameColonyTests.cs
+using NUnit.Framework;
+using GameDevTV.RTS.MainGame;
+
+namespace GameDevTV.RTS.Tests
+{
+    public class MainGameColonyTests
+    {
+        [Test]
+        public void BuildingInfo_HabitatHasTenBedsAndOneBuildWeek()
+        {
+            var info = MainGameData.Get(MainGameBuildingId.Habitat);
+            Assert.AreEqual(10, info.Beds);
+            Assert.AreEqual(1, info.BuildWeeks);
+        }
+
+        [Test]
+        public void LandingOxygen_IsFifty()
+        {
+            Assert.AreEqual(50, MainGameData.LandingOxygen);
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Confirm test fails to compile / fail** (types missing)
+
+Expected: compile error `MainGameData` / `MainGameBuildingId` not found.
+
+- [ ] **Step 3: Implement data types**
+
+```csharp
+// Assets/Scripts/MainGame/MainGameBuildingId.cs
+namespace GameDevTV.RTS.MainGame
+{
+    public enum MainGameBuildingId
+    {
+        None = 0,
+        Aquifer,
+        Oxygen,
+        Solar,
+        Habitat,
+        WindTurbine,
+        CommandPost // landing pad, pre-placed
+    }
+}
+```
+
+```csharp
+// Assets/Scripts/MainGame/MainGameData.cs
+namespace GameDevTV.RTS.MainGame
+{
+    public enum MainGameFeature
+    {
+        None = 0,
+        Ice,
+        Glacier,
+        Minerals // unused in MainGame slice but reserved
+    }
+
+    public readonly struct MainGameBuildingInfo
+    {
+        public readonly MainGameBuildingId Id;
+        public readonly string DisplayName;
+        public readonly int BuildWeeks;
+        public readonly int Beds;
+        public readonly int PowerOutput; // solar=1, wind=2 (Unreal wind stronger in hills later; use 1 for both if needed)
+        public readonly bool NeedsPower;
+        public readonly int IceHarvestPerWeek; // aquifer
+        public readonly int IceConsumedPerWeek; // oxygen
+        public readonly int OxygenProducedPerWeek; // oxygen when powered + has ice
+
+        public MainGameBuildingInfo(
+            MainGameBuildingId id, string name, int buildWeeks, int beds,
+            int powerOutput, bool needsPower, int iceHarvest, int iceIn, int o2Out)
+        {
+            Id = id; DisplayName = name; BuildWeeks = buildWeeks; Beds = beds;
+            PowerOutput = powerOutput; NeedsPower = needsPower;
+            IceHarvestPerWeek = iceHarvest; IceConsumedPerWeek = iceIn; OxygenProducedPerWeek = o2Out;
+        }
+    }
+
+    public static class MainGameData
+    {
+        // From Unreal TTBuildings.h / TTColony.h / TTStory
+        public const int LandingOxygen = 50;
+        public const double O2PerColonist = 0.5;
+        public const int StartColonists = 12;
+        public const int HarvestRange = 3; // tiles
+        public const int MainGameSteps = 6;
+        public const int MainGameShuttleWeeks = 3;
+        public const int MainGameShuttleSize = 6;
+        public const int MainGameStormWeeks = 2;
+        public const int OxygenStoreTargetMult = 3; // step 5: store 3 * O2Need
+
+        public static MainGameBuildingInfo Get(MainGameBuildingId id) => id switch
+        {
+            MainGameBuildingId.Aquifer => new(id, "Ice Aquifer", 2, 0, 0, false, 8, 0, 0),
+            MainGameBuildingId.Oxygen => new(id, "Oxygen Processor", 1, 0, 0, true, 0, 4, 8),
+            MainGameBuildingId.Solar => new(id, "Solar Array", 1, 0, 1, false, 0, 0, 0),
+            MainGameBuildingId.Habitat => new(id, "Habitat Domes", 1, 10, 0, false, 0, 0, 0),
+            MainGameBuildingId.WindTurbine => new(id, "Wind Turbine", 1, 0, 2, false, 0, 0, 0),
+            MainGameBuildingId.CommandPost => new(id, "Command Post", 0, 0, 0, false, 0, 0, 0),
+            _ => new(MainGameBuildingId.None, "", 0, 0, 0, false, 0, 0, 0)
+        };
+    }
+}
+```
+
+```csharp
+// Assets/Scripts/MainGame/MainGameBoardState.cs
+using System.Collections.Generic;
+
+namespace GameDevTV.RTS.MainGame
+{
+    public sealed class MainGameTile
+    {
+        public int Index;
+        public MainGameFeature Feature;
+        public int DepositLeft; // ice amount remaining
+        public bool Revealed;
+        public bool Lit; // reachable / power-lit ground for drone start
+        public MainGameBuildingId Building;
+        public bool Broken;
+    }
+
+    public sealed class MainGameSite
+    {
+        public int Tile;
+        public MainGameBuildingId Id;
+        public int WeeksDone;
+        public int WeeksTotal;
+    }
+
+    public sealed class MainGameBoardState
+    {
+        public readonly List<MainGameTile> Tiles = new();
+        public readonly List<MainGameSite> Sites = new();
+        public readonly HashSet<int> FirstIceTiles = new();
+
+        public MainGameTile At(int i) => Tiles[i];
+
+        public int NeighborDistance(int a, int b)
+        {
+            // Filled by controller using ColonyTileGrid / hex distance.
+            // For pure tests, inject via MainGameColony.SetDistanceFn.
+            return 0;
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Run EditMode tests in the connected Editor**
+
+```bash
+unity status --format json
+# Prefer a project CliCommand if one exists for EditMode tests; otherwise compile-check:
+unity command eval "return UnityEditor.EditorUtility.scriptCompilationFailed;" --json
+```
+
+If a registered test runner command exists (`unity command` / `unity list`), run only `MainGameColonyTests`.  
+**Do not** run `unity test` (spawns second Editor / OOM).
+
+Expected: tests pass; `scriptCompilationFailed` is false.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add Assets/Scripts/MainGame Assets/Scripts/Tests/MainGameColonyTests.cs
+git commit -m "$(cat <<'EOF'
+feat(prologue): add Unreal-aligned building data and board types
+
+EOF
+)"
+```
+
+---
+
+### Task 2: Pure sim — O2, beds, End Week production
+
+**Files:**
+- Create: `Assets/Scripts/MainGame/MainGameColony.cs`
+- Modify: `Assets/Scripts/Tests/MainGameColonyTests.cs`
+
+- [ ] **Step 1: Write failing tests**
+
+```csharp
+[Test]
+public void O2Need_StartColonists_IsSix()
+{
+    var c = MainGameColony.CreateLanding();
+    // 12 colonists * 0.5 = 6 (no claimed-bed relief in MainGame)
+    Assert.AreEqual(6, c.O2Need());
+}
+
+[Test]
+public void EndWeek_PoweredOxygen_AddsNetOxygen()
+{
+    var c = MainGameColony.CreateLanding();
+    // Fixture: ice tile 1, aquifer on 2 (dist 1), oxygen on 3, solar on 4 touching 3
+    c.DebugPlaceComplete(2, MainGameBuildingId.Aquifer);
+    c.DebugPlaceComplete(3, MainGameBuildingId.Oxygen);
+    c.DebugPlaceComplete(4, MainGameBuildingId.Solar);
+    c.SetDistanceFn((a, b) =>
+    {
+        if ((a == 2 && b == 1) || (a == 1 && b == 2)) return 1;
+        if ((a == 3 && b == 4) || (a == 4 && b == 3)) return 1;
+        return 99;
+    });
+    c.Board.At(1).Feature = MainGameFeature.Ice;
+    c.Board.At(1).DepositLeft = 100;
+    c.Board.At(1).Revealed = true;
+    int before = c.Oxygen;
+    c.EndWeek();
+    // Aquifer +8 ice stock; Oxygen consumes 4 ice produces +8 O2; colonists breathe 6 → net +2 O2 from processor path
+    Assert.Greater(c.Oxygen, before - 6); // at least processor ran
+}
+
+[Test]
+public void TotalBeds_TwoHabitats_IsTwenty()
+{
+    var c = MainGameColony.CreateLanding();
+    c.DebugPlaceComplete(5, MainGameBuildingId.Habitat);
+    c.DebugPlaceComplete(6, MainGameBuildingId.Habitat);
+    Assert.AreEqual(20, c.TotalBeds());
+}
+```
+
+- [ ] **Step 2: Run tests — expect fail**
+
+- [ ] **Step 3: Implement `MainGameColony` (core)**
+
+```csharp
+// Assets/Scripts/MainGame/MainGameColony.cs
+using System;
+using System.Collections.Generic;
+
+namespace GameDevTV.RTS.MainGame
+{
+    public sealed class MainGameColony
+    {
+        public MainGameBoardState Board { get; } = new();
+        public int Week { get; private set; }
+        public int Oxygen { get; private set; } = MainGameData.LandingOxygen;
+        public int IceStock { get; private set; }
+        public int Colonists { get; private set; } = MainGameData.StartColonists;
+        public int MainGameStep { get; private set; }
+        public bool DustStormActive { get; private set; }
+        public bool SolarDarkened => DustStormActive;
+        public int ShuttleLandWeek { get; private set; } = -1;
+        public bool ShuttleLanded { get; private set; }
+        public int StormLandWeek { get; private set; } = -1;
+        public HashSet<MainGameBuildingId> Unlocked { get; } = new();
+
+        Func<int, int, int> _dist = (a, b) => a == b ? 0 : 99;
+
+        public static MainGameColony CreateLanding()
+        {
+            var c = new MainGameColony();
+            // Ensure a small board for tests
+            for (int i = 0; i < 16; i++)
+                c.Board.Tiles.Add(new MainGameTile { Index = i, Lit = i == 0, Revealed = i == 0 });
+            c.Board.At(0).Building = MainGameBuildingId.CommandPost;
+            c.Board.At(0).Lit = true;
+            c.Board.At(0).Revealed = true;
+            return c;
+        }
+
+        public void SetDistanceFn(Func<int, int, int> fn) => _dist = fn;
+
+        public int Dist(int a, int b) => _dist(a, b);
+
+        public void DebugPlaceComplete(int tile, MainGameBuildingId id)
+        {
+            Board.At(tile).Building = id;
+            Board.At(tile).Revealed = true;
+        }
+
+        public int O2Need()
+        {
+            if (Colonists <= 0) return 0;
+            return (int)Math.Ceiling(Colonists * MainGameData.O2PerColonist);
+        }
+
+        public double O2Runway()
+        {
+            int need = O2Need();
+            return need <= 0 ? 1e9 : (double)Oxygen / need;
+        }
+
+        public int TotalBeds()
+        {
+            int beds = 0;
+            foreach (var t in Board.Tiles)
+            {
+                if (t.Building == MainGameBuildingId.None || t.Broken) continue;
+                beds += MainGameData.Get(t.Building).Beds;
+            }
+            return beds;
+        }
+
+        public bool IsPowered(int tile)
+        {
+            var b = Board.At(tile).Building;
+            if (b == MainGameBuildingId.None) return false;
+            var info = MainGameData.Get(b);
+            if (!info.NeedsPower) return true;
+            if (SolarDarkened)
+            {
+                // Only wind counts during storm
+                foreach (var t in Board.Tiles)
+                {
+                    if (t.Building != MainGameBuildingId.WindTurbine || t.Broken) continue;
+                    if (Dist(t.Index, tile) <= 1) return true;
+                }
+                return false;
+            }
+            foreach (var t in Board.Tiles)
+            {
+                if (t.Broken) continue;
+                if (t.Building != MainGameBuildingId.Solar && t.Building != MainGameBuildingId.WindTurbine) continue;
+                if (Dist(t.Index, tile) <= 1) return true;
+            }
+            return false;
+        }
+
+        public bool AquiferReachesIce(int aquiferTile)
+        {
+            foreach (var t in Board.Tiles)
+            {
+                if (!t.Revealed || t.DepositLeft <= 0) continue;
+                if (t.Feature != MainGameFeature.Ice && t.Feature != MainGameFeature.Glacier) continue;
+                if (Dist(aquiferTile, t.Index) <= MainGameData.HarvestRange) return true;
+            }
+            return false;
+        }
+
+        public List<string> EndWeek()
+        {
+            var log = new List<string>();
+            // 1) Advance sites
+            for (int i = Board.Sites.Count - 1; i >= 0; i--)
+            {
+                var s = Board.Sites[i];
+                s.WeeksDone++;
+                if (s.WeeksDone >= s.WeeksTotal)
+                {
+                    Board.At(s.Tile).Building = s.Id;
+                    log.Add($"Completed {MainGameData.Get(s.Id).DisplayName}");
+                    Board.Sites.RemoveAt(i);
+                }
+            }
+
+            // 2) Harvest ice from aquifers
+            foreach (var t in Board.Tiles)
+            {
+                if (t.Building != MainGameBuildingId.Aquifer || t.Broken) continue;
+                int gained = 0;
+                foreach (var ice in Board.Tiles)
+                {
+                    if (!ice.Revealed || ice.DepositLeft <= 0) continue;
+                    if (ice.Feature != MainGameFeature.Ice && ice.Feature != MainGameFeature.Glacier) continue;
+                    if (Dist(t.Index, ice.Index) > MainGameData.HarvestRange) continue;
+                    int take = Math.Min(MainGameData.Get(MainGameBuildingId.Aquifer).IceHarvestPerWeek - gained, ice.DepositLeft);
+                    ice.DepositLeft -= take;
+                    gained += take;
+                    if (gained >= MainGameData.Get(MainGameBuildingId.Aquifer).IceHarvestPerWeek) break;
+                }
+                IceStock += gained;
+            }
+
+            // 3) Oxygen processors
+            foreach (var t in Board.Tiles)
+            {
+                if (t.Building != MainGameBuildingId.Oxygen || t.Broken) continue;
+                if (!IsPowered(t.Index)) { log.Add("Oxygen Processor unpowered"); continue; }
+                var info = MainGameData.Get(MainGameBuildingId.Oxygen);
+                if (IceStock < info.IceConsumedPerWeek) { log.Add("Oxygen Processor starved for ice"); continue; }
+                IceStock -= info.IceConsumedPerWeek;
+                Oxygen += info.OxygenProducedPerWeek;
+            }
+
+            // 4) Breathe
+            int need = O2Need();
+            int breathed = Math.Min(need, Oxygen);
+            Oxygen -= breathed;
+            if (breathed < need) log.Add("AIR CRITICAL: not enough oxygen");
+
+            // 5) Shuttle
+            if (!ShuttleLanded && ShuttleLandWeek >= 0 && Week + 1 >= ShuttleLandWeek)
+            {
+                ShuttleLanded = true;
+                Colonists += MainGameData.MainGameShuttleSize;
+                log.Add($"{MainGameData.MainGameShuttleSize} colonists landed");
+            }
+
+            // 6) Storm start
+            if (StormLandWeek >= 0 && Week + 1 >= StormLandWeek)
+                DustStormActive = true;
+
+            Week++;
+            StoryCheck(log);
+            return log;
+        }
+
+        public void StoryCheck(List<string> log)
+        {
+            // Step advancement — see Task 3 for full rules; keep stub that only unlocks nothing yet
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Tests pass**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add Assets/Scripts/MainGame/MainGameColony.cs Assets/Scripts/Tests/MainGameColonyTests.cs
+git commit -m "$(cat <<'EOF'
+feat(prologue): End Week O2, beds, and power rules
+
+EOF
+)"
+```
+
+---
+
+### Task 3: Placement preview + MainGame step machine
+
+**Files:**
+- Modify: `Assets/Scripts/MainGame/MainGameColony.cs`
+- Modify: `Assets/Scripts/Tests/MainGameColonyTests.cs`
+
+- [ ] **Step 1: Failing tests for preview + steps**
+
+```csharp
+[Test]
+public void Preview_AquiferTooFarFromIce_Refuses()
+{
+    var c = MainGameColony.CreateLanding();
+    c.Unlocked.Add(MainGameBuildingId.Aquifer);
+    c.Board.At(1).Feature = MainGameFeature.Ice;
+    c.Board.At(1).DepositLeft = 50;
+    c.Board.At(1).Revealed = true;
+    c.SetDistanceFn((a, b) => (a == 10 && b == 1) || (a == 1 && b == 10) ? 4 : 99);
+    Assert.IsFalse(c.Preview(10, MainGameBuildingId.Aquifer, out string reason));
+    StringAssert.Contains("3", reason);
+}
+
+[Test]
+public void Preview_SolarNotTouchingOxygen_RefusesWhenPlacingSolarForPowerCheck()
+{
+    // Placing oxygen is allowed without power; IsPowered false until solar touches.
+    var c = MainGameColony.CreateLanding();
+    c.Unlocked.Add(MainGameBuildingId.Oxygen);
+    c.Unlocked.Add(MainGameBuildingId.Solar);
+    Assert.IsTrue(c.Preview(3, MainGameBuildingId.Oxygen, out _));
+}
+
+[Test]
+public void StoryCheck_AfterIceRevealed_AdvancesToStep1AndUnlocksAquifer()
+{
+    var c = MainGameColony.CreateLanding();
+    c.StartMainGame();
+    Assert.AreEqual(0, c.MainGameStep);
+    c.Board.At(2).Feature = MainGameFeature.Ice;
+    c.Board.At(2).DepositLeft = 40;
+    c.Board.At(2).Revealed = true;
+    c.Board.FirstIceTiles.Add(2);
+    c.StoryCheck(new System.Collections.Generic.List<string>());
+    Assert.AreEqual(1, c.MainGameStep);
+    Assert.IsTrue(c.Unlocked.Contains(MainGameBuildingId.Aquifer));
+}
+```
+
+- [ ] **Step 2: Expect fail**
+
+- [ ] **Step 3: Implement `Preview`, `TryPlace`, `StartMainGame`, full `StoryCheck`**
+
+Rules (from Unreal):
+
+```
+Preview order:
+1. tile occupied by building or site → refuse
+2. id not in Unlocked → "Not yet: finish the objective at the top first"
+3. aquifer: must be within HarvestRange of revealed ice with DepositLeft > 0
+4. otherwise OK (oxygen/solar/habitat/wind have no feature lock in MainGame)
+
+TryPlace: enqueue MainGameSite with BuildWeeks from MainGameData
+
+StartMainGame:
+  MainGameStep = 0
+  Unlocked clear
+  ShuttleLandWeek = -1
+  StormLandWeek = -1
+
+StoryCheck advancement (after place / reveal / EndWeek):
+  step 0 → 1 when any ice revealed (record FirstIceTiles)
+  step 1 → 2 when aquifer complete reaching that ice; unlock oxygen+solar
+  step 2 → 3 when powered oxygen exists; set ShuttleLandWeek = Week + MainGameShuttleWeeks; unlock habitat
+  step 3 → 4 when TotalBeds >= 20 (2 habitats) OR (beds >= colonists after shuttle — Unreal asks for 2 habitats)
+  step 4 → 5 when second aquifer reaches ice NOT in FirstIceTiles (or first deposit dry AND new ice drilled);
+           schedule StormLandWeek = Week + MainGameStormWeeks; unlock wind
+  step 5 → 6 (done) when DustStormActive was true and then storm weeks elapsed
+            AND Oxygen >= OxygenStoreTargetMult * O2Need at storm arrival (ride-out: Oxygen > 0 each week)
+
+ObjectiveText(): port strings from FTTColony::MainGameObjective default switch
+```
+
+Implement `ObjectiveText(out MainGameBuildingId suggestBuild, out bool wantDrone)` with the Unreal copy from the design spec.
+
+- [ ] **Step 4: Tests pass**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -am "$(cat <<'EOF'
+feat(prologue): placement preview and guided step unlocks
+
+EOF
+)"
+```
+
+---
+
+### Task 4: Disable Colony Acts; boot MainGameController
+
+**Files:**
+- Create: `Assets/Scripts/MainGame/MainGameController.cs`
+- Modify: `Assets/Scripts/Player/ColonyActManager.cs` (guard `BeginRun`)
+- Modify: `PROJECT_KNOWLEDGE.md` §0 header
+
+- [ ] **Step 1: Add compile-time / runtime switch**
+
+```csharp
+// In ColonyActManager.BeginRun / HandlePlanetGenerated — at top:
+if (MainGameController.IsActive)
+{
+    Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
+    return;
+}
+```
+
+```csharp
+// Assets/Scripts/MainGame/MainGameController.cs
+using UnityEngine;
+using GameDevTV.RTS.Environment;
+
+namespace GameDevTV.RTS.MainGame
+{
+    public class MainGameController : MonoBehaviour
+    {
+        public static MainGameController Instance { get; private set; }
+        public static bool IsActive => Instance != null && Instance.enabled;
+
+        public MainGameColony Colony { get; private set; }
+
+        void Awake()
+        {
+            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            Instance = this;
+        }
+
+        void Start()
+        {
+            Colony = MainGameColony.CreateLanding();
+            // Replace CreateLanding board with real hex indices when PlanetGenerator finishes
+            PlanetGenerator.OnPlanetGenerated += HandlePlanetGenerated;
+            if (PlanetGenerator.Instance != null)
+                HandlePlanetGenerated();
+        }
+
+        void OnDestroy()
+        {
+            PlanetGenerator.OnPlanetGenerated -= HandlePlanetGenerated;
+            if (Instance == this) Instance = null;
+        }
+
+        void HandlePlanetGenerated()
+        {
+            SyncBoardFromPlanet();
+            Colony.StartMainGame();
+        }
+
+        public void SyncBoardFromPlanet()
+        {
+            // Map PlanetGenerator / HexGridManager tiles → MainGameBoardState
+            // Mark home pad Lit+Revealed; hide ice until drone reveals
+            // Wire SetDistanceFn to ColonyTileGrid hex distance
+        }
+
+        public void EndWeek()
+        {
+            var log = Colony.EndWeek();
+            MainGameHUD.Instance?.ShowWeekReport(log);
+            MainGameHUD.Instance?.Refresh(Colony);
+            RefreshHandUnlocks();
+        }
+
+        void RefreshHandUnlocks()
+        {
+            // Tell CardDeckController which MainGameBuildingIds are unlocked
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Scene wiring**
+
+Via connected Editor:
+
+```bash
+unity command eval "var go = new UnityEngine.GameObject(\"MainGameController\"); go.AddComponent<GameDevTV.RTS.MainGame.MainGameController>(); return go.name;" --json
+```
+
+Persist into the main play scene (save scene after adding). Disable or remove auto-start UI for BetweenActShop / Acts panel from default visible state.
+
+- [ ] **Step 3: Update PROJECT_KNOWLEDGE.md**
+
+Replace §0 one-sentence game and owner table: MainGameColony / MainGameController are authoritative; Colony Acts marked **Archived**. Point to the design spec.
+
+- [ ] **Step 4: Live smoke**
+
+```bash
+unity command eval "UnityEditor.EditorApplication.isPlaying = true;" --json
+# wait, then:
+unity command eval "return GameDevTV.RTS.MainGame.MainGameController.IsActive;" --json
+unity command eval "return GameDevTV.RTS.Player.ColonyActManager.Instance != null && GameDevTV.RTS.Player.ColonyActManager.Instance.ActIndex;" --json
+```
+
+Expected: MainGame active; Acts did not begin a Materials quota run (or ActIndex stays unset / BeginRun skipped).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add Assets/Scripts/MainGame/MainGameController.cs Assets/Scripts/Player/ColonyActManager.cs PROJECT_KNOWLEDGE.md
+git commit -m "$(cat <<'EOF'
+feat(prologue): boot MainGame as default; archive Colony Acts run
+
+EOF
+)"
+```
+
+---
+
+### Task 5: Card hand unlocks + placement bridge
+
+**Files:**
+- Modify: `Assets/Scripts/Player/CardDeckController.cs`
+- Modify: `Assets/Scripts/Player/PlayerInput.cs`
+- Create or remap card assets for: Ice Aquifer, Oxygen Processor, Solar Array, Habitat Domes, Wind Turbine
+
+- [ ] **Step 1: Map cards to `MainGameBuildingId`**
+
+Add helper:
+
+```csharp
+public static bool TryGetMainGameId(BlueprintCardSO card, out MainGameBuildingId id)
+{
+    id = MainGameBuildingId.None;
+    if (card == null) return false;
+    string n = card.cardName ?? card.name;
+    if (n.IndexOf("Aquifer", System.StringComparison.OrdinalIgnoreCase) >= 0
+        || n.IndexOf("Ice", System.StringComparison.OrdinalIgnoreCase) >= 0 && n.IndexOf("Drill", System.StringComparison.OrdinalIgnoreCase) >= 0)
+    { id = MainGameBuildingId.Aquifer; return true; }
+    if (n.IndexOf("Oxygen", System.StringComparison.OrdinalIgnoreCase) >= 0) { id = MainGameBuildingId.Oxygen; return true; }
+    if (n.IndexOf("Solar", System.StringComparison.OrdinalIgnoreCase) >= 0) { id = MainGameBuildingId.Solar; return true; }
+    if (n.IndexOf("Habitat", System.StringComparison.OrdinalIgnoreCase) >= 0) { id = MainGameBuildingId.Habitat; return true; }
+    if (n.IndexOf("Wind", System.StringComparison.OrdinalIgnoreCase) >= 0) { id = MainGameBuildingId.WindTurbine; return true; }
+    return false;
+}
+```
+
+When `MainGameController.IsActive`, hand rebuild = only unlocked prologue cards (plus drone/scan card for step 0/4). Strip Acts seating (climate force-seat, CP handoff, Materials filters).
+
+- [ ] **Step 2: PlayerInput ghost uses `Colony.Preview`**
+
+On place confirm: `Colony.TryPlace(tileIndex, id)` then spawn construction ghost / complete mesh via existing building prefabs if available; else colored plinth.
+
+- [ ] **Step 3: Manual place path smoke in Play Mode** (eval + play)
+
+Confirm locked card cannot place; unlocked aquifer refuses far from ice.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "$(cat <<'EOF'
+feat(prologue): lock hand to Unreal unlocks and preview placement
+
+EOF
+)"
+```
+
+---
+
+### Task 6: Drone scan reveal
+
+**Files:**
+- Create: `Assets/Scripts/MainGame/MainGameDroneScan.cs`
+- Hook input for paint path
+
+- [ ] **Step 1: Behavior**
+
+- Player enters scan mode when objective `wantDrone`  
+- Path must start from a `Lit` revealed tile  
+- Each tile flown over becomes `Revealed`  
+- If ice/glacier found: add to board, if step 0 record `FirstIceTiles`, call `StoryCheck`  
+- Lit frontier expands along revealed tiles adjacent to buildings/power (keep simple: all revealed tiles become Lit)
+
+- [ ] **Step 2: Test pure reveal helper**
+
+```csharp
+[Test]
+public void RevealPath_MarksIceAndAdvancesStory()
+{
+    var c = MainGameColony.CreateLanding();
+    c.StartMainGame();
+    c.Board.At(3).Feature = MainGameFeature.Ice;
+    c.Board.At(3).DepositLeft = 30;
+    c.RevealTiles(new[] { 1, 2, 3 });
+    Assert.IsTrue(c.Board.At(3).Revealed);
+    Assert.AreEqual(1, c.MainGameStep);
+}
+```
+
+Implement `RevealTiles(IEnumerable<int> path)` on `MainGameColony`.
+
+- [ ] **Step 3: Wire UI / click path in controller**
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "$(cat <<'EOF'
+feat(prologue): drone paint-path ice discovery
+
+EOF
+)"
+```
+
+---
+
+### Task 7: MainGame HUD + End Week
+
+**Files:**
+- Create: `Assets/Scripts/UI/MainGameHUD.cs`
+- Hide Acts weeks/quota panels while MainGame active
+
+- [ ] **Step 1: HUD fields**
+
+- Objective text (`Colony.ObjectiveText`)  
+- Coming up: shuttle weeks / storm weeks  
+- AIR: `Oxygen`, `Δ` estimate, `O2Runway` weeks  
+- End Week button → `MainGameController.EndWeek`  
+- Week report toast (reuse or simple TMP)
+
+- [ ] **Step 2: Refresh each place / week / reveal**
+
+- [ ] **Step 3: Live Play Mode: complete scripted soft path with eval cheats if needed**
+
+Add temporary `MainGameController.DebugSkipToStep(int)` for trailer setup only (`#if DEVELOPMENT_BUILD || UNITY_EDITOR`).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "$(cat <<'EOF'
+feat(prologue): HUD objective, AIR meter, and End Week
+
+EOF
+)"
+```
+
+---
+
+### Task 8: Dust storm + MainGame complete + fellowship smoke
+
+**Files:**
+- Modify: `MainGameColony.cs` storm duration / clear  
+- Optional: `Assets/Scripts/MainGame/MainGameBot.cs` for autoplay smoke
+
+- [ ] **Step 1: Storm rules**
+
+When `StormLandWeek` reached: `DustStormActive = true` for `MainGameStormWeeks` weeks. Solar does not power; Wind does. After storm ends and step 5 conditions met → `MainGameStep = 6`, fire `OnMainGameComplete`.
+
+- [ ] **Step 2: EditMode test**
+
+```csharp
+[Test]
+public void DustStorm_DarkensSolar_WindKeepsOxygenPowered()
+{
+    var c = MainGameColony.CreateLanding();
+    c.DebugPlaceComplete(3, MainGameBuildingId.Oxygen);
+    c.DebugPlaceComplete(4, MainGameBuildingId.Solar);
+    c.DebugPlaceComplete(5, MainGameBuildingId.WindTurbine);
+    c.SetDistanceFn((a, b) => Math.Abs(a - b) <= 1 ? Math.Abs(a - b) : 99);
+    Assert.IsTrue(c.IsPowered(3));
+    c.DebugForceStorm(true);
+    Assert.IsTrue(c.IsPowered(3)); // wind touching
+    // Remove wind
+    c.Board.At(5).Building = MainGameBuildingId.None;
+    Assert.IsFalse(c.IsPowered(3));
+}
+```
+
+- [ ] **Step 3: Full Play Mode walkthrough** (human or bot): steps 0→5 without Acts UI  
+
+Checklist:
+
+- [ ] No Materials quota / Terra-Coin shop  
+- [ ] Objective advances  
+- [ ] Storm darkens solar  
+- [ ] Survive with O2 > 0  
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "$(cat <<'EOF'
+feat(prologue): dust storm pressure and MainGame completion
+
+EOF
+)"
+```
+
+---
+
+### Task 9: Docs + archive note for fellowship
+
+**Files:**
+- Modify: `PROJECT_KNOWLEDGE.md` (finish §0 rewrite)  
+- Optional: `GDD.md` pointer only if lore conflicts  
+
+- [ ] **Step 1: Document archived Colony Acts**, MainGame owner scripts, steel/concrete delta  
+- [ ] **Step 2: List follow-on** Industry port (do not implement)  
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -am "$(cat <<'EOF'
+docs: MainGame run model replaces Colony Acts in project knowledge
+
+EOF
+)"
+```
+
+---
+
+## Spec coverage (self-review)
+
+| Spec requirement | Task |
+| --- | --- |
+| Replace Colony Acts default | 4, 9 |
+| MainGame steps 0–5 + unlocks | 3, 5, 6 |
+| End Week | 2, 7 |
+| O2 / beds / power | 2, 8 |
+| Drone find ice | 6 |
+| Placement within 3 / solar touch | 3, 5 |
+| Dust storm | 8 |
+| HUD objective + AIR + End Week | 7 |
+| Flat hex, no planetoid | all (reuse hex) |
+| No adjacency combos | 3–5 (Preview has no combo score) |
+| Fellowship playable slice | 8 smoke |
+| Steel/Concrete deferred | File map delta note |
+
+**Placeholder scan:** none intentional; Storm clear timing uses Unreal `MainGameStormWeeks`.  
+**Type names:** `MainGameBuildingId`, `MainGameColony`, `MainGameController`, `MainGameHUD` consistent across tasks.
+
+---
+
+## Execution notes for agents
+
+1. Never `unity test` / `unity build` / second Editor — use connected `unity command eval` + EditMode compilation.  
+2. Commit after each task when the user has asked for commits, or batch commits if the user prefers fewer; default in this plan assumes commits are allowed during execution (confirm with owner if unsure).  
+3. Prefer matching Unreal numbers over inventing balance.  
+4. Do not reintroduce Colony Acts Materials quotas into the MainGame HUD.  

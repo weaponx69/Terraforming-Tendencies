@@ -460,6 +460,32 @@ namespace GameDevTV.RTS.Utilities
             if (building == null) return;
             Vector3 grounded = SnapToNavMesh(building.transform.position);
             building.transform.position = grounded;
+            SeatVisualsOnGround(building.gameObject, 0.04f);
+        }
+
+        /// <summary>Sample ground at XZ, then lift so lowest enabled renderer sits on the surface (slopes / hills).</summary>
+        public static void SeatVisualsOnGround(GameObject root, float groundPad = 0.04f)
+        {
+            if (root == null) return;
+            Vector3 p = root.transform.position;
+            float groundY = SnapToGround(p).y;
+            p.y = groundY + groundPad;
+            root.transform.position = p;
+
+            float minY = float.PositiveInfinity;
+            bool any = false;
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null || !renderer.enabled) continue;
+                if (renderer is ParticleSystemRenderer) continue;
+                minY = Mathf.Min(minY, renderer.bounds.min.y);
+                any = true;
+            }
+
+            if (!any || float.IsInfinity(minY)) return;
+            float lift = groundY + groundPad - minY;
+            if (Mathf.Abs(lift) > 0.005f)
+                root.transform.position += Vector3.up * lift;
         }
 
         private static Vector3 SnapToNavMesh(Vector3 approximate)
@@ -485,39 +511,19 @@ namespace GameDevTV.RTS.Utilities
 
         private static Vector3 SnapToGround(Vector3 approximate)
         {
-            int terrainMask = LayerMask.GetMask("Terrain");
+            // Authoritative height field (matches visible mesh). Avoid Terrain collider offsets.
+            if (PlanetGenerator.Instance != null)
+                return ColonyTileGrid.ApplyGroundY(approximate);
+
             int groundMask = LayerMask.GetMask("Default", "Terrain");
             if (groundMask == 0) groundMask = Physics.DefaultRaycastLayers;
 
-            Vector3[] origins =
+            Vector3 origin = new Vector3(approximate.x, 200f, approximate.z);
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 400f, groundMask,
+                    QueryTriggerInteraction.Ignore)
+                && !IsIgnorableGroundHit(hit))
             {
-                new Vector3(approximate.x, approximate.y + 120f, approximate.z),
-                new Vector3(approximate.x, 200f, approximate.z),
-            };
-
-            foreach (Vector3 origin in origins)
-            {
-                if (terrainMask != 0
-                    && Physics.Raycast(origin, Vector3.down, out RaycastHit terrainHit, 400f, terrainMask,
-                        QueryTriggerInteraction.Ignore))
-                {
-                    return terrainHit.point;
-                }
-
-                if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 400f, groundMask,
-                        QueryTriggerInteraction.Ignore))
-                {
-                    if (IsIgnorableGroundHit(hit)) continue;
-                    return hit.point;
-                }
-            }
-
-            // Last resort: any non-trigger collider that is not a building/pad ghost.
-            if (Physics.Raycast(new Vector3(approximate.x, 200f, approximate.z), Vector3.down,
-                    out RaycastHit anyHit, 400f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
-                && !IsIgnorableGroundHit(anyHit))
-            {
-                return anyHit.point;
+                return hit.point;
             }
 
             return new Vector3(approximate.x, approximate.y, approximate.z);

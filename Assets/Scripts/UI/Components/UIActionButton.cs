@@ -32,6 +32,12 @@ namespace GameDevTV.RTS.UI.Components
         private TextMeshProUGUI costLabel;
         private Color defaultButtonColor = Color.white;
         private string goalKey = string.Empty;
+        private bool picked;
+        private int slotHandIndex = -1;
+        private bool slotIsSurvey;
+
+        /// <summary>Hand index bound to this slot (UI playthrough).</summary>
+        public int HandIndexForPlaythrough => slotHandIndex;
 
         private static readonly string MATERIALS_FORMAT = "{0} Materials";
         private static readonly string DEPENDENCY_FORMAT_NO_COMMA = "<color=#AC0000>{0}</color>.";
@@ -42,6 +48,12 @@ namespace GameDevTV.RTS.UI.Components
             button = GetComponent<Button>();
             rectTransform = GetComponent<RectTransform>();
             buttonImage = GetComponent<Image>();
+            if (icon == null)
+            {
+                var iconT = transform.Find("Icon");
+                if (iconT != null)
+                    icon = iconT.GetComponent<Image>();
+            }
             if (buttonImage != null)
             {
                 defaultButtonColor = buttonImage.color;
@@ -76,6 +88,12 @@ namespace GameDevTV.RTS.UI.Components
         {
             if (button == null) return;
 
+            int reboundHand = -1;
+            if (command is BuildBuildingCommand bbcRebind && bbcRebind.HandIndex >= 0)
+                reboundHand = bbcRebind.HandIndex;
+            else if (command is PlayCardCommand pcRebind && pcRebind.HandIndex >= 0)
+                reboundHand = pcRebind.HandIndex;
+
             button.onClick.RemoveAllListeners();
             SetIcon(command.Icon);
             EnsureCardTextLayout();
@@ -83,7 +101,11 @@ namespace GameDevTV.RTS.UI.Components
             int cost = materialsCostOverride >= 0 ? materialsCostOverride : ResolveMaterialsCost(command);
             SetCost(command, cost);
             button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
-            button.onClick.AddListener(onClick);
+            button.onClick.AddListener(() =>
+            {
+                ClickPulse();
+                onClick?.Invoke();
+            });
             isActive = true;
             if (buttonImage != null)
             {
@@ -95,6 +117,9 @@ namespace GameDevTV.RTS.UI.Components
                 buttonImage.raycastTarget = true;
             }
             ApplyGoalAccent(cardGoal);
+
+            if (reboundHand >= 0 && reboundHand == PlayerInput.PickedHandIndex)
+                SetPicked(true);
 
             if (command is BuildBuildingCommand buildCmd && buildCmd.Building != null)
             {
@@ -126,10 +151,8 @@ namespace GameDevTV.RTS.UI.Components
                     {
                         goalBadge.SetText($"+{score}");
                         goalBadge.fontSize = 14f;
-                        EnsureReadableBlackText(goalBadge);
                         ResetGoalBadgeLayout();
                     }
-                    EnsureReadableBlackText(goalBadge);
                 }
             }
 
@@ -144,6 +167,8 @@ namespace GameDevTV.RTS.UI.Components
                     // Tooltip text component may not be properly set up — ignore
                 }
             }
+
+            RefreshCardTextContrast();
         }
 
         public void Disable()
@@ -158,6 +183,9 @@ namespace GameDevTV.RTS.UI.Components
                 button.onClick.RemoveAllListeners();
             }
             isActive = false;
+            SetPicked(false);
+            slotHandIndex = -1;
+            slotIsSurvey = false;
             CancelInvoke();
 
             // Empty slots should not leave opaque chrome boxes on screen.
@@ -211,26 +239,26 @@ namespace GameDevTV.RTS.UI.Components
                 label = labelGO.GetComponent<TextMeshProUGUI>();
             }
 
-            label.fontSize = 18f;
-            label.fontSizeMin = 18f;
-            label.fontSizeMax = 18f;
-            label.enableAutoSizing = false;
+            label.fontSize = 22f;
+            label.fontSizeMin = 16f;
+            label.fontSizeMax = 22f;
+            label.enableAutoSizing = true;
             label.alignment = TextAlignmentOptions.Bottom;
             label.color = Color.black;
             label.fontStyle = FontStyles.Bold;
             label.richText = true;
             label.raycastTarget = false;
             label.textWrappingMode = TextWrappingModes.Normal;
-            label.overflowMode = TextOverflowModes.Truncate;
-            label.margin = new Vector4(6f, 2f, 6f, 2f);
+            label.overflowMode = TextOverflowModes.Overflow;
+            label.margin = new Vector4(8f, 4f, 8f, 6f);
 
             RectTransform labelRt = label.rectTransform;
-            labelRt.anchorMin = new Vector2(0.06f, 0.10f);
-            labelRt.anchorMax = new Vector2(0.94f, 0.32f);
+            labelRt.anchorMin = new Vector2(0.04f, 0.02f);
+            labelRt.anchorMax = new Vector2(0.96f, 0.32f);
             labelRt.offsetMin = Vector2.zero;
             labelRt.offsetMax = Vector2.zero;
             labelRt.pivot = new Vector2(0.5f, 0f);
-            EnsureReadableBlackText(label);
+            RefreshCardTextContrast();
 
             if (costLabel == null)
             {
@@ -240,7 +268,7 @@ namespace GameDevTV.RTS.UI.Components
             }
 
             // Top-left cost chip — always above the icon, hard to miss.
-            costLabel.fontSize = 18f;
+            costLabel.fontSize = 20f;
             costLabel.fontStyle = FontStyles.Bold;
             costLabel.alignment = TextAlignmentOptions.TopLeft;
             costLabel.color = Color.black;
@@ -248,25 +276,79 @@ namespace GameDevTV.RTS.UI.Components
             costLabel.raycastTarget = false;
             costLabel.margin = new Vector4(10f, 8f, 4f, 2f);
             if (label != null && label.font != null) costLabel.font = label.font;
-            EnsureReadableBlackText(costLabel);
-
             RectTransform costRt = costLabel.rectTransform;
-            costRt.anchorMin = new Vector2(0.04f, 0.72f);
-            costRt.anchorMax = new Vector2(0.55f, 0.98f);
+            costRt.anchorMin = new Vector2(0.04f, 0.70f);
+            costRt.anchorMax = new Vector2(0.62f, 0.98f);
             costRt.offsetMin = Vector2.zero;
             costRt.offsetMax = Vector2.zero;
             costRt.pivot = new Vector2(0f, 1f);
+            label.transform.SetAsLastSibling();
             costLabel.transform.SetAsLastSibling();
         }
 
-        /// <summary>Black face text + soft light outline so it stays readable on tinted cards.</summary>
-        private static void EnsureReadableBlackText(TextMeshProUGUI tmp)
+        public void BindSlot(int handIndex, bool surveyCard)
+        {
+            slotHandIndex = handIndex;
+            slotIsSurvey = surveyCard;
+        }
+
+        public void RefreshPicked(int pickedHand, bool surveyLive)
+        {
+            bool on = isActive && slotHandIndex >= 0
+                && (slotHandIndex == pickedHand || (slotIsSurvey && surveyLive));
+            SetPicked(on);
+        }
+
+        void ClickPulse()
+        {
+            if (!isActive) return;
+            transform.localScale = new Vector3(1.12f, 1.14f, 1f);
+        }
+
+        public void SetPicked(bool value)
+        {
+            if (picked == value) return;
+            picked = value;
+            EnsureGoalOutline();
+            if (goalOutline != null)
+            {
+                goalOutline.enabled = value;
+                goalOutline.effectColor = new Color(1f, 0.82f, 0.15f, 1f);
+                goalOutline.effectDistance = new Vector2(4f, -4f);
+            }
+            if (!value)
+                transform.localScale = Vector3.one;
+        }
+
+        private void Update()
+        {
+            if (!picked)
+                return;
+            float bob = Mathf.Abs(Mathf.Sin(Time.unscaledTime * 6.5f));
+            float scale = 1.04f + bob * 0.08f;
+            transform.localScale = new Vector3(scale, scale + bob * 0.04f, 1f);
+        }
+
+        void RefreshCardTextContrast()
+        {
+            Color plate = buttonImage != null ? buttonImage.color : defaultButtonColor;
+            if (label != null) ApplyReadableCardText(label, plate);
+            if (costLabel != null) ApplyReadableCardText(costLabel, plate);
+            if (goalBadge != null) ApplyReadableCardText(goalBadge, plate);
+        }
+
+        /// <summary>Light text on dark card plates; dark text on pale plates.</summary>
+        static void ApplyReadableCardText(TextMeshProUGUI tmp, Color plateColor)
         {
             if (tmp == null) return;
-            tmp.color = Color.black;
+            float lum = 0.2126f * plateColor.r + 0.7152f * plateColor.g + 0.0722f * plateColor.b;
+            bool darkPlate = lum < 0.48f;
+            tmp.color = darkPlate ? new Color(0.97f, 0.98f, 1f, 1f) : new Color(0.08f, 0.08f, 0.1f, 1f);
             var outline = tmp.GetComponent<UnityEngine.UI.Outline>();
             if (outline == null) outline = tmp.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(1f, 1f, 1f, 0.75f);
+            outline.effectColor = darkPlate
+                ? new Color(0f, 0f, 0f, 0.88f)
+                : new Color(1f, 1f, 1f, 0.78f);
             outline.effectDistance = new Vector2(1.2f, -1.2f);
             outline.enabled = true;
         }
@@ -303,7 +385,7 @@ namespace GameDevTV.RTS.UI.Components
                 costLabel.text = $"{weekPart}\n{materialsCost} Mat";
             else
                 costLabel.text = weekPart;
-            EnsureReadableBlackText(costLabel);
+            RefreshCardTextContrast();
         }
 
         private static string FormatWeekCost(int weeks)
@@ -347,7 +429,54 @@ namespace GameDevTV.RTS.UI.Components
             {
                 this.icon.sprite = icon;
                 this.icon.enabled = true;
+                this.icon.color = Color.white;
+                this.icon.preserveAspect = true;
+                this.icon.type = Image.Type.Simple;
             }
+        }
+
+        /// <summary>
+        /// MainGame hand: show the mineral price. Grey the card when short but keep clicks —
+        /// PlayBuildingCard shows the same failure message.
+        /// </summary>
+        public void ApplyMainGameMinerals(int cost, int have)
+        {
+            if (cost <= 0 || !isActive) return;
+            bool shortStock = have < cost;
+            if (costLabel != null)
+            {
+                costLabel.gameObject.SetActive(true);
+                costLabel.text = shortStock ? $"Need {cost}\nhave {have}" : $"{cost} materials";
+                costLabel.color = shortStock ? new Color(1f, 0.62f, 0.55f, 1f) : costLabel.color;
+            }
+            if (!shortStock)
+            {
+                if (button != null)
+                    button.interactable = true;
+                if (buttonImage != null)
+                {
+                    Color c = defaultButtonColor;
+                    c.a = Mathf.Clamp(c.a, 0.55f, 0.92f);
+                    if (c.a < 0.4f) c.a = 0.7f;
+                    buttonImage.color = c;
+                }
+                if (icon != null)
+                    icon.color = Color.white;
+                RefreshCardTextContrast();
+                return;
+            }
+
+            if (button != null)
+                button.interactable = true;
+            if (buttonImage != null)
+                buttonImage.color = new Color(0.38f, 0.38f, 0.42f, 0.92f);
+            if (icon != null)
+                icon.color = new Color(0.45f, 0.45f, 0.48f, 0.9f);
+            if (goalOutline != null)
+                goalOutline.effectColor = new Color(0.3f, 0.3f, 0.32f, 0.5f);
+            RefreshCardTextContrast();
+            if (tooltip != null)
+                tooltip.SetText($"Need {cost} materials to build this. You have {have}. End Week while a mineral mine works, or place a cheaper Solar Array first.");
         }
 
         private void ApplyGoalAccent(string goal)
@@ -362,11 +491,7 @@ namespace GameDevTV.RTS.UI.Components
             Color accent = TerraformingGoalColors.ForGoal(goalKey);
 
             if (label != null)
-            {
-                // Goal tint stays on the plate/outline — face text stays black for readability.
-                EnsureReadableBlackText(label);
                 label.richText = true;
-            }
 
             if (buttonImage != null)
             {
@@ -388,20 +513,19 @@ namespace GameDevTV.RTS.UI.Components
                 bool show = !string.IsNullOrEmpty(goalKey);
                 goalBadge.gameObject.SetActive(show);
                 if (show)
-                {
-                    EnsureReadableBlackText(goalBadge);
                     goalBadge.SetText(TerraformingGoalColors.ShortLabel(goalKey));
-                }
             }
+
+            RefreshCardTextContrast();
         }
 
         private void ClearGoalAccent()
         {
             goalKey = string.Empty;
-            if (label != null) EnsureReadableBlackText(label);
             if (buttonImage != null) buttonImage.color = defaultButtonColor;
             if (goalOutline != null) goalOutline.enabled = false;
             if (goalBadge != null) goalBadge.gameObject.SetActive(false);
+            RefreshCardTextContrast();
         }
 
         private void EnsureGoalOutline()

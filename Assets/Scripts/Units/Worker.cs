@@ -343,7 +343,7 @@ namespace GameDevTV.RTS.Units
                 Bus<SupplyEvent>.Raise(Owner, new SupplyEvent(Owner, -building.Cost.Gas, building.Cost.GasSO));
             }
 
-            // Drive navigation and construction via the C# brain coroutine for better control over the procedural rise-from-ground animation.
+            // Drive navigation and construction via the C# brain coroutine. Scaffolding covers the pad until the timer finishes.
             // Note: The behavior tree is still running but remains in a waiting state.
             Brain.StartBuild(baseBuilding, building, navDestination);
 

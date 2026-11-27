@@ -39,8 +39,19 @@ namespace GameDevTV.RTS.Environment
         
         // Hex grid data
         private Dictionary<Vector2Int, HexTile> hexGrid = new Dictionary<Vector2Int, HexTile>();
+        static readonly Vector2Int[] HoverNeighborDeltas =
+        {
+            new(+1, 0), new(+1, -1), new(0, -1),
+            new(-1, 0), new(-1, +1), new(0, +1),
+        };
         private Dictionary<Vector3, Vector2Int> worldToHexMap = new Dictionary<Vector3, Vector2Int>();
         private Vector3 gridOrigin;
+
+        /// <summary>MainGame disk: one ring each — not ~600 shroud GameObjects with LineRenderers.</summary>
+        LineRenderer sharedHoverRing;
+        LineRenderer sharedHighlightRing;
+        Vector2Int? sharedHoverCell;
+        Vector2Int? sharedHighlightCell;
         
         // Flat-topped hex geometry driven by ColonyTileGrid (building-sized cells).
         private float HexWidth => GameDevTV.RTS.Player.ColonyTileGrid.HexWidth;
@@ -88,6 +99,7 @@ namespace GameDevTV.RTS.Environment
                 if (!IsRevealed)
                 {
                     IsRevealed = true;
+                    if (GameObject == null) return;
                     // Disable the shroud material or destroy the tile
                     // Disable the solid mesh, but leave the GameObject (and its LineRenderer) active!
                     if (GameObject != null)
@@ -124,6 +136,15 @@ namespace GameDevTV.RTS.Environment
                 {
                     Debug.Log($"[HexHighlight] Selected {HexCoordinates} -> {highlighted}; revealed={IsRevealed}, object={GameObject?.name ?? "NULL"}, outline={outline != null}");
                 }
+                if (GameObject == null)
+                {
+                    var mgr = Instance;
+                    if (mgr == null) return;
+                    if (highlighted) mgr.sharedHighlightCell = HexCoordinates;
+                    else if (mgr.sharedHighlightCell == HexCoordinates) mgr.sharedHighlightCell = null;
+                    mgr.RefreshSharedOutlines();
+                    return;
+                }
                 UpdateOutline();
             }
 
@@ -134,22 +155,35 @@ namespace GameDevTV.RTS.Environment
                 {
                     Debug.Log($"[HexHighlight] Hovered {HexCoordinates} -> {hovered}; revealed={IsRevealed}, object={GameObject?.name ?? "NULL"}, outline={outline != null}");
                 }
+                if (GameObject == null)
+                {
+                    var mgr = Instance;
+                    if (mgr == null) return;
+                    if (hovered) mgr.sharedHoverCell = HexCoordinates;
+                    else if (mgr.sharedHoverCell == HexCoordinates) mgr.sharedHoverCell = null;
+                    mgr.RefreshSharedOutlines();
+                    return;
+                }
                 UpdateOutline();
             }
 
             private void UpdateOutline()
             {
+                if (GameObject == null) return;
                 if (outline == null)
                 {
                     if (HighlightTrace) Debug.LogWarning($"[HexHighlight] Cannot update {HexCoordinates}: LineRenderer is missing.");
                     return;
                 }
 
-                outline.enabled = IsRevealed;
-                if (!IsRevealed) return;
+                // Only draw a hex when the cursor (or keyboard selection) is on it —
+                // never leave a permanent cyan/dark grid over the whole map.
+                bool show = isHovered || isHighlighted;
+                outline.enabled = show;
+                if (!show) return;
 
-                Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : isHovered ? Color.white : Color.cyan;
-                float width = isHighlighted ? 0.32f : isHovered ? 0.22f : 0.1f;
+                Color color = isHighlighted ? new Color(0.1f, 0.55f, 1f) : Color.white;
+                float width = isHighlighted ? 0.32f : 0.22f;
                 outline.startColor = color;
                 outline.endColor = color;
                 outline.startWidth = width;
@@ -159,6 +193,160 @@ namespace GameDevTV.RTS.Environment
                     if (outlineMaterial.HasProperty("_BaseColor")) outlineMaterial.SetColor("_BaseColor", color);
                     if (outlineMaterial.HasProperty("_Color")) outlineMaterial.SetColor("_Color", color);
                 }
+                RefreshOutlineGeometry();
+            }
+
+            /// <summary>Re-seat the ring on current terrain (planet DEM), not spawn-time flat Y.</summary>
+            void RefreshOutlineGeometry()
+            {
+                if (outline == null) return;
+                Vector3 center = GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(HexCoordinates);
+                float lift = 0.14f;
+                float radius = GameDevTV.RTS.Player.ColonyTileGrid.TileSize;
+                var points = new Vector3[6];
+                for (int i = 0; i < 6; i++)
+                {
+                    float angleRad = Mathf.PI / 180f * (60f * i);
+                    points[i] = new Vector3(
+                        center.x + radius * Mathf.Cos(angleRad),
+                        center.y + lift,
+                        center.z + radius * Mathf.Sin(angleRad));
+                }
+                outline.positionCount = 6;
+                outline.SetPositions(points);
+            }
+
+            /// <summary>Re-apply outline visibility (e.g. after the hover-only policy lands).</summary>
+            public void RefreshOutlineVisibility()
+            {
+                if (GameObject == null)
+                {
+                    isHighlighted = false;
+                    isHovered = false;
+                    return;
+                }
+                if (GameObject != null)
+                {
+                    foreach (var rend in GameObject.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (rend is LineRenderer) continue;
+                        rend.enabled = false;
+                    }
+                }
+                UpdateOutline();
+            }
+        }
+
+        /// <summary>Force every hex outline to re-evaluate (hides the permanent grid).</summary>
+        public void RefreshAllOutlineVisibility()
+        {
+            foreach (var tile in hexGrid.Values)
+                tile.RefreshOutlineVisibility();
+            sharedHoverCell = null;
+            sharedHighlightCell = null;
+            RefreshSharedOutlines();
+        }
+
+        /// <summary>
+        /// MainGame colony is a small disk — replace planet-wide shroud hexes (10k+) with a local ring (~500).
+        /// </summary>
+        public void GenerateLocalHexDisk(Vector2Int centerCell, int axialRadius)
+        {
+            float size = CellSize;
+            cellSize = size;
+            if (gridRoot == null)
+            {
+                var rootGO = new GameObject("HexGridRoot");
+                gridRoot = rootGO.transform;
+            }
+            ClearHexGrid();
+            EnsureSharedOutlines();
+            sharedHoverCell = null;
+            sharedHighlightCell = null;
+            int created = 0;
+            for (int dq = -axialRadius; dq <= axialRadius; dq++)
+            {
+                for (int dr = -axialRadius; dr <= axialRadius; dr++)
+                {
+                    var cell = new Vector2Int(centerCell.x + dq, centerCell.y + dr);
+                    if (GameDevTV.RTS.Player.ColonyTileGrid.HexDistance(centerCell, cell) > axialRadius)
+                        continue;
+                    Vector3 worldPos = HexToWorldPosition(cell);
+                    var hexTile = new HexTile(cell, worldPos, null);
+                    hexGrid[cell] = hexTile;
+                    created++;
+                }
+            }
+            foreach (var tile in hexGrid.Values)
+                tile.Reveal();
+            RefreshSharedOutlines();
+            Debug.Log($"[HexGridManager] MainGame lightweight hex disk: {created} cells (center={centerCell}, r={axialRadius}, shared outline).");
+        }
+
+        void EnsureSharedOutlines()
+        {
+            if (sharedHoverRing != null && sharedHighlightRing != null) return;
+            if (gridRoot == null)
+            {
+                var rootGO = new GameObject("HexGridRoot");
+                gridRoot = rootGO.transform;
+            }
+            sharedHoverRing = CreateSharedRing("SharedHexHoverRing", Color.white, 0.22f);
+            sharedHighlightRing = CreateSharedRing("SharedHexHighlightRing", new Color(0.1f, 0.55f, 1f), 0.32f);
+        }
+
+        LineRenderer CreateSharedRing(string name, Color color, float width)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(gridRoot, false);
+            var lr = go.AddComponent<LineRenderer>();
+            lr.useWorldSpace = true;
+            lr.loop = true;
+            lr.positionCount = 6;
+            lr.startWidth = width;
+            lr.endWidth = width;
+            lr.material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            lr.numCornerVertices = 2;
+            lr.numCapVertices = 2;
+            lr.sortingOrder = 100;
+            lr.enabled = false;
+            lr.startColor = color;
+            lr.endColor = color;
+            return lr;
+        }
+
+        internal void RefreshSharedOutlines()
+        {
+            ApplySharedRing(sharedHoverRing, sharedHoverCell, Color.white, 0.22f);
+            ApplySharedRing(sharedHighlightRing, sharedHighlightCell, new Color(0.1f, 0.55f, 1f), 0.32f);
+        }
+
+        static void ApplySharedRing(LineRenderer lr, Vector2Int? cell, Color color, float width)
+        {
+            if (lr == null) return;
+            if (!cell.HasValue)
+            {
+                lr.enabled = false;
+                return;
+            }
+            lr.enabled = true;
+            lr.startColor = color;
+            lr.endColor = color;
+            lr.startWidth = width;
+            lr.endWidth = width;
+            Vector3 center = GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(cell.Value);
+            float lift = 0.14f;
+            float radius = GameDevTV.RTS.Player.ColonyTileGrid.TileSize;
+            for (int i = 0; i < 6; i++)
+            {
+                float angleRad = Mathf.PI / 180f * (60f * i);
+                var p = new Vector3(
+                    center.x + radius * Mathf.Cos(angleRad),
+                    center.y + lift,
+                    center.z + radius * Mathf.Sin(angleRad));
+                lr.SetPosition(i, p);
             }
         }
         
@@ -175,7 +363,7 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public Vector3 HexToWorldPosition(Vector2Int hexCoords)
         {
-            return GameDevTV.RTS.Player.ColonyTileGrid.CellToWorld(hexCoords, 0f);
+            return GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(hexCoords);
         }
         
         /// <summary>
@@ -197,13 +385,72 @@ namespace GameDevTV.RTS.Environment
         public HexTile GetHexAtWorldPosition(Vector3 worldPosition)
         {
             Vector2Int hexCoords = WorldToHexCoordinates(worldPosition);
-            
-            if (hexGrid.ContainsKey(hexCoords))
+            return GetHex(hexCoords);
+        }
+
+        /// <summary>
+        /// Hex under the cursor from a terrain raycast hit — flat XZ snap, optional screen tie-break on hills.
+        /// </summary>
+        public HexTile GetHexForHover(Vector3 groundPoint, Camera cam = null, Vector2? screenPos = null)
+        {
+            if (cam != null && screenPos.HasValue)
             {
-                return hexGrid[hexCoords];
+                HexTile screenPick = PickHexNearestOnScreen(groundPoint, cam, screenPos.Value);
+                if (screenPick != null) return screenPick;
             }
-            
-            return null;
+
+            return PickHexNearestOnGround(groundPoint);
+        }
+
+        HexTile PickHexNearestOnScreen(Vector3 groundPoint, Camera cam, Vector2 screenPos)
+        {
+            Vector2Int cell = WorldToHexCoordinates(groundPoint);
+            const float maxPickPx = 96f;
+            HexTile best = null;
+            float bestPx = float.MaxValue;
+
+            void Consider(Vector2Int c)
+            {
+                HexTile tile = GetHex(c);
+                if (tile == null) return;
+                Vector3 center = GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(c);
+                Vector3 sp = cam.WorldToScreenPoint(center + Vector3.up * 0.35f);
+                if (sp.z < 0f) return;
+                float px = Vector2.Distance(new Vector2(sp.x, sp.y), screenPos);
+                if (px > maxPickPx || px >= bestPx) return;
+                bestPx = px;
+                best = tile;
+            }
+
+            Consider(cell);
+            foreach (var delta in HoverNeighborDeltas)
+                Consider(cell + delta);
+            return best;
+        }
+
+        HexTile PickHexNearestOnGround(Vector3 groundPoint)
+        {
+            Vector2Int cell = WorldToHexCoordinates(groundPoint);
+            float maxSq = GameDevTV.RTS.Player.ColonyTileGrid.StickRadius
+                          * GameDevTV.RTS.Player.ColonyTileGrid.StickRadius;
+            HexTile best = null;
+            float bestSq = maxSq;
+
+            void Consider(Vector2Int c)
+            {
+                HexTile tile = GetHex(c);
+                if (tile == null) return;
+                Vector3 center = GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(c);
+                float sq = GameDevTV.RTS.Player.ColonyTileGrid.HorizontalDistSq(groundPoint, center);
+                if (sq >= bestSq) return;
+                bestSq = sq;
+                best = tile;
+            }
+
+            Consider(cell);
+            foreach (var delta in HoverNeighborDeltas)
+                Consider(cell + delta);
+            return best;
         }
 
         /// <summary>
@@ -235,32 +482,19 @@ namespace GameDevTV.RTS.Environment
         {
             if (origin == null || direction == Vector2Int.zero) return null;
 
-            Vector3 desiredDirection = new Vector3(direction.x, 0f, direction.y).normalized;
-            HexTile nearest = null;
-            float nearestDistance = float.MaxValue;
-            float maximumDistance = Mathf.Max(HexHeight, HexWidth) * 1.25f;
-
-            foreach (HexTile candidate in hexGrid.Values)
+            Vector2Int step = direction switch
             {
-                if (candidate == origin) continue;
-                if (revealedOnly && !candidate.IsRevealed) continue;
+                var d when d == Vector2Int.up => new Vector2Int(0, 1),
+                var d when d == Vector2Int.down => new Vector2Int(0, -1),
+                var d when d == Vector2Int.right => new Vector2Int(1, 0),
+                var d when d == Vector2Int.left => new Vector2Int(-1, 0),
+                _ => Vector2Int.zero
+            };
+            if (step == Vector2Int.zero) return null;
 
-                Vector3 offset = candidate.WorldPosition - origin.WorldPosition;
-                offset.y = 0f;
-                float distance = offset.magnitude;
-                if (distance > maximumDistance || distance < 0.01f) continue;
-
-                float directionAlignment = Vector3.Dot(offset / distance, desiredDirection);
-                if (directionAlignment < 0.45f) continue;
-
-                if (distance < nearestDistance)
-                {
-                    nearest = candidate;
-                    nearestDistance = distance;
-                }
-            }
-
-            return nearest;
+            HexTile next = GetHex(origin.HexCoordinates + step);
+            if (next == null || (revealedOnly && !next.IsRevealed)) return null;
+            return next;
         }
 
         public HexTile GetRevealedNeighborInDirection(HexTile origin, Vector2Int direction)
@@ -274,22 +508,23 @@ namespace GameDevTV.RTS.Environment
         /// </summary>
         public HexTile GetNearestHex(Vector3 worldPosition, bool revealedOnly = false)
         {
-            HexTile nearest = null;
-            float nearestDistance = float.MaxValue;
+            HexTile fast = GetHexForHover(worldPosition);
+            if (fast != null && (!revealedOnly || fast.IsRevealed))
+                return fast;
 
-            foreach (HexTile tile in hexGrid.Values)
+            if (revealedOnly)
             {
-                if (revealedOnly && !tile.IsRevealed) continue;
-
-                float distance = (tile.WorldPosition - worldPosition).sqrMagnitude;
-                if (distance < nearestDistance)
+                Vector2Int cell = WorldToHexCoordinates(worldPosition);
+                foreach (var delta in HoverNeighborDeltas)
                 {
-                    nearest = tile;
-                    nearestDistance = distance;
+                    HexTile t = GetHex(cell + delta);
+                    if (t != null && t.IsRevealed)
+                        return t;
                 }
+                return null;
             }
 
-            return nearest;
+            return fast;
         }
 
         public HexTile GetNearestRevealedHex(Vector3 worldPosition)
@@ -391,7 +626,14 @@ namespace GameDevTV.RTS.Environment
                 modifier.ignoreFromBuild = true;
             }
 
-            // ADD PERMANENT OUTLINE
+            // Hide shroud cylinder / mesh — hexes should not paint the map; outline is hover-only.
+            foreach (var rend in hexGO.GetComponentsInChildren<Renderer>(true))
+            {
+                if (rend is LineRenderer) continue;
+                rend.enabled = false;
+            }
+
+            // Hover / selection outline only (starts disabled).
             LineRenderer lr = hexGO.AddComponent<LineRenderer>();
             lr.useWorldSpace = true; // Use world space so the prefab's scale doesn't warp the lines!
             lr.loop = true;
@@ -405,7 +647,7 @@ namespace GameDevTV.RTS.Environment
             lr.numCapVertices = 2;
             lr.sortingOrder = 100;
             lr.enabled = false;
-            lr.startColor = Color.cyan; // Solid cyan!
+            lr.startColor = Color.cyan;
             lr.endColor = Color.cyan;
             
             // Draw a flat-topped hexagon (corners at 0, 60, 120, 180, 240, 300)
@@ -450,6 +692,9 @@ namespace GameDevTV.RTS.Environment
         
         private void Update()
         {
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                return;
+
             // Only run exploration logic every 0.25 seconds to save performance
             explorationTimer += Time.deltaTime;
             if (explorationTimer >= 0.25f)
@@ -552,6 +797,15 @@ namespace GameDevTV.RTS.Environment
         {
             if (PlanetGenerator.Instance == null || PlanetGenerator.Instance.Config == null)
                 return;
+
+            // MainGame builds a small local disk after planet sync — skip planet-wide hex spawn.
+            if (UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>(
+                    UnityEngine.FindObjectsInactive.Include) != null)
+            {
+                Debug.Log("[HexGridManager] Planet generated with MainGame in scene — deferring hex disk to MainGame sync.");
+                OnStartingAreaRevealed?.Invoke();
+                return;
+            }
 
             GenerateHexGrid();
 

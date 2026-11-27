@@ -43,13 +43,11 @@ namespace GameDevTV.RTS.Tests
 
             // Get all NavMesh surfaces on the generator
             var surfaces = generatorObj.GetComponentsInChildren<NavMeshSurface>();
-            
-            // Check how many agent types are actually registered in the project settings
-            int registeredAgentCount = NavMesh.GetSettingsCount();
 
-            // Assert that the generator dynamically added a surface for EVERY agent type
-            Assert.AreEqual(registeredAgentCount, surfaces.Length, 
-                $"PlanetGenerator should have {registeredAgentCount} NavMeshSurfaces, one for each agent type, but found {surfaces.Length}.");
+            // Air bake is off. Only the humanoid ground surface is built.
+            Assert.AreEqual(1, surfaces.Length,
+                $"PlanetGenerator should bake one ground NavMeshSurface, but found {surfaces.Length}.");
+            Assert.AreEqual(0, surfaces[0].agentTypeID);
 
             // --- Regression Test: Verify TransparentFX is excluded ---
             int transparentLayer = LayerMask.NameToLayer("TransparentFX");
@@ -61,10 +59,9 @@ namespace GameDevTV.RTS.Tests
                     $"NavMeshSurface for agent {s.agentTypeID} MUST exclude the TransparentFX layer to avoid baking thousands of ghosts!");
             }
 
-            // Verify each agent type actually has a valid NavMesh baked
-            for (int i = 0; i < registeredAgentCount; i++)
+            // Verify the ground agent binds to the baked NavMesh
             {
-                NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
+                NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(0);
                 
                 // Create a test agent of this type
                 GameObject testAgentObj = new GameObject($"TestAgent_Type_{settings.agentTypeID}");

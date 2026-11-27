@@ -20,8 +20,11 @@ namespace GameDevTV.RTS.Units
 
         private float tickTimer = 0f;
 
-        private void Update()
+        /// <summary>Throttled building tick from <see cref="BuildingManager"/>.</summary>
+        public void SimulationTick(float dt)
         {
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive) return;
+            if (dt <= 0f) return;
             if (Owner == Owner.Invalid) return;
             if (Progress.State != BuildingProgress.BuildingState.Completed) return;
 
@@ -29,16 +32,23 @@ namespace GameDevTV.RTS.Units
             if (efficiency <= 0f) return;
 
             bool shouldGenerateOxygen = BuildingSO != null && (
+                BuildingSO.Name.Contains("Atmosphere Processor") ||
                 BuildingSO.Name.Contains("Oxygen Processor") ||
                 BuildingSO.Name.Contains("Algae Spreader") ||
                 BuildingSO.Name.Contains("Greenery Dome")
             );
             if (!shouldGenerateOxygen) return;
 
-            tickTimer += Time.deltaTime;
-            if (tickTimer < tickRate) return;
-            tickTimer -= tickRate;
+            tickTimer += dt;
+            while (tickTimer >= tickRate)
+            {
+                tickTimer -= tickRate;
+                ApplyOxygenTick(efficiency);
+            }
+        }
 
+        void ApplyOxygenTick(float efficiency)
+        {
             if (Supplies.Oxygen == null || !Supplies.Oxygen.ContainsKey(Owner)) return;
 
             float rate = Mathf.Min(Mathf.Max(0f, oxygenPerTick), MaxOxygenPerTick) * efficiency;

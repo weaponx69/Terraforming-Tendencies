@@ -21,6 +21,8 @@ namespace GameDevTV.RTS.Utilities
         public static bool TryGrantForCommandPost(BaseBuilding commandPost)
         {
             if (commandPost == null || commandPost.Owner != Owner.Player1) return false;
+            // MainGame: Command Post only — no free auto-gather drone.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive) return false;
             if (commandPost.BuildingSO == null
                 || commandPost.BuildingSO.Name == null
                 || commandPost.BuildingSO.Name.IndexOf("Command", System.StringComparison.OrdinalIgnoreCase) < 0)

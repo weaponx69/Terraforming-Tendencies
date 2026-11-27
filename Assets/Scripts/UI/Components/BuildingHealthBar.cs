@@ -39,6 +39,12 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                enabled = false;
+                return;
+            }
+
             if (!TryBuildBar()) return;
             building.OnHealthUpdated += HandleHealthUpdated;
             ApplyFill();

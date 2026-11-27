@@ -18,9 +18,6 @@ namespace GameDevTV.RTS.Behavior
 
         private float startBuildTime;
         private BaseBuilding completedBuilding;
-        private Renderer buildingRenderer;
-        private Vector3 startPosition;
-        private Vector3 endPosition;
         private float targetHealth;
 
         protected override Status OnStart()
@@ -45,15 +42,7 @@ namespace GameDevTV.RTS.Behavior
 
             completedBuilding.StartBuilding(Self.Value.GetComponent<IBuildingBuilder>());
             startBuildTime = completedBuilding.Progress.StartTime;
-
-            buildingRenderer = completedBuilding.MainRenderer;
-
-            if (buildingRenderer != null)
-            {
-                endPosition = completedBuilding.transform.position;
-                startPosition = endPosition - Vector3.up * buildingRenderer.bounds.size.y;
-                buildingRenderer.transform.position = startPosition;
-            }
+            ConstructionScaffold.Ensure(completedBuilding.transform);
 
             return OnUpdate();
         }
@@ -76,11 +65,6 @@ namespace GameDevTV.RTS.Behavior
                 targetHealth -= healAmount;
             }
 
-            if (buildingRenderer != null)
-            {
-                buildingRenderer.transform.position = Vector3.Lerp(startPosition, endPosition, normalizedTime);
-            }
-
             return normalizedTime >= 1 ? Status.Success : Status.Running;
         }
 
@@ -89,6 +73,7 @@ namespace GameDevTV.RTS.Behavior
             // // Debug.Log($"[BuildBuildingAction] OnEnd with Status={CurrentStatus}");
             if (CurrentStatus == Status.Success && completedBuilding != null)
             {
+                ConstructionScaffold.Clear(completedBuilding.transform);
                 completedBuilding.enabled = true;
                 completedBuilding.CompleteConstruction();
             }

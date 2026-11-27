@@ -45,6 +45,25 @@ namespace GameDevTV.RTS.Units
             GhostMaterial  = MakeMetal(ghostColor, metallic: 0.65f, smoothness: 0.15f, transparent: true);
             FinalMaterial  = MakeMetal(finalColor, metallic: 0.85f, smoothness: 0.20f, transparent: false);
 
+            Transform baked = null;
+            foreach (var t in GetComponentsInChildren<Transform>(true))
+            {
+                if (t != null && t.name == "Building Mesh")
+                {
+                    baked = t;
+                    break;
+                }
+            }
+            if (baked != null)
+            {
+                var bakedRenderer = baked.GetComponent<MeshRenderer>();
+                if (bakedRenderer != null)
+                    building.SetMainRenderer(bakedRenderer);
+                float top = bakedRenderer != null ? bakedRenderer.bounds.size.y : height;
+                BuildSmokeEffect(top);
+                return;
+            }
+
             // Destroy any existing renderer/filter that shipped with the prefab so it doesn't compete.
             foreach (var r in GetComponentsInChildren<MeshRenderer>())
             {
@@ -57,7 +76,7 @@ namespace GameDevTV.RTS.Units
             }
 
             BuildGeometry();
-            BuildSmokeEffect();
+            BuildSmokeEffect(height);
 
             // Tell BaseBuilding to treat the stack as the primary renderer
             // (used for ghost/placement material during construction).
@@ -149,12 +168,11 @@ namespace GameDevTV.RTS.Units
 
         // ── Smoke ─────────────────────────────────────────────────────────────
 
-        private void BuildSmokeEffect()
+        private void BuildSmokeEffect(float top)
         {
             GameObject smokeGO = new GameObject("SmokeEffect");
             smokeGO.transform.SetParent(transform, false);
-            // Place smoke exactly at the top of the monolith
-            smokeGO.transform.localPosition = new Vector3(0f, height + 0.1f, 0f);
+            smokeGO.transform.localPosition = new Vector3(0f, top + 0.1f, 0f);
 
             smokePS = smokeGO.AddComponent<ParticleSystem>();
 

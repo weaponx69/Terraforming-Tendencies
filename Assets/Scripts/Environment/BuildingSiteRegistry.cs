@@ -35,7 +35,10 @@ namespace GameDevTV.RTS.Environment
             return name.Contains("mine")
                 || name.Contains("strip")
                 || name.Contains("deep-core mining laser")
-                || name.Contains("mining laser");
+                || name.Contains("mining laser")
+                || name.Contains("gas well")
+                || name.Contains("ore extractor")
+                || name.Contains("iron ore");
         }
 
         public static bool IsCommandBuilding(BuildingSO building)

@@ -70,25 +70,18 @@ namespace GameDevTV.RTS.Commands
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
             if (HandIndex >= 0 && !BuildingSiteRegistry.IsCommandPostBuilding(Building))
                 targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
+            targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
 
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter { agentTypeID = 0, areaMask = UnityEngine.AI.NavMesh.AllAreas };
-            if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
-            {
-                if (HandIndex >= 0)
-                    targetPos = new Vector3(targetPos.x, navHit.position.y, targetPos.z);
-                else
-                    targetPos = navHit.position;
-            }
-
-            // Card plays: Materials waived under Colony Acts; power is optional (not a place gate).
+            // Card plays: Materials waived under Colony Acts / MainGame; power is optional (not a place gate).
             if (HandIndex >= 0)
             {
+                bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
                 bool colonyActs = ColonyActManager.Instance != null;
-                if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
-                if (!HasEnoughMaterialsForCard(context.Owner))
+                if (!prologue && !HasEnoughMaterialsForCard(context.Owner))
                     return false;
-                if (!HasEnoughWeeksForCard())
+                if (!prologue && !HasEnoughWeeksForCard())
                     return false;
                 if (BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && !GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
@@ -103,19 +96,26 @@ namespace GameDevTV.RTS.Commands
                         targetPos = mineSnap;
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
-                    // Mines still cannot claim the Command Post tile.
-                    if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                    // Acts: mines cannot claim the Command Post tile. MainGame deposits often sit on home/CP.
+                    if (!prologue
+                        && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         return false;
                 }
-                else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                // MainGame Aquifer / climate tiles use ice-range Preview, not Acts deposit reservation.
+                else if (!prologue
+                    && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                 {
                     return false;
                 }
-                if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                // MainGame occupancy is MainGameColony.Preview — not Acts Command Post pads.
+                if (!prologue
+                    && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     return false;
-                if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
+                // MainGame uses ice-range / deposit rules, not Acts sector-feature geology.
+                if (!prologue
+                    && DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
                     return false;
                 return AllRestrictionsPass(targetPos, context.Owner, requireWorker: false);
@@ -129,13 +129,8 @@ namespace GameDevTV.RTS.Commands
             IBuildingBuilder builder = context.Commandable as IBuildingBuilder;
 
             bool isCommandPost = BuildingSiteRegistry.IsCommandPostBuilding(Building);
-            UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
-            {
-                agentTypeID = 0,
-                areaMask = UnityEngine.AI.NavMesh.AllAreas
-            };
 
-            // Snap the placement position to the NavMesh so it spawns on the true ground, not on top of rock colliders
+            // Snap to sector / tile, then pin Y to the visible planet mesh height field.
             Vector3 targetPos = SnapToNearestSector(context.Hit.point);
 
             // Card tiles snap to the Combolands square grid (join edges with neighbors).
@@ -152,9 +147,7 @@ namespace GameDevTV.RTS.Commands
                             context.Hit.point);
                         return;
                     }
-                    targetPos = claimPos;
-                    if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit claimHit, 20f, filter))
-                        targetPos = new Vector3(targetPos.x, claimHit.position.y, targetPos.z);
+                    targetPos = ColonyTileGrid.ApplyGroundY(claimPos);
                 }
                 else
                 {
@@ -162,17 +155,14 @@ namespace GameDevTV.RTS.Commands
                     if (BuildingSiteRegistry.IsMineBuilding(Building)
                         && DiscoverySystem.TrySnapToMineDeposit(Building, context.Hit.point, out Vector3 mineSnap, out _))
                     {
-                        targetPos = new Vector3(mineSnap.x, targetPos.y, mineSnap.z);
+                        targetPos = mineSnap;
                     }
+                    targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
                 }
             }
-
-            if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out UnityEngine.AI.NavMeshHit navHit, 20f, filter))
+            else
             {
-                if (HandIndex >= 0)
-                    targetPos = new Vector3(targetPos.x, navHit.position.y, targetPos.z);
-                else
-                    targetPos = navHit.position;
+                targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
             }
 
             // Check if this is the player's very first Command Post
@@ -205,8 +195,10 @@ namespace GameDevTV.RTS.Commands
 
                 if (HandIndex >= 0)
                 {
+                    // MainGame owns placement gates (Preview / TryPlaceImmediate in PlayerInput).
+                    bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
                     bool colonyActs = ColonyActManager.Instance != null;
-                    if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
+                    if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Not enough spare power to place this card.";
@@ -214,7 +206,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!HasEnoughMaterialsForCard(context.Owner))
+                    if (!prologue && !HasEnoughMaterialsForCard(context.Owner))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? $"Need materials to place {Building.Name}.";
@@ -222,7 +214,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!HasEnoughWeeksForCard())
+                    if (!prologue && !HasEnoughWeeksForCard())
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Not enough weeks left to play this card.";
@@ -230,7 +222,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    if (!prologue
+                        && BuildingSiteRegistry.IsCommandPostBuilding(Building)
                         && !GameDevTV.RTS.Utilities.SectorColonization.TryResolveCommandPostTargetSector(
                             context.Hit.point, out _, out string cpGateFail))
                     {
@@ -240,8 +233,13 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
+                    // Mines always require a matching discovered deposit (MainGame + Acts).
+                    // MainGame already committed the hex the ghost showed. Do not jump to a different pad.
                     if (BuildingSiteRegistry.IsMineBuilding(Building))
                     {
+                        if (!prologue
+                            && DiscoverySystem.TrySnapToMineDeposit(Building, targetPos, out Vector3 mineSnap, out _))
+                            targetPos = mineSnap;
                         if (!DiscoverySystem.HasDiscoveredMineDeposit(Building))
                         {
                             DiscoverySystem.TryGetMineResourceType(Building, out string type);
@@ -257,7 +255,8 @@ namespace GameDevTV.RTS.Commands
                                 targetPos);
                             return;
                         }
-                        if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
+                        if (!prologue
+                            && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         {
                             ExplorationManager.NotifyPlacementFailed(
                                 "That tile is the Command Post pad — mine a deposit on another tile.",
@@ -265,7 +264,8 @@ namespace GameDevTV.RTS.Commands
                             return;
                         }
                     }
-                    else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    else if (!prologue
+                        && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                         && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
@@ -274,7 +274,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+                    if (!prologue
+                        && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                         && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
@@ -283,7 +284,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature)
+                    if (!prologue
+                        && DiscoverySystem.TryGetRequiredSectorFeature(Building, out var needFeature)
                         && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
                     {
                         ExplorationManager.NotifyPlacementFailed(
@@ -292,7 +294,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
+                    if (!prologue && !AllRestrictionsPass(targetPos, context.Owner, requireWorker: false))
                     {
                         string reason = ExplainCardPlacementFailure(targetPos, context.Owner)
                             ?? "Can't place here.";
@@ -300,7 +302,7 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    if (!ReservedSiteBuildUtility.TrySpendMaterials(Building, context.Owner))
+                    if (!prologue && !ReservedSiteBuildUtility.TrySpendMaterials(Building, context.Owner))
                     {
                         int need = ReservedSiteBuildUtility.GetMaterialsCost(Building);
                         ExplorationManager.NotifyPlacementFailed(
@@ -312,8 +314,22 @@ namespace GameDevTV.RTS.Commands
                     GameObject cardInstance = Instantiate(Building.Prefab, targetPos, Quaternion.identity);
                     if (cardInstance.TryGetComponent(out BaseBuilding cardBuilding))
                     {
-                        // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
-                        cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
+                        if (prologue && !isCommandPost)
+                        {
+                            // Scaffolding over build weeks on the colony clock. The sim site
+                            // (TryPlace) finishes on the same week ticks.
+                            cardBuilding.BindBuildingDefinition(Building);
+                            int weeks = 1;
+                            if (GameDevTV.RTS.MainGame.MainGameCardMap.TryGetMainGameId(Building, out var buildId))
+                                weeks = Mathf.Max(1, GameDevTV.RTS.MainGame.MainGameData.Get(buildId).BuildWeeks);
+                            cardBuilding.gameObject.AddComponent<GameDevTV.RTS.MainGame.MainGameConstruction>()
+                                .Begin(context.Owner, weeks);
+                        }
+                        else
+                        {
+                            // Card tiles finish instantly (Combolands-style); week spend + score flush in ConsumeCardAfterBuild.
+                            cardBuilding.CompleteInstantCardPlace(context.Owner, Building);
+                        }
                         // Command Posts must stay replayable across sectors — do not draft-lock them.
                         if (!isCommandPost)
                             BlueprintDraftManager.LockBuilding(Building.Name);
@@ -521,6 +537,10 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
+            // MainGame: Unreal ice-range rules live in MainGameColony.Preview — not Acts geology.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                return true;
+
             // Deposit tiles are mine-only (Command Posts still claim their reserved pad).
             if (!BuildingSiteRegistry.IsMineBuilding(Building)
                 && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
@@ -565,15 +585,16 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null) return "No building on this card.";
 
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
             bool colonyActs = ColonyActManager.Instance != null;
-            if (colonyActs && !HasEnoughWeeksForCard())
+            if (!prologue && colonyActs && !HasEnoughWeeksForCard())
             {
                 int need = CardDeckController.GetWeekCost(Building);
                 int have = ColonyActManager.Instance != null ? ColonyActManager.Instance.WeeksRemaining : 0;
                 return $"Need {need} week{(need == 1 ? "" : "s")} to play {Building.Name} (have {have}).";
             }
 
-            if (!colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
+            if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, owner))
             {
                 float gen = PowerGridManager.GetBoardPowerGeneration(owner);
                 float used = PowerGridManager.GetBoardPowerUpkeep(owner);
@@ -584,10 +605,13 @@ namespace GameDevTV.RTS.Commands
                        "Build more Solar or demolish consumers.";
             }
 
-            int matCost = ReservedSiteBuildUtility.GetMaterialsCost(Building);
-            int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
-            if (matCost > 0 && haveMats < matCost)
-                return $"Need {matCost} Materials (have {haveMats}).";
+            if (!prologue)
+            {
+                int matCost = ReservedSiteBuildUtility.GetMaterialsCost(Building);
+                int haveMats = Supplies.Materials != null && Supplies.Materials.TryGetValue(owner, out int m) ? m : 0;
+                if (matCost > 0 && haveMats < matCost)
+                    return $"Need {matCost} Materials (have {haveMats}).";
+            }
 
             if (BuildingSiteRegistry.IsCommandPostBuilding(Building))
             {
@@ -608,10 +632,12 @@ namespace GameDevTV.RTS.Commands
                 }
                 if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, point))
                     return "Place this mine on the matching discovered deposit tile.";
-                if (GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
+                if (!prologue
+                    && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(point))
                     return "That tile is the Command Post pad — mine a deposit on another tile.";
             }
-            else if (!BuildingSiteRegistry.IsCommandPostBuilding(Building)
+            else if (!prologue
+                && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                 && DiscoverySystem.IsOnAnyMineableDeposit(point))
             {
                 return "Deposit tiles are reserved for mines — place elsewhere.";
@@ -623,7 +649,8 @@ namespace GameDevTV.RTS.Commands
                 return "That tile is reserved for the Command Post — place on an adjacent tile.";
             }
 
-            if (DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive
+                && DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
             {
                 string featureName = DiscoverySystem.DescribeSectorFeature(feature);
                 if (!DiscoverySystem.IsSectorFeatureDiscovered(feature))

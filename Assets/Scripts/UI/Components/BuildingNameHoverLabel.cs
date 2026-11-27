@@ -1,3 +1,5 @@
+using GameDevTV.RTS.MainGame;
+using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
 using TMPro;
 using UnityEngine;
@@ -28,6 +30,13 @@ namespace GameDevTV.RTS.UI.Components
         private void Start()
         {
             if (building == null || IsGhostOrInvalid())
+            {
+                enabled = false;
+                return;
+            }
+
+            // MainGame: N buildings × raycasts/frame was crushing Editor FPS.
+            if (MainGameController.IsActive)
             {
                 enabled = false;
                 return;
@@ -84,6 +93,7 @@ namespace GameDevTV.RTS.UI.Components
             }
 
             ApplyFont();
+            labelRoot.transform.localScale = Vector3.one * 0.012f;
             if (labelRoot.GetComponentInParent<FaceCamera>() == null
                 && labelRoot.GetComponent<FaceCamera>() == null
                 && labelRoot.name == "Label Canvas")
@@ -113,7 +123,7 @@ namespace GameDevTV.RTS.UI.Components
         private bool IsPointerOverThisBuilding()
         {
             if (Camera.main == null) return false;
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            if (UiPlaythroughUtil.PointerBlocksWorldInteraction())
                 return false;
 
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);

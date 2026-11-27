@@ -5,6 +5,7 @@ using System.Linq;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.MainGame;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -14,19 +15,34 @@ namespace GameDevTV.RTS.Environment
         public static PlanetGenerator Instance { get; private set; }
         public static event System.Action OnPlanetGenerated;
 
+        /// <summary>MainGame-friendly deposit placement (play mode or Terraforming scene bake).</summary>
+        public static bool IsMainGamePlacementRun()
+        {
+            if (Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>() != null) return true;
+            string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            return scene.IndexOf("Terraforming", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public PlanetConfig Config;
+        [Tooltip("Must match PlanetConfig.BakedGeometryRevision when UseAuthoritativeBakedMesh is on.")]
+        public int SceneBakedGeometryRevision;
         public float CellSize = 1f;
         public bool SpawnFloraOnStart = false; // Default to barren planet
         public bool HasGenerated { get; private set; }
+        Vector3[] drawnVerts;
+        int drawnWidth;
+        int drawnHeight;
 
         public Vector3 StartingAreaCenter
         {
             get
             {
+                if (Application.isPlaying
+                    && GameDevTV.RTS.MainGame.LandingSiteResourceLayout.TryGetActiveLandingWorld(out Vector3 landing))
+                    return landing;
+
                 if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count > 0)
-                {
                     return SectorManager.Instance.Sectors[0].Center;
-                }
 
                 return Config == null
                     ? Vector3.zero
@@ -44,10 +60,33 @@ namespace GameDevTV.RTS.Environment
         private void Awake()
         {
             Instance = this;
+            EnsureConfigLoaded();
+            ApplyPatchScaleFromConfig();
+            // Drop the detailed mesh collider as soon as the scene loads, in the
+            // editor and in play, so physics is not cooking the drawn surface.
+            if (HasBuiltRelief())
+            {
+                EnsureDrawnHeightCache();
+                EnsureCoarseCollider();
+                EnsureWrapStreaming();
+            }
+        }
+
+        bool HasBuiltRelief()
+        {
+            if (Config == null)
+                Config = Resources.Load<PlanetConfig>("Planet 1 - Easy");
+            if (Config == null) return false;
+            if (!TryGetComponent<MeshFilter>(out var filter) || filter.sharedMesh == null)
+                return false;
+            int expected = (Config.MapWidth + 1) * (Config.MapHeight + 1);
+            return filter.sharedMesh.vertexCount == expected && filter.sharedMesh.bounds.size.y > 0.5f;
         }
 
         private void Start()
         {
+            SectorManager.EnsureExists();
+
             if (GameDevTV.RTS.Player.CampaignManager.Instance != null && GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet != null)
             {
                 Config = GameDevTV.RTS.Player.CampaignManager.Instance.CurrentPlanet;
@@ -71,30 +110,286 @@ namespace GameDevTV.RTS.Environment
                 // // Debug.LogWarning("[PlanetGenerator] Could not load SupplySOs from Resources! Ensure they exist in Assets/Resources/Gatherable Supplies/");
             }
 
-            if (SectorManager.Instance != null)
+            ApplyPatchScaleFromConfig();
+            bool meshReady = HasBuiltRelief();
+            bool bakedFast = ShouldUseBakedMeshFastPath(meshReady);
+
+            if (SectorManager.Instance != null && !bakedFast)
             {
                 SectorManager.Instance.ReinitializeSectors();
             }
             
             FixPreplacedGatherables();
 
-            if (Application.isPlaying)
+            if (bakedFast)
+            {
+                CompleteFastBootFromBakedMesh();
+                return;
+            }
+
+            if (meshReady && (NeedsPlanetRegenForPatchScale() || NeedsReliefRegenForHeightAuthoring()))
+            {
+                if (NeedsPlanetRegenForPatchScale())
+                    Debug.Log($"[PlanetGenerator] Regenerating terrain for PlanetPatchDiameter={Config.PlanetPatchDiameter:0} (was ~{CurrentMeshSpanX():0}m wide).");
+                else
+                    Debug.Log($"[PlanetGenerator] Regenerating terrain relief (mesh Y={CurrentMeshSpanY():0.#}m, want ~{Config.HeightAmplitude:0.#}m DEM span).");
+                ClearPlanet();
+                meshReady = false;
+            }
+
+            if (!meshReady)
             {
                 ClearPlanet();
                 GeneratePlanet();
             }
-            else if (GetComponent<MeshFilter>().sharedMesh == null)
-            {
-                GeneratePlanet();
-            }
             else
             {
+                // Mesh is already in the scene. Do not rebuild it.
+                // The walk mesh is baked once, in play, and only if it is missing.
+                HasGenerated = true;
+                EnsureDrawnHeightCache();
+                EnsureCoarseCollider();
+                EnsureWrapStreaming();
+                RefreshDepositMarkHeights();
+                ApplyAuthoredOrGradientSurface();
+                ApplyHorizonPresentationFromConfig();
+                GroundExistingWorldObjects();
+                EnsurePlanetHorizonFromZoom();
+                EnsureSectorResourceNodesPlaced();
+                if (Application.isPlaying)
+                    ScheduleNavMeshBakeIfNeeded();
+                OnPlanetGenerated?.Invoke();
+                if (ShouldReassertPhotoSurfaceAfterGenerate())
+                    StartCoroutine(CoReassertPhotoSurface());
+            }
+            }
+
+            Coroutine deferredNavMeshBake;
+
+            void ScheduleNavMeshBakeIfNeeded()
+            {
+                if (!Application.isPlaying)
+                {
+                    BakeAllNavMeshes();
+                    return;
+                }
+
+                if (IsMainGamePlacementRun())
+                {
+                    if (deferredNavMeshBake != null)
+                        StopCoroutine(deferredNavMeshBake);
+                    deferredNavMeshBake = StartCoroutine(CoDeferredNavMeshBake());
+                    return;
+                }
+
                 BakeAllNavMeshes();
             }
+
+            System.Collections.IEnumerator CoDeferredNavMeshBake()
+            {
+                // Let MainGame HUD / camera appear before the full-planet nav bake.
+                yield return null;
+                yield return null;
+                yield return null;
+                if (!HasGroundNavMesh())
+                    BakeAllNavMeshes();
+                deferredNavMeshBake = null;
+            }
+
+            void ApplyPatchScaleFromConfig()
+            {
+                if (Config == null || Config.PlanetPatchDiameter < 1f) return;
+                int span = Mathf.Max(Config.MapWidth, Config.MapHeight);
+                CellSize = Config.PlanetPatchDiameter / span;
+            }
+
+            void EnsureConfigLoaded()
+            {
+                if (Config != null) return;
+                Config = Resources.Load<PlanetConfig>("Planet 1 - Easy");
+            }
+
+            /// <summary>World width/height of one torus tile (same period as terrain ghosts).</summary>
+            public bool TryGetPatchWorldSize(out float mapWidth, out float mapHeight)
+            {
+                mapWidth = mapHeight = 0f;
+                EnsureConfigLoaded();
+                if (Config == null) return false;
+                ApplyPatchScaleFromConfig();
+
+                mapWidth = Config.MapWidth * CellSize;
+                mapHeight = Config.MapHeight * CellSize;
+                if (Config.PlanetPatchDiameter > 1f)
+                {
+                    mapWidth = Config.PlanetPatchDiameter;
+                    mapHeight = Config.PlanetPatchDiameter;
+                }
+
+                // Torus wrap must match the baked mesh span, not a stale config/mesh pair.
+                if (TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null)
+                {
+                    var extent = mf.sharedMesh.bounds.size;
+                    if (extent.x > 8f) mapWidth = extent.x;
+                    if (extent.z > 8f) mapHeight = extent.z;
+                }
+
+                return mapWidth >= 1f && mapHeight >= 1f;
+            }
+
+            bool ShouldUseBakedMeshFastPath(bool meshReady)
+            {
+                if (!meshReady || Config == null || !Config.UseAuthoritativeBakedMesh)
+                    return false;
+                if (Config.BakedGeometryRevision < 1
+                    || SceneBakedGeometryRevision != Config.BakedGeometryRevision)
+                    return false;
+                if (NeedsPlanetRegenForPatchScale() || NeedsReliefRegenForHeightAuthoring())
+                    return false;
+                return true;
+            }
+
+            /// <summary>Baked mesh Y span too small vs DEM — photo reads as a flat decal.</summary>
+            bool NeedsReliefRegenForHeightAuthoring()
+            {
+                if (Config == null || Config.Heightmap == null || Config.HeightAmplitude < 0.1f)
+                    return false;
+                if (!TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null)
+                    return true;
+                float spanY = mf.sharedMesh.bounds.size.y;
+                float wantSpan = Config.HeightAmplitude * 0.5f;
+                return spanY < wantSpan - 3f;
+            }
+
+            void CompleteFastBootFromBakedMesh()
+            {
+                HasGenerated = true;
+                EnsureDrawnHeightCache();
+                RefreshBakedSurfaceMeshNormals();
+                EnsureCoarseCollider();
+                EnsureWrapStreaming();
+                RefreshDepositMarkHeights();
+                ApplyAuthoredOrGradientSurface();
+                ApplyHorizonPresentationFromConfig();
+                GroundExistingWorldObjects();
+                EnsurePlanetHorizonFromZoom();
+                if (SectorManager.Instance != null && SectorManager.Instance.Sectors.Count == 0)
+                    SectorManager.Instance.ReinitializeSectors();
+                EnsureSectorResourceNodesPlaced();
+                if (Application.isPlaying)
+                    ScheduleNavMeshBakeIfNeeded();
+                Debug.Log(
+                    $"[PlanetGenerator] Baked fast boot (revision {SceneBakedGeometryRevision}) — skipped procedural regen.");
+                if (Application.isPlaying && (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                    || GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene()))
+                {
+                    GameDevTV.RTS.Player.PlayerInput.EnsureOnMainCameraForSlice();
+                    GameDevTV.RTS.Player.PlayerInput.Instance?.RefreshMainGameCameraAfterPlanet();
+                }
+                OnPlanetGenerated?.Invoke();
+                if (ShouldReassertPhotoSurfaceAfterGenerate())
+                    StartCoroutine(CoReassertPhotoSurface());
+            }
+
+            public void EnsurePlanetHorizonFromZoom()
+            {
+                if (!GameDevTV.RTS.MainGame.MainGameController.IsActive) return;
+                if (GetComponent<PlanetHorizonFromZoom>() == null)
+                    gameObject.AddComponent<PlanetHorizonFromZoom>();
+            }
+
+            /// <summary>Asteroids-style torus wrap in planet local space (full flat patch, not landing disk).</summary>
+            public Vector3 WrapWorldOnPatch(Vector3 worldPos)
+            {
+                if (!TryGetPatchWorldSize(out float mapW, out float mapH))
+                    return worldPos;
+
+                float keepY = worldPos.y;
+                Vector3 local = transform.InverseTransformPoint(worldPos);
+                local.x = Mathf.Repeat(local.x, mapW);
+                local.z = Mathf.Repeat(local.z, mapH);
+                Vector3 wrapped = transform.TransformPoint(local);
+                wrapped.y = keepY;
+                return wrapped;
+            }
+
+            bool NeedsPlanetRegenForPatchScale()
+            {
+                if (Config == null || Config.PlanetPatchDiameter < 1f) return false;
+                float want = Config.PlanetPatchDiameter > 1f
+                    ? Config.PlanetPatchDiameter
+                    : Config.MapWidth * CellSize;
+                float have = CurrentMeshSpanX();
+                if (have < 1f) return false;
+                return Mathf.Abs(have - want) > Mathf.Max(32f, want * 0.04f);
+            }
+
+            float CurrentMeshSpanX()
+            {
+                if (!TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null)
+                    return 0f;
+                return mf.sharedMesh.bounds.size.x;
+            }
+
+            float CurrentMeshSpanY()
+            {
+                if (!TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null)
+                    return 0f;
+                return mf.sharedMesh.bounds.size.y;
+            }
+
+            public void ApplyHorizonPresentationFromConfig()
+            {
+                if (Config != null && Config.EnableHorizonCurvature)
+                    EnableHorizonPresentation();
+                else
+                    DisableHorizonPresentation();
+            }
+
+            /// <summary>Curved terrain shader in Play Mode (off by default — keep geometry flat).</summary>
+            public void EnableHorizonPresentation()
+            {
+                if (Config == null || !Config.EnableHorizonCurvature) return;
+                float bodyR = Mathf.Max(Config.HorizonBodyRadiusMeters, 100f);
+                float patch = Config.PlanetPatchDiameter > 1f
+                    ? Config.PlanetPatchDiameter
+                    : Mathf.Max(Config.MapWidth, Config.MapHeight) * CellSize;
+                float half = patch * 0.5f;
+                float strength = (half * half) / (2f * bodyR);
+                strength = Mathf.Clamp(strength, 0.00004f, 0.004f);
+
+                ApplyCurvedWorldShader(gameObject);
+                CurvedWorldUpdater updater = GetComponentInChildren<CurvedWorldUpdater>(true);
+                if (updater == null)
+                {
+                    var go = new GameObject("CurvedWorldUpdater");
+                    go.transform.SetParent(transform, false);
+                    updater = go.AddComponent<CurvedWorldUpdater>();
+                }
+                updater.CurveStrength = strength;
+                updater.CurveOrigin = null;
+            }
+
+            public void DisableHorizonPresentation()
+            {
+                Shader.SetGlobalFloat("_CurveStrength", 0f);
+                var updater = GetComponentInChildren<CurvedWorldUpdater>(true);
+                if (updater != null)
+                {
+                    if (Application.isPlaying)
+                        Destroy(updater.gameObject);
+                    else
+                        DestroyImmediate(updater.gameObject);
+                }
             }
 
             private void BakeAllNavMeshes()
             {
+                if (HasGroundNavMesh())
+                {
+                    Debug.Log("[PlanetGenerator] Ground navmesh already baked — skipping.");
+                    return;
+                }
+
                 // Ensure physics system is aware of feature colliders before bake
                 Physics.SyncTransforms();
 
@@ -102,108 +397,54 @@ namespace GameDevTV.RTS.Environment
 
                 try
                 {
-                int agentTypeCount = NavMesh.GetSettingsCount();
-
-                // Create or find FlyZone child for Air Units
+                // Air units are retired. Drop any leftover FlyZone so its bake meshes
+                // are not left in the scene drawing extra planet copies.
                 Transform flyZone = transform.Find("FlyZone");
                 if (flyZone != null)
-                {
-                    // If it was marked for destruction, it might still be found. Destroy it immediately.
                     DestroyImmediate(flyZone.gameObject);
-                    flyZone = null;
-                }
-            
-                if (flyZone == null)
+
+                for (int c = 0; c < transform.childCount; c++)
                 {
-                    flyZone = new GameObject("FlyZone").transform;
-                    flyZone.parent = transform;
-                    flyZone.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
-                }
-            
-                flyZone.localPosition = new Vector3(0, AirUnitFlightHeight, 0); 
-                flyZone.localRotation = Quaternion.identity;
-                flyZone.localScale = Vector3.one;
-
-                float mapWidthWorld = Config.MapWidth * CellSize;
-                float mapHeightWorld = Config.MapHeight * CellSize;
-                Mesh airBakeMesh = CreateFlatPlaneMesh(mapWidthWorld, mapHeightWorld);
-                Material terrainMat = GetComponent<MeshRenderer>().sharedMaterial;
-
-                // Ensure FlyZone has a continuous flat plane for Air Units (matches DroneMovementTests)
-                GameObject bakeMeshObj = new GameObject("BakeMesh");
-                bakeMeshObj.transform.parent = flyZone;
-                bakeMeshObj.transform.localPosition = Vector3.zero;
-                bakeMeshObj.transform.localRotation = Quaternion.identity;
-                bakeMeshObj.transform.localScale = Vector3.one;
-                bakeMeshObj.layer = LayerMask.NameToLayer("TransparentFX");
-
-                var tempRenderers = new System.Collections.Generic.List<MeshRenderer>();
-
-                if (!bakeMeshObj.TryGetComponent<MeshFilter>(out var ff)) ff = bakeMeshObj.AddComponent<MeshFilter>();
-                ff.sharedMesh = airBakeMesh;
-
-                if (!bakeMeshObj.TryGetComponent<MeshRenderer>(out var mr)) mr = bakeMeshObj.AddComponent<MeshRenderer>();
-                mr.sharedMaterial = terrainMat;
-                mr.enabled = true;
-                tempRenderers.Add(mr);
-
-                // Ghosting for Air NavMesh wrapping
-                for (int x = -2; x <= 2; x++)
-                {
-                    for (int z = -2; z <= 2; z++)
-                    {
-                        if (x == 0 && z == 0) continue;
-                        GameObject ghost = new GameObject($"BakeMesh Ghost ({x},{z})");
-                        ghost.transform.parent = flyZone;
-                        ghost.transform.localPosition = new Vector3(x * mapWidthWorld, 0, z * mapHeightWorld);
-                        ghost.transform.localRotation = Quaternion.identity;
-                        ghost.transform.localScale = Vector3.one;
-                        ghost.gameObject.layer = LayerMask.NameToLayer("TransparentFX");
-                    
-                        var gff = ghost.AddComponent<MeshFilter>();
-                        gff.sharedMesh = airBakeMesh;
-
-                        var gmr = ghost.AddComponent<MeshRenderer>();
-                        gmr.sharedMaterial = terrainMat;
-                        gmr.enabled = true;
-                        tempRenderers.Add(gmr);
-                    }
+                    Transform wrap = transform.GetChild(c);
+                    if (wrap == null || !wrap.name.StartsWith("Terrain Ghost")) continue;
+                    if (wrap.TryGetComponent<MeshCollider>(out var wrapCol))
+                        wrapCol.enabled = false;
                 }
 
-                // Sync transforms so bakes see the newly created/moved ghosts
-                Physics.SyncTransforms(); 
+                int agentTypeCount = NavMesh.GetSettingsCount();
 
                 for (int i = 0; i < agentTypeCount; i++)
                 {
                     NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
-                    bool isAirAgent = settings.agentTypeID != 0; // Assuming 0 is Humanoid
+                    if (settings.agentTypeID != 0)
+                        continue;
 
-                    // Find where this surface should live
-                    GameObject targetObj = isAirAgent ? flyZone.gameObject : gameObject;
-                
-                    NavMeshSurface surface = targetObj.AddComponent<NavMeshSurface>();
+                    NavMeshSurface surface = null;
+                    foreach (var existing in GetComponents<NavMeshSurface>())
+                    {
+                        if (existing != null && existing.agentTypeID == 0)
+                        {
+                            surface = existing;
+                            break;
+                        }
+                    }
+                    if (surface == null)
+                        surface = gameObject.AddComponent<NavMeshSurface>();
                     surface.agentTypeID = settings.agentTypeID;
 
-                    // Use Children for Air Units to only bake the FlyZone elevated mesh
-                    // Use All for ground units to catch ghosts and expansion features
-                    surface.collectObjects = isAirAgent ? CollectObjects.Children : CollectObjects.All;
-                    surface.useGeometry = NavMeshCollectGeometry.RenderMeshes; 
+                    // Ground units: terrain collider plus walkable colliders.
+                    surface.collectObjects = CollectObjects.All;
+                    surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
                 
                     int mask = ~0;
                     int buildingsLayer = LayerMask.NameToLayer("Buildings");
-                    int suppliesLayer = LayerMask.NameToLayer("Supplies");
                     int transparentLayer = LayerMask.NameToLayer("TransparentFX");
                 
                     // Exclude buildings from static bake (they use NavMeshObstacles)
                     if (buildingsLayer != -1) mask &= ~(1 << buildingsLayer);
-                    // Air units ignore supplies on the ground
-                    if (isAirAgent && suppliesLayer != -1) mask &= ~(1 << suppliesLayer);
-                    // CRITICAL: The FlyZone elevated geometry (used to bake the Air NavMesh at Y=4)
-                    // lives on the TransparentFX layer. It must NOT contaminate the GROUND bake,
-                    // otherwise a phantom walkable surface is created at flight height and
-                    // buildings/units snap upward into the air. The air surface uses
-                    // collectObjects=Children so it still bakes the FlyZone correctly.
-                    if (!isAirAgent && transparentLayer != -1) mask &= ~(1 << transparentLayer);
+                    // Keep TransparentFX out of the ground bake so leftover helper meshes
+                    // cannot create a walkable surface above the terrain.
+                    if (transparentLayer != -1) mask &= ~(1 << transparentLayer);
 
                     // Exclude Text meshes from NavMesh baking to prevent invalid vertex data errors
                     int textMeshProLayer = LayerMask.NameToLayer("TextMeshPro");
@@ -215,17 +456,156 @@ namespace GameDevTV.RTS.Environment
                     surface.layerMask = mask;
                     surface.BuildNavMesh();
                 }
-
-                // Disable the renderers immediately after baking so they are never drawn
-                foreach (var renderer in tempRenderers)
-                {
-                    renderer.enabled = false;
-                }
                 }
                 finally
                 {
                     RestoreNavMeshBakeInterferenceSources(disabledBehaviours, disabledRenderers);
+                    EnsureWrapStreaming();
                 }
+            }
+
+            /// <summary>
+            /// Wrap copies stay in the scene, but only the ones near the camera
+            /// (and a short way along the current grab) are drawn.
+            /// </summary>
+            public void EnsureWrapStreaming()
+            {
+                var streamer = GetComponent<TerrainWrapStreamer>();
+                if (streamer == null)
+                    streamer = gameObject.AddComponent<TerrainWrapStreamer>();
+                streamer.Bind(this);
+            }
+
+            bool HasGroundNavMesh()
+            {
+                foreach (var surface in GetComponents<NavMeshSurface>())
+                {
+                    if (surface != null && surface.agentTypeID == 0 && surface.navMeshData != null)
+                        return true;
+                }
+                return false;
+            }
+
+            /// <summary>
+            /// Clicks and the walk bake use a quarter-resolution copy of the visible mesh.
+            /// The detailed mesh stays on the renderer only.
+            /// </summary>
+            public void EnsureCoarseCollider()
+            {
+                if (!TryGetComponent<MeshFilter>(out var visualFilter) || visualFilter.sharedMesh == null)
+                    return;
+                Vector3[] visualVerts = visualFilter.sharedMesh.vertices;
+                CacheDrawnVerts(visualVerts);
+                if (TryGetComponent<MeshCollider>(out var heavy))
+                {
+                    heavy.sharedMesh = null;
+                    heavy.enabled = false;
+                }
+
+                Transform child = transform.Find("PlanetCollision");
+                if (child == null)
+                {
+                    var go = new GameObject("PlanetCollision");
+                    go.transform.SetParent(transform, false);
+                    go.layer = gameObject.layer;
+                    child = go.transform;
+                }
+                if (!child.TryGetComponent<MeshCollider>(out var coarseCol))
+                    coarseCol = child.gameObject.AddComponent<MeshCollider>();
+                Mesh coarse = BuildCoarseColliderMesh(visualVerts);
+                if (coarse == null)
+                    return;
+                coarseCol.sharedMesh = coarse;
+                coarseCol.enabled = true;
+
+                for (int i = 0; i < transform.childCount; i++)
+                {
+                    Transform wrap = transform.GetChild(i);
+                    if (wrap == null || !wrap.name.StartsWith("Terrain Ghost")) continue;
+                    if (!wrap.TryGetComponent<MeshCollider>(out var wrapCol)) continue;
+                    wrapCol.sharedMesh = coarse;
+                }
+            }
+
+            void CacheDrawnVerts(Vector3[] verts)
+            {
+                drawnVerts = verts;
+                drawnWidth = Config != null ? Config.MapWidth : 0;
+                drawnHeight = Config != null ? Config.MapHeight : 0;
+            }
+
+            /// <summary>Keep a copy of drawn mesh heights for placement (independent of physics colliders).</summary>
+            public void EnsureDrawnHeightCache()
+            {
+                if (Config == null)
+                    Config = Resources.Load<PlanetConfig>("Planet 1 - Easy");
+                if (!TryGetComponent<MeshFilter>(out var filter) || filter.sharedMesh == null)
+                    return;
+                CacheDrawnVerts(filter.sharedMesh.vertices);
+            }
+
+            void RefreshDepositMarkHeights()
+            {
+                float floatHeight = GameDevTV.RTS.MainGame.MainGameIceMarkers.DepositFloatHeight;
+                foreach (var mark in Object.FindObjectsByType<GameDevTV.RTS.MainGame.MainGameDepositMark>(FindObjectsInactive.Exclude))
+                {
+                    if (mark == null) continue;
+                    Vector3 ground = mark.GroundPoint;
+                    ground.y = SampleGroundY(ground);
+                    mark.GroundPoint = ground;
+                    var root = mark.transform;
+                    root.position = ground + Vector3.up * floatHeight;
+                    GameDevTV.RTS.MainGame.MainGameDepositMark.EnsureClickVolume(root, floatHeight);
+                }
+            }
+
+            Mesh BuildCoarseColliderMesh(Vector3[] src)
+            {
+                const int stride = 4;
+                int width = Config != null ? Config.MapWidth : 0;
+                int height = Config != null ? Config.MapHeight : 0;
+                int srcStride = width + 1;
+                if (src == null || width < stride || height < stride || src.Length != srcStride * (height + 1))
+                    return null;
+
+                int cellsX = width / stride;
+                int cellsZ = height / stride;
+                int vx = cellsX + 1;
+                int vz = cellsZ + 1;
+                var verts = new Vector3[vx * vz];
+                for (int z = 0; z <= cellsZ; z++)
+                {
+                    int sz = Mathf.Min(z * stride, height);
+                    for (int x = 0; x <= cellsX; x++)
+                    {
+                        int sx = Mathf.Min(x * stride, width);
+                        verts[z * vx + x] = src[sz * srcStride + sx];
+                    }
+                }
+
+                var tris = new int[cellsX * cellsZ * 6];
+                int t = 0;
+                for (int z = 0; z < cellsZ; z++)
+                {
+                    for (int x = 0; x < cellsX; x++)
+                    {
+                        int i = z * vx + x;
+                        tris[t++] = i;
+                        tris[t++] = i + vx;
+                        tris[t++] = i + 1;
+                        tris[t++] = i + 1;
+                        tris[t++] = i + vx;
+                        tris[t++] = i + vx + 1;
+                    }
+                }
+
+                var mesh = new Mesh { name = "PlanetCollision" };
+                if (verts.Length > 65000)
+                    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                mesh.vertices = verts;
+                mesh.triangles = tris;
+                mesh.RecalculateBounds();
+                return mesh;
             }
 
             /// <summary>
@@ -283,36 +663,6 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            /// <summary>
-            /// Continuous flat plane covering the map extents for Air Units NavMesh bake.
-            /// Matches the elevated Plane used by DroneMovementTests.
-            /// </summary>
-            private static Mesh CreateFlatPlaneMesh(float width, float height)
-            {
-                Mesh mesh = new Mesh { name = "AirBakePlane" };
-                mesh.vertices = new[]
-                {
-                    new Vector3(0f, 0f, 0f),
-                    new Vector3(width, 0f, 0f),
-                    new Vector3(0f, 0f, height),
-                    new Vector3(width, 0f, height)
-                };
-                mesh.triangles = new[] { 0, 2, 1, 2, 3, 1 };
-                mesh.normals = new[]
-                {
-                    Vector3.up, Vector3.up, Vector3.up, Vector3.up
-                };
-                mesh.uv = new[]
-                {
-                    new Vector2(0f, 0f),
-                    new Vector2(1f, 0f),
-                    new Vector2(0f, 1f),
-                    new Vector2(1f, 1f)
-                };
-                mesh.RecalculateBounds();
-                return mesh;
-            }
-
                 public void ClearPlanet()
                 {
                     // Use DestroyImmediate to ensure hierarchy is clean for immediate reconstruction
@@ -322,6 +672,7 @@ namespace GameDevTV.RTS.Environment
                     }
                     if (TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = null;
                     if (TryGetComponent<MeshCollider>(out var mc)) mc.sharedMesh = null;
+                    drawnVerts = null;
 
                     // Also clear any existing NavMeshSurfaces to avoid stale data
                     foreach (var surface in GetComponents<NavMeshSurface>())
@@ -340,6 +691,7 @@ namespace GameDevTV.RTS.Environment
                 public void GeneratePlanet()
                 {
                 if (Config == null) return;
+                ApplyPatchScaleFromConfig();
 
                 Mesh mesh = new Mesh();
                 mesh.name = "Procedural Planet Surface";
@@ -356,16 +708,61 @@ namespace GameDevTV.RTS.Environment
                 float minHeight = 0f;
                 float maxHeight = 0.1f; // Avoid divide by zero in UV mapping
 
+                // Seeded hills on the visible mesh (same function as PlanetTerrainBuilder collider).
+                Vector3 landingLocal = transform.InverseTransformPoint(StartingAreaCenter);
+                var heightParams = PlanetTerrainBuilder.MakeParams(Config, CellSize, landingLocal);
+
                 for (int i = 0, y = 0; y <= height; y++)
                 {
                 for (int x = 0; x <= width; x++, i++)
                 {
-                    // Flat terrain
-                    float yPos = 0f;
+                    float wx = x * CellSize;
+                    float wz = y * CellSize;
+                    float yPos = PlanetTerrainBuilder.SampleWorldY(wx, wz, in heightParams);
 
-                    vertices[i] = new Vector3(x * CellSize, yPos, y * CellSize);
+                    vertices[i] = new Vector3(wx, yPos, wz);
+                    float u = width > 0 ? x / (float)width : 0f;
+                    float v = height > 0 ? y / (float)height : 0f;
+                    uvs[i] = new Vector2(u, v);
+                    if (yPos < minHeight) minHeight = yPos;
+                    if (yPos > maxHeight) maxHeight = yPos;
                 }
                 }
+
+                // Ease height into the wrap so ghost copies don't meet on a crease.
+                int stride = width + 1;
+                int blend = Mathf.Clamp(width / 24, 4, 12);
+                for (int y = 0; y <= height; y++)
+                {
+                    int row = y * stride;
+                    float avgY = (vertices[row].y + vertices[row + width].y) * 0.5f;
+                    for (int k = 0; k <= blend; k++)
+                    {
+                        float t = k / (float)blend;
+                        t = t * t * (3f - 2f * t);
+                        vertices[row + k].y = Mathf.Lerp(avgY, vertices[row + k].y, t);
+                        vertices[row + width - k].y = Mathf.Lerp(avgY, vertices[row + width - k].y, t);
+                    }
+                }
+                for (int x = 0; x <= width; x++)
+                {
+                    int bottom = x;
+                    int top = height * stride + x;
+                    float avgY = (vertices[bottom].y + vertices[top].y) * 0.5f;
+                    for (int k = 0; k <= blend; k++)
+                    {
+                        float t = k / (float)blend;
+                        t = t * t * (3f - 2f * t);
+                        vertices[k * stride + x].y = Mathf.Lerp(avgY, vertices[k * stride + x].y, t);
+                        vertices[(height - k) * stride + x].y = Mathf.Lerp(avgY, vertices[(height - k) * stride + x].y, t);
+                    }
+                }
+                float cornerY = (vertices[0].y + vertices[width].y
+                    + vertices[height * stride].y + vertices[height * stride + width].y) * 0.25f;
+                vertices[0].y = cornerY;
+                vertices[width].y = cornerY;
+                vertices[height * stride].y = cornerY;
+                vertices[height * stride + width].y = cornerY;
 
                 for (int ti = 0, vi = 0, y = 0; y < height; y++, vi++)
                 {
@@ -376,13 +773,6 @@ namespace GameDevTV.RTS.Environment
                     triangles[ti + 4] = triangles[ti + 1] = vi + width + 1;
                     triangles[ti + 5] = vi + width + 2;
                 }
-                }
-
-                // Assign UVs strictly based on normalized height for the gradient mapping
-                for (int i = 0; i < vertices.Length; i++)
-                {
-                float normHeight = Mathf.InverseLerp(minHeight, maxHeight, vertices[i].y);
-                uvs[i] = new Vector2(0, normHeight);
                 }
 
                 mesh.vertices = vertices;
@@ -422,7 +812,11 @@ namespace GameDevTV.RTS.Environment
                 mesh.normals = normals;
 
                 GetComponent<MeshFilter>().mesh = mesh;
-                GetComponent<MeshCollider>().sharedMesh = mesh;
+                if (TryGetComponent<MeshCollider>(out var heavyCol))
+                {
+                    heavyCol.sharedMesh = null;
+                    heavyCol.enabled = false;
+                }
 
                 float generatedMapWidth = width * CellSize;
                 float generatedMapHeight = height * CellSize;
@@ -434,16 +828,7 @@ namespace GameDevTV.RTS.Environment
                     : Vector3.zero;
                 Debug.Log($"[PlanetGenerator] World bounds min={mapMin}, max={mapMax}, center={mapCenter}; Sector 0 center={sectorCenter}; offset={sectorCenter - mapCenter}");
 
-                MeshRenderer renderer = GetComponent<MeshRenderer>();
-                Shader shader = Shader.Find("Custom/URP_CurvedWorld");
-                if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-                if (shader != null)
-                {
-                Material mat = new Material(shader);
-                mat.mainTexture = GenerateHeightGradient();
-                mat.SetFloat("_Smoothness", 0.1f); // Smooth but not shiny
-                renderer.sharedMaterial = mat;
-                }
+                ApplyAuthoredOrGradientSurface();
 
                 // Create 8 visual ghosts for seamless wrapping
                 float mapWidthWorld = width * CellSize;
@@ -468,10 +853,13 @@ namespace GameDevTV.RTS.Environment
                         mf.sharedMesh = mesh;
                         
                         MeshRenderer mr = ghost.AddComponent<MeshRenderer>();
-                        mr.sharedMaterial = renderer.sharedMaterial;
+                        if (TryGetComponent<MeshRenderer>(out var mainMr))
+                            mr.sharedMaterial = mainMr.sharedMaterial;
+                        mr.enabled = false;
 
                         MeshCollider mc = ghost.AddComponent<MeshCollider>();
                         mc.sharedMesh = mesh;
+                        mc.enabled = false;
                     }
                 }
 
@@ -484,19 +872,325 @@ namespace GameDevTV.RTS.Environment
                     SectorManager.Instance.InitializeSectors();
                 }
 
+                // Terrain collider / SampleHeight (visual hills are already on the mesh above).
+                Vector3 landing = StartingAreaCenter;
+                try
+                {
+                    var built = PlanetTerrainBuilder.BuildOrUpdate(transform, Config, CellSize, landing);
+                    if (built == null)
+                        Debug.LogWarning("[PlanetGenerator] PlanetTerrainBuilder returned null — using mesh heights only.");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[PlanetGenerator] Terrain build failed: {ex.Message}\n{ex.StackTrace}");
+                }
+                // Keep MeshRenderer on — mesh carries visible relief. Wrap copies stream in
+                // near the camera so a grab still has ground ahead of it.
+                Debug.Log($"[PlanetGenerator] Mesh relief span Y=[{minHeight:0.#}..{maxHeight:0.#}] wavelength={heightParams.Wavelength:0.#} amp={heightParams.HeightAmp:0.#}");
+
                 // Place resource nodes per sector (replaces old random scatter)
                 PlaceSectorResourceNodes();
 
-                BakeAllNavMeshes();
-                // Curved world shader disabled — flat terrain looks better for node-based exploration
-                // ApplyCurvedWorldShader(gameObject);
-                // GameObject updater = new GameObject("CurvedWorldUpdater");
-                // updater.transform.parent = transform;
-                // updater.AddComponent<CurvedWorldUpdater>();
+                EnsureDrawnHeightCache();
+                EnsureCoarseCollider();
+                EnsureWrapStreaming();
+                RefreshDepositMarkHeights();
+                ScheduleNavMeshBakeIfNeeded();
+                ApplyHorizonPresentationFromConfig();
+
+                GroundExistingWorldObjects();
 
                 HasGenerated = true;
+                EnsurePlanetHorizonFromZoom();
+                if (TryGetPatchWorldSize(out float torusW, out float torusH))
+                    Debug.Log($"[PlanetGenerator] Torus period {torusW:0}m x {torusH:0}m (camera wrap = full flat patch).");
                 OnPlanetGenerated?.Invoke();
+                // ClimateVisualStages may swap gradients on the same frame — reassert photo albedo.
+                ApplyAuthoredOrGradientSurface();
+                if (ShouldReassertPhotoSurfaceAfterGenerate())
+                    StartCoroutine(CoReassertPhotoSurface());
                 }
+
+            static bool ShouldReassertPhotoSurfaceAfterGenerate()
+            {
+                if (!Application.isPlaying) return false;
+                var inst = Instance;
+                if (inst == null || inst.Config == null || inst.Config.AlbedoMap == null) return false;
+                return !GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene();
+            }
+
+        System.Collections.IEnumerator CoReassertPhotoSurface()
+        {
+            yield return null;
+            ApplyAuthoredOrGradientSurface();
+        }
+
+        /// <summary>URP Lit with AlbedoMap when authored; otherwise height-band gradient.</summary>
+        public void ApplyAuthoredOrGradientSurface()
+        {
+            if (Config == null) return;
+            if (!TryGetComponent<MeshRenderer>(out var renderer)) return;
+            renderer.enabled = true;
+
+            bool mainGameSurface = Application.isPlaying
+                && (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                    || GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene());
+
+            // MainGame: stay on URP Lit — Unlit often reads as a white void with our volume/ambient stack.
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit")
+                            ?? Shader.Find("Universal Render Pipeline/Simple Lit");
+            if (!mainGameSurface)
+                shader ??= Shader.Find("Custom/URP_CurvedWorld");
+            if (shader == null) return;
+
+            Material mat = new Material(shader);
+            EnsureOpaqueTerrainMaterial(mat);
+            if (mainGameSurface && mat.HasProperty("_Cull"))
+                mat.SetFloat("_Cull", 0f);
+            if (Config.AlbedoMap != null)
+            {
+                // Photo + DEM normal carry landforms; detail dust tiles for close-up (spec: DetailTiling).
+                var repeat = ComputeHeroAlbedoRepeat(mainGameSurface);
+                Config.AlbedoMap.wrapMode = TextureWrapMode.Repeat;
+                mat.mainTexture = Config.AlbedoMap;
+                mat.mainTextureScale = repeat;
+                if (mat.HasProperty("_BaseMap"))
+                {
+                    mat.SetTexture("_BaseMap", Config.AlbedoMap);
+                    mat.SetTextureScale("_BaseMap", repeat);
+                }
+                var tint = mainGameSurface
+                    ? new Color(0.94f, 0.91f, 0.86f, 1f)
+                    : new Color(0.82f, 0.76f, 0.70f, 1f);
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", tint);
+                else if (mat.HasProperty("_Color")) mat.SetColor("_Color", tint);
+                if (Config.NormalMap != null && mat.HasProperty("_BumpMap"))
+                {
+                    Config.NormalMap.wrapMode = TextureWrapMode.Repeat;
+                    mat.SetTexture("_BumpMap", Config.NormalMap);
+                    mat.SetTextureScale("_BumpMap", repeat);
+                    mat.EnableKeyword("_NORMALMAP");
+                    if (mat.HasProperty("_BumpScale"))
+                        mat.SetFloat("_BumpScale", mainGameSurface ? 1.15f : 0.65f);
+                }
+                if (mat.HasProperty("_Smoothness"))
+                    mat.SetFloat("_Smoothness", mainGameSurface ? 0.08f : 0.04f);
+                if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0f);
+                ApplyCloseSand(mat);
+            }
+            else
+            {
+                var grad = GenerateHeightGradient();
+                grad.name = "ClimateGroundGrad";
+                mat.mainTexture = grad;
+                if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", grad);
+                if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.1f);
+            }
+
+            renderer.sharedMaterial = mat;
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child == null || !child.name.StartsWith("Terrain Ghost", System.StringComparison.Ordinal))
+                    continue;
+                if (child.TryGetComponent<MeshRenderer>(out var gmr))
+                    gmr.sharedMaterial = mat;
+            }
+
+            if (Application.isPlaying && GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                GameDevTV.RTS.MainGame.MainGameGroundVisualTuning.SharpenPlanetTextures();
+
+            Debug.Log(Config.AlbedoMap != null
+                ? $"[PlanetGenerator] Surface material = photo albedo '{Config.AlbedoMap.name}'"
+                : "[PlanetGenerator] Surface material = ClimateGroundGrad fallback");
+        }
+
+        static void EnsureOpaqueTerrainMaterial(Material mat)
+        {
+            if (mat == null) return;
+            if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 0f);
+            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.EnableKeyword("_SURFACE_TYPE_OPAQUE");
+            if (mat.HasProperty("_ZWrite")) mat.SetFloat("_ZWrite", 1f);
+            mat.SetOverrideTag("RenderType", "Opaque");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
+        }
+
+        void RefreshBakedSurfaceMeshNormals()
+        {
+            if (!TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null) return;
+            mf.sharedMesh.RecalculateNormals();
+            mf.sharedMesh.RecalculateTangents();
+            mf.sharedMesh.RecalculateBounds();
+        }
+
+        /// <summary>
+        /// Dust on the photo. Albedo adds grit. The normal stays quiet so it
+        /// does not replace the hills and valleys.
+        /// </summary>
+        Vector2 ComputeHeroAlbedoRepeat(bool mainGameSurface) => Vector2.one;
+
+        void ApplyCloseSand(Material mat)
+        {
+            if (Config.DetailAlbedoMap == null || !mat.HasProperty("_DetailAlbedoMap")) return;
+            float tiling = Config.DetailTiling > 1f ? Config.DetailTiling : 32f;
+            if (Application.isPlaying
+                && (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                    || GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene()))
+            {
+                if (TryGetPatchWorldSize(out float patchW, out _))
+                    tiling *= Mathf.Clamp(patchW / 512f, 1f, 4f);
+            }
+
+            var repeat = new Vector2(tiling, tiling);
+            Config.DetailAlbedoMap.wrapMode = TextureWrapMode.Repeat;
+            mat.SetTexture("_DetailAlbedoMap", Config.DetailAlbedoMap);
+            mat.SetTextureScale("_DetailAlbedoMap", repeat);
+            bool mainGameSurface = Application.isPlaying
+                && (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                    || GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene());
+            if (mat.HasProperty("_DetailAlbedoMapScale"))
+                mat.SetFloat("_DetailAlbedoMapScale", mainGameSurface ? 0.62f : 1f);
+            if (Config.DetailNormalMap != null && mat.HasProperty("_DetailNormalMap"))
+            {
+                Config.DetailNormalMap.wrapMode = TextureWrapMode.Repeat;
+                mat.SetTexture("_DetailNormalMap", Config.DetailNormalMap);
+                mat.SetTextureScale("_DetailNormalMap", repeat);
+                if (mat.HasProperty("_DetailNormalMapScale"))
+                    mat.SetFloat("_DetailNormalMapScale", mainGameSurface ? 0.28f : 0.35f);
+            }
+            mat.EnableKeyword("_DETAIL_MULX2");
+        }
+
+        /// <summary>Pin buildings / deposits / gatherables to the mesh height after relief is baked.</summary>
+        void GroundExistingWorldObjects()
+        {
+            foreach (var b in BaseBuilding.ActiveBuildings)
+            {
+                if (b == null) continue;
+                Vector3 p = b.transform.position;
+                p.y = SampleGroundY(p);
+                b.transform.position = p;
+            }
+
+            foreach (var gs in Object.FindObjectsByType<GatherableSupply>(FindObjectsInactive.Exclude))
+            {
+                if (gs == null) continue;
+                Vector3 p = gs.transform.position;
+                p.y = SampleGroundY(p);
+                gs.transform.position = p;
+            }
+
+            foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
+            {
+                if (hr == null) continue;
+                Vector3 p = hr.transform.position;
+                p.y = SampleGroundY(p);
+                hr.transform.position = p;
+            }
+        }
+
+        /// <summary>World Y of the visible planet triangles, so placed meshes meet the ground you see.</summary>
+        public float SampleGroundY(Vector3 worldPos)
+        {
+            if (TrySampleVisibleMesh(worldPos, out float meshY))
+                return meshY;
+            if (TrySampleCoarseCollider(worldPos, out meshY))
+                return meshY;
+
+            if (Config != null)
+            {
+                Vector3 local = transform.InverseTransformPoint(worldPos);
+                Vector3 landingLocal = transform.InverseTransformPoint(StartingAreaCenter);
+                var p = PlanetTerrainBuilder.MakeParams(Config, CellSize, landingLocal);
+                float yLocal = PlanetTerrainBuilder.SampleWorldY(local.x, local.z, in p);
+                return transform.TransformPoint(new Vector3(local.x, yLocal, local.z)).y;
+            }
+
+            int mask = LayerMask.GetMask("Default", "Terrain");
+            if (mask == 0) mask = Physics.DefaultRaycastLayers;
+            if (Physics.Raycast(worldPos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f, mask,
+                    QueryTriggerInteraction.Ignore))
+                return hit.point.y;
+            return 0f;
+        }
+
+        bool TrySampleCoarseCollider(Vector3 worldPos, out float y)
+        {
+            y = 0f;
+            Transform child = transform.Find("PlanetCollision");
+            if (child == null || !child.TryGetComponent<MeshCollider>(out var col)
+                || col.sharedMesh == null || !col.enabled)
+                return false;
+            Bounds bounds = col.bounds;
+            var origin = new Vector3(worldPos.x, bounds.max.y + 25f, worldPos.z);
+            var ray = new Ray(origin, Vector3.down);
+            if (!col.Raycast(ray, out RaycastHit hit, bounds.size.y + 50f))
+                return false;
+            y = hit.point.y;
+            return true;
+        }
+
+        bool TrySampleVisibleMesh(Vector3 worldPos, out float y)
+        {
+            y = 0f;
+            if (drawnVerts == null)
+                EnsureDrawnHeightCache();
+            int width = drawnWidth;
+            int height = drawnHeight;
+            int stride = width + 1;
+            if (drawnVerts == null || width < 1 || height < 1 || drawnVerts.Length != stride * (height + 1))
+            {
+                EnsureDrawnHeightCache();
+                stride = drawnWidth + 1;
+                if (drawnVerts == null || drawnWidth < 1 || drawnHeight < 1
+                    || drawnVerts.Length != stride * (drawnHeight + 1))
+                    return false;
+                width = drawnWidth;
+                height = drawnHeight;
+            }
+
+            Vector3 local = transform.InverseTransformPoint(worldPos);
+            float mapW = width * CellSize;
+            float mapH = height * CellSize;
+            float lx = Mathf.Repeat(local.x, mapW);
+            float lz = Mathf.Repeat(local.z, mapH);
+            float fx = lx / CellSize;
+            float fz = lz / CellSize;
+            int x = Mathf.Clamp(Mathf.FloorToInt(fx), 0, width - 1);
+            int z = Mathf.Clamp(Mathf.FloorToInt(fz), 0, height - 1);
+            float u = Mathf.Clamp01(fx - x);
+            float v = Mathf.Clamp01(fz - z);
+            int i = z * stride + x;
+            float y00 = drawnVerts[i].y;
+            float y10 = drawnVerts[i + 1].y;
+            float y01 = drawnVerts[i + stride].y;
+            float y11 = drawnVerts[i + stride + 1].y;
+            float localY = (u + v) <= 1f
+                ? y00 * (1f - u - v) + y10 * u + y01 * v
+                : y10 * (1f - v) + y01 * (1f - u) + y11 * (u + v - 1f);
+            y = transform.TransformPoint(new Vector3(local.x, localY, local.z)).y;
+            return true;
+        }
+
+        /// <summary>Baked / fast boot paths skip <see cref="GeneratePlanet"/> — place nodes once sectors exist.</summary>
+        public void EnsureSectorResourceNodesPlaced()
+        {
+            SectorManager.EnsureExists();
+            if (SectorManager.Instance == null) return;
+            if (SectorManager.Instance.Sectors.Count == 0)
+                SectorManager.Instance.InitializeSectors();
+            if (SectorManager.Instance.Sectors.Count == 0) return;
+
+            int totalNodes = 0;
+            foreach (var sector in SectorManager.Instance.Sectors)
+            {
+                if (sector?.Nodes != null) totalNodes += sector.Nodes.Count;
+            }
+
+            if (totalNodes > 0) return;
+            PlaceSectorResourceNodes();
+        }
 
                 /// <summary>
                 /// Place resource, feature, and nexus nodes in each sector.
@@ -511,6 +1205,7 @@ namespace GameDevTV.RTS.Environment
                     }
                     Debug.Log($"[PlanetGenerator] Placing nodes in {SectorManager.Instance.Sectors.Count} sectors...");
 
+                    bool prologueRun = IsMainGamePlacementRun();
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
                         int sectorIndex = SectorManager.Instance.Sectors.IndexOf(sector);
@@ -523,6 +1218,7 @@ namespace GameDevTV.RTS.Environment
                         var usedDepositCells = new System.Collections.Generic.HashSet<Vector2Int> { cpCell };
 
                         bool isStartingSector = sectorIndex == 0;
+                        int minDepositHexGap = prologueRun && isStartingSector ? 1 : 2;
                         float revealRadius = HexGridManager.Instance != null
                             ? HexGridManager.Instance.StartingAreaRevealRadius
                             : 15f;
@@ -534,13 +1230,20 @@ namespace GameDevTV.RTS.Environment
                             if (usedDepositCells.Contains(cell)) return false;
                             foreach (var used in usedDepositCells)
                             {
-                                // Leave at least one empty hex ring between deposits / CP.
-                                if (ColonyTileGrid.HexDistance(used, cell) < 2)
+                                if (ColonyTileGrid.HexDistance(used, cell) < minDepositHexGap)
                                     return false;
                             }
                             usedDepositCells.Add(cell);
                             return true;
                         };
+
+                        if (prologueRun && isStartingSector)
+                        {
+                            PlaceLandingZoneSectorNodes(sector, sectorIndex, cpCell, usedDepositCells,
+                                minDepositHexGap, secW);
+                            EnsureMinimumSectorResources(sector, sectorIndex);
+                            continue;
+                        }
 
                         System.Func<Vector3> randomPos = () =>
                         {
@@ -561,7 +1264,7 @@ namespace GameDevTV.RTS.Environment
                                     {
                                         var cell = new Vector2Int(cpCell.x + dq, cpCell.y + dr);
                                         if (ColonyTileGrid.HexDistance(cpCell, cell) != ring) continue;
-                                        Vector3 candidate = ColonyTileGrid.CellToWorld(cell, 0f);
+                                        Vector3 candidate = ColonyTileGrid.CellToWorldOnGround(cell);
                                         if (tryClaimDepositCell(candidate))
                                             return candidate;
                                     }
@@ -573,34 +1276,74 @@ namespace GameDevTV.RTS.Environment
                                 sector.Center + new Vector3(dir.x, 0f, dir.y) * (ColonyTileGrid.TileSize * 3f));
                         };
 
-                        // Sparse deposits (richer yield applied at spawn) — board stays placeable.
-                        for (int i = 0; i < 2; i++)
+                        int nearCampMaxRing = prologueRun && isStartingSector
+                            ? LandingSiteResourceLayout.SurveyCorridorMaxHex
+                            : 8;
+
+                        System.Func<Vector3> randomPosNearCamp = () =>
                         {
-                            Vector3 pos;
-                            if (isStartingSector && i == 0)
+                            for (int attempt = 0; attempt < 24; attempt++)
                             {
-                                pos = ColonyTileGrid.SnapToTile(
-                                    sector.Center + new Vector3(-bootstrapRadius * 0.9f, 0f, bootstrapRadius * 0.75f));
-                                if (!tryClaimDepositCell(pos))
-                                    pos = randomPos();
+                                int ring = Random.Range(MainGameSectorDepositBootstrap.MinHexDistFromCamp, nearCampMaxRing + 1);
+                                int dq = Random.Range(-ring, ring + 1);
+                                int dr = Random.Range(-ring, ring + 1);
+                                var cell = new Vector2Int(cpCell.x + dq, cpCell.y + dr);
+                                if (ColonyTileGrid.HexDistance(cpCell, cell) != ring) continue;
+                                Vector3 candidate = ColonyTileGrid.CellToWorldOnGround(cell);
+                                if (tryClaimDepositCell(candidate))
+                                    return candidate;
                             }
-                            else if (isStartingSector && i == 1)
+                            for (int ring = MainGameSectorDepositBootstrap.MinHexDistFromCamp; ring <= nearCampMaxRing; ring++)
                             {
-                                pos = ColonyTileGrid.SnapToTile(
-                                    sector.Center + new Vector3(bootstrapRadius * 0.85f, 0f, -bootstrapRadius * 0.7f));
-                                if (!tryClaimDepositCell(pos))
-                                    pos = randomPos();
+                                for (int dq = -ring; dq <= ring; dq++)
+                                {
+                                    for (int dr = -ring; dr <= ring; dr++)
+                                    {
+                                        var cell = new Vector2Int(cpCell.x + dq, cpCell.y + dr);
+                                        if (ColonyTileGrid.HexDistance(cpCell, cell) != ring) continue;
+                                        Vector3 candidate = ColonyTileGrid.CellToWorldOnGround(cell);
+                                        if (tryClaimDepositCell(candidate))
+                                            return candidate;
+                                    }
+                                }
                             }
-                            else
+                            return randomPos();
+                        };
+                        var pickDepositPos = prologueRun && isStartingSector
+                            ? (System.Func<Vector3>)randomPosNearCamp
+                            : randomPos;
+
+                        // Sparse deposits (richer yield applied at spawn) — board stays placeable.
+                        // PlanetConfig allowlist gates which gatherable types spawn (planet mix); select UI is future.
+                        bool allowMinerals = Config == null || Config.AllowMinerals;
+                        bool allowGas = Config == null || Config.AllowGas;
+                        bool allowIron = Config == null || Config.AllowIron;
+                        bool allowRegolith = Config == null || Config.AllowRegolith;
+
+                        if (allowMinerals)
+                        {
+                            int mineralPads = prologueRun && isStartingSector ? 3 : 2;
+                            for (int i = 0; i < mineralPads; i++)
                             {
-                                pos = randomPos();
+                                Vector3 pos;
+                                if (isStartingSector && (i == 0 || i == 1))
+                                {
+                                    pos = randomPosNearCamp();
+                                }
+                                else
+                                {
+                                    pos = pickDepositPos();
+                                }
+                                sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                             }
-                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos, "A crystalline mineral deposit glistens in the light.", "Minerals"));
                         }
 
-                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, randomPos(), "Vaporous gases seep from fissures in the ground.", "Gas"));
-                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, randomPos(), "A rich iron ore deposit, suitable for smelting.", "Iron"));
-                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, randomPos(), "Loose regolith, useful for construction.", "Regolith"));
+                        if (allowGas)
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, pickDepositPos(), "Vaporous gases seep from fissures in the ground.", "Gas"));
+                        if (allowIron)
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, pickDepositPos(), "A rich iron ore deposit, suitable for smelting.", "Iron"));
+                        if (allowRegolith)
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, pickDepositPos(), "Loose regolith, useful for construction.", "Regolith"));
 
                         // Feature node (based on sector's assigned feature)
                         string featureLabel = "";
@@ -630,7 +1373,10 @@ namespace GameDevTV.RTS.Environment
                         }
                         if (!string.IsNullOrEmpty(featureLabel))
                         {
-                            var featureNode = new SectorNode(SectorNode.NodeType.Feature, sector.Center + new Vector3(Random.Range(-5f, 5f), 0, Random.Range(-5f, 5f)), featureFlavor, featureLabel);
+                            Vector3 featurePos = prologueRun && isStartingSector
+                                ? pickDepositPos()
+                                : sector.Center + new Vector3(Random.Range(-5f, 5f), 0, Random.Range(-5f, 5f));
+                            var featureNode = new SectorNode(SectorNode.NodeType.Feature, featurePos, featureFlavor, featureLabel);
                             sector.Nodes.Add(featureNode);
                         }
 
@@ -653,21 +1399,29 @@ namespace GameDevTV.RTS.Environment
                     // Spawn visual markers (colored discs + labels)
                     SpawnNodeVisuals();
 
-                    // Resource types for Sector 0 are discovered before node visuals exist.
-                    // Re-apply so Minerals/Gas discs light up planet-wide (FoW retired).
-                    DiscoverySystem.RefreshDiscoveredResourceNodes();
-                    SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
-
-                    // Set Sector 0's first node as explored (entry point from UCC)
-                    if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
+                    if (prologueRun)
                     {
-                        var firstNode = SectorManager.Instance.Sectors[0].Nodes[0];
-                        Debug.Log($"[PlanetGenerator] First node has {firstNode.connections.Count} connections before OnExplored()");
-                        string connInfo = firstNode.connections.Count > 0
-                            ? $"explored={firstNode.connections[0].isExplored} discovered={firstNode.connections[0].isDiscovered}"
-                            : "NONE";
-                        firstNode.OnExplored();
-                        Debug.Log($"[PlanetGenerator] After OnExplored: {firstNode.connections.Count} connections. First connection: {connInfo}");
+                        // MainGame: leave every deposit as "?" — MainGameResourceFog owns reveal.
+                        Debug.Log("[PlanetGenerator] MainGame active — skipping auto-discover / first-node explore.");
+                    }
+                    else
+                    {
+                        // Resource types for Sector 0 are discovered before node visuals exist.
+                        // Re-apply so Minerals/Gas discs light up planet-wide (FoW retired).
+                        DiscoverySystem.RefreshDiscoveredResourceNodes();
+                        SectorManager.Instance.DiscoverResourcesInUnlockedSectors();
+
+                        // Set Sector 0's first node as explored (entry point from UCC)
+                        if (SectorManager.Instance.Sectors.Count > 0 && SectorManager.Instance.Sectors[0].Nodes.Count > 0)
+                        {
+                            var firstNode = SectorManager.Instance.Sectors[0].Nodes[0];
+                            Debug.Log($"[PlanetGenerator] First node has {firstNode.connections.Count} connections before OnExplored()");
+                            string connInfo = firstNode.connections.Count > 0
+                                ? $"explored={firstNode.connections[0].isExplored} discovered={firstNode.connections[0].isDiscovered}"
+                                : "NONE";
+                            firstNode.OnExplored();
+                            Debug.Log($"[PlanetGenerator] After OnExplored: {firstNode.connections.Count} connections. First connection: {connInfo}");
+                        }
                     }
 
                     // Update visibility based on node states
@@ -682,6 +1436,134 @@ namespace GameDevTV.RTS.Environment
                 /// Log nominal SO yield. Actual materials budget is met by richer Amount on the
                 /// sparse deposit set at spawn — do not flood the sector with extra mine tiles.
                 /// </summary>
+                private void PlaceLandingZoneSectorNodes(
+                    SectorManager.Sector sector,
+                    int sectorIndex,
+                    Vector2Int cpCell,
+                    System.Collections.Generic.HashSet<Vector2Int> usedCells,
+                    int minHexGap,
+                    float secW)
+                {
+                    Vector2Int landingCell = LandingSiteResourceLayout.PickLandingCell(cpCell);
+                    var layout = LandingSiteResourceLayout.Create(landingCell);
+                    cpCell = landingCell;
+                    Vector3 landingWorld = layout.WorldAt(landingCell);
+                    landingWorld.y = ColonyTileGrid.SampleGroundY(landingWorld);
+                    sector.Center = landingWorld;
+                    bool allowMinerals = Config == null || Config.AllowMinerals;
+                    bool allowGas = Config == null || Config.AllowGas;
+                    bool allowIron = Config == null || Config.AllowIron;
+                    bool allowRegolith = Config == null || Config.AllowRegolith;
+
+                    System.Func<Vector2Int, bool> claimCell = cell =>
+                    {
+                        if (usedCells.Contains(cell)) return false;
+                        foreach (var used in usedCells)
+                        {
+                            if (ColonyTileGrid.HexDistance(used, cell) < minHexGap) return false;
+                        }
+                        usedCells.Add(cell);
+                        return true;
+                    };
+
+                    System.Func<Vector2Int, Vector3> place = cell =>
+                    {
+                        if (!claimCell(cell))
+                        {
+                            for (int ring = 1; ring <= 2; ring++)
+                            {
+                                bool ok = false;
+                                for (int side = 0; side < 6 && !ok; side++)
+                                {
+                                    var alt = LandingSiteResourceLayout.RingCell(cpCell, ring, side, 0);
+                                    if (!claimCell(alt)) continue;
+                                    cell = alt;
+                                    ok = true;
+                                }
+                                if (ok) break;
+                            }
+                        }
+
+                        Vector3 pos = layout.WorldAt(cell);
+                        return SnapSitePosition(pos);
+                    };
+
+                    if (allowMinerals)
+                    {
+                        foreach (var veinCell in layout.MineralVein)
+                        {
+                            var pos = place(veinCell);
+                            sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Minerals, pos,
+                                "Crystalline minerals along a narrow vein near the landing corridor.", "Minerals"));
+                        }
+                    }
+
+                    if (allowIron)
+                    {
+                        var pos = place(layout.IronBody);
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Iron, pos,
+                            "Iron-rich ore at the edge of the surveyed basin.", "Iron"));
+                    }
+
+                    if (allowGas)
+                    {
+                        var pos = place(layout.GasFissure);
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Gas, pos,
+                            "Gas seeping from a fissure downwind of the landing zone.", "Gas"));
+                    }
+
+                    if (allowRegolith)
+                    {
+                        var pos = place(layout.RegolithField);
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Regolith, pos,
+                            "Loose regolith scraped from the landing apron.", "Regolith"));
+                    }
+
+                    string featureLabel = "";
+                    string featureFlavor = "";
+                    switch (sector.Feature)
+                    {
+                        case SectorManager.SectorFeature.LavaTube:
+                            featureLabel = "Lava Tube";
+                            featureFlavor = "A lava tube breach on the edge of the landing basin.";
+                            break;
+                        case SectorManager.SectorFeature.FaultLine:
+                            featureLabel = "Fault Line";
+                            featureFlavor = "A fault traced during orbital survey of this landing site.";
+                            break;
+                        case SectorManager.SectorFeature.WaterDeposit:
+                            featureLabel = "Water Deposit";
+                            featureFlavor = "Subsurface hydrology cluster — why the dropship landed here.";
+                            break;
+                        case SectorManager.SectorFeature.Glacier:
+                            featureLabel = "Glacier";
+                            featureFlavor = "A glacier apron in the landing basin's cold trap.";
+                            break;
+                        case SectorManager.SectorFeature.Volcano:
+                            featureLabel = "Volcanic Vent";
+                            featureFlavor = "A dormant vent outside the landing apron.";
+                            break;
+                    }
+
+                    if (!string.IsNullOrEmpty(featureLabel))
+                    {
+                        var pos = place(layout.FeatureCell);
+                        sector.Nodes.Add(new SectorNode(SectorNode.NodeType.Feature, pos, featureFlavor, featureLabel));
+                    }
+
+                    int nextSector = sectorIndex + 1;
+                    if (nextSector < SectorManager.Instance.Sectors.Count)
+                    {
+                        Vector3 nexusPos = sector.Center + new Vector3(secW * 0.3f, 0, 0);
+                        var nexusNode = new SectorNode(SectorNode.NodeType.Nexus, nexusPos,
+                            "A strange signal emanates from this point... leading to the next sector.", "Nexus Signal");
+                        nexusNode.connectedSectorIndex = nextSector;
+                        sector.Nodes.Add(nexusNode);
+                    }
+
+                    Debug.Log("[PlanetGenerator] Sector 0 — landing zone resource clusters placed (pre-survey site).");
+                }
+
                 private void EnsureMinimumSectorResources(SectorManager.Sector sector, int sectorIndex)
                 {
                     SupplySO ironSO = Resources.Load<SupplySO>("Gatherable Supplies/Iron");
@@ -729,9 +1611,18 @@ namespace GameDevTV.RTS.Environment
                         Vector3 sectorMax = sector.Center + new Vector3(secW * 0.4f, 0, secH * 0.4f);
                         bool isStartingSector = SectorManager.Instance.Sectors.IndexOf(sector) == 0;
 
-                        Vector3 commandPos = isStartingSector
-                            ? SnapSitePosition(sector.Center + new Vector3(-bootstrapRadius * 0.35f, 0f, -bootstrapRadius * 0.2f))
-                            : SnapSitePosition(sector.Center + new Vector3(-secW * 0.15f, 0, -secH * 0.15f));
+                        Vector3 commandPos;
+                        if (isStartingSector && IsMainGamePlacementRun()
+                            && LandingSiteResourceLayout.TryGetActiveLandingWorld(out Vector3 landingPad))
+                            commandPos = SnapSitePosition(landingPad);
+                        else if (isStartingSector)
+                            commandPos = SnapSitePosition(sector.Center + new Vector3(-bootstrapRadius * 0.35f, 0f, -bootstrapRadius * 0.2f));
+                        else
+                            commandPos = SnapSitePosition(sector.Center + new Vector3(-secW * 0.15f, 0, -secH * 0.15f));
+                        // Starting pad sits on the hex center. The lit prologue disc is drawn there;
+                        // a navmesh snap leaves the building beside that disc.
+                        if (isStartingSector)
+                            commandPos = ColonyTileGrid.CellToWorldOnGround(ColonyTileGrid.WorldToCell(commandPos));
                         var commandSite = new BuildingSiteSlot(BuildingSiteKind.CommandPost, commandPos, sector);
                         sector.BuildingSites.Add(commandSite);
                         commandSite.MarkerGO = CreateSiteMarker(markerRoot.transform, commandPos, BuildingSiteKind.CommandPost, commandSite);
@@ -836,20 +1727,7 @@ namespace GameDevTV.RTS.Environment
 
                 private Vector3 SnapSitePosition(Vector3 approximate)
                 {
-                    Vector3 pos = approximate;
-                    int mask = LayerMask.GetMask("Default", "Terrain");
-                    if (mask == 0) mask = Physics.DefaultRaycastLayers;
-
-                    if (Physics.Raycast(pos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f, mask,
-                            QueryTriggerInteraction.Ignore))
-                    {
-                        // Skip hits on buildings / pad ghosts so clusters don't stack on air meshes.
-                        if (hit.collider.GetComponentInParent<BaseBuilding>() == null
-                            && hit.collider.GetComponentInParent<BuildingSiteMarker>() == null)
-                        {
-                            pos = hit.point;
-                        }
-                    }
+                    Vector3 pos = ColonyTileGrid.ApplyGroundY(approximate);
 
                     UnityEngine.AI.NavMeshQueryFilter filter = new UnityEngine.AI.NavMeshQueryFilter
                     {
@@ -858,8 +1736,8 @@ namespace GameDevTV.RTS.Environment
                     };
                     if (UnityEngine.AI.NavMesh.SamplePosition(pos, out UnityEngine.AI.NavMeshHit navHit, 8f, filter))
                     {
-                        // Keep terrain Y so pads never sit on elevated / air bake samples.
-                        pos = new Vector3(navHit.position.x, pos.y, navHit.position.z);
+                        // Keep XZ from NavMesh if available, but height always from the mesh field.
+                        pos = ColonyTileGrid.ApplyGroundY(new Vector3(navHit.position.x, 0f, navHit.position.z));
                     }
 
                     return pos;
@@ -974,13 +1852,10 @@ namespace GameDevTV.RTS.Environment
                         {
                             if (node.visualGO != null) continue;
 
-                            // Snap position to ground — float well above terrain
-                            Vector3 spawnPos = node.position;
-                            spawnPos.y = 1.5f; // Default above terrain
-                            if (Physics.Raycast(spawnPos + Vector3.up * 50f, Vector3.down, out RaycastHit hit, 100f, LayerMask.GetMask("Default", "Terrain")))
-                            {
-                                spawnPos.y = hit.point.y + 0.5f; // Float above ground
-                            }
+                            // Snap deposit pad to the visible mesh height field.
+                            Vector2Int depositCell = ColonyTileGrid.WorldToCell(node.position);
+                            Vector3 spawnPos = ColonyTileGrid.CellToWorldOnGround(depositCell);
+                            node.position = spawnPos;
 
                             // --- Dot marker (small flat circle) ---
                             Color dotColor;
@@ -1011,8 +1886,9 @@ namespace GameDevTV.RTS.Environment
                             dot.name = $"Node_{node.type}";
                             dot.transform.position = spawnPos;
                             float visSize = Mathf.Max(dotSize, 0.7f);
-                            dot.transform.localScale = new Vector3(visSize, 0.12f, visSize);
+                            dot.transform.localScale = new Vector3(visSize, 0.08f, visSize);
                             dot.transform.parent = transform; // Parent to PlanetGenerator so AI can find it
+                            GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.SeatVisualsOnGround(dot, 0.02f);
                             dot.layer = LayerMask.NameToLayer("Supplies"); // Set to Supplies layer
                             var dotRenderer = dot.GetComponent<MeshRenderer>();
                             var dotMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -1068,20 +1944,42 @@ namespace GameDevTV.RTS.Environment
                                                          
                                                          // --- Floating label (feature name or "?") ---
                                                          var qmGo = new GameObject($"QuestionMark_{node.type}");
-                                                         qmGo.transform.position = spawnPos + Vector3.up * 3.2f;
+                                                         Vector3 ground = spawnPos;
+                                                         ground.y = SampleGroundY(ground);
+                                                         float qmFloat = GameDevTV.RTS.MainGame.MainGameIceMarkers.DepositFloatHeight;
+                                                         qmGo.transform.position = ground + Vector3.up * qmFloat;
                                                          qmGo.transform.parent = questionMarkRoot.transform;
-                                                         var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
-                                                         string label = !string.IsNullOrEmpty(node.labelOverride)
-                                                             ? node.labelOverride
-                                                             : "?";
-                                                         qmText.text = label;
-                                                         qmText.fontSize = node.type == SectorNode.NodeType.Feature ? 6f : 5f;
-                                                         qmText.alignment = TMPro.TextAlignmentOptions.Center;
-                                                         qmText.color = node.type == SectorNode.NodeType.Feature
-                                                             ? new Color(0.55f, 0.95f, 1f)
-                                                             : Color.yellow;
-                                                         qmText.fontStyle = TMPro.FontStyles.Bold;
-                                                         qmText.transform.localScale = Vector3.one * 0.9f;
+                                                         bool prologueRun = IsMainGamePlacementRun();
+                                                         string label = prologueRun
+                                                             ? "?"
+                                                             : (!string.IsNullOrEmpty(node.labelOverride)
+                                                                 ? node.labelOverride
+                                                                 : "?");
+                                                         float qmFont = GameDevTV.RTS.MainGame.MainGameIceMarkers.MarkerFontSize;
+                                                         Color qmColor = prologueRun
+                                                             ? new Color(1f, 0.92f, 0.2f, 1f)
+                                                             : (node.type == SectorNode.NodeType.Feature
+                                                                 ? new Color(0.55f, 0.95f, 1f)
+                                                                 : Color.yellow);
+                                                         if (prologueRun)
+                                                         {
+                                                             GameDevTV.RTS.MainGame.MainGameWorldQuestionLabel.EnsureOnMarkRoot(
+                                                                 qmGo.transform, label, qmFont, qmColor);
+                                                         }
+                                                         else
+                                                         {
+                                                             var qmText = qmGo.AddComponent<TMPro.TextMeshPro>();
+                                                             qmText.text = label;
+                                                             float qmScale = GameDevTV.RTS.MainGame.MainGameIceMarkers.MarkerScale;
+                                                             qmText.fontSize = qmFont;
+                                                             qmText.alignment = TMPro.TextAlignmentOptions.Center;
+                                                             qmText.color = qmColor;
+                                                             qmText.fontStyle = TMPro.FontStyles.Bold;
+                                                             qmText.transform.localScale = Vector3.one * qmScale;
+                                                         }
+                                                         var depositMark = qmGo.AddComponent<GameDevTV.RTS.MainGame.MainGameDepositMark>();
+                                                         depositMark.GroundPoint = ground;
+                                                         GameDevTV.RTS.MainGame.MainGameDepositMark.EnsureClickVolume(qmGo.transform, qmFloat);
                                                          node.questionMarkGO = qmGo;
                                                      }
                                                  }
@@ -1131,10 +2029,40 @@ namespace GameDevTV.RTS.Environment
                 /// </summary>
                 private void UpdateAllNodeVisibility()
                 {
+                    bool prologueRun = IsMainGamePlacementRun();
                     foreach (var sector in SectorManager.Instance.Sectors)
                     {
                         foreach (var node in sector.Nodes)
                         {
+                            if (prologueRun)
+                            {
+                                // Keep GO alive for fog/reveal, but hide colored pucks — only "?" until survey.
+                                node.SetVisualVisible(true);
+                                if (node.visualGO != null)
+                                {
+                                    foreach (var r in node.visualGO.GetComponentsInChildren<Renderer>(true))
+                                        if (r != null) r.enabled = false;
+                                    if (node.visualGO.TryGetComponent(out GatherableSupply gs))
+                                    {
+                                        gs.SetVisible(false);
+                                        gs.ToggleColliders(false);
+                                    }
+                                }
+                                if (node.questionMarkGO != null)
+                                {
+                                    node.questionMarkGO.SetActive(true);
+                                    var tmp = node.questionMarkGO.GetComponentInChildren<TMPro.TMP_Text>(true);
+                                    if (tmp != null)
+                                    {
+                                        tmp.text = "?";
+                                        tmp.color = new Color(1f, 0.92f, 0.2f, 1f);
+                                    }
+                                }
+                                node.isExplored = false;
+                                node.isDiscovered = true;
+                                continue;
+                            }
+
                             node.SetVisualVisible(true);
                             // Feature / nexus keep name labels; hide legacy "?" on resources
                             // (HiddenResource beacons carry the deposit name instead).
@@ -1145,8 +2073,9 @@ namespace GameDevTV.RTS.Environment
                     }
                 }
 
-                public void ApplyCurvedWorldShader(GameObject root)
+                public void ApplyCurvedWorldShader(GameObject root, bool forceZoomPresentation = false)
                 {
+                    if (Config != null && !Config.EnableHorizonCurvature && !forceZoomPresentation) return;
                     Shader curvedShader = Shader.Find("Custom/URP_CurvedWorld");
                     Shader curvedShaderTransparent = Shader.Find("Custom/URP_CurvedWorld_Transparent");
                     if (curvedShader == null || curvedShaderTransparent == null) return;
@@ -1548,6 +2477,10 @@ namespace GameDevTV.RTS.Environment
                     MeshRenderer renderer = GetComponent<MeshRenderer>();
                     if (renderer == null) return;
 
+                    // Photo albedo planets keep the authored surface exact — no climate tint washout.
+                    if (Config != null && Config.AlbedoMap != null)
+                        return;
+
                     Material mat = renderer.material; // instance so we don't mutate a shared asset
                     if (mat == null) return;
 
@@ -1560,6 +2493,7 @@ namespace GameDevTV.RTS.Environment
                     Texture2D gradient = GenerateHeightGradient(colorLow, colorMid, colorHigh);
                     gradient.name = "ClimateGroundGrad";
                     mat.mainTexture = gradient;
+                    if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", gradient);
                     if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", baseTint);
                     else if (mat.HasProperty("_Color")) mat.SetColor("_Color", baseTint);
 

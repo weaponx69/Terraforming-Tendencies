@@ -80,3 +80,43 @@ If they find a "Small Scrap Pile," they get enough Biomass to launch 5 more.
 If they find a "Permanent Vein," they win the early game.
 
 Does this "Search and Discovery" phase feel like the right level of "Casual" for you? Or should the probes be even more automated (like they just launch themselves every 30 seconds)?
+
+---
+
+## Current design decisions (authoritative intent)
+
+*Gameplay rules that conflict with archived Colony Acts notes in [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) should follow this section + live MainGame specs under `docs/specs/`.*
+
+*Older “casual / probe droid” notes above this section are historical brainstorm only — not the tone target.*
+
+### Tone & references
+
+- **Not casual.** Target feel is closer to **Frostpunk 2**: scarce life support, hard weeks, consequential card plays, pressure from cold/oxygen/storms.
+- Colony sim + cards + End Week / time-lapse remain the spine (Unreal MainGame clone direction).
+
+### Planet select (future)
+
+- Before a run starts, the player will **choose what kind of planet to colonize** (planet type / `PlanetConfig`).
+- That choice sets climate pressure, which resources exist, and how hard early survival is.
+- Not required for the current MainGame vertical slice, but generation and resource rules should stay planet-type–driven so this screen can plug in later.
+
+### Exploration as puzzle (Blue Prince–like)
+
+- Survey / uncovering is not autopilot fog-clearing — it should play like a **spatial puzzle**.
+- Reference: **Blue Prince** — limited moves, reading the board, committing to a route, information as the reward.
+- Practical implications for Survey Team: tile budget, adjacent paint, day cost, and `?` placement should reward planning (which trail, which mystery first) more than spraying the map.
+- Exact puzzle layers (keys, gated regions, drafted paths, etc.) are future design; do not flatten Survey into free RTS scout micro.
+
+### Survey Team art
+
+- Ground **capsules** in the Survey Team search animation are **placeholder for spacesuit people** (suited colonists / crew on foot), not robots or barrels.
+- Aerial units are survey drones. Prefer the small procedural Survey Team drone look over player-commanded Mining Drone micro for harvest flavor.
+
+### Resources stay individual
+
+- Deposit types (**Minerals, Gas, Iron, Regolith**, plus ice for life support) are **separate stocks**, not collapsed into a single Materials bank.
+- **Planet type decides which of those exist** — not every planet has the same mix; generation / `PlanetConfig` gates scatter, Survey `?`s, and mine cards.
+- Survey uncovers a typed deposit → player places the matching **mine building on that pad** → building produces that resource on the time-lapse week/day clock.
+- Harvest presentation: small Survey-style drones (and optionally crew) animate at the mine — not a player-selected Mining Drone unit gathering in real time.
+
+Specs: [`docs/specs/2026-11-19-prologue-survey-team-design.md`](docs/specs/2026-11-19-prologue-survey-team-design.md), [`docs/specs/2026-11-20-individual-resources-design.md`](docs/specs/2026-11-20-individual-resources-design.md).
