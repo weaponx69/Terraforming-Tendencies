@@ -266,7 +266,7 @@ namespace GameDevTV.RTS.Units
 
             if (MainRenderer != null && primaryMaterial == null)
             {
-                primaryMaterial = GameDevTV.RTS.Prologue.PrologueController.IsActive
+                primaryMaterial = GameDevTV.RTS.MainGame.MainGameController.IsActive
                     ? MainRenderer.sharedMaterial
                     : MainRenderer.material;
             }
@@ -521,8 +521,8 @@ namespace GameDevTV.RTS.Units
             Progress = new BuildingProgress(BuildingProgress.BuildingState.Completed, Progress.StartTime, 1);
             unitBuildingThis = null;
             enabled = true;
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
-                GameDevTV.RTS.Prologue.ProloguePerformanceBudget.ApplyBuildingVisuals(gameObject);
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                GameDevTV.RTS.MainGame.MainGamePerformanceBudget.ApplyBuildingVisuals(gameObject);
             EnsureBuildingHealthBar();
             Supplies.BeginColonyIntegrityIfNeeded(this);
 
@@ -549,6 +549,12 @@ namespace GameDevTV.RTS.Units
             if (VisionTransform != null)
             {
                 VisionTransform.gameObject.SetActive(Owner == Owner.Player1);
+                if (GameDevTV.RTS.MainGame.MainGameController.IsActive
+                    || GameDevTV.RTS.MainGame.MainGameController.IsMainGamePlayScene())
+                {
+                    foreach (var r in VisionTransform.GetComponentsInChildren<Renderer>(true))
+                        if (r != null) r.enabled = false;
+                }
             }
 
             // Crush any rocks/supplies underneath when construction is completed!
@@ -680,7 +686,7 @@ namespace GameDevTV.RTS.Units
                 GameDevTV.RTS.Environment.PowerGridManager.RecalculateGrids();
             }
             if (isCommandPost && Owner == Owner.Player1
-                && !GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                && !GameDevTV.RTS.MainGame.MainGameController.IsActive)
             {
                 var workers = Object.FindObjectsByType<Worker>(FindObjectsInactive.Include);
                 int count = 0;
@@ -747,10 +753,10 @@ namespace GameDevTV.RTS.Units
         }
 
         /// <summary>
-        /// Prologue finish hook: ensure a PowerNode exists, then auto-link adjacent
+        /// MainGame finish hook: ensure a PowerNode exists, then auto-link adjacent
         /// completed buildings via the existing pressurized-tube path.
         /// </summary>
-        public void NotifyProloguePowerLink()
+        public void NotifyMainGamePowerLink()
         {
             if (!TryGetComponent(out PowerNode _))
                 gameObject.AddComponent<PowerNode>();
@@ -1265,6 +1271,9 @@ namespace GameDevTV.RTS.Units
             if (Owner != Owner.Player1) return false;
             if (Progress.State == BuildingProgress.BuildingState.Destroyed) return false;
 
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+                return GameDevTV.RTS.MainGame.MainGameDemolish.TryDemolish(this, refund);
+
             BuildingSO def = ResolvedBuildingSO;
             int buildCost = GameDevTV.RTS.Utilities.ReservedSiteBuildUtility.GetMaterialsCost(def);
             int refundAmt = 0;
@@ -1299,7 +1308,7 @@ namespace GameDevTV.RTS.Units
 
         private void EnsureBuildingHealthBar()
         {
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive) return;
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive) return;
             if (GetComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>() != null) return;
             gameObject.AddComponent<GameDevTV.RTS.UI.Components.BuildingHealthBar>();
         }

@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 using TMPro;
 using GameDevTV.RTS.Player;
 using GameDevTV.RTS.Audio;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 
 namespace GameDevTV.RTS.UI
 {
@@ -38,14 +38,14 @@ namespace GameDevTV.RTS.UI
         Transform researchLadderRoot;
         readonly List<TextMeshProUGUI> researchRowLabels = new();
         readonly List<Button> researchRowButtons = new();
-        readonly List<PrologueResearchId> researchRowIds = new();
+        readonly List<MainGameResearchId> researchRowIds = new();
         TextMeshProUGUI researchHeaderLabel;
         TextMeshProUGUI researchHintLabel;
 
         private void Awake()
         {
             // The Menu button is saved inactive so it does not sit on screen before Play.
-            foreach (var candidate in Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var candidate in Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
             {
                 if (candidate == null || candidate.gameObject.name != "Menu Button") continue;
                 candidate.gameObject.SetActive(true);
@@ -129,7 +129,7 @@ namespace GameDevTV.RTS.UI
         }
 
         /// <summary>
-        /// Research card: open pause with the Prologue research ladder focused for a pick.
+        /// Research card: open pause with the MainGame research ladder focused for a pick.
         /// Card stays in hand until a locked project is begun (or Esc without picking).
         /// </summary>
         public void OpenResearchPick()
@@ -142,12 +142,12 @@ namespace GameDevTV.RTS.UI
                 EnsureResearchLadder();
                 RefreshResearchLadder();
             }
-            SetResearchLadderVisible(PrologueController.IsActive);
+            SetResearchLadderVisible(MainGameController.IsActive);
         }
 
         void EnsureResearchLadder()
         {
-            if (!PrologueController.IsActive)
+            if (!MainGameController.IsActive)
             {
                 SetResearchLadderVisible(false);
                 return;
@@ -222,15 +222,16 @@ namespace GameDevTV.RTS.UI
             researchHintLabel = MakeResearchLabel(root.transform, "Hint", font, 13f, FontStyles.Italic);
             researchHintLabel.color = new Color(0.75f, 0.82f, 0.9f, 1f);
 
-            // Tier-1 baseline (always unlocked in Prologue).
-            AddResearchStatusRow(root.transform, font, PrologueResearchId.None, isTier1: true);
+            // Tier-1 baseline (always unlocked in MainGame).
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.None, isTier1: true);
 
-            AddResearchStatusRow(root.transform, font, PrologueResearchId.FasterBuild, isTier1: false);
-            AddResearchStatusRow(root.transform, font, PrologueResearchId.LongerPowerReach, isTier1: false);
-            AddResearchStatusRow(root.transform, font, PrologueResearchId.ExtraScanType, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.FasterBuild, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.LongerPowerReach, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.ExtraScanType, isTier1: false);
+            AddResearchStatusRow(root.transform, font, MainGameResearchId.ExtendedSurvey, isTier1: false);
         }
 
-        void AddResearchStatusRow(Transform parent, TMP_FontAsset font, PrologueResearchId id, bool isTier1)
+        void AddResearchStatusRow(Transform parent, TMP_FontAsset font, MainGameResearchId id, bool isTier1)
         {
             var row = new GameObject(isTier1 ? "Tier1" : id.ToString(), typeof(RectTransform));
             row.transform.SetParent(parent, false);
@@ -292,24 +293,24 @@ namespace GameDevTV.RTS.UI
 
         void RefreshResearchLadder()
         {
-            if (!PrologueController.IsActive || researchLadderRoot == null)
+            if (!MainGameController.IsActive || researchLadderRoot == null)
             {
                 SetResearchLadderVisible(false);
                 return;
             }
 
             SetResearchLadderVisible(true);
-            var research = PrologueController.Instance?.Colony?.Research;
+            var research = MainGameController.Instance?.Colony?.Research;
             if (research == null) return;
 
-            bool canStart = research.Active == PrologueResearchId.None;
+            bool canStart = research.Active == MainGameResearchId.None;
             if (researchHintLabel != null)
             {
                 if (researchPickPending && canStart)
                     researchHintLabel.text = "Pick a locked project to begin.";
                 else if (!canStart)
                     researchHintLabel.text =
-                        $"In progress: {PrologueResearch.DisplayName(research.Active)} — {research.WeeksRemaining} wk left";
+                        $"In progress: {MainGameResearch.DisplayName(research.Active)} — {research.WeeksRemaining} wk left";
                 else
                     researchHintLabel.text = "Tap a locked project to begin (no Active).";
             }
@@ -321,7 +322,7 @@ namespace GameDevTV.RTS.UI
                 var btn = researchRowButtons[i];
                 if (label == null || btn == null) continue;
 
-                if (id == PrologueResearchId.None)
+                if (id == MainGameResearchId.None)
                 {
                     // Tier-1 connected power — always lit.
                     label.text = "Connected Power (Tier 1) — unlocked";
@@ -330,8 +331,8 @@ namespace GameDevTV.RTS.UI
                     continue;
                 }
 
-                int weeks = PrologueData.ResearchWeeks(id);
-                string name = PrologueResearch.DisplayName(id);
+                int weeks = MainGameData.ResearchWeeks(id);
+                string name = MainGameResearch.DisplayName(id);
 
                 if (research.IsUnlocked(id))
                 {
@@ -358,23 +359,23 @@ namespace GameDevTV.RTS.UI
         {
             if (rowIndex < 0 || rowIndex >= researchRowIds.Count) return;
             var id = researchRowIds[rowIndex];
-            if (id == PrologueResearchId.None) return;
+            if (id == MainGameResearchId.None) return;
 
-            var colony = PrologueController.Instance?.Colony;
+            var colony = MainGameController.Instance?.Colony;
             if (colony?.Research == null) return;
 
             if (!colony.Research.TryBegin(id, out var reason))
             {
-                PrologueHUD.Instance?.ShowNote(new List<string> { reason ?? "Cannot research" });
+                MainGameHUD.Instance?.ShowNote(new List<string> { reason ?? "Cannot research" });
                 RefreshResearchLadder();
                 return;
             }
 
             researchPickPending = false;
             CardDeckController.Instance?.ConsumeResearchCardFromHand();
-            PrologueHUD.Instance?.ShowNote(new List<string>
+            MainGameHUD.Instance?.ShowNote(new List<string>
             {
-                $"Research started: {PrologueResearch.DisplayName(id)} ({PrologueData.ResearchWeeks(id)} wk)."
+                $"Research started: {MainGameResearch.DisplayName(id)} ({MainGameData.ResearchWeeks(id)} wk)."
             });
             RefreshResearchLadder();
         }

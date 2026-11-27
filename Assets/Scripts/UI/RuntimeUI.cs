@@ -8,7 +8,7 @@ using GameDevTV.RTS.Units;
 using UnityEngine;
 using TMPro;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using UnityEngine.UI;
 
 namespace GameDevTV.RTS.UI
@@ -231,7 +231,7 @@ namespace GameDevTV.RTS.UI
                 }
 
                 // Do NOT paint an opaque debug plate over Center Container — it covers the
-                // map and reads as "UI scrolled off screen" during Prologue playtests.
+                // map and reads as "UI scrolled off screen" during MainGame playtests.
 
                 // Leave the lower-left corner for the card hand — shove selection info right.
                 ShiftBuildingSelectedPanelRight(bottomBar);
@@ -326,7 +326,7 @@ namespace GameDevTV.RTS.UI
 
         private void Awake()
         {
-            // Prologue HUD is built in code at play. Do not paint or recreate the old
+            // MainGame HUD is built in code at play. Do not paint or recreate the old
             // Acts bars while the editor is idle — they used to sit on screen before Play.
             if (!Application.isPlaying) return;
 
@@ -731,9 +731,9 @@ namespace GameDevTV.RTS.UI
         {
             if (!Application.isPlaying) return;
 
-            // Prologue owns the top of the screen — hide Acts resource chrome so it
-            // cannot overlap / scroll the Prologue objective off-screen.
-            if (PrologueController.IsActive)
+            // MainGame owns the top of the screen — hide Acts resource chrome so it
+            // cannot overlap / scroll the MainGame objective off-screen.
+            if (MainGameController.IsActive)
             {
                 if (!prologueChromeHiddenOnce)
                 {
@@ -764,7 +764,8 @@ namespace GameDevTV.RTS.UI
             string[] panels =
             {
                 "Top Resource Bar", "Supplies Bar", "Active Objectives Panel", "Weeks Left Panel",
-                "Generation Summary UI Controller", "Foundry Starvation UI", "Expansion Proposal UI"
+                "Generation Summary UI Controller", "Foundry Starvation UI", "Expansion Proposal UI",
+                "Center Container"
             };
             foreach (string name in panels)
             {
@@ -807,7 +808,7 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void ApplyHudReadability()
         {
-            if (PrologueController.IsActive)
+            if (MainGameController.IsActive)
             {
                 HideActsResourceChrome();
                 return;
@@ -959,7 +960,7 @@ namespace GameDevTV.RTS.UI
         /// </summary>
         private void EnsureMaterialsMetricVisible()
         {
-            if (PrologueController.IsActive) return;
+            if (MainGameController.IsActive) return;
 
             if (materialsLabelText == null || materialsValueText == null)
             {

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.AI;
@@ -10,14 +10,14 @@ using UnityEngine.InputSystem;
 
 namespace GameDevTV.RTS.Diagnostics
 {
-    /// <summary>Metrics from exercising real Prologue survey code (not NavMesh stubs).</summary>
-    public struct PrologueSurveyStressResult
+    /// <summary>Metrics from exercising real MainGame survey code (not NavMesh stubs).</summary>
+    public struct MainGameSurveyStressResult
     {
         public bool Success;
         public string Error;
         public int TargetTile;
         public int PaintCountAfter;
-        public bool PrologueActive;
+        public bool MainGameActive;
         public bool ScanMode;
         public double ClickFrameDispatchMs;
         public double PathDrainMs;
@@ -27,7 +27,7 @@ namespace GameDevTV.RTS.Diagnostics
         public float MaxDispatchSpikeMs;
     }
 
-    public enum PrologueSurveyStressCase
+    public enum MainGameSurveyStressCase
     {
         MarkClickProduction,
         MarkClickSynchronousPath,
@@ -229,26 +229,26 @@ namespace GameDevTV.RTS.Diagnostics
         public int UnitCount => receivers?.Length ?? 0;
 
         /// <summary>
-        /// Drives <see cref="PrologueDroneScan"/> / survey mission — real hex paint, BFS, reveal, and fog queues.
+        /// Drives <see cref="MainGameDroneScan"/> / survey mission — real hex paint, BFS, reveal, and fog queues.
         /// </summary>
-        public PrologueSurveyStressResult RunPrologueSurveyStress(PrologueSurveyStressCase scenario)
+        public MainGameSurveyStressResult RunMainGameSurveyStress(MainGameSurveyStressCase scenario)
         {
-            var result = new PrologueSurveyStressResult
+            var result = new MainGameSurveyStressResult
             {
-                PrologueActive = PrologueController.IsActive,
+                MainGameActive = MainGameController.IsActive,
             };
 
-            if (!PrologueController.IsActive || PrologueController.Instance?.Colony == null)
+            if (!MainGameController.IsActive || MainGameController.Instance?.Colony == null)
             {
                 result.Error = "prologue_inactive";
                 return result;
             }
 
-            var scan = PrologueDroneScan.Instance;
+            var scan = MainGameDroneScan.Instance;
             if (scan == null)
             {
-                var go = new GameObject("PrologueDroneScan_Diagnostic");
-                scan = go.AddComponent<PrologueDroneScan>();
+                var go = new GameObject("MainGameDroneScan_Diagnostic");
+                scan = go.AddComponent<MainGameDroneScan>();
             }
 
             int markTile = ResolveSurveyMarkTile();
@@ -260,21 +260,21 @@ namespace GameDevTV.RTS.Diagnostics
 
             result.TargetTile = markTile;
 
-            bool prevSync = PrologueDroneScan.DiagnosticForceSynchronousMarkPath;
+            bool prevSync = MainGameDroneScan.DiagnosticForceSynchronousMarkPath;
             try
             {
                 switch (scenario)
                 {
-                    case PrologueSurveyStressCase.MarkClickProduction:
-                        PrologueDroneScan.DiagnosticForceSynchronousMarkPath = false;
+                    case MainGameSurveyStressCase.MarkClickProduction:
+                        MainGameDroneScan.DiagnosticForceSynchronousMarkPath = false;
                         result = ExecuteMarkClickStress(scan, markTile);
                         break;
-                    case PrologueSurveyStressCase.MarkClickSynchronousPath:
-                        PrologueDroneScan.DiagnosticForceSynchronousMarkPath = true;
+                    case MainGameSurveyStressCase.MarkClickSynchronousPath:
+                        MainGameDroneScan.DiagnosticForceSynchronousMarkPath = true;
                         result = ExecuteMarkClickStress(scan, markTile);
                         break;
-                    case PrologueSurveyStressCase.ConfirmSurveyTeam:
-                        PrologueDroneScan.DiagnosticForceSynchronousMarkPath = false;
+                    case MainGameSurveyStressCase.ConfirmSurveyTeam:
+                        MainGameDroneScan.DiagnosticForceSynchronousMarkPath = false;
                         ExecuteMarkClickStress(scan, markTile);
                         result = ExecuteConfirmStress(scan);
                         result.TargetTile = markTile;
@@ -283,28 +283,28 @@ namespace GameDevTV.RTS.Diagnostics
             }
             finally
             {
-                PrologueDroneScan.DiagnosticForceSynchronousMarkPath = prevSync;
+                MainGameDroneScan.DiagnosticForceSynchronousMarkPath = prevSync;
             }
 
-            result.PrologueActive = PrologueController.IsActive;
+            result.MainGameActive = MainGameController.IsActive;
             result.ScanMode = scan.ScanMode;
             return result;
         }
 
-        static PrologueSurveyStressResult ExecuteMarkClickStress(PrologueDroneScan scan, int markTile)
+        static MainGameSurveyStressResult ExecuteMarkClickStress(MainGameDroneScan scan, int markTile)
         {
-            var result = new PrologueSurveyStressResult { TargetTile = markTile };
-            if (PrologueSurveyMission.Instance != null && PrologueSurveyMission.Instance.IsSearching)
-                PrologueSurveyMission.Instance.AbortForPlaytest();
+            var result = new MainGameSurveyStressResult { TargetTile = markTile };
+            if (MainGameSurveyMission.Instance != null && MainGameSurveyMission.Instance.IsSearching)
+                MainGameSurveyMission.Instance.AbortForPlaytest();
             scan.CancelPaint();
-            scan.BeginPaintMission(PrologueSurveyMission.DefaultTileBudget, PrologueSurveyMission.DefaultDays);
+            scan.BeginPaintMission(MainGameSurveyMission.DefaultTileBudget, MainGameSurveyMission.DefaultDays);
 
-            PrologueFpsMonitor.BeginBurstCapture();
+            MainGameFpsMonitor.BeginBurstCapture();
             var total = Stopwatch.StartNew();
             var clickWatch = Stopwatch.StartNew();
             bool clicked = scan.AutomationOrderMarkTile(markTile);
             clickWatch.Stop();
-            PrologueFpsMonitor.RecordSyntheticSpike(clickWatch.Elapsed.TotalMilliseconds);
+            MainGameFpsMonitor.RecordSyntheticSpike(clickWatch.Elapsed.TotalMilliseconds);
 
             result.ClickFrameDispatchMs = clickWatch.Elapsed.TotalMilliseconds;
             result.Success = clicked;
@@ -312,78 +312,78 @@ namespace GameDevTV.RTS.Diagnostics
             var drainWatch = Stopwatch.StartNew();
             DrainSurveyPathPipeline(scan);
             drainWatch.Stop();
-            PrologueFpsMonitor.RecordSyntheticSpike(drainWatch.Elapsed.TotalMilliseconds);
+            MainGameFpsMonitor.RecordSyntheticSpike(drainWatch.Elapsed.TotalMilliseconds);
             result.PathDrainMs = drainWatch.Elapsed.TotalMilliseconds;
 
-            result.VisionFollowUpMs = PrologueVisionThrottle.TickOneSliceMs();
-            PrologueFpsMonitor.RecordSyntheticSpike(result.VisionFollowUpMs);
+            result.VisionFollowUpMs = MainGameVisionThrottle.TickOneSliceMs();
+            MainGameFpsMonitor.RecordSyntheticSpike(result.VisionFollowUpMs);
 
             total.Stop();
-            PrologueFpsMonitor.EndBurstCapture();
+            MainGameFpsMonitor.EndBurstCapture();
 
             result.PaintCountAfter = scan.PaintCount;
             result.TotalWallMs = total.Elapsed.TotalMilliseconds;
-            result.AvgFrameTimeMs = PrologueFpsMonitor.AvgFrameTimeMs;
-            result.MaxDispatchSpikeMs = PrologueFpsMonitor.MaxDispatchSpikeMs;
+            result.AvgFrameTimeMs = MainGameFpsMonitor.AvgFrameTimeMs;
+            result.MaxDispatchSpikeMs = MainGameFpsMonitor.MaxDispatchSpikeMs;
             result.Success = clicked && scan.PaintCount > 0;
             if (!result.Success && string.IsNullOrEmpty(result.Error))
                 result.Error = scan.PaintCount == 0 ? "paint_route_empty" : "click_failed";
             return result;
         }
 
-        static PrologueSurveyStressResult ExecuteConfirmStress(PrologueDroneScan scan)
+        static MainGameSurveyStressResult ExecuteConfirmStress(MainGameDroneScan scan)
         {
-            var result = new PrologueSurveyStressResult();
-            if (scan.PaintCount < PrologueDroneScan.MinConfirmTiles)
+            var result = new MainGameSurveyStressResult();
+            if (scan.PaintCount < MainGameDroneScan.MinConfirmTiles)
             {
                 result.Error = "insufficient_paint_for_confirm";
                 result.PaintCountAfter = scan.PaintCount;
                 return result;
             }
 
-            PrologueFpsMonitor.BeginBurstCapture();
+            MainGameFpsMonitor.BeginBurstCapture();
             var total = Stopwatch.StartNew();
             var clickWatch = Stopwatch.StartNew();
             bool confirmed = scan.ConfirmPaint();
             clickWatch.Stop();
-            PrologueFpsMonitor.RecordSyntheticSpike(clickWatch.Elapsed.TotalMilliseconds);
+            MainGameFpsMonitor.RecordSyntheticSpike(clickWatch.Elapsed.TotalMilliseconds);
 
             result.ClickFrameDispatchMs = clickWatch.Elapsed.TotalMilliseconds;
             result.Success = confirmed;
 
-            result.VisionFollowUpMs = PrologueVisionThrottle.TickOneSliceMs();
-            PrologueFpsMonitor.RecordSyntheticSpike(result.VisionFollowUpMs);
+            result.VisionFollowUpMs = MainGameVisionThrottle.TickOneSliceMs();
+            MainGameFpsMonitor.RecordSyntheticSpike(result.VisionFollowUpMs);
 
             total.Stop();
-            PrologueFpsMonitor.EndBurstCapture();
+            MainGameFpsMonitor.EndBurstCapture();
 
             result.TotalWallMs = total.Elapsed.TotalMilliseconds;
-            result.AvgFrameTimeMs = PrologueFpsMonitor.AvgFrameTimeMs;
-            result.MaxDispatchSpikeMs = PrologueFpsMonitor.MaxDispatchSpikeMs;
+            result.AvgFrameTimeMs = MainGameFpsMonitor.AvgFrameTimeMs;
+            result.MaxDispatchSpikeMs = MainGameFpsMonitor.MaxDispatchSpikeMs;
             result.PaintCountAfter = scan.PaintCount;
             if (!confirmed)
                 result.Error = "confirm_rejected";
             return result;
         }
 
-        static void DrainSurveyPathPipeline(PrologueDroneScan scan)
+        static void DrainSurveyPathPipeline(MainGameDroneScan scan)
         {
-            var pathQueue = PrologueHexPathQueue.Instance
-                            ?? new GameObject("PrologueHexPathQueue").AddComponent<PrologueHexPathQueue>();
+            var pathQueue = MainGameHexPathQueue.Instance
+                            ?? new GameObject("MainGameHexPathQueue").AddComponent<MainGameHexPathQueue>();
 
             var watchdog = Stopwatch.StartNew();
             while ((scan.IsRoutingMark || pathQueue.HasPendingJobs) && watchdog.ElapsedMilliseconds < 15_000)
             {
                 var slice = Stopwatch.StartNew();
-                pathQueue.Pump(PrologueHexPathQueue.ExpansionsPerFrame * 8);
+                pathQueue.Pump(MainGameHexPathQueue.ExpansionsPerFrame * 8);
                 slice.Stop();
-                PrologueFpsMonitor.RecordSyntheticSpike(slice.Elapsed.TotalMilliseconds);
+                MainGameFpsMonitor.RecordSyntheticSpike(slice.Elapsed.TotalMilliseconds);
             }
         }
 
         static int ResolveSurveyMarkTile()
         {
-            var ctrl = PrologueController.Instance;
+            var ctrl = MainGameController.Instance;
             if (ctrl == null) return -1;
 
             int home = -1;
@@ -392,7 +392,7 @@ namespace GameDevTV.RTS.Diagnostics
             {
                 for (int i = 0; i < colony.Board.Tiles.Count; i++)
                 {
-                    if (colony.Board.At(i).Building == PrologueBuildingId.CommandPost)
+                    if (colony.Board.At(i).Building == MainGameBuildingId.CommandPost)
                     {
                         home = i;
                         break;
@@ -402,7 +402,7 @@ namespace GameDevTV.RTS.Diagnostics
 
             int best = -1;
             int bestD = int.MaxValue;
-            var marks = PrologueInteractableIndex.DepositMarks;
+            var marks = MainGameInteractableIndex.DepositMarks;
             for (int m = 0; m < marks.Count; m++)
             {
                 var mark = marks[m];
@@ -416,7 +416,7 @@ namespace GameDevTV.RTS.Diagnostics
 
             if (best >= 0) return best;
 
-            var ice = PrologueInteractableIndex.IceClicks;
+            var ice = MainGameInteractableIndex.IceClicks;
             for (int i = 0; i < ice.Count; i++)
             {
                 if (ice[i] == null) continue;
@@ -426,7 +426,7 @@ namespace GameDevTV.RTS.Diagnostics
             return -1;
         }
 
-        static bool TryTileForSurveyMarkDiagnostic(PrologueController ctrl, Vector3 ground, out int tileIndex)
+        static bool TryTileForSurveyMarkDiagnostic(MainGameController ctrl, Vector3 ground, out int tileIndex)
         {
             tileIndex = -1;
             if (ctrl == null) return false;

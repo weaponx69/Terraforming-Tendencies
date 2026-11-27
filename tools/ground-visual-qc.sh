@@ -44,10 +44,10 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 
-"$ROOT/tools/prologue-perf-scenario.sh" >/dev/null 2>&1 || true
+"$ROOT/tools/main-game-perf-scenario.sh" >/dev/null 2>&1 || true
 sleep 4
 
-prep=$(unity command eval 'return GameDevTV.RTS.Diagnostics.PrologueGroundVisualQc.PrepareHeavyLoad();' --json --timeout 300 2>/dev/null \
+prep=$(unity command eval 'return GameDevTV.RTS.Diagnostics.MainGameGroundVisualQc.PrepareHeavyLoad();' --json --timeout 300 2>/dev/null \
   | extract_result || echo fail)
 echo "prepare: $prep"
 if [[ "$prep" != prepared* ]]; then
@@ -64,12 +64,12 @@ worst_fps=999
 
 for iter in $(seq 1 "$ITERATIONS"); do
   for zoom in close mid far; do
-    sample=$(unity command eval "return GameDevTV.RTS.Diagnostics.PrologueGroundVisualQc.SetZoomAndSample(\"$zoom\");" --json --timeout 120 2>/dev/null \
+    sample=$(unity command eval "return GameDevTV.RTS.Diagnostics.MainGameGroundVisualQc.SetZoomAndSample(\"$zoom\");" --json --timeout 120 2>/dev/null \
       | extract_result || echo '{}')
     sleep "$WAIT_SEC"
     fps_list=()
     for _ in $(seq 1 "$FPS_SAMPLES"); do
-      f=$(unity command eval 'return GameDevTV.RTS.Prologue.PrologueFpsMonitor.LastSecondFps;' --json --timeout 30 2>/dev/null \
+      f=$(unity command eval 'return GameDevTV.RTS.MainGame.MainGameFpsMonitor.LastSecondFps;' --json --timeout 30 2>/dev/null \
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["result"]["result"])' 2>/dev/null || echo 0)
       fps_list+=("$f")
       sleep 0.8
@@ -78,7 +78,7 @@ for iter in $(seq 1 "$ITERATIONS"); do
     if [ "$fps_med" -lt "$worst_fps" ]; then worst_fps=$fps_med; fi
     shot="$OUT_DIR/iter${iter}_${zoom}.png"
     unity command screenshot --output "$shot" --width 1920 --height 1080 2>/dev/null || true
-    diag=$(unity command eval 'return GameDevTV.RTS.Prologue.PrologueGroundVisualTuning.DiagnosticsLine();' --json --timeout 30 2>/dev/null \
+    diag=$(unity command eval 'return GameDevTV.RTS.MainGame.MainGameGroundVisualTuning.DiagnosticsLine();' --json --timeout 30 2>/dev/null \
       | extract_result || echo "")
     SAMPLE_JSON="$sample" DIAG="$diag" python3 -c 'import json,os; s=os.environ.get("SAMPLE_JSON") or "{}"; 
 try: sample=json.loads(s)

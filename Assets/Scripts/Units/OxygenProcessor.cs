@@ -23,7 +23,7 @@ namespace GameDevTV.RTS.Units
         /// <summary>Throttled building tick from <see cref="BuildingManager"/>.</summary>
         public void SimulationTick(float dt)
         {
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive) return;
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive) return;
             if (dt <= 0f) return;
             if (Owner == Owner.Invalid) return;
             if (Progress.State != BuildingProgress.BuildingState.Completed) return;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameDevTV.RTS.MainGame;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Units
@@ -38,13 +39,16 @@ namespace GameDevTV.RTS.Units
         public static void Apply(GameObject root)
         {
             if (root == null) return;
-            // Baked prefab meshes stay. The runtime swap was leaving the cylinder
-            // on the asset and only covering it after the building woke up.
-            foreach (var existing in root.GetComponentsInChildren<MeshRenderer>(true))
+            // Baked prefab meshes stay in Acts / editor. Main Game still swaps Command Post
+            // (and friends) to URP Lit vertex meshes — baked FBX materials often read flat/untextured on the slice.
+            if (!MainGameController.IsActive)
             {
-                if (existing != null
-                    && existing.gameObject.name.IndexOf("Building Mesh", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                    return;
+                foreach (var existing in root.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (existing != null
+                        && existing.gameObject.name.IndexOf("Building Mesh", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        return;
+                }
             }
             string name = root.name ?? string.Empty;
             var building = root.GetComponent<BaseBuilding>();

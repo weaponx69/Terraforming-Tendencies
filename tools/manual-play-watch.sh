@@ -122,11 +122,11 @@ print(f"{w}x{h}+{x}+{y}")
 '
 
 metrics_code='
-int fps = GameDevTV.RTS.Prologue.PrologueFpsMonitor.LastSecondFps;
-int smooth = GameDevTV.RTS.Prologue.ProloguePerformanceBudget.SmoothedFps();
-bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
-int step = GameDevTV.RTS.Prologue.PrologueController.Instance?.Colony?.PrologueStep ?? -1;
-int week = GameDevTV.RTS.Prologue.PrologueController.Instance?.Colony?.Week ?? -1;
+int fps = GameDevTV.RTS.MainGame.MainGameFpsMonitor.LastSecondFps;
+int smooth = GameDevTV.RTS.MainGame.MainGamePerformanceBudget.SmoothedFps();
+bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
+int step = GameDevTV.RTS.MainGame.MainGameController.Instance?.Colony?.MainGameStep ?? -1;
+int week = GameDevTV.RTS.MainGame.MainGameController.Instance?.Colony?.Week ?? -1;
 long heap = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / (1024L * 1024L);
 return $"fps={fps} smooth={smooth} prologue={prologue} step={step} week={week} heapMb={heap} dtMs={UnityEngine.Time.unscaledDeltaTime * 1000f:0.0}";
 '

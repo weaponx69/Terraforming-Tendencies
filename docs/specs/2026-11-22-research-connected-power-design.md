@@ -2,8 +2,8 @@
 
 **Date:** 2026-11-22  
 **Status:** Approved — awaiting implementation plan  
-**Engine:** Unity Prologue  
-**Builds on:** Prologue cards / End Week in [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md); Acts power stack (`PowerNode`, `PressurizedTube`, `ConnectPowerCommand`, `AutoConnectAdjacentPowerNodes`); RTS `TechTreeSO` / `TechTreeUI`.
+**Engine:** Unity MainGame  
+**Builds on:** MainGame cards / End Week in [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md); Acts power stack (`PowerNode`, `PressurizedTube`, `ConnectPowerCommand`, `AutoConnectAdjacentPowerNodes`); RTS `TechTreeSO` / `TechTreeUI`.
 
 ## 1. Player fantasy
 
@@ -11,12 +11,12 @@ You aim the colony with cards. Power is real from day one: pressurized tubes lin
 
 ## 2. Decisions (locked)
 
-1. **Connected power is Tier‑1** — reuse the existing tube / `PowerNode` stack from Prologue start. No research gate on basic connectivity.
+1. **Connected power is Tier‑1** — reuse the existing tube / `PowerNode` stack from MainGame start. No research gate on basic connectivity.
 2. **Camp power is power** — it fills the same energy pool until the colony generates its own (e.g. Geothermal on the tube grid).
 3. **Orbital Scan costs energy**, not minerals. No research paywall. Unchanged seating rule (available while unrevealed ice remains); refuse or disable when energy is too low.
 4. **Research costs weeks only** — no mineral / faith / tech-point currency for research.
 5. **Research cards unlock seating** — playing research completes a next-tier target; that unlocks which advanced cards / abilities can seat. Combo of pause tech-tree map + card delivery.
-6. **Tier‑1 of every branch starts unlocked** in Prologue (basic Survey, builds, Orbital, connected tubes).
+6. **Tier‑1 of every branch starts unlocked** in MainGame (basic Survey, builds, Orbital, connected tubes).
 
 ## 3. Power and tubes
 
@@ -26,11 +26,11 @@ You aim the colony with cards. Power is real from day one: pressurized tubes lin
 | --- | --- |
 | `PowerNode.ConnectTo` | Links nodes; draws pressurized tube (`LineRenderer` + `PressurizedTube`) |
 | `BaseBuilding.AutoConnectAdjacentPowerNodes` | Auto-link neighbors when construction finishes |
-| `ConnectPowerCommand` | Click-connect path (available if needed; prefer auto-adjacent for Prologue) |
+| `ConnectPowerCommand` | Click-connect path (available if needed; prefer auto-adjacent for MainGame) |
 | `PressurizedTube` | Damageable link; engineers / colonists repair and transit |
 | `EnergyPipelineManager` / worker `BuildPipeline` | Worker-built pipeline path when a link needs a trip |
 
-### 3.2 Prologue behavior
+### 3.2 MainGame behavior
 
 - When a building that needs or supplies power finishes next to another powered node, tubes auto-link within the Tier‑1 connection rules.
 - Colonists build / maintain tubes. Player supplies materials when a link costs minerals (existing pipeline material rules where they already apply).
@@ -53,7 +53,7 @@ Manual wire drawing stays out of scope.
 
 ## 5. Research loop
 
-1. A **Research** card seats randomly in the hand (same seating family as other Prologue cards).
+1. A **Research** card seats randomly in the hand (same seating family as other MainGame cards).
 2. Player plays it → picks a available **next-tier** target (pause tech tree and/or short pick list).
 3. Research runs over **End Weeks** until the week cost is paid.
 4. On complete: unlock that tier’s **cards / abilities** so they can seat (delivery is seating, not only invisible buffs).
@@ -82,14 +82,14 @@ Exact week costs and card list are balance follow-ups in the implementation plan
 ## 8. Non-goals (this pass)
 
 - Gating Orbital or basic tubes behind research  
-- Manual wire drawing UI as the primary Prologue path  
-- Full Acts power-placement gates in Prologue  
+- Manual wire drawing UI as the primary MainGame path  
+- Full Acts power-placement gates in MainGame  
 - Solid-tube upgrade as a required ship item (research later)  
 - Rewriting `PowerNode` / `PressurizedTube` from scratch  
 
 ## 9. Success criteria
 
-- Prologue buildings link with visible pressurized tubes using the existing stack.  
+- MainGame buildings link with visible pressurized tubes using the existing stack.  
 - Camp power supplies energy until colony generators are online.  
 - Orbital Scan spends energy and never minerals; never requires research.  
 - Research cards spend weeks and unlock higher-tier seating only.  

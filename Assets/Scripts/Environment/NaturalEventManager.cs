@@ -5,7 +5,7 @@ using GameDevTV.RTS.Units;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 
 namespace GameDevTV.RTS.Environment
 {
@@ -92,8 +92,8 @@ namespace GameDevTV.RTS.Environment
             Bus<BuildingSpawnEvent>.OnEvent[Owner.Player1] -= OnFirstBuildingSpawned;
             EnsureExists();
 
-            // Prologue / Colony Acts: no wall-clock meteor waves.
-            if (PrologueController.IsActive
+            // MainGame / Colony Acts: no wall-clock meteor waves.
+            if (MainGameController.IsActive
                 || (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive))
             {
                 Instance?.StopAssault();
@@ -115,7 +115,7 @@ namespace GameDevTV.RTS.Environment
 
         public void BeginAssault()
         {
-            if (PrologueController.IsActive) return;
+            if (MainGameController.IsActive) return;
             if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
                 return;
             if (waveRoutine == null)
@@ -134,7 +134,7 @@ namespace GameDevTV.RTS.Environment
         /// <summary>Immediate single strike (Colony Acts card disaster).</summary>
         public void TriggerStrike(GameObject preferredPrefab = null)
         {
-            if (PrologueController.IsActive) return;
+            if (MainGameController.IsActive) return;
             Vector3 targetPos = GetTargetPosition();
             if (preferredPrefab != null)
             {
@@ -148,7 +148,7 @@ namespace GameDevTV.RTS.Environment
 
         public void TryTurnThreat(int turnNumber)
         {
-            if (PrologueController.IsActive) return;
+            if (MainGameController.IsActive) return;
             if (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive)
                 return;
             if (waveRoutine == null) return;
@@ -165,7 +165,7 @@ namespace GameDevTV.RTS.Environment
             yield return new WaitForSeconds(firstWaveDelay);
             while (true)
             {
-                if (PrologueController.IsActive
+                if (MainGameController.IsActive
                     || (ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive))
                 {
                     yield return new WaitForSeconds(timeBetweenWaves);

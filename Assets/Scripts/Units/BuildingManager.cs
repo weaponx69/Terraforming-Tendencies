@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -59,7 +59,7 @@ namespace GameDevTV.RTS.Units
             float dt = simulationAccumulator;
             simulationAccumulator = 0f;
 
-            bool prologue = PrologueController.IsActive;
+            bool prologue = MainGameController.IsActive;
             bool colonyActs = ColonyActManager.Instance != null && ColonyActManager.Instance.IsRunActive;
 
             if (!prologue && !colonyActs)

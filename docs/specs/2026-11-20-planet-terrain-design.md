@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-20  
 **Status:** Superseded (Easy visuals) by [2026-11-21-planet-surface-dem-design.md](2026-11-21-planet-surface-dem-design.md) — grounding/mesh sampling ideas may still apply  
-**Engine:** Unity Prologue / planet gen
+**Engine:** Unity MainGame / planet gen
 
 ## Summary
 
@@ -44,4 +44,4 @@ Replace the flat planet mesh look with a **seeded Unity Terrain** per planet typ
 
 ## Success
 
-- Play Mode: visible hills/valleys away from landing; deposits sit on the surface; Prologue can still place Aquifer / Survey.
+- Play Mode: visible hills/valleys away from landing; deposits sit on the surface; MainGame can still place Aquifer / Survey.

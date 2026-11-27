@@ -11,6 +11,22 @@ namespace GameDevTV.RTS.Environment
     {
         public static SectorManager Instance { get; private set; }
 
+        /// <summary>MainGame.unity ships without this component — create at runtime so deposits/? can spawn.</summary>
+        public static void EnsureExists()
+        {
+            if (Instance != null) return;
+            var existing = UnityEngine.Object.FindAnyObjectByType<SectorManager>(FindObjectsInactive.Include);
+            if (existing != null)
+            {
+                Instance = existing;
+                return;
+            }
+
+            var go = new GameObject("SectorManager");
+            go.AddComponent<SectorManager>();
+            Debug.LogWarning("[SectorManager] Created at runtime (add to MainGame.unity to persist).");
+        }
+
         public enum SectorFeature { None, Volcano, FaultLine, LavaTube, WaterDeposit, Glacier }
 
         [System.Serializable]
@@ -233,9 +249,9 @@ namespace GameDevTV.RTS.Environment
             {
                 BeginTerraformingOn(Sectors[0]);
 
-                // Prologue: deposits stay "?" until Survey Team uncovers them.
-                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null
-                                   || GameDevTV.RTS.Prologue.PrologueController.IsActive;
+                // MainGame: deposits stay "?" until Survey Team uncovers them.
+                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>() != null
+                                   || GameDevTV.RTS.MainGame.MainGameController.IsActive;
                 if (!prologueRun)
                 {
                     // Force-discover Minerals and Gas types so the player can bootstrap (Acts).
@@ -395,7 +411,7 @@ namespace GameDevTV.RTS.Environment
             {
                 InitializeSectors();
             }
-            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
             int bCount = BaseBuilding.ActiveBuildings?.Count ?? 0;
             if (prologue)
             {
@@ -414,8 +430,8 @@ namespace GameDevTV.RTS.Environment
             if (!hasDoneStartingDiscovery && Sectors.Count > 0 && Time.timeSinceLevelLoad > 0.1f)
             {
                 hasDoneStartingDiscovery = true;
-                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>() != null
-                                   || GameDevTV.RTS.Prologue.PrologueController.IsActive;
+                bool prologueRun = UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>() != null
+                                   || GameDevTV.RTS.MainGame.MainGameController.IsActive;
                 if (!prologueRun)
                 {
                     DiscoverResourcesInUnlockedSectors();

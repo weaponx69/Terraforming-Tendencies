@@ -39,7 +39,7 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
             {
                 enabled = false;
                 return;

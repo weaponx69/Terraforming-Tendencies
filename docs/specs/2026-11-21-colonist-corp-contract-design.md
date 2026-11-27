@@ -2,8 +2,8 @@
 
 **Date:** 2026-11-21  
 **Status:** In the game  
-**Engine:** Unity Prologue  
-**Builds on:** the Prologue run in [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) (cards on tiles, End Week, shuttle, storm).
+**Engine:** Unity MainGame  
+**Builds on:** the MainGame run in [`PROJECT_KNOWLEDGE.md`](../../PROJECT_KNOWLEDGE.md) (cards on tiles, End Week, shuttle, storm).
 
 ## 1. Player fantasy
 
@@ -17,7 +17,7 @@ The corporation holds the contract. It has a clock, and it can cancel if the col
 2. Colonists perform the terraforming that card named. Construction weeks and weekly air, ice, and mine output are their work.
 3. The corporation is simulated as the contract holder: deadlines, satisfaction, and faith. It cancels the contract when any one of those fails.
 4. The terraforming number moves on a week only when the colonists actually ran the job. A card on a pad with unmet needs sits still.
-5. This layer lands in the Prologue first. Colony Acts stays archived.
+5. This layer lands in the MainGame first. Colony Acts stays archived.
 
 ## 3. Three actors
 
@@ -31,7 +31,7 @@ A card is a nudge with a place. It tells the colonists which job to run. It does
 
 ## 4. What the player still does
 
-Unchanged from the current Prologue:
+Unchanged from the current MainGame:
 
 - Survey Team: paint up to 5 tiles, confirm, 3 colony days, then reveal.
 - Place Ice Aquifer within 3 of revealed ice.
@@ -46,7 +46,7 @@ Playing the card assigns the job. The weeks after that are the colonists carryin
 
 On each End Week, colonists work jobs the player has already aimed.
 
-**Construction.** A site on the board advances one week when colonist satisfaction at the start of the week is **40 or above**. Below 40, the site stays where it is and the week log says the crew stopped. Haul weeks and build weeks are otherwise the rules already in `PrologueColony`.
+**Construction.** A site on the board advances one week when colonist satisfaction at the start of the week is **40 or above**. Below 40, the site stays where it is and the week log says the crew stopped. Haul weeks and build weeks are otherwise the rules already in `MainGameColony`.
 
 **Terraforming.** A finished Oxygen Processor adds its weekly air only when all of these are true:
 
@@ -66,7 +66,7 @@ An aquifer pulls ice, and a mine credits its stock, under that same satisfaction
 | No critical air, and beds cover colonists once the shuttle has landed | +8 |
 | Cap | 0 to 100 |
 
-Starting crew is `StartColonists` (12). The shuttle adds `PrologueShuttleSize` (6). Air need stays `ceil(colonists × 0.5)`.
+Starting crew is `StartColonists` (12). The shuttle adds `MainGameShuttleSize` (6). Air need stays `ceil(colonists × 0.5)`.
 
 Satisfaction is the colonists’ willingness to work. At 40 and above they build and terraform. Below 40 they are still on the pad, and the job waits.
 
@@ -86,16 +86,16 @@ The corporation does not place buildings. It watches the contract.
 
 The step check uses the step value from before `StoryCheck` runs. A week that finishes the current objective is a faith gain. A quiet week is a loss of faith.
 
-**Clock.** The corporation’s deadlines are the ones the Prologue already schedules:
+**Clock.** The corporation’s deadlines are the ones the MainGame already schedules:
 
-- Shuttle: `PrologueShuttleWeeks` (3) after the first powered oxygen processor.
-- Storm: `PrologueStormWeeks` (2) after the second ice drill, then the colony must still have oxygen above 0 for `PrologueStormWeeks` more weeks to clear the prologue.
+- Shuttle: `MainGameShuttleWeeks` (3) after the first powered oxygen processor.
+- Storm: `MainGameStormWeeks` (2) after the second ice drill, then the colony must still have oxygen above 0 for `MainGameStormWeeks` more weeks to clear the prologue.
 
 No separate week cap is added. A colony that never reaches those deadlines still loses, because faith falls on every week the step does not advance.
 
 ## 7. How a week ends
 
-`PrologueColony.EndWeek` keeps its current order, with the contract wrapped around it.
+`MainGameColony.EndWeek` keeps its current order, with the contract wrapped around it.
 
 1. Read satisfaction. If it is below 40, skip site progress and skip aquifer, mine, and oxygen yields. Log the stall.
 2. Run the rest of the week as it does now (breathe, shuttle landing, storm flag, week increment).
@@ -128,7 +128,7 @@ The End Week log states the colonist result in one line: air gained, crew stoppe
 
 ### In
 
-- Satisfaction and faith on `PrologueColony`, shown on `PrologueHUD`, updated only from `EndWeek`.
+- Satisfaction and faith on `MainGameColony`, shown on `MainGameHUD`, updated only from `EndWeek`.
 - Work gate at satisfaction 40 for construction progress and for ice, mine, and oxygen yields.
 - Contract loss on satisfaction 0, faith 0, or storm with no air.
 - Week log lines for stall, cancel, and terraforming output.
@@ -144,7 +144,7 @@ The End Week log states the colonist result in one line: air gained, crew stoppe
 
 ## 10. First numbers
 
-These are the values to ship. Tune them in `PrologueData` if a full prologue run cancels while the existing step goals are being met on pace, or if faith never falls on a stalled run.
+These are the values to ship. Tune them in `MainGameData` if a full prologue run cancels while the existing step goals are being met on pace, or if faith never falls on a stalled run.
 
 | Constant | Value |
 | --- | ---: |
@@ -164,7 +164,7 @@ These are the values to ship. Tune them in `PrologueData` if a full prologue run
 - Satisfaction 39: an in-progress site does not gain a week, and a powered oxygen processor with ice does not add air.
 - Satisfaction 40: that site gains a week, and the processor adds `OxygenProducedPerWeek`.
 - A week with critical air reduces satisfaction by 20. A following week with air covered and beds covered gains 8.
-- A week that does not change `PrologueStep` reduces faith by 8. A week that advances the step gains 15.
+- A week that does not change `MainGameStep` reduces faith by 8. A week that advances the step gains 15.
 - Satisfaction 0 or faith 0 ends the run and does not set step 6.
 - Storm active and oxygen 0 ends the run.
 - Step 6 still requires oxygen above 0 for the storm hold, with satisfaction and faith above 0 on that week.

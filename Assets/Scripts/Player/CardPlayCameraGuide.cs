@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Commands;
 using GameDevTV.RTS.Environment;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
@@ -25,11 +25,18 @@ namespace GameDevTV.RTS.Player
             if (!TryResolvePlayWorld(bbc.Building, out Vector3 world))
                 return false;
 
-            Vector3 cam = PlayerInput.GetCameraFocusPosition();
-            if (ColonyTileGrid.HorizontalDistSq(cam, world) <= SkipFlyHorizSq)
-                return false;
+            bool mainGame = MainGameController.IsActive;
+            if (!mainGame)
+            {
+                Vector3 cam = PlayerInput.GetCameraFocusPosition();
+                if (ColonyTileGrid.HorizontalDistSq(cam, world) <= SkipFlyHorizSq)
+                    return false;
+            }
 
-            PlayerInput.FlyCameraToWorldPosition(world, durationSeconds);
+            if (mainGame)
+                PlayerInput.FlyHandCardToPlaySite(world, durationSeconds);
+            else
+                PlayerInput.FlyCameraToWorldPosition(world, durationSeconds);
             return true;
         }
 
@@ -38,8 +45,8 @@ namespace GameDevTV.RTS.Player
             world = default;
             if (building == null) return false;
 
-            if (PrologueController.IsActive)
-                return TryResolveProloguePlayWorld(building, out world);
+            if (MainGameController.IsActive)
+                return TryResolveMainGamePlayWorld(building, out world);
 
             if (BuildingSiteRegistry.IsCommandPostBuilding(building))
             {
@@ -60,34 +67,34 @@ namespace GameDevTV.RTS.Player
         }
 
         /// <summary>CLI / bots: board tile index for the active prologue building card.</summary>
-        public static bool TryGetProloguePlacementTile(BuildingSO building, out int tileIndex)
+        public static bool TryGetMainGamePlacementTile(BuildingSO building, out int tileIndex)
         {
             tileIndex = -1;
-            var ctrl = PrologueController.Instance;
+            var ctrl = MainGameController.Instance;
             var colony = ctrl?.Colony;
             if (colony == null || building == null) return false;
 
             if (BuildingSiteRegistry.IsMineBuilding(building))
-                return TryGetPrologueMinePlacementTile(building, out tileIndex);
+                return TryGetMainGameMinePlacementTile(building, out tileIndex);
 
-            if (!PrologueCardMap.TryGetPrologueId(building, out var id)
-                || id == PrologueBuildingId.None
-                || id == PrologueBuildingId.CommandPost)
+            if (!MainGameCardMap.TryGetMainGameId(building, out var id)
+                || id == MainGameBuildingId.None
+                || id == MainGameBuildingId.CommandPost)
                 return false;
 
-            int secondIce = colony.PrologueStep >= 4 ? colony.SecondIceTargetTile() : -1;
+            int secondIce = colony.MainGameStep >= 4 ? colony.SecondIceTargetTile() : -1;
             int anchor = PlacementAnchor(colony, id, secondIce);
             if (anchor < 0) anchor = 0;
 
-            if (id == PrologueBuildingId.Aquifer && colony.PrologueStep >= 4 && secondIce >= 0)
+            if (id == MainGameBuildingId.Aquifer && colony.MainGameStep >= 4 && secondIce >= 0)
             {
                 int bestIce = -1;
                 int bestD = int.MaxValue;
                 for (int i = 0; i < colony.Board.Tiles.Count; i++)
                 {
                     var pad = colony.Board.At(i);
-                    if (pad.Building != PrologueBuildingId.None) continue;
-                    if (pad.Feature == PrologueFeature.Ice || pad.Feature == PrologueFeature.Glacier) continue;
+                    if (pad.Building != MainGameBuildingId.None) continue;
+                    if (pad.Feature == MainGameFeature.Ice || pad.Feature == MainGameFeature.Glacier) continue;
                     if (!colony.Preview(i, id, out _)) continue;
                     if (!colony.ReachesNewIce(i)) continue;
                     int d = colony.Dist(secondIce, i);
@@ -110,9 +117,9 @@ namespace GameDevTV.RTS.Player
             for (int i = 0; i < colony.Board.Tiles.Count; i++)
             {
                 var pad = colony.Board.At(i);
-                if (pad.Building != PrologueBuildingId.None) continue;
-                if (id == PrologueBuildingId.Aquifer
-                    && (pad.Feature == PrologueFeature.Ice || pad.Feature == PrologueFeature.Glacier))
+                if (pad.Building != MainGameBuildingId.None) continue;
+                if (id == MainGameBuildingId.Aquifer
+                    && (pad.Feature == MainGameFeature.Ice || pad.Feature == MainGameFeature.Glacier))
                     continue;
                 if (!colony.Preview(i, id, out _)) continue;
                 int d = anchor >= 0 ? colony.Dist(anchor, i) : 0;
@@ -126,10 +133,10 @@ namespace GameDevTV.RTS.Player
             return true;
         }
 
-        static bool TryResolveProloguePlayWorld(BuildingSO building, out Vector3 world)
+        static bool TryResolveMainGamePlayWorld(BuildingSO building, out Vector3 world)
         {
             world = default;
-            var ctrl = PrologueController.Instance;
+            var ctrl = MainGameController.Instance;
             var colony = ctrl?.Colony;
             if (colony == null) return false;
 
@@ -137,20 +144,37 @@ namespace GameDevTV.RTS.Player
                 && DiscoverySystem.TryGetAutoMinePlacement(building, out world, out _))
                 return true;
 
-            if (!PrologueCardMap.TryGetPrologueId(building, out var id) || id == PrologueBuildingId.None)
+            if (!MainGameCardMap.TryGetMainGameId(building, out var id) || id == MainGameBuildingId.None)
                 return false;
 
-            Vector3 cam = PlayerInput.GetCameraFocusPosition();
-            var suggestPads = Object.FindObjectsByType<PrologueRevealGhostPad>(FindObjectsInactive.Exclude);
+            if (TryGetMainGamePlacementTile(building, out int placementTile)
+                && ctrl.TryGetCell(placementTile, out Vector2Int placeCell))
+            {
+                world = ColonyTileGrid.CellToWorldOnHighestGround(placeCell);
+                return true;
+            }
+
+            if (id == MainGameBuildingId.Aquifer && TryResolveAquiferIceFallback(colony, ctrl, out world))
+                return true;
+
+            // Fall back: ghost pad nearest the placement anchor (not the camera).
+            var suggestPads = Object.FindObjectsByType<MainGameRevealGhostPad>(FindObjectsInactive.Exclude);
+            int secondIce = colony.MainGameStep >= 4 ? colony.SecondIceTargetTile() : -1;
+            int anchorTile = PlacementAnchor(colony, id, secondIce);
+            Vector3 anchorWorld = anchorTile >= 0 && ctrl.TryGetCell(anchorTile, out Vector2Int anchorCell)
+                ? ColonyTileGrid.CellToWorldOnHighestGround(anchorCell)
+                : PlayerInput.GetCameraFocusPosition();
             float bestSq = float.MaxValue;
-            PrologueRevealGhostPad bestPad = null;
+            MainGameRevealGhostPad bestPad = null;
             for (int i = 0; i < suggestPads.Length; i++)
             {
                 var pad = suggestPads[i];
                 if (pad == null || pad.BoardTileIndex < 0) continue;
                 if (!colony.Preview(pad.BoardTileIndex, id, out _)) continue;
-                if (id == PrologueBuildingId.Aquifer && !colony.CanPlaceAquiferPad(pad.BoardTileIndex)) continue;
-                float sq = ColonyTileGrid.HorizontalDistSq(cam, pad.transform.position);
+                if (id == MainGameBuildingId.Aquifer && !colony.CanPlaceAquiferPad(pad.BoardTileIndex)) continue;
+                if (!ctrl.TryGetCell(pad.BoardTileIndex, out Vector2Int _))
+                    continue;
+                float sq = ColonyTileGrid.HorizontalDistSq(anchorWorld, pad.transform.position);
                 if (sq >= bestSq) continue;
                 bestSq = sq;
                 bestPad = pad;
@@ -162,22 +186,15 @@ namespace GameDevTV.RTS.Player
                 return true;
             }
 
-            if (id == PrologueBuildingId.Aquifer && TryResolveAquiferIceFallback(colony, ctrl, out world))
-                return true;
-
-            if (!TryGetProloguePlacementTile(building, out int tile) || !ctrl.TryGetCell(tile, out Vector2Int cell))
-                return false;
-
-            world = ColonyTileGrid.CellToWorldOnHighestGround(cell);
-            return true;
+            return false;
         }
 
-        static bool TryResolveAquiferIceFallback(PrologueColony colony, PrologueController ctrl, out Vector3 world)
+        static bool TryResolveAquiferIceFallback(MainGameColony colony, MainGameController ctrl, out Vector3 world)
         {
             world = default;
-            int secondIce = colony.PrologueStep >= 4 ? colony.SecondIceTargetTile() : -1;
+            int secondIce = colony.MainGameStep >= 4 ? colony.SecondIceTargetTile() : -1;
             int iceAnchor = -1;
-            if (colony.PrologueStep >= 4 && !colony.SecondIceDrill() && secondIce >= 0)
+            if (colony.MainGameStep >= 4 && !colony.SecondIceDrill() && secondIce >= 0)
                 iceAnchor = secondIce;
             else if (colony.Board.FirstIceTiles.Count > 0)
                 iceAnchor = FirstSetElement(colony.Board.FirstIceTiles);
@@ -187,14 +204,14 @@ namespace GameDevTV.RTS.Player
                 {
                     var t = colony.Board.At(i);
                     if (!t.Revealed || t.DepositLeft <= 0) continue;
-                    if (t.Feature != PrologueFeature.Ice && t.Feature != PrologueFeature.Glacier) continue;
+                    if (t.Feature != MainGameFeature.Ice && t.Feature != MainGameFeature.Glacier) continue;
                     iceAnchor = i;
                     break;
                 }
             }
 
             if (iceAnchor < 0)
-                iceAnchor = colony.NearestRevealedIceTile(FindBuildingTile(colony, PrologueBuildingId.CommandPost));
+                iceAnchor = colony.NearestRevealedIceTile(FindBuildingTile(colony, MainGameBuildingId.CommandPost));
             if (iceAnchor < 0) return false;
             if (!colony.TryFindAquiferPadNearIce(iceAnchor, out int padTile)) return false;
             if (!ctrl.TryGetCell(padTile, out Vector2Int padCell)) return false;
@@ -202,12 +219,12 @@ namespace GameDevTV.RTS.Player
             return true;
         }
 
-        static bool TryGetPrologueMinePlacementTile(BuildingSO building, out int tileIndex)
+        static bool TryGetMainGameMinePlacementTile(BuildingSO building, out int tileIndex)
         {
             tileIndex = -1;
             if (!DiscoverySystem.TryGetAutoMinePlacement(building, out Vector3 world, out _))
                 return false;
-            var ctrl = PrologueController.Instance;
+            var ctrl = MainGameController.Instance;
             if (ctrl == null || !ctrl.TryGetTileIndex(world, out tileIndex))
                 tileIndex = -1;
             return tileIndex >= 0;
@@ -268,19 +285,19 @@ namespace GameDevTV.RTS.Player
             return found;
         }
 
-        static int PlacementAnchor(PrologueColony colony, PrologueBuildingId id, int secondIce) => id switch
+        static int PlacementAnchor(MainGameColony colony, MainGameBuildingId id, int secondIce) => id switch
         {
-            PrologueBuildingId.WindTurbine => FindBuildingTile(colony, PrologueBuildingId.Oxygen),
-            PrologueBuildingId.Oxygen => FindBuildingTile(colony, PrologueBuildingId.CommandPost),
-            PrologueBuildingId.Habitat => FindBuildingTile(colony, PrologueBuildingId.Oxygen),
-            PrologueBuildingId.Aquifer when colony.PrologueStep >= 4 && secondIce >= 0 => secondIce,
-            PrologueBuildingId.Aquifer when colony.Board.FirstIceTiles.Count > 0
+            MainGameBuildingId.WindTurbine => FindBuildingTile(colony, MainGameBuildingId.Oxygen),
+            MainGameBuildingId.Oxygen => FindBuildingTile(colony, MainGameBuildingId.CommandPost),
+            MainGameBuildingId.Habitat => FindBuildingTile(colony, MainGameBuildingId.Oxygen),
+            MainGameBuildingId.Aquifer when colony.MainGameStep >= 4 && secondIce >= 0 => secondIce,
+            MainGameBuildingId.Aquifer when colony.Board.FirstIceTiles.Count > 0
                 => FirstSetElement(colony.Board.FirstIceTiles),
-            PrologueBuildingId.Solar => FindBuildingTile(colony, PrologueBuildingId.CommandPost),
-            _ => FindBuildingTile(colony, PrologueBuildingId.CommandPost)
+            MainGameBuildingId.Solar => FindBuildingTile(colony, MainGameBuildingId.CommandPost),
+            _ => FindBuildingTile(colony, MainGameBuildingId.CommandPost)
         };
 
-        static int FindBuildingTile(PrologueColony colony, PrologueBuildingId id)
+        static int FindBuildingTile(MainGameColony colony, MainGameBuildingId id)
         {
             for (int i = 0; i < colony.Board.Tiles.Count; i++)
                 if (colony.Board.At(i).Building == id) return i;

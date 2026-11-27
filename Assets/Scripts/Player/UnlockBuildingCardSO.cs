@@ -13,8 +13,8 @@ namespace GameDevTV.RTS.Player
             public override bool CanApply()
             {
                 if (buildingToUnlock == null) return false;
-                // Prologue placement is gated by PrologueColony.Preview, not reserved sites.
-                if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                // MainGame placement is gated by MainGameColony.Preview, not reserved sites.
+                if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
                     return true;
                 if (ColonyActManager.Instance != null)
                 {
@@ -29,8 +29,8 @@ namespace GameDevTV.RTS.Player
 
             public override int GetMaterialsPlayCost()
             {
-                // Prologue / Colony Acts: building cards are free to play from the hand.
-                if (ColonyActManager.Instance != null || GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                // MainGame / Colony Acts: building cards are free to play from the hand.
+                if (ColonyActManager.Instance != null || GameDevTV.RTS.MainGame.MainGameController.IsActive)
                     return 0;
                 int fromBuilding = ReservedSiteBuildUtility.GetMaterialsCost(buildingToUnlock);
                 int fromCard = MaterialsCost;

@@ -4,13 +4,13 @@
 
 ## Vertical slice = the game (for now)
 
-The scene everyone plays today is labeled **Prologue**, but architecturally it is the **vertical slice** that will grow into the full title:
+The scene everyone plays today is labeled **MainGame**, but architecturally it is the **vertical slice** that will grow into the full title:
 
 - Shared planet: [`PlanetGenerator`](../../Assets/Scripts/Environment/PlanetGenerator.cs), deposits, DEM grounding  
 - Shared player stack: [`PlayerInput`](../../Assets/Scripts/Player/PlayerInput.cs), cards, [`ColonyTileGrid`](../../Assets/Scripts/Player/ColonyTileGrid.cs), buildings, HUD  
-- Run owner: [`PrologueController`](../../Assets/Scripts/Prologue/PrologueController.cs) + [`PrologueColony`](../../Assets/Scripts/Prologue/PrologueColony.cs) (slice sim — not a disposable tutorial silo)
+- Run owner: [`MainGameController`](../../Assets/Scripts/MainGame/MainGameController.cs) + [`MainGameColony`](../../Assets/Scripts/MainGame/MainGameColony.cs) (slice sim — not a disposable tutorial silo)
 
-Treat **Prologue*** naming as **temporary packaging**, not permission to build “prologue-only” rules that will never apply to sector 2, multiplayer, or post-contract play. When you verify the slice (UI playthrough, bootstrap, survey, mines), you are verifying **the product loop**, not an optional module.
+Treat **MainGame*** naming as **temporary packaging**, not permission to build “prologue-only” rules that will never apply to sector 2, multiplayer, or post-contract play. When you verify the slice (UI playthrough, bootstrap, survey, mines), you are verifying **the product loop**, not an optional module.
 
 **Colony Acts** is archived legacy; do not treat it as an equal second game mode for new design or sign-off.
 
@@ -27,7 +27,7 @@ Treat **Prologue*** naming as **temporary packaging**, not permission to build �
 
 | Area | Harness | Notes |
 |------|---------|--------|
-| **Vertical slice (current main game)** | [`tools/prologue-ui-playthrough.sh`](../../tools/prologue-ui-playthrough.sh) | End-to-end player UI for the slice; `BeginNewPrologueRunForPlaytest()` every run → board sync + deposit bootstrap + fog. |
+| **Vertical slice (current main game)** | [`tools/main-game-ui-playthrough.sh`](../../tools/main-game-ui-playthrough.sh) | End-to-end player UI for the slice; `BeginNewMainGameRunForPlaytest()` every run → board sync + deposit bootstrap + fog. |
 | **Archived Acts** | [`tools/colony-acts-player-bot-cli.sh`](../../tools/colony-acts-player-bot-cli.sh) | Legacy bot only if deliberately testing old Acts code — not the product direction. |
 | **Single feature in slice** | Manual Play + shortest UI path | Same rules: real UI; document clicks and outcome. |
 
@@ -41,7 +41,7 @@ Treat **Prologue*** naming as **temporary packaging**, not permission to build �
 
 ## Unit tests (allowed, narrow role)
 
-EditMode tests (e.g. [`PrologueColonyTests`](../../Assets/Scripts/Tests/PrologueColonyTests.cs), movement/nav tests) may assert **rules and math** on small fakes.
+EditMode tests (e.g. [`MainGameColonyTests`](../../Assets/Scripts/Tests/MainGameColonyTests.cs), movement/nav tests) may assert **rules and math** on small fakes.
 
 They **do not** replace player verification and must not be described as playthroughs or smoke coverage for a feature.
 
@@ -49,14 +49,14 @@ They **do not** replace player verification and must not be described as playthr
 
 Automated **vertical-slice** verifies must run:
 
-1. `PrologueController.BeginNewPrologueRunForPlaytest()` — new colony, `SyncBoardFromPlanet`, [`PrologueSectorDepositBootstrap`](../../Assets/Scripts/Prologue/PrologueSectorDepositBootstrap.cs), ice markers, resource fog.
-2. Then [`PrologueUiPlaythrough`](../../Assets/Scripts/Prologue/PrologueUiPlaythrough.cs) + shell clicks **or** equivalent manual UI.
+1. `MainGameController.BeginNewMainGameRunForPlaytest()` — new colony, `SyncBoardFromPlanet`, [`MainGameSectorDepositBootstrap`](../../Assets/Scripts/MainGame/MainGameSectorDepositBootstrap.cs), ice markers, resource fog.
+2. Then [`MainGameUiPlaythrough`](../../Assets/Scripts/MainGame/MainGameUiPlaythrough.cs) + shell clicks **or** equivalent manual UI.
 
 Skipping bootstrap means the run is **invalid** for slice sign-off (deposits/`?` will lie about real player experience). When the full game adds more boot steps, they belong in the same “fresh world” path — not a separate test harness.
 
-## Prologue / vertical slice
+## MainGame / vertical slice
 
-Same rules as the rest of the project. Bootstrap for automated runs: `BeginNewPrologueRunForPlaytest()` then UI playthrough (see **World bootstrap** above). Supersedes any older prologue-only verification doc.
+Same rules as the rest of the project. Bootstrap for automated runs: `BeginNewMainGameRunForPlaytest()` then UI playthrough (see **World bootstrap** above). Supersedes any older prologue-only verification doc.
 
 ## Agents and contributors
 

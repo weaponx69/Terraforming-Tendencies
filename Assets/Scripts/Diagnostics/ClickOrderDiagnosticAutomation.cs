@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Text;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Diagnostics
 {
     /// <summary>
-    /// Play Mode matrix with burdened-board warm-up, then real Prologue survey stress cases.
+    /// Play Mode matrix with burdened-board warm-up, then real MainGame survey stress cases.
     /// </summary>
     public static class ClickOrderDiagnosticAutomation
     {
@@ -33,7 +33,7 @@ namespace GameDevTV.RTS.Diagnostics
             var sb = new StringBuilder(512);
             sb.Append('{');
             sb.Append("\"step\":\"warmup\"");
-            sb.Append(",\"prologueActive\":").Append(PrologueController.IsActive ? "true" : "false");
+            sb.Append(",\"prologueActive\":").Append(MainGameController.IsActive ? "true" : "false");
             ClickOrderDiagnosticWarmup.AppendWarmupJson(sb, warmup);
             sb.Append('}');
             return sb.ToString();
@@ -53,20 +53,20 @@ namespace GameDevTV.RTS.Diagnostics
             sb.Append("\"matrixKind\":\"prologue_survey_production_burdened\"");
             sb.Append(",\"timestamp\":\"").Append(System.DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)).Append('\"');
             sb.Append(",\"step\":\"matrix\"");
-            sb.Append(",\"prologueActive\":").Append(PrologueController.IsActive ? "true" : "false");
+            sb.Append(",\"prologueActive\":").Append(MainGameController.IsActive ? "true" : "false");
             sb.Append(",\"markTile\":").Append(markTile);
             sb.Append(",\"goal\":").Append(Vec3(markWorld));
             sb.Append(",\"cases\":[");
 
-            var rProd = diag.RunPrologueSurveyStress(PrologueSurveyStressCase.MarkClickProduction);
+            var rProd = diag.RunMainGameSurveyStress(MainGameSurveyStressCase.MarkClickProduction);
             AppendProductionCase(sb, "P1_mark_click_async", rProd, first: true);
 
             sb.Append(',');
-            var rSync = diag.RunPrologueSurveyStress(PrologueSurveyStressCase.MarkClickSynchronousPath);
+            var rSync = diag.RunMainGameSurveyStress(MainGameSurveyStressCase.MarkClickSynchronousPath);
             AppendProductionCase(sb, "P2_mark_click_sync_bfs", rSync, first: false);
 
             sb.Append(',');
-            var rConfirm = diag.RunPrologueSurveyStress(PrologueSurveyStressCase.ConfirmSurveyTeam);
+            var rConfirm = diag.RunMainGameSurveyStress(MainGameSurveyStressCase.ConfirmSurveyTeam);
             AppendProductionCase(sb, "P3_confirm_survey_team", rConfirm, first: false);
 
             sb.Append(']');
@@ -131,7 +131,7 @@ namespace GameDevTV.RTS.Diagnostics
             return matrixJson;
         }
 
-        static void AppendProductionCase(StringBuilder sb, string id, PrologueSurveyStressResult r, bool first)
+        static void AppendProductionCase(StringBuilder sb, string id, MainGameSurveyStressResult r, bool first)
         {
             if (!first) { }
 
@@ -154,14 +154,14 @@ namespace GameDevTV.RTS.Diagnostics
             sb.Append(",\"raycastMs\":0");
             sb.Append(",\"asyncDrainedJobs\":0");
             sb.Append(",\"asyncDrainMs\":").Append(r.PathDrainMs.ToString("F4", CultureInfo.InvariantCulture));
-            sb.Append(",\"pendingAfter\":").Append(PrologueVisionThrottle.Instance != null && PrologueVisionThrottle.Instance.HasPending ? 1 : 0);
+            sb.Append(",\"pendingAfter\":").Append(MainGameVisionThrottle.Instance != null && MainGameVisionThrottle.Instance.HasPending ? 1 : 0);
             sb.Append('}');
         }
 
         static Vector3 ResolveMarkWorld(out int markTile)
         {
             markTile = -1;
-            var ctrl = PrologueController.Instance;
+            var ctrl = MainGameController.Instance;
             if (ctrl == null) return ResolveGoalFallback();
 
             int home = -1;
@@ -170,7 +170,7 @@ namespace GameDevTV.RTS.Diagnostics
             {
                 for (int i = 0; i < colony.Board.Tiles.Count; i++)
                 {
-                    if (colony.Board.At(i).Building == PrologueBuildingId.CommandPost)
+                    if (colony.Board.At(i).Building == MainGameBuildingId.CommandPost)
                     {
                         home = i;
                         break;
@@ -179,7 +179,7 @@ namespace GameDevTV.RTS.Diagnostics
             }
 
             int bestD = int.MaxValue;
-            var marks = PrologueInteractableIndex.DepositMarks;
+            var marks = MainGameInteractableIndex.DepositMarks;
             for (int m = 0; m < marks.Count; m++)
             {
                 var mark = marks[m];
@@ -202,7 +202,7 @@ namespace GameDevTV.RTS.Diagnostics
             if (markTile >= 0 && ctrl.TryGetCell(markTile, out var bestCell))
                 return ColonyTileGrid.CellToWorldOnGround(bestCell);
 
-            var ice = PrologueInteractableIndex.IceClicks;
+            var ice = MainGameInteractableIndex.IceClicks;
             for (int i = 0; i < ice.Count; i++)
             {
                 if (ice[i] == null || ice[i].TileIndex < 0) continue;
@@ -216,9 +216,9 @@ namespace GameDevTV.RTS.Diagnostics
 
         static Vector3 ResolveGoalFallback()
         {
-            if (PrologueController.Instance != null)
+            if (MainGameController.Instance != null)
             {
-                Vector2Int homeCell = PrologueController.Instance.ResolveHomeCell();
+                Vector2Int homeCell = MainGameController.Instance.ResolveHomeCell();
                 Vector3 home = ColonyTileGrid.CellToWorldOnGround(homeCell);
                 return home + new Vector3(36f, 0f, 28f);
             }

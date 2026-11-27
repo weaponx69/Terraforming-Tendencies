@@ -1,0 +1,33 @@
+---
+description: Main game is the product (not a silo). Agent wording + architecture—read before any work.
+alwaysApply: true
+---
+
+# Main game = the game
+
+## Non-negotiable truth
+
+The **main-scene run** (today: `Assets/Scripts/MainGame/`, `MainGameController`) is **Terraforming Tendencies**—the same loop the shipped game will use: planet surface, sectors, survey-as-puzzle, typed resources, cards, placement, build weeks, End Week, corporate pressure.
+
+**`MainGame*` types are the authoritative sim**; do not fork a parallel “real game” later without explicit direction.
+
+## Do
+
+- Extend **main-game systems** toward the full product: `MainGameController`, `MainGameColony`, shared planet (`PlanetGenerator`, `SectorManager`), cards, `ColonyTileGrid`, placement, HUD.
+- Frame plans as **game-wide** (perf, DOTS, culling, fog, economy, UI)—applicable as the run grows (more sectors, planet pick), not “main-game-only” hacks.
+- Treat **player verification** on the main run as verifying **the game** ([`player-verify-after-changes.mdc`](player-verify-after-changes.mdc)).
+- Use **archived** only where the repo already says so (e.g. **Colony Acts**), not for the main run.
+
+## Do not
+
+- Call the main run a **separate module**, **tutorial**, **demo**, **one-off**, or **side quest**.
+- Propose **main-game-only** code paths or optimizations that duplicate mechanics the full game will need.
+- Split architecture into “main game” vs “real game” (e.g. two fog systems, two economies) without explicit user direction.
+
+## How agents talk to the player (required)
+
+**Use:** the **game**, **main game**, **main run**, **current run**, **main scene**.
+
+**Do not frame work as** “prologue work” or a “prologue project” (legacy Unreal label only—do not revive in chat).
+
+**Harness filenames** (`main-game-ui-playthrough.sh`, etc.) are historical renames; describe them as **game playtests**.

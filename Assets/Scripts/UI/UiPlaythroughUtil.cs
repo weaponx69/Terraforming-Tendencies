@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.UI.Containers;
 using UnityEngine;
@@ -20,7 +20,8 @@ namespace GameDevTV.RTS.UI
         {
             if (EventSystem.current == null) return false;
 
-            if (PrologueController.IsActive && PrologueHUD.Instance != null && PrologueHUD.Instance.BriefingBlocksClicks)
+            if (MainGameController.IsActive && MainGameHUD.Instance != null
+                && MainGameHUD.Instance.BriefingPointerBlocksWorldAtPointer())
                 return true;
 
             if (!EventSystem.current.IsPointerOverGameObject()) return false;

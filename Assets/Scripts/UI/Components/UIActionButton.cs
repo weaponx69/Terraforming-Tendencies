@@ -48,6 +48,12 @@ namespace GameDevTV.RTS.UI.Components
             button = GetComponent<Button>();
             rectTransform = GetComponent<RectTransform>();
             buttonImage = GetComponent<Image>();
+            if (icon == null)
+            {
+                var iconT = transform.Find("Icon");
+                if (iconT != null)
+                    icon = iconT.GetComponent<Image>();
+            }
             if (buttonImage != null)
             {
                 defaultButtonColor = buttonImage.color;
@@ -82,6 +88,12 @@ namespace GameDevTV.RTS.UI.Components
         {
             if (button == null) return;
 
+            int reboundHand = -1;
+            if (command is BuildBuildingCommand bbcRebind && bbcRebind.HandIndex >= 0)
+                reboundHand = bbcRebind.HandIndex;
+            else if (command is PlayCardCommand pcRebind && pcRebind.HandIndex >= 0)
+                reboundHand = pcRebind.HandIndex;
+
             button.onClick.RemoveAllListeners();
             SetIcon(command.Icon);
             EnsureCardTextLayout();
@@ -89,7 +101,11 @@ namespace GameDevTV.RTS.UI.Components
             int cost = materialsCostOverride >= 0 ? materialsCostOverride : ResolveMaterialsCost(command);
             SetCost(command, cost);
             button.interactable = selectedUnits == null || selectedUnits.Any((unit) => !command.IsLocked(new CommandContext(unit, new RaycastHit())));
-            button.onClick.AddListener(onClick);
+            button.onClick.AddListener(() =>
+            {
+                ClickPulse();
+                onClick?.Invoke();
+            });
             isActive = true;
             if (buttonImage != null)
             {
@@ -101,6 +117,9 @@ namespace GameDevTV.RTS.UI.Components
                 buttonImage.raycastTarget = true;
             }
             ApplyGoalAccent(cardGoal);
+
+            if (reboundHand >= 0 && reboundHand == PlayerInput.PickedHandIndex)
+                SetPicked(true);
 
             if (command is BuildBuildingCommand buildCmd && buildCmd.Building != null)
             {
@@ -280,6 +299,12 @@ namespace GameDevTV.RTS.UI.Components
             SetPicked(on);
         }
 
+        void ClickPulse()
+        {
+            if (!isActive) return;
+            transform.localScale = new Vector3(1.12f, 1.14f, 1f);
+        }
+
         public void SetPicked(bool value)
         {
             if (picked == value) return;
@@ -411,17 +436,17 @@ namespace GameDevTV.RTS.UI.Components
         }
 
         /// <summary>
-        /// Prologue hand: show the mineral price. Grey the card when short but keep clicks —
+        /// MainGame hand: show the mineral price. Grey the card when short but keep clicks —
         /// PlayBuildingCard shows the same failure message.
         /// </summary>
-        public void ApplyPrologueMinerals(int cost, int have)
+        public void ApplyMainGameMinerals(int cost, int have)
         {
             if (cost <= 0 || !isActive) return;
             bool shortStock = have < cost;
             if (costLabel != null)
             {
                 costLabel.gameObject.SetActive(true);
-                costLabel.text = shortStock ? $"Need {cost}\nhave {have}" : $"{cost} minerals";
+                costLabel.text = shortStock ? $"Need {cost}\nhave {have}" : $"{cost} materials";
                 costLabel.color = shortStock ? new Color(1f, 0.62f, 0.55f, 1f) : costLabel.color;
             }
             if (!shortStock)
@@ -451,7 +476,7 @@ namespace GameDevTV.RTS.UI.Components
                 goalOutline.effectColor = new Color(0.3f, 0.3f, 0.32f, 0.5f);
             RefreshCardTextContrast();
             if (tooltip != null)
-                tooltip.SetText($"Need {cost} minerals to build this. You have {have}. End Week while a mineral mine works, or place a cheaper Solar Array first.");
+                tooltip.SetText($"Need {cost} materials to build this. You have {have}. End Week while a mineral mine works, or place a cheaper Solar Array first.");
         }
 
         private void ApplyGoalAccent(string goal)

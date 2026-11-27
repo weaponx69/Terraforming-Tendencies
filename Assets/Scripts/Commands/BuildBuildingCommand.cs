@@ -72,10 +72,10 @@ namespace GameDevTV.RTS.Commands
                 targetPos = ColonyTileGrid.SnapForPlacement(targetPos, context.Owner, out _);
             targetPos = ColonyTileGrid.ApplyGroundY(targetPos);
 
-            // Card plays: Materials waived under Colony Acts / Prologue; power is optional (not a place gate).
+            // Card plays: Materials waived under Colony Acts / MainGame; power is optional (not a place gate).
             if (HandIndex >= 0)
             {
-                bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+                bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
                 bool colonyActs = ColonyActManager.Instance != null;
                 if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     return false;
@@ -96,24 +96,24 @@ namespace GameDevTV.RTS.Commands
                         targetPos = mineSnap;
                     if (!DiscoverySystem.IsOnDiscoveredMineDeposit(Building, targetPos))
                         return false;
-                    // Acts: mines cannot claim the Command Post tile. Prologue deposits often sit on home/CP.
+                    // Acts: mines cannot claim the Command Post tile. MainGame deposits often sit on home/CP.
                     if (!prologue
                         && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                         return false;
                 }
-                // Prologue Aquifer / climate tiles use ice-range Preview, not Acts deposit reservation.
+                // MainGame Aquifer / climate tiles use ice-range Preview, not Acts deposit reservation.
                 else if (!prologue
                     && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && DiscoverySystem.IsOnAnyMineableDeposit(targetPos))
                 {
                     return false;
                 }
-                // Prologue occupancy is PrologueColony.Preview — not Acts Command Post pads.
+                // MainGame occupancy is MainGameColony.Preview — not Acts Command Post pads.
                 if (!prologue
                     && !BuildingSiteRegistry.IsCommandPostBuilding(Building)
                     && GameDevTV.RTS.Utilities.SectorColonization.IsReservedCommandPostTile(targetPos))
                     return false;
-                // Prologue uses ice-range / deposit rules, not Acts sector-feature geology.
+                // MainGame uses ice-range / deposit rules, not Acts sector-feature geology.
                 if (!prologue
                     && DiscoverySystem.TryGetRequiredSectorFeature(Building, out _)
                     && !DiscoverySystem.IsOnRequiredSectorFeature(Building, targetPos))
@@ -195,8 +195,8 @@ namespace GameDevTV.RTS.Commands
 
                 if (HandIndex >= 0)
                 {
-                    // Prologue owns placement gates (Preview / TryPlaceImmediate in PlayerInput).
-                    bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+                    // MainGame owns placement gates (Preview / TryPlaceImmediate in PlayerInput).
+                    bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
                     bool colonyActs = ColonyActManager.Instance != null;
                     if (!prologue && !colonyActs && !PowerGridManager.CanPlayBuildingForPower(Building, context.Owner))
                     {
@@ -233,8 +233,8 @@ namespace GameDevTV.RTS.Commands
                         return;
                     }
 
-                    // Mines always require a matching discovered deposit (Prologue + Acts).
-                    // Prologue already committed the hex the ghost showed. Do not jump to a different pad.
+                    // Mines always require a matching discovered deposit (MainGame + Acts).
+                    // MainGame already committed the hex the ghost showed. Do not jump to a different pad.
                     if (BuildingSiteRegistry.IsMineBuilding(Building))
                     {
                         if (!prologue
@@ -320,9 +320,9 @@ namespace GameDevTV.RTS.Commands
                             // (TryPlace) finishes on the same week ticks.
                             cardBuilding.BindBuildingDefinition(Building);
                             int weeks = 1;
-                            if (GameDevTV.RTS.Prologue.PrologueCardMap.TryGetPrologueId(Building, out var buildId))
-                                weeks = Mathf.Max(1, GameDevTV.RTS.Prologue.PrologueData.Get(buildId).BuildWeeks);
-                            cardBuilding.gameObject.AddComponent<GameDevTV.RTS.Prologue.PrologueConstruction>()
+                            if (GameDevTV.RTS.MainGame.MainGameCardMap.TryGetMainGameId(Building, out var buildId))
+                                weeks = Mathf.Max(1, GameDevTV.RTS.MainGame.MainGameData.Get(buildId).BuildWeeks);
+                            cardBuilding.gameObject.AddComponent<GameDevTV.RTS.MainGame.MainGameConstruction>()
                                 .Begin(context.Owner, weeks);
                         }
                         else
@@ -537,8 +537,8 @@ namespace GameDevTV.RTS.Commands
                 if (!hasWorker) return false;
             }
 
-            // Prologue: Unreal ice-range rules live in PrologueColony.Preview — not Acts geology.
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            // MainGame: Unreal ice-range rules live in MainGameColony.Preview — not Acts geology.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
                 return true;
 
             // Deposit tiles are mine-only (Command Posts still claim their reserved pad).
@@ -585,7 +585,7 @@ namespace GameDevTV.RTS.Commands
         {
             if (Building == null) return "No building on this card.";
 
-            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
             bool colonyActs = ColonyActManager.Instance != null;
             if (!prologue && colonyActs && !HasEnoughWeeksForCard())
             {
@@ -649,7 +649,7 @@ namespace GameDevTV.RTS.Commands
                 return "That tile is reserved for the Command Post — place on an adjacent tile.";
             }
 
-            if (!GameDevTV.RTS.Prologue.PrologueController.IsActive
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive
                 && DiscoverySystem.TryGetRequiredSectorFeature(Building, out var feature))
             {
                 string featureName = DiscoverySystem.DescribeSectorFeature(feature);

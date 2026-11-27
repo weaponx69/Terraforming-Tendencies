@@ -1,4 +1,4 @@
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.Units;
 using TMPro;
@@ -35,8 +35,8 @@ namespace GameDevTV.RTS.UI.Components
                 return;
             }
 
-            // Prologue: N buildings × raycasts/frame was crushing Editor FPS.
-            if (PrologueController.IsActive)
+            // MainGame: N buildings × raycasts/frame was crushing Editor FPS.
+            if (MainGameController.IsActive)
             {
                 enabled = false;
                 return;

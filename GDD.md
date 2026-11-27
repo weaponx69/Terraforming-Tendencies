@@ -85,20 +85,20 @@ Does this "Search and Discovery" phase feel like the right level of "Casual" for
 
 ## Current design decisions (authoritative intent)
 
-*Gameplay rules that conflict with archived Colony Acts notes in [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) should follow this section + live Prologue specs under `docs/specs/`.*
+*Gameplay rules that conflict with archived Colony Acts notes in [`PROJECT_KNOWLEDGE.md`](PROJECT_KNOWLEDGE.md) should follow this section + live MainGame specs under `docs/specs/`.*
 
 *Older “casual / probe droid” notes above this section are historical brainstorm only — not the tone target.*
 
 ### Tone & references
 
 - **Not casual.** Target feel is closer to **Frostpunk 2**: scarce life support, hard weeks, consequential card plays, pressure from cold/oxygen/storms.
-- Colony sim + cards + End Week / time-lapse remain the spine (Unreal Prologue clone direction).
+- Colony sim + cards + End Week / time-lapse remain the spine (Unreal MainGame clone direction).
 
 ### Planet select (future)
 
 - Before a run starts, the player will **choose what kind of planet to colonize** (planet type / `PlanetConfig`).
 - That choice sets climate pressure, which resources exist, and how hard early survival is.
-- Not required for the current Prologue vertical slice, but generation and resource rules should stay planet-type–driven so this screen can plug in later.
+- Not required for the current MainGame vertical slice, but generation and resource rules should stay planet-type–driven so this screen can plug in later.
 
 ### Exploration as puzzle (Blue Prince–like)
 

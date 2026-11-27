@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Automated ClickOrderDiagnostic matrix (Play Mode). Exercises real Prologue survey paint orders.
+# Automated ClickOrderDiagnostic matrix (Play Mode). Exercises real MainGame survey paint orders.
 #
 # Usage:
-#   1. Press Play on Assets/Scenes/Terraforming-Tendencies.unity (Prologue active recommended)
+#   1. Press Play on Assets/Scenes/Terraforming-Tendencies.unity (MainGame active recommended)
 #   2. SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh
 #
 # Env:
@@ -46,7 +46,7 @@ fi
 
 echo "Baseline FPS (${BASELINE_SETTLE_SEC}s settle)..."
 sleep "$BASELINE_SETTLE_SEC"
-fps_before="$(unity command eval 'return GameDevTV.RTS.Prologue.PrologueFpsMonitor.LastSecondFps;' --json --timeout 45 2>/dev/null | eval_result)"
+fps_before="$(unity command eval 'return GameDevTV.RTS.MainGame.MainGameFpsMonitor.LastSecondFps;' --json --timeout 45 2>/dev/null | eval_result)"
 fps_before="${fps_before:-0}"
 
 if [[ "$SKIP_WARMUP" == "1" ]]; then
@@ -68,7 +68,7 @@ sample_fps() {
   : > "$out"
   echo "  Sampling ${FPS_SAMPLE_COUNT}× every ${FPS_SAMPLE_INTERVAL_SEC}s → $out"
   for _ in $(seq 1 "$FPS_SAMPLE_COUNT"); do
-    v="$(unity command eval 'return GameDevTV.RTS.Prologue.PrologueFpsMonitor.LastSecondFps;' --json --timeout 45 2>/dev/null | eval_result)"
+    v="$(unity command eval 'return GameDevTV.RTS.MainGame.MainGameFpsMonitor.LastSecondFps;' --json --timeout 45 2>/dev/null | eval_result)"
     v="${v:-0}"
     echo "$v" >> "$out"
     sleep "$FPS_SAMPLE_INTERVAL_SEC"
@@ -214,7 +214,7 @@ sc = data.get("fps_sample_count") or (data.get("fps_live_after_warmup") or {}).g
 if sc:
     lines.append(f"- **Live sample config:** {sc} samples (see shell FPS_SAMPLE_COUNT / FPS_SAMPLE_INTERVAL_SEC)")
 lines.append(f"- **Mark tile:** {data.get('markTile', '—')}")
-lines.append(f"- **Prologue active:** {data.get('prologueActive')}")
+lines.append(f"- **MainGame active:** {data.get('prologueActive')}")
 lines.append(f"- **Avg frame time (matrix):** {float(data.get('avgFrameTimeMs', 0)):.2f} ms")
 lines.append(f"- **Max dispatch spike (matrix):** {float(data.get('maxDispatchSpikeMs', 0)):.2f} ms")
 lines.append(f"- **Goal:** {data.get('goal')}")
@@ -235,7 +235,7 @@ lines.append("")
 lines.append("## Interpretation")
 lines.append("")
 if not data.get("prologueActive"):
-    lines.append("- **Prologue inactive:** boot Prologue (play survey slice) before trusting survey numbers.")
+    lines.append("- **MainGame inactive:** boot MainGame (play survey slice) before trusting survey numbers.")
 p_sync = next((x for x in cases if x.get("id") == "P2_mark_click_sync_bfs"), None)
 p_async = next((x for x in cases if x.get("id") == "P1_mark_click_async"), None)
 if p_sync and p_async:

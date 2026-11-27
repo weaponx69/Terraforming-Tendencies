@@ -1,12 +1,12 @@
 using System.Collections.Generic;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.UI;
 using UnityEngine;
 
 namespace GameDevTV.RTS.Player
 {
     /// <summary>
-    /// Prologue research hire: opens the pause research ladder to pick a Tier-2 project.
+    /// Research card — opens the in-game research panel (no pause).
     /// </summary>
     [CreateAssetMenu(fileName = "ResearchCard", menuName = "Cards/Research Card")]
     public class ResearchCardSO : BlueprintCardSO
@@ -15,45 +15,44 @@ namespace GameDevTV.RTS.Player
 
         public override bool CanApply()
         {
-            if (!PrologueController.IsActive) return false;
-            var c = PrologueController.Instance?.Colony;
+            if (!MainGameController.IsActive) return false;
+            var c = MainGameController.Instance?.Colony;
             if (c?.Research == null) return false;
-            return c.Research.Active == PrologueResearchId.None
+            return c.Research.Active == MainGameResearchId.None
                 && c.Research.HasLockedProject();
         }
 
         public override void Apply()
         {
-            var c = PrologueController.Instance?.Colony;
+            var c = MainGameController.Instance?.Colony;
             if (c?.Research == null) return;
 
-            var pause = Object.FindFirstObjectByType<PauseMenuUI>(FindObjectsInactive.Exclude);
-            if (pause != null)
+            var hud = MainGameHUD.Instance;
+            hud?.EnsureResearchPicker();
+            if (MainGameResearchPickerUI.Instance != null)
             {
-                pause.OpenResearchPick();
-                PrologueHUD.Instance?.ShowNote(new List<string>
-                {
-                    "Choose a research project from the pause ladder."
-                });
+                MainGameResearchPickerUI.Instance.Open();
                 return;
             }
 
-            // Fallback if pause UI is missing: auto-pick first locked Tier-2 id.
-            var pick = PrologueResearchId.FasterBuild;
+            // Fallback if HUD picker is missing:
+            var pick = MainGameResearchId.FasterBuild;
             if (c.Research.IsUnlocked(pick))
-                pick = PrologueResearchId.LongerPowerReach;
+                pick = MainGameResearchId.LongerPowerReach;
             if (c.Research.IsUnlocked(pick))
-                pick = PrologueResearchId.ExtraScanType;
+                pick = MainGameResearchId.ExtraScanType;
+            if (c.Research.IsUnlocked(pick))
+                pick = MainGameResearchId.ExtendedSurvey;
 
             if (!c.Research.TryBegin(pick, out var reason))
             {
-                PrologueHUD.Instance?.ShowNote(new List<string> { reason ?? "Cannot research" });
+                MainGameHUD.Instance?.ShowNote(new List<string> { reason ?? "Cannot research" });
                 return;
             }
 
-            PrologueHUD.Instance?.ShowNote(new List<string>
+            MainGameHUD.Instance?.ShowNote(new List<string>
             {
-                $"Research started: {PrologueResearch.DisplayName(pick)} ({PrologueData.ResearchWeeks(pick)} wk)."
+                $"Research started: {MainGameResearch.DisplayName(pick)} ({MainGameData.ResearchWeeks(pick)} wk)."
             });
         }
 

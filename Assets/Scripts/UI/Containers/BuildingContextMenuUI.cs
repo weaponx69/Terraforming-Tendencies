@@ -1,4 +1,5 @@
 using GameDevTV.RTS.Player;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using TMPro;
@@ -89,10 +90,14 @@ namespace GameDevTV.RTS.UI.Containers
             if (canRepair)
                 repairLabel.text = "Repair (2 Mat)";
 
-            int cost = ReservedSiteBuildUtility.GetMaterialsCost(building.ResolvedBuildingSO);
-            float rate = building.Progress.State == BuildingProgress.BuildingState.Building ? 0.75f : 0.5f;
-            int refund = Mathf.Max(0, Mathf.RoundToInt(cost * rate));
-            demolishLabel.text = refund > 0 ? $"Demolish (+{refund} Mat)" : "Demolish";
+            int refund = MainGameController.IsActive
+                ? MainGameDemolish.EstimateRefund(building)
+                : EstimateActsRefund(building);
+            demolishLabel.text = refund > 0
+                ? MainGameController.IsActive
+                    ? $"Demolish (+{refund} materials)"
+                    : $"Demolish (+{refund} Mat)"
+                : "Demolish";
 
             panelRt.gameObject.SetActive(true);
             PositionNear(screenPosition);
@@ -118,6 +123,13 @@ namespace GameDevTV.RTS.UI.Containers
             var b = target;
             Hide();
             b?.TryDemolish(refund: true);
+        }
+
+        static int EstimateActsRefund(BaseBuilding building)
+        {
+            int cost = ReservedSiteBuildUtility.GetMaterialsCost(building.ResolvedBuildingSO);
+            float rate = building.Progress.State == BuildingProgress.BuildingState.Building ? 0.75f : 0.5f;
+            return Mathf.Max(0, Mathf.RoundToInt(cost * rate));
         }
 
         private bool IsPointerOverMenu()

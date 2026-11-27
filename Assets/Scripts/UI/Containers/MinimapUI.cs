@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -382,8 +382,8 @@ namespace GameDevTV.RTS.UI.Containers
             }
         }
 
-        /// <summary>Prologue uses code HUD — skip full-map CPU rebuild every frame.</summary>
-        public static void SetPrologueSuspended(bool suspended)
+        /// <summary>MainGame uses code HUD — skip full-map CPU rebuild every frame.</summary>
+        public static void SetMainGameSuspended(bool suspended)
         {
             prologueSuspended = suspended;
             if (suspended && Instance != null && Instance.panel != null)
@@ -392,7 +392,7 @@ namespace GameDevTV.RTS.UI.Containers
 
         private void LateUpdate()
         {
-            if (prologueSuspended || PrologueController.IsActive)
+            if (prologueSuspended || MainGameController.IsActive)
             {
                 if (panel != null && panel.gameObject.activeSelf)
                     panel.gameObject.SetActive(false);

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using UnityEngine;
 using UnityEngine.AI;
@@ -36,15 +36,15 @@ namespace GameDevTV.RTS.Diagnostics
             int buildingCount = DefaultBuildingCount)
         {
             var report = new WarmupReport { Success = false };
-            var ctrl = PrologueController.Instance;
-            if (ctrl == null || !PrologueController.IsActive || ctrl.Colony == null)
+            var ctrl = MainGameController.Instance;
+            if (ctrl == null || !MainGameController.IsActive || ctrl.Colony == null)
             {
                 report.Error = "prologue_inactive";
                 return report;
             }
 
-            PrologueSurveyMission.Instance?.AbortForPlaytest();
-            PrologueDroneScan.Instance?.CancelPaint();
+            MainGameSurveyMission.Instance?.AbortForPlaytest();
+            MainGameDroneScan.Instance?.CancelPaint();
 
             UnlockWarmupBuildingsInternal(ctrl.Colony);
             report.HomeTile = HomeTile(ctrl.Colony);
@@ -62,7 +62,7 @@ namespace GameDevTV.RTS.Diagnostics
             for (int w = 0; w < waypoints.Count; w++)
             {
                 int goal = waypoints[w];
-                if (!PrologueHexPathQueue.TryFindPathNow(ctrl, ctrl.Colony, cursor, goal, out var leg, tryAltGoals: true)
+                if (!MainGameHexPathQueue.TryFindPathNow(ctrl, ctrl.Colony, cursor, goal, out var leg, tryAltGoals: true)
                     || leg == null || leg.Count < 2)
                     continue;
 
@@ -79,26 +79,26 @@ namespace GameDevTV.RTS.Diagnostics
 
                 ctrl.Colony.RevealTiles(revealed);
                 LitTiles(ctrl.Colony, revealed);
-                PrologueVisionThrottle.QueueSurveyFog(ctrl, revealed);
-                PrologueSearchedTiles.Instance?.RefreshForTiles(revealed);
+                MainGameVisionThrottle.QueueSurveyFog(ctrl, revealed);
+                MainGameSearchedTiles.Instance?.RefreshForTiles(revealed);
                 foreach (int tile in revealed)
-                    PrologueIceMarkers.Instance?.OnTileRevealed(tile);
+                    MainGameIceMarkers.Instance?.OnTileRevealed(tile);
 
                 cursor = goal;
             }
 
             report.PaintTiles = cumulativePath.Count;
 
-            var scan = PrologueDroneScan.Instance
-                       ?? new GameObject("PrologueDroneScan_Warmup").AddComponent<PrologueDroneScan>();
+            var scan = MainGameDroneScan.Instance
+                       ?? new GameObject("MainGameDroneScan_Warmup").AddComponent<MainGameDroneScan>();
             scan.AutomationSeedPaintRoute(cumulativePath);
 
-            if (cumulativePath.Count >= PrologueDroneScan.MinConfirmTiles)
+            if (cumulativePath.Count >= MainGameDroneScan.MinConfirmTiles)
             {
-                var mission = PrologueSurveyMission.Instance
-                              ?? new GameObject("PrologueSurveyMission").AddComponent<PrologueSurveyMission>();
+                var mission = MainGameSurveyMission.Instance
+                              ?? new GameObject("MainGameSurveyMission").AddComponent<MainGameSurveyMission>();
                 var dayPath = new List<int>(cumulativePath);
-                if (mission.StartSearch(dayPath, PrologueSurveyMission.DefaultDays))
+                if (mission.StartSearch(dayPath, MainGameSurveyMission.DefaultDays))
                 {
                     int mid = Mathf.Clamp(dayPath.Count / 2, 0, dayPath.Count - 1);
                     mission.AutomationSimulateRevealProgress(mid);
@@ -108,14 +108,14 @@ namespace GameDevTV.RTS.Diagnostics
 
             report.BuildingsSpawned = SpawnBuildingCluster(ctrl, cumulativePath, buildingCount, out report.NavMeshObstaclesEnabled);
 
-            PrologueBuildingRegistry.Invalidate();
-            ProloguePathGroundOverlay.Instance?.Apply();
-            PrologueSearchedTiles.Instance?.RefreshAll();
+            MainGameBuildingRegistry.Invalidate();
+            MainGamePathGroundOverlay.Instance?.Apply();
+            MainGameSearchedTiles.Instance?.RefreshAll();
 
             for (int i = 0; i < VisionPumpSlices; i++)
-                PrologueVisionThrottle.TickOneSliceMs();
+                MainGameVisionThrottle.TickOneSliceMs();
 
-            report.FpsAfterWarmup = PrologueFpsMonitor.LastSecondFps;
+            report.FpsAfterWarmup = MainGameFpsMonitor.LastSecondFps;
             report.Success = true;
             return report;
         }
@@ -136,28 +136,28 @@ namespace GameDevTV.RTS.Diagnostics
             sb.Append('}');
         }
 
-        public static void UnlockWarmupBuildings(PrologueColony colony) =>
+        public static void UnlockWarmupBuildings(MainGameColony colony) =>
             UnlockWarmupBuildingsInternal(colony);
 
-        static void UnlockWarmupBuildingsInternal(PrologueColony colony)
+        static void UnlockWarmupBuildingsInternal(MainGameColony colony)
         {
             foreach (var id in new[]
                      {
-                         PrologueBuildingId.Habitat, PrologueBuildingId.Oxygen,
-                         PrologueBuildingId.WindTurbine, PrologueBuildingId.Aquifer
+                         MainGameBuildingId.Habitat, MainGameBuildingId.Oxygen,
+                         MainGameBuildingId.WindTurbine, MainGameBuildingId.Aquifer
                      })
                 colony.Unlocked.Add(id);
         }
 
-        static int HomeTile(PrologueColony colony)
+        static int HomeTile(MainGameColony colony)
         {
             for (int i = 0; i < colony.Board.Tiles.Count; i++)
-                if (colony.Board.At(i).Building == PrologueBuildingId.CommandPost)
+                if (colony.Board.At(i).Building == MainGameBuildingId.CommandPost)
                     return i;
             return colony.Board.Tiles.Count > 0 ? 0 : -1;
         }
 
-        static List<int> PickSurveyWaypoints(PrologueController ctrl, int home, int count)
+        static List<int> PickSurveyWaypoints(MainGameController ctrl, int home, int count)
         {
             var picks = new List<int>(count);
             var colony = ctrl.Colony;
@@ -167,7 +167,7 @@ namespace GameDevTV.RTS.Diagnostics
                 for (int i = 0; i < colony.Board.Tiles.Count && picks.Count < count; i++)
                 {
                     if (colony.Dist(home, i) != rings[r]) continue;
-                    if (colony.Board.At(i).Building != PrologueBuildingId.None) continue;
+                    if (colony.Board.At(i).Building != MainGameBuildingId.None) continue;
                     if (picks.Contains(i)) continue;
                     picks.Add(i);
                 }
@@ -180,7 +180,7 @@ namespace GameDevTV.RTS.Diagnostics
                 for (int i = 0; i < colony.Board.Tiles.Count; i++)
                 {
                     if (i == home || picks.Contains(i)) continue;
-                    if (colony.Board.At(i).Building != PrologueBuildingId.None) continue;
+                    if (colony.Board.At(i).Building != MainGameBuildingId.None) continue;
                     int d = colony.Dist(home, i);
                     if (d <= bestD) continue;
                     bestD = d;
@@ -195,14 +195,14 @@ namespace GameDevTV.RTS.Diagnostics
         }
 
         public static int SpawnBuildingClusterPublic(
-            PrologueController ctrl,
+            MainGameController ctrl,
             List<int> nearPath,
             int targetCount,
             out int navObstacles) =>
             SpawnBuildingCluster(ctrl, nearPath, targetCount, out navObstacles);
 
         static int SpawnBuildingCluster(
-            PrologueController ctrl,
+            MainGameController ctrl,
             List<int> nearPath,
             int targetCount,
             out int navObstacles)
@@ -210,14 +210,14 @@ namespace GameDevTV.RTS.Diagnostics
             navObstacles = 0;
             var used = new HashSet<int>();
             foreach (var t in ctrl.Colony.Board.Tiles)
-                if (t.Building != PrologueBuildingId.None)
+                if (t.Building != MainGameBuildingId.None)
                     used.Add(t.Index);
 
             var ids = new[]
             {
-                PrologueBuildingId.Habitat, PrologueBuildingId.Oxygen,
-                PrologueBuildingId.WindTurbine, PrologueBuildingId.Habitat,
-                PrologueBuildingId.Oxygen, PrologueBuildingId.Habitat
+                MainGameBuildingId.Habitat, MainGameBuildingId.Oxygen,
+                MainGameBuildingId.WindTurbine, MainGameBuildingId.Habitat,
+                MainGameBuildingId.Oxygen, MainGameBuildingId.Habitat
             };
 
             int spawned = 0;
@@ -242,7 +242,7 @@ namespace GameDevTV.RTS.Diagnostics
             return spawned;
         }
 
-        static int PickBuildingPad(PrologueController ctrl, List<int> nearPath, HashSet<int> used, PrologueBuildingId id)
+        static int PickBuildingPad(MainGameController ctrl, List<int> nearPath, HashSet<int> used, MainGameBuildingId id)
         {
             var colony = ctrl.Colony;
             int anchor = nearPath.Count > 0 ? nearPath[nearPath.Count / 2] : HomeTile(colony);
@@ -252,12 +252,12 @@ namespace GameDevTV.RTS.Diagnostics
             for (int i = 0; i < colony.Board.Tiles.Count; i++)
             {
                 if (used.Contains(i)) continue;
-                if (colony.Board.At(i).Building != PrologueBuildingId.None) continue;
+                if (colony.Board.At(i).Building != MainGameBuildingId.None) continue;
                 if (!colony.Board.At(i).Revealed) continue;
                 int dPath = nearPath.Count > 0 ? MinDistToPath(colony, i, nearPath) : colony.Dist(anchor, i);
                 int dHome = colony.Dist(HomeTile(colony), i);
                 int score = dPath * 2 + dHome;
-                if (id == PrologueBuildingId.Aquifer && !NearIce(colony, i)) continue;
+                if (id == MainGameBuildingId.Aquifer && !NearIce(colony, i)) continue;
                 if (score >= bestScore) continue;
                 bestScore = score;
                 best = i;
@@ -267,7 +267,7 @@ namespace GameDevTV.RTS.Diagnostics
             return best;
         }
 
-        static int MinDistToPath(PrologueColony colony, int tile, List<int> path)
+        static int MinDistToPath(MainGameColony colony, int tile, List<int> path)
         {
             int best = int.MaxValue;
             for (int i = 0; i < path.Count; i++)
@@ -275,20 +275,20 @@ namespace GameDevTV.RTS.Diagnostics
             return best;
         }
 
-        static bool NearIce(PrologueColony colony, int tile)
+        static bool NearIce(MainGameColony colony, int tile)
         {
             for (int i = 0; i < colony.Board.Tiles.Count; i++)
             {
                 var t = colony.Board.At(i);
                 if (t.DepositLeft <= 0) continue;
-                if (t.Feature != PrologueFeature.Ice && t.Feature != PrologueFeature.Glacier) continue;
-                if (colony.Dist(tile, i) <= PrologueData.HarvestRange) return true;
+                if (t.Feature != MainGameFeature.Ice && t.Feature != MainGameFeature.Glacier) continue;
+                if (colony.Dist(tile, i) <= MainGameData.HarvestRange) return true;
             }
 
             return false;
         }
 
-        static bool SpawnFinishedBuilding(PrologueController ctrl, int tile, PrologueBuildingId id)
+        static bool SpawnFinishedBuilding(MainGameController ctrl, int tile, MainGameBuildingId id)
         {
             var def = BuildingDef(id);
             if (def?.Prefab == null || !ctrl.TryGetCell(tile, out Vector2Int cell)) return false;
@@ -304,18 +304,18 @@ namespace GameDevTV.RTS.Diagnostics
 
             building.CompleteInstantCardPlace(Owner.Player1, def);
             ColonyGroundMesh.Apply(go);
-            if (id == PrologueBuildingId.Aquifer)
+            if (id == MainGameBuildingId.Aquifer)
                 WaterIceAquiferMeshBuilder.Apply(go);
-            PrologueRevealGhosts.OnPadBuilt(world);
+            MainGameRevealGhosts.OnPadBuilt(world);
             return true;
         }
 
-        static BuildingSO BuildingDef(PrologueBuildingId id) => id switch
+        static BuildingSO BuildingDef(MainGameBuildingId id) => id switch
         {
-            PrologueBuildingId.Aquifer => LoadSo("Water Ice Aquifer", "Cards/WaterIceAquiferCard"),
-            PrologueBuildingId.Oxygen => LoadSo("Atmosphere Processor", "Cards/OxygenProcessorCard"),
-            PrologueBuildingId.Habitat => LoadSo("Habitat", "Cards/HabitatCard"),
-            PrologueBuildingId.WindTurbine => LoadSo("Windmill", "Cards/GeothermalGeneratorCard"),
+            MainGameBuildingId.Aquifer => LoadSo("Water Ice Aquifer", "Cards/WaterIceAquiferCard"),
+            MainGameBuildingId.Oxygen => LoadSo("Atmosphere Processor", "Cards/OxygenProcessorCard"),
+            MainGameBuildingId.Habitat => LoadSo("Habitat", "Cards/HabitatCard"),
+            MainGameBuildingId.WindTurbine => LoadSo("Windmill", "Cards/GeothermalGeneratorCard"),
             _ => null
         };
 
@@ -342,7 +342,7 @@ namespace GameDevTV.RTS.Diagnostics
             return n;
         }
 
-        static void LitTiles(PrologueColony colony, IList<int> indices)
+        static void LitTiles(MainGameColony colony, IList<int> indices)
         {
             if (colony == null || indices == null) return;
             for (int i = 0; i < indices.Count; i++)

@@ -1,5 +1,5 @@
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Containers;
 using UnityEngine;
@@ -26,10 +26,10 @@ namespace GameDevTV.RTS.Utilities
 
         public static bool IsIntentionalPauseOverlayActive()
         {
-            // Prologue banner II / Space pause drives Time.timeScale — not an orphan.
-            if (PrologueController.IsActive
-                && PrologueTimeLapse.Instance != null
-                && PrologueTimeLapse.Instance.IsPaused)
+            // MainGame banner II / Space pause drives Time.timeScale — not an orphan.
+            if (MainGameController.IsActive
+                && MainGameTimeLapse.Instance != null
+                && MainGameTimeLapse.Instance.IsPaused)
             {
                 return true;
             }

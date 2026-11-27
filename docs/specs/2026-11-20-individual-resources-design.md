@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-20  
 **Status:** Implementing (Phase 1)  
-**Engine:** Unity Prologue first; Acts Materials bank is archived for the Prologue run
+**Engine:** Unity MainGame first; Acts Materials bank is archived for the MainGame run
 
 ## Summary
 
@@ -20,15 +20,15 @@ Possible deposit / stock types (not every planet has all of them):
 | Iron            | Iron Ore Extractor (Foundry mesh)        | Separate stock; place on Iron pad |
 | Regolith        | Basalt Strip-Mine                        | Separate stock |
 
-**Retired for Prologue:** collapsing mine output into one **Materials** bank (Acts-era).
+**Retired for MainGame:** collapsing mine output into one **Materials** bank (Acts-era).
 
 ## Planet type drives which resources exist
 
 - **Not every planet has the same resource mix.** Availability is defined by **planet type** / `PlanetConfig` (and related generation), not a fixed global set.
 - Generation only scatters deposit types allowed for that planet; Survey `?` marks and mine cards only appear for types that exist here.
 - HUD / hand only surface stocks and extractors for types present (or already unlocked) on the current planet.
-- Ice may be rare or absent on some worlds — Prologue oxygen pressure must respect that planet’s rules (alternate life-support path is out of scope for this doc unless specified later).
-- **Future:** pre-run **planet select** UI — player picks the world type to colonize; that choice feeds `PlanetConfig` (resources + pressure). Not required for the current Prologue slice.
+- Ice may be rare or absent on some worlds — MainGame oxygen pressure must respect that planet’s rules (alternate life-support path is out of scope for this doc unless specified later).
+- **Future:** pre-run **planet select** UI — player picks the world type to colonize; that choice feeds `PlanetConfig` (resources + pressure). Not required for the current MainGame slice.
 
 ## Player flow
 
@@ -41,7 +41,7 @@ Possible deposit / stock types (not every planet has all of them):
 ## HUD
 
 - Show per-type counts (Ice already on AIR strip; add Minerals / Gas / Iron / Regolith as needed when first unlocked).  
-- Do not reintroduce a Prologue “Materials” total that sums them.
+- Do not reintroduce a MainGame “Materials” total that sums them.
 
 ## Survey Team art (related)
 

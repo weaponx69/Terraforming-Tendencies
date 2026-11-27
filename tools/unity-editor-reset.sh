@@ -7,8 +7,7 @@ unity command eval "$(cat <<'CS'
 if (UnityEditor.EditorApplication.isPlaying)
     UnityEditor.EditorApplication.isPlaying = false;
 const string scenePath = "Assets/Scenes/Terraforming-Tendencies.unity";
-if (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().path != scenePath)
-    UnityEditor.SceneManagement.EditorSceneManager.OpenScene(scenePath);
+GameDevTV.RTS.EditorTools.MainGameEditorSceneUtility.RequestOpenScene(scenePath);
 var asm = typeof(UnityEditor.Editor).Assembly;
 var gvType = asm.GetType("UnityEditor.GameView") ?? asm.GetType("UnityEditor.PlayModeView");
 int closed = 0;

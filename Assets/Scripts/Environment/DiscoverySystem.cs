@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
@@ -250,7 +250,7 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Prologue Survey: mark a type as known for mine-card gating without mass-revealing every pad.
+        /// MainGame Survey: mark a type as known for mine-card gating without mass-revealing every pad.
         /// Individual pads still use <see cref="HiddenResource.ForceDiscover"/>.
         /// </summary>
         public static void MarkTypeKnownWithoutMassReveal(string typeName)
@@ -364,10 +364,10 @@ namespace GameDevTV.RTS.Environment
         public static bool HasDiscoveredMineDeposit(BuildingSO building)
         {
             if (!TryGetMineResourceType(building, out string type)) return true;
-            if (PrologueController.IsActive
+            if (MainGameController.IsActive
                 && type.Equals("Ice", System.StringComparison.OrdinalIgnoreCase))
             {
-                return PrologueController.Instance?.Colony?.HasSurveyedIce() ?? false;
+                return MainGameController.Instance?.Colony?.HasSurveyedIce() ?? false;
             }
             return HasDiscoveredDepositOfType(type);
         }
@@ -443,16 +443,16 @@ namespace GameDevTV.RTS.Environment
         public static bool IsOnDiscoveredMineDeposit(BuildingSO building, Vector3 worldPos)
         {
             if (!TryGetMineResourceType(building, out string type)) return true;
-            if (PrologueController.IsActive
+            if (MainGameController.IsActive
                 && type.Equals("Ice", System.StringComparison.OrdinalIgnoreCase))
             {
-                var colony = PrologueController.Instance?.Colony;
-                var ctrl = PrologueController.Instance;
+                var colony = MainGameController.Instance?.Colony;
+                var ctrl = MainGameController.Instance;
                 if (colony != null && ctrl != null && ctrl.TryGetTileIndex(worldPos, out int tile))
                 {
                     var t = colony.Board.At(tile);
                     if (t.Revealed
-                        && (t.Feature == PrologueFeature.Ice || t.Feature == PrologueFeature.Glacier))
+                        && (t.Feature == MainGameFeature.Ice || t.Feature == MainGameFeature.Glacier))
                         return true;
                 }
             }
@@ -556,12 +556,12 @@ namespace GameDevTV.RTS.Environment
             float bestDist = max;
             Vector3 bestPos = cursorWorld;
             bool found = false;
-            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
 
             void Consider(Vector3 pos)
             {
                 // Never snap mines onto the Command Post keepout / sector center.
-                // Prologue deposits often sit on the home/CP cell — still mineable.
+                // MainGame deposits often sit on the home/CP cell — still mineable.
                 if (!prologue && SectorColonization.IsReservedCommandPostTile(pos))
                     return;
                 float d = Mathf.Sqrt(ColonyTileGrid.HorizontalDistSq(cursorWorld, pos));
@@ -622,7 +622,7 @@ namespace GameDevTV.RTS.Environment
             HiddenResource anyBest = null;
             HiddenResource blockedByCp = null;
             var focus = SectorManager.Instance != null ? SectorManager.Instance.GetClimateFocusSector() : null;
-            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
 
             foreach (var hr in Object.FindObjectsByType<HiddenResource>(FindObjectsInactive.Exclude))
             {

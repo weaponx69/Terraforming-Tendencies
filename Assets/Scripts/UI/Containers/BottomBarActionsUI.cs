@@ -3,7 +3,7 @@ using GameDevTV.RTS.Environment;
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.UI;
 using GameDevTV.RTS.UI.Components;
 using GameDevTV.RTS.Units;
@@ -183,10 +183,10 @@ namespace GameDevTV.RTS.UI.Containers
 
         static void CardFaceSize(out float width, out float height)
         {
-            if (PrologueController.IsActive)
+            if (MainGameController.IsActive)
             {
-                width = PrologueUiLayout.CardWidth;
-                height = PrologueUiLayout.CardHeight;
+                width = MainGameUiLayout.CardWidth;
+                height = MainGameUiLayout.CardHeight;
             }
             else
             {
@@ -196,7 +196,7 @@ namespace GameDevTV.RTS.UI.Containers
         }
 
         float HandCardSpacing() =>
-            PrologueController.IsActive ? PrologueUiLayout.CardSpacing : cardSpacing;
+            MainGameController.IsActive ? MainGameUiLayout.CardSpacing : cardSpacing;
 
         private void ApplyPlayingCardLayout()
         {
@@ -353,8 +353,8 @@ namespace GameDevTV.RTS.UI.Containers
 
         float EffectiveBottomMargin()
         {
-            if (PrologueController.IsActive)
-                return PrologueUiLayout.CardBottomMargin;
+            if (MainGameController.IsActive)
+                return MainGameUiLayout.CardBottomMargin;
             return bottomMargin;
         }
 
@@ -391,7 +391,6 @@ namespace GameDevTV.RTS.UI.Containers
             if (!Application.isPlaying) return;
 
             UpdateDockHoverGlow();
-            RefreshPickedCards();
 
             if (BuildingSiteSelectionController.IsSelecting) return;
 
@@ -399,9 +398,11 @@ namespace GameDevTV.RTS.UI.Containers
 
             // Only rebuild when the hand actually changes — polling was fighting scroll
             // and recreating ScriptableObjects every half-second.
-            int handPoll = GameDevTV.RTS.Prologue.PrologueController.IsActive ? 120 : 30;
+            int handPoll = GameDevTV.RTS.MainGame.MainGameController.IsActive ? 120 : 30;
             if (Time.frameCount % handPoll == 0 && HandFingerprintChanged())
                 RefreshBar();
+            else
+                RefreshPickedCards();
         }
 
         private void LateUpdate()
@@ -415,9 +416,9 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (actionButtons == null) return;
             int picked = GameDevTV.RTS.Player.PlayerInput.PickedHandIndex;
-            bool surveyLive = PrologueDroneScan.Instance != null
-                && PrologueDroneScan.Instance.ScanMode
-                && !PrologueDroneScan.Instance.IsFlying;
+            bool surveyLive = MainGameDroneScan.Instance != null
+                && MainGameDroneScan.Instance.ScanMode
+                && !MainGameDroneScan.Instance.IsFlying;
             for (int i = 0; i < actionButtons.Length; i++)
             {
                 var slot = actionButtons[i];
@@ -518,7 +519,7 @@ namespace GameDevTV.RTS.UI.Containers
             }
             var focus = SectorManager.Instance?.ActiveSector;
             fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
-            fingerprint = unchecked(fingerprint * 31 + PrologueMineralsOnHand());
+            fingerprint = unchecked(fingerprint * 31 + MainGameMineralsOnHand());
 
             if (fingerprint == lastHandFingerprint && hand.Count == lastHandCount)
                 return false;
@@ -528,7 +529,7 @@ namespace GameDevTV.RTS.UI.Containers
             return true;
         }
 
-        public void ApplyPrologueCompactLayout()
+        public void ApplyMainGameCompactLayout()
         {
             if (!isBuilt) return;
             ApplyPlayingCardLayout();
@@ -543,8 +544,8 @@ namespace GameDevTV.RTS.UI.Containers
             var hand = CardDeckController.Instance?.Hand;
             if (hand == null) return;
 
-            // Prologue hands are tiny — never leave the strip scrolled off-screen.
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive && hand.Count <= 6)
+            // MainGame hands are tiny — never leave the strip scrolled off-screen.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive && hand.Count <= 6)
                 scrollOffset = 0f;
 
             // Visible subset for the focused sector — real hand indices stay on the commands.
@@ -563,7 +564,7 @@ namespace GameDevTV.RTS.UI.Containers
                 fingerprint = unchecked(fingerprint * 31 + (int)EntityId.ToULong(visible[i].card.GetEntityId()));
             var focus = SectorManager.Instance?.ActiveSector;
             fingerprint = unchecked(fingerprint * 31 + (focus != null ? focus.GetHashCode() : 0));
-            fingerprint = unchecked(fingerprint * 31 + PrologueMineralsOnHand());
+            fingerprint = unchecked(fingerprint * 31 + MainGameMineralsOnHand());
             lastHandFingerprint = fingerprint;
 
             EnsureHandSlotCount(Mathf.Max(visible.Count, 1));
@@ -596,7 +597,7 @@ namespace GameDevTV.RTS.UI.Containers
                         {
                             PlayBuildingCard(cardIndex, unlockCard.buildingToUnlock);
                         }, sectorGoal, unlockCard.GetMaterialsPlayCost());
-                        ApplyPrologueMineralLock(actionButtons[i], card);
+                        ApplyMainGameMineralLock(actionButtons[i], card);
                         actionButtons[i].BindSlot(cardIndex, false);
                     }
                     else
@@ -612,9 +613,9 @@ namespace GameDevTV.RTS.UI.Containers
                         var capturedCard = card;
                         actionButtons[i].EnableFor(playCmd, null, () =>
                         {
-                            // Prologue Survey Team: play immediately even while time is paused.
+                            // MainGame Survey Team: play immediately even while time is paused.
                             // PlayerInput.ActivateAction used to swallow PlayCard at timeScale=0.
-                            if (GameDevTV.RTS.Prologue.PrologueController.IsActive
+                            if (GameDevTV.RTS.MainGame.MainGameController.IsActive
                                 && capturedCard is ScoutingCardSO
                                 && CardDeckController.Instance != null)
                             {
@@ -623,7 +624,7 @@ namespace GameDevTV.RTS.UI.Containers
                             }
                             Bus<CommandSelectedEvent>.Raise(owner, new CommandSelectedEvent(playCmd));
                         }, sectorGoal, playCmd.MaterialsCost);
-                        ApplyPrologueMineralLock(actionButtons[i], card);
+                        ApplyMainGameMineralLock(actionButtons[i], card);
                         bool survey = card is ScoutingCardSO scout
                             && scout.scoutingType == ScoutingCardSO.ScoutingType.SurveyDrone;
                         actionButtons[i].BindSlot(cardIndex, survey);
@@ -636,6 +637,7 @@ namespace GameDevTV.RTS.UI.Containers
             }
 
             FitLayoutToActiveCards();
+            RefreshPickedCards();
         }
 
         /// <summary>
@@ -665,18 +667,18 @@ namespace GameDevTV.RTS.UI.Containers
             ApplyPlayingCardLayout();
         }
 
-        static int PrologueMineralsOnHand()
+        static int MainGameMineralsOnHand()
         {
-            var colony = GameDevTV.RTS.Prologue.PrologueController.Instance?.Colony;
-            if (!GameDevTV.RTS.Prologue.PrologueController.IsActive || colony == null) return 0;
-            return colony.GetStock(GameDevTV.RTS.Prologue.PrologueResourceId.Minerals);
+            var colony = GameDevTV.RTS.MainGame.MainGameController.Instance?.Colony;
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive || colony == null) return 0;
+            return colony.GetStock(GameDevTV.RTS.MainGame.MainGameResourceId.Minerals);
         }
 
-        static void ApplyPrologueMineralLock(UIActionButton button, BlueprintCardSO card)
+        static void ApplyMainGameMineralLock(UIActionButton button, BlueprintCardSO card)
         {
-            if (!GameDevTV.RTS.Prologue.PrologueController.IsActive || button == null) return;
-            int cost = GameDevTV.RTS.Prologue.PrologueCardMap.MineralCost(card);
-            button.ApplyPrologueMinerals(cost, PrologueMineralsOnHand());
+            if (!GameDevTV.RTS.MainGame.MainGameController.IsActive || button == null) return;
+            int cost = GameDevTV.RTS.MainGame.MainGameCardMap.MineralCost(card);
+            button.ApplyMainGameMinerals(cost, MainGameMineralsOnHand());
         }
 
 #if UNITY_EDITOR
@@ -707,7 +709,7 @@ namespace GameDevTV.RTS.UI.Containers
                     return GameDevTV.RTS.Player.PlayerInput.PlacementGhostActive;
                 }
 
-                if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+                if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
                 {
                     CardDeckController.Instance.PlayCard(i);
                     return true;
@@ -737,16 +739,16 @@ namespace GameDevTV.RTS.UI.Containers
         {
             if (building == null) return;
 
-            // Prologue places via ice-range Preview — skip Acts power / materials / geology click gates.
-            bool prologue = GameDevTV.RTS.Prologue.PrologueController.IsActive;
+            // MainGame places via ice-range Preview — skip Acts power / materials / geology click gates.
+            bool prologue = GameDevTV.RTS.MainGame.MainGameController.IsActive;
             if (prologue)
             {
-                int cost = GameDevTV.RTS.Prologue.PrologueCardMap.MineralCost(building);
-                int have = PrologueMineralsOnHand();
+                int cost = GameDevTV.RTS.MainGame.MainGameCardMap.MineralCost(building);
+                int have = MainGameMineralsOnHand();
                 if (cost > 0 && have < cost)
                 {
                     ExplorationManager.NotifyPlacementFailed(
-                        $"Need {cost} minerals to build {building.Name} (have {have}).",
+                        $"Need {cost} materials to build {building.Name} (have {have}).",
                         ResolveErrorHintPosition());
                     return;
                 }

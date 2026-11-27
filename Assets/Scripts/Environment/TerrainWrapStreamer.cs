@@ -33,10 +33,10 @@ namespace GameDevTV.RTS.Environment
         public void Bind(PlanetGenerator planet)
         {
             tiles.Clear();
-            if (planet != null && planet.Config != null)
+            if (planet != null && planet.TryGetPatchWorldSize(out float w, out float h))
             {
-                mapWidth = Mathf.Max(1f, planet.Config.MapWidth * planet.CellSize);
-                mapHeight = Mathf.Max(1f, planet.Config.MapHeight * planet.CellSize);
+                mapWidth = Mathf.Max(1f, w);
+                mapHeight = Mathf.Max(1f, h);
             }
 
             for (int i = 0; i < transform.childCount; i++)

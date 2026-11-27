@@ -210,9 +210,9 @@ namespace GameDevTV.RTS.Player
 
         private void Start()
         {
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
             {
-                Debug.Log("[ColonyActManager] Archived: Prologue mode owns the run.");
+                Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
                 return;
             }
             if (!started && PlanetGenerator.Instance != null)
@@ -221,9 +221,9 @@ namespace GameDevTV.RTS.Player
 
         private void HandlePlanetGenerated()
         {
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
             {
-                Debug.Log("[ColonyActManager] Archived: Prologue mode owns the run.");
+                Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
                 return;
             }
             BeginRun();
@@ -238,9 +238,9 @@ namespace GameDevTV.RTS.Player
 
         public void BeginRun()
         {
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
             {
-                Debug.Log("[ColonyActManager] Archived: Prologue mode owns the run.");
+                Debug.Log("[ColonyActManager] Archived: MainGame mode owns the run.");
                 return;
             }
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-21  
 **Status:** Approved  
-**Engine:** Unity Prologue / `PlanetGenerator`  
+**Engine:** Unity MainGame / `PlanetGenerator`  
 **Canonical path:** `docs/specs/` (Unity docs — not `.summer`)  
 **Supersedes (look/height source):** [2026-11-20-planet-terrain-design.md](2026-11-20-planet-terrain-design.md) for Easy planet visuals — keep mesh height sampling / grounding from that work; **replace Perlin landforms** with curated DEM + photo albedo.
 
@@ -17,14 +17,14 @@ Easy planet ground uses a **curated elevation map (DEM)** for shape and the terr
 - Surface reads like photographed planetary terrain (After image), not plastic Perlin blobs.
 - Plenty of **buildable flat ground** on Easy: pick a plains-leaning DEM crop + flatten landing disk.
 - Keep existing grounding APIs: `ColonyTileGrid.SampleGroundY` / `ApplyGroundY` / `CellToWorldOnGround`.
-- Ship first for **Planet 1 – Easy** / Prologue; other planets can reuse the same slots later.
+- Ship first for **Planet 1 – Easy** / MainGame; other planets can reuse the same slots later.
 
 ## Non-goals (v1)
 
 - Runtime download of DEM/imagery  
 - Many random DEM crops per run (one curated crop per planet type)  
 - Full multi-biome splat painting / vegetation  
-- Changing Prologue rules, cards, or fog  
+- Changing MainGame rules, cards, or fog  
 - Godot / `.summer` game tree assets (this is Unity; references live under `Assets/Art/…`)
 
 ## Design
@@ -65,7 +65,7 @@ Easy planet ground uses a **curated elevation map (DEM)** for shape and the terr
 
 ## Success
 
-- Play Mode Easy/Prologue: ground looks like the **After** reference (photo dust/rock, natural relief, flat camp).
+- Play Mode Easy/MainGame: ground looks like the **After** reference (photo dust/rock, natural relief, flat camp).
 - No floating buildings/deposits vs mesh.
 - Console/boot still works if maps missing (fallback), but Easy assets have maps assigned for the intended look.
 

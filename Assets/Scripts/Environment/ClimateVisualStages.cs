@@ -228,6 +228,17 @@ namespace GameDevTV.RTS.Environment
         {
             if (!driveFogAndAmbient) return;
 
+            // Tactical MainGame: full-screen dust fog + desaturated volume reads as a white/grey void when zoomed.
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
+            {
+                RenderSettings.fog = false;
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+                RenderSettings.ambientSkyColor = new Color(0.55f, 0.52f, 0.48f);
+                RenderSettings.ambientEquatorColor = new Color(0.45f, 0.40f, 0.36f);
+                RenderSettings.ambientGroundColor = new Color(0.35f, 0.30f, 0.26f);
+                return;
+            }
+
             GetStageAtmosphere(stage, out Color fogA, out Color ambientA);
             GetStageAtmosphere(next, out Color fogB, out Color ambientB);
 

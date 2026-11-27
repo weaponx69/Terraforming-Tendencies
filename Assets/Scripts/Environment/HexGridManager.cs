@@ -47,7 +47,7 @@ namespace GameDevTV.RTS.Environment
         private Dictionary<Vector3, Vector2Int> worldToHexMap = new Dictionary<Vector3, Vector2Int>();
         private Vector3 gridOrigin;
 
-        /// <summary>Prologue disk: one ring each — not ~600 shroud GameObjects with LineRenderers.</summary>
+        /// <summary>MainGame disk: one ring each — not ~600 shroud GameObjects with LineRenderers.</summary>
         LineRenderer sharedHoverRing;
         LineRenderer sharedHighlightRing;
         Vector2Int? sharedHoverCell;
@@ -248,7 +248,7 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Prologue colony is a small disk — replace planet-wide shroud hexes (10k+) with a local ring (~500).
+        /// MainGame colony is a small disk — replace planet-wide shroud hexes (10k+) with a local ring (~500).
         /// </summary>
         public void GenerateLocalHexDisk(Vector2Int centerCell, int axialRadius)
         {
@@ -280,7 +280,7 @@ namespace GameDevTV.RTS.Environment
             foreach (var tile in hexGrid.Values)
                 tile.Reveal();
             RefreshSharedOutlines();
-            Debug.Log($"[HexGridManager] Prologue lightweight hex disk: {created} cells (center={centerCell}, r={axialRadius}, shared outline).");
+            Debug.Log($"[HexGridManager] MainGame lightweight hex disk: {created} cells (center={centerCell}, r={axialRadius}, shared outline).");
         }
 
         void EnsureSharedOutlines()
@@ -388,28 +388,68 @@ namespace GameDevTV.RTS.Environment
             return GetHex(hexCoords);
         }
 
-        /// <summary>O(1) hover pick — only checks the cell under the cursor and its six neighbors.</summary>
-        public HexTile GetHexForHover(Vector3 groundPoint)
+        /// <summary>
+        /// Hex under the cursor from a terrain raycast hit — flat XZ snap, optional screen tie-break on hills.
+        /// </summary>
+        public HexTile GetHexForHover(Vector3 groundPoint, Camera cam = null, Vector2? screenPos = null)
+        {
+            if (cam != null && screenPos.HasValue)
+            {
+                HexTile screenPick = PickHexNearestOnScreen(groundPoint, cam, screenPos.Value);
+                if (screenPick != null) return screenPick;
+            }
+
+            return PickHexNearestOnGround(groundPoint);
+        }
+
+        HexTile PickHexNearestOnScreen(Vector3 groundPoint, Camera cam, Vector2 screenPos)
         {
             Vector2Int cell = WorldToHexCoordinates(groundPoint);
-            HexTile direct = GetHex(cell);
-            if (direct != null)
-                return direct;
+            const float maxPickPx = 96f;
+            HexTile best = null;
+            float bestPx = float.MaxValue;
 
-            float maxSq = (CellSize * 1.35f) * (CellSize * 1.35f);
+            void Consider(Vector2Int c)
+            {
+                HexTile tile = GetHex(c);
+                if (tile == null) return;
+                Vector3 center = GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(c);
+                Vector3 sp = cam.WorldToScreenPoint(center + Vector3.up * 0.35f);
+                if (sp.z < 0f) return;
+                float px = Vector2.Distance(new Vector2(sp.x, sp.y), screenPos);
+                if (px > maxPickPx || px >= bestPx) return;
+                bestPx = px;
+                best = tile;
+            }
+
+            Consider(cell);
+            foreach (var delta in HoverNeighborDeltas)
+                Consider(cell + delta);
+            return best;
+        }
+
+        HexTile PickHexNearestOnGround(Vector3 groundPoint)
+        {
+            Vector2Int cell = WorldToHexCoordinates(groundPoint);
+            float maxSq = GameDevTV.RTS.Player.ColonyTileGrid.StickRadius
+                          * GameDevTV.RTS.Player.ColonyTileGrid.StickRadius;
             HexTile best = null;
             float bestSq = maxSq;
-            foreach (var delta in HoverNeighborDeltas)
+
+            void Consider(Vector2Int c)
             {
-                HexTile neighbor = GetHex(cell + delta);
-                if (neighbor == null) continue;
-                float sq = (neighbor.WorldPosition - groundPoint).sqrMagnitude;
-                if (sq < bestSq)
-                {
-                    bestSq = sq;
-                    best = neighbor;
-                }
+                HexTile tile = GetHex(c);
+                if (tile == null) return;
+                Vector3 center = GameDevTV.RTS.Player.ColonyTileGrid.CellToWorldOnGround(c);
+                float sq = GameDevTV.RTS.Player.ColonyTileGrid.HorizontalDistSq(groundPoint, center);
+                if (sq >= bestSq) return;
+                bestSq = sq;
+                best = tile;
             }
+
+            Consider(cell);
+            foreach (var delta in HoverNeighborDeltas)
+                Consider(cell + delta);
             return best;
         }
 
@@ -652,7 +692,7 @@ namespace GameDevTV.RTS.Environment
         
         private void Update()
         {
-            if (GameDevTV.RTS.Prologue.PrologueController.IsActive)
+            if (GameDevTV.RTS.MainGame.MainGameController.IsActive)
                 return;
 
             // Only run exploration logic every 0.25 seconds to save performance
@@ -758,11 +798,11 @@ namespace GameDevTV.RTS.Environment
             if (PlanetGenerator.Instance == null || PlanetGenerator.Instance.Config == null)
                 return;
 
-            // Prologue builds a small local disk after planet sync — skip planet-wide hex spawn.
-            if (UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.Prologue.PrologueController>(
+            // MainGame builds a small local disk after planet sync — skip planet-wide hex spawn.
+            if (UnityEngine.Object.FindAnyObjectByType<GameDevTV.RTS.MainGame.MainGameController>(
                     UnityEngine.FindObjectsInactive.Include) != null)
             {
-                Debug.Log("[HexGridManager] Planet generated with Prologue in scene — deferring hex disk to Prologue sync.");
+                Debug.Log("[HexGridManager] Planet generated with MainGame in scene — deferring hex disk to MainGame sync.");
                 OnStartingAreaRevealed?.Invoke();
                 return;
             }

@@ -13,7 +13,7 @@ alwaysApply: true
 
 1. `unity status` — Editor **ready** (one instance; no second Editor / `unity test` batch loop).
 2. Run the **shortest harness** for what you touched:
-   - **Default E2E:** `SKIP_ENTER_PLAY=1 SKIP_RECOMPILE=1 ./tools/prologue-ui-playthrough.sh` (or `SKIP_BOOTSTRAP=1` to keep current run).
+   - **Default E2E:** `SKIP_ENTER_PLAY=1 SKIP_RECOMPILE=1 ./tools/main-game-ui-playthrough.sh` (or `SKIP_BOOTSTRAP=1` to keep current run).
    - **Input / survey dispatch / perf spikes:** `SKIP_ENTER_PLAY=1 ./tools/click-order-diagnostic.sh`.
    - **Acts legacy** (only if requested): `./tools/colony-acts-player-bot-cli.sh`.
    - **Narrow manual:** Play Mode + real clicks; capture screenshot or step outcome.

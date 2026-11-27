@@ -18,7 +18,7 @@ namespace GameDevTV.RTS.Units
         void Update()
         {
             float rate = degreesPerSecond;
-            var colony = GameDevTV.RTS.Prologue.PrologueController.Instance?.Colony;
+            var colony = GameDevTV.RTS.MainGame.MainGameController.Instance?.Colony;
             if (colony != null && colony.DustStormActive)
                 rate *= stormBoost;
             if (host != null && host.Progress.State != BuildingProgress.BuildingState.Completed)

@@ -1,7 +1,7 @@
 using GameDevTV.RTS.EventBus;
 using GameDevTV.RTS.Events;
 using GameDevTV.RTS.Player;
-using GameDevTV.RTS.Prologue;
+using GameDevTV.RTS.MainGame;
 using GameDevTV.RTS.Units;
 using GameDevTV.RTS.Utilities;
 using UnityEngine;
@@ -78,9 +78,9 @@ namespace GameDevTV.RTS.Environment
         }
 
         /// <summary>
-        /// Prologue fog: put the deposit back under a "?" (even if Acts auto-discover already ran).
+        /// MainGame fog: put the deposit back under a "?" (even if Acts auto-discover already ran).
         /// </summary>
-        public void ConcealForPrologue()
+        public void ConcealForMainGame()
         {
             IsDiscovered = false;
             if (TryGetComponent<GatherableSupply>(out var supply))
@@ -125,7 +125,7 @@ namespace GameDevTV.RTS.Environment
                 }
             }
 
-            if (PrologueController.IsActive)
+            if (MainGameController.IsActive)
                 return;
             if (transform.Find("DepositLabel") != null) return;
             var labelGo = new GameObject("DepositLabel");
@@ -137,7 +137,7 @@ namespace GameDevTV.RTS.Environment
             float jitterZ = ((h % 37) - 18) * 0.22f;
             labelGo.transform.SetParent(transform, false);
             labelGo.transform.localPosition = new Vector3(jitterX, 2.2f + jitterY, jitterZ);
-            var billboard = PrologueBillboardLabel.Ensure(labelGo);
+            var billboard = MainGameBillboardLabel.Ensure(labelGo);
             if (billboard != null)
                 billboard.AnchorToGround = false;
             var tmp = labelGo.AddComponent<TMPro.TextMeshPro>();

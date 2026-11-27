@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement this plan task-by-task, in order, checking off each step as it lands. Steps use checkbox (`- [x]`) syntax for tracking. Dispatch a fresh subagent per task where the tasks are independent (see dispatching-parallel-agents), otherwise execute inline with a review checkpoint after each task.
 
-**Goal:** Make Easy/Prologue ground look like the **After** reference — curated Mars DEM heights + photo albedo, colony flats — while keeping `SampleGroundY` / placement grounding.
+**Goal:** Make Easy/MainGame ground look like the **After** reference — curated Mars DEM heights + photo albedo, colony flats — while keeping `SampleGroundY` / placement grounding.
 
 **Architecture:** Extend `PlanetConfig` with heightmap/albedo textures. Refactor `PlanetTerrainBuilder` so `SampleWorldY` reads the DEM (bilinear) with landing flatten; Perlin remains fallback only when `Heightmap` is null. `PlanetGenerator` builds mesh Y from that sampler, uses world UVs, and applies URP Lit with the albedo map. Ship textures under `Assets/Art/Planets/Easy/` (visible Unity folders).
 

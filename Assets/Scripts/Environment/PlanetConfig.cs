@@ -50,6 +50,12 @@ namespace GameDevTV.RTS.Environment
         [Tooltip("Shader vertex bend (off = flat geometry; use PlanetPatchDiameter for more space).")]
         public bool EnableHorizonCurvature;
 
+        [Header("Baked surface (fast load)")]
+        [Tooltip("When on, Play uses mesh already in the scene if SceneBakedGeometryRevision matches.")]
+        public bool UseAuthoritativeBakedMesh;
+        [Tooltip("Bump when you rebake the surface in the Editor — must match PlanetGenerator.SceneBakedGeometryRevision.")]
+        public int BakedGeometryRevision;
+
         [Header("Sectors")]
         public int SectorsX = 3;
         public int SectorsY = 3;
